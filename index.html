@@ -11,19 +11,21 @@
     #viewer { width: 100%; height: 100%; position: relative; }
     canvas { width: 100%; height: 100%; display: block; }
     .hint { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 12px; color: rgba(255,255,255,0.5); pointer-events: none; }
-    .panel { position: absolute; top: 12px; background: rgba(20,20,30,0.55); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); border-radius: 16px; padding: 10px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 4px 30px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.08); }
+    .panel { position: absolute; top: 12px; background: rgba(255,255,255,0.06); backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); border-radius: 22px; padding: 12px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 8px 40px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.08), inset 0 0 0 0.5px rgba(255,255,255,0.3), inset 0 0 18px 0 rgba(255,255,255,0.08), inset 0 1px 1px rgba(255,255,255,0.4), inset 0 -1px 1px rgba(255,255,255,0.1); }
+    .panel::before { content: ''; position: absolute; inset: 0; border-radius: 22px; filter: url(#glass-refract); background: rgba(255,255,255,0.015); mix-blend-mode: overlay; opacity: 0.6; pointer-events: none; }
+    .panel > * { position: relative; }
     .panel-l { left: 12px; width: 240px; display: flex; flex-direction: column; gap: 3px; }
     .panel-r { right: 12px; font-size: 11px; color: rgba(255,255,255,0.9); line-height: 2; padding: 8px 12px; }
     .section { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.5); margin-top: 8px; padding-left: 2px; }
     .section:first-child { margin-top: 0; }
-    .seg { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); }
-    .seg button { flex: 1; font-size: 10px; padding: 6px 4px; border: none; cursor: pointer; background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7); transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1); font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-    .seg button:active { transform: scale(0.92); transition-duration: 0.08s; }
+    .seg { display: flex; gap: 4px; border-radius: 10px; overflow: hidden; border: none; background: none; }
+    .seg button { flex: 1; font-size: 10px; padding: 6px 4px; border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85); transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .seg button:active { transform: scale(0.88); transition-duration: 0.08s; }
     .seg button i { font-size: 13px; line-height: 1; flex-shrink: 0; }
-    .seg button:not(:last-child) { border-right: 1px solid rgba(255,255,255,0.08); }
-    .seg button:hover { background: rgba(255,255,255,0.12); }
-    .seg button.on { background: rgba(255,255,255,0.18); color: #fff; font-weight: 500; }
-    .seg button.on:hover { background: rgba(255,255,255,0.24); }
+    .seg button:not(:last-child) { border-right: 1px solid rgba(255,255,255,0.18); }
+    .seg button:hover { background: rgba(255,255,255,0.2); transform: scale(1.04); border-color: rgba(255,255,255,0.25); }
+    .seg button.on { background: rgba(255,255,255,0.28); color: #fff; font-weight: 600; border-color: rgba(255,255,255,0.35); box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 0 8px rgba(255,255,255,0.06); }
+    .seg button.on:hover { background: rgba(255,255,255,0.35); transform: scale(1.04); }
 
     /* Toggle switch liquid bounce */
     .toggle-switch { transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); }
@@ -39,31 +41,38 @@
     /* Toggle switch row */
     .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 2px; }
     .toggle-label { font-size: 11px; color: rgba(255,255,255,0.75); }
-    .toggle-switch { position: relative; width: 36px; height: 20px; border-radius: 10px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.1); cursor: pointer; transition: all 0.2s ease; flex-shrink: 0; }
-    .toggle-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 7px; background: rgba(255,255,255,0.5); transition: all 0.2s ease; }
-    .toggle-switch.on { background: rgba(100,180,255,0.4); border-color: rgba(100,180,255,0.5); }
-    .toggle-switch.on::after { left: 18px; background: #fff; }
+    .toggle-switch { position: relative; width: 36px; height: 20px; border-radius: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); cursor: pointer; transition: all 0.2s ease; flex-shrink: 0; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1); }
+    .toggle-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 7px; background: rgba(255,255,255,0.6); box-shadow: 0 1px 3px rgba(0,0,0,0.15); transition: all 0.2s ease; }
+    .toggle-switch.on { background: rgba(100,180,255,0.35); border-color: rgba(100,180,255,0.45); box-shadow: inset 0 1px 2px rgba(0,0,0,0.05), 0 0 8px rgba(100,180,255,0.2); }
+    .toggle-switch.on::after { left: 18px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.15), 0 0 4px rgba(100,180,255,0.3); }
 
     /* Picker label */
     .picker-label { font-size: 10px; color: rgba(255,255,255,0.5); padding: 2px 2px 3px; }
     .rgb-seg button { color: #fff; font-weight: 600; font-size: 11px; padding: 5px 0; }
-    .rgb-seg button:hover { filter: brightness(1.1); }
+    .rgb-seg button:hover { filter: brightness(1.15); transform: scale(1.06); }
     .rgb-seg .rb { background: #dc3545; }
     .rgb-seg .yb { background: #e6a817; }
     .rgb-seg .gb { background: #28a745; }
     .rgb-seg .ob { background: #999; }
-    .rgb-seg .party { background: linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00); }
+    .rgb-seg .party { background: linear-gradient(90deg,rgba(255,60,60,0.55),rgba(255,200,50,0.55),rgba(50,200,80,0.55),rgba(50,180,255,0.55),rgba(100,60,255,0.55),rgba(255,80,200,0.55),rgba(255,60,60,0.55)); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
     .rgb-seg button.on { box-shadow: inset 0 0 0 2px #fff, 0 0 0 1.5px #333; }
     .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+    .slider-row { display: flex; align-items: center; gap: 8px; padding: 4px 2px; }
+    .slider-row label { font-size: 10px; color: rgba(255,255,255,0.5); white-space: nowrap; min-width: 52px; }
+    .slider-row input[type=range] { flex: 1; -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.12); outline: none; cursor: pointer; }
+    .slider-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 8px; background: rgba(255,255,255,0.9); box-shadow: 0 1px 6px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.3); cursor: pointer; }
+    .slider-row input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 8px; background: rgba(255,255,255,0.9); box-shadow: 0 1px 6px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.3); cursor: pointer; border: none; }
+    .slider-row .slider-val { font-size: 10px; color: rgba(255,255,255,0.5); min-width: 26px; text-align: right; }
 
     /* FAB toggle button */
-    .fab { position: absolute; top: 12px; left: 12px; width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(20,20,30,0.55); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); box-shadow: 0 4px 30px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.08); color: rgba(255,255,255,0.9); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.25s ease; z-index: 10; }
-    .fab:hover { background: rgba(20,20,30,0.7); }
+    .fab { position: absolute; top: 12px; left: 12px; width: 42px; height: 42px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.06); backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.06), inset 0 0 0 0.5px rgba(255,255,255,0.3), inset 0 0 12px 0 rgba(255,255,255,0.08), inset 0 1px 1px rgba(255,255,255,0.4), inset 0 -1px 1px rgba(255,255,255,0.1); color: rgba(255,255,255,0.9); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.25s ease; z-index: 10; overflow: hidden; }
+    .fab::before { content: ''; position: absolute; inset: 0; border-radius: 15px; filter: url(#glass-refract); background: rgba(255,255,255,0.015); mix-blend-mode: overlay; opacity: 0.6; pointer-events: none; }
+    .fab:hover { background: rgba(255,255,255,0.12); }
     .fab.hidden { opacity: 0; pointer-events: none; transform: scale(0.8); }
 
     /* Close button inside panel */
-    .panel-close { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7); font-size: 14px; cursor: pointer; transition: all 0.15s; flex-shrink: 0; margin-left: auto; }
-    .panel-close:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    .panel-close { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8); font-size: 14px; cursor: pointer; transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); flex-shrink: 0; margin-left: auto; }
+    .panel-close:hover { background: rgba(255,255,255,0.25); color: #fff; transform: scale(1.1); }
     .panel-header { display: flex; align-items: center; margin-bottom: 2px; }
     .panel-title { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.85); letter-spacing: 0.3px; }
 
@@ -89,36 +98,66 @@
     }
 
     /* Night mode — light glass UI */
-    body.night-mode .panel { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.18); box-shadow: 0 4px 30px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15); }
+    body.night-mode .panel { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.18); box-shadow: 0 8px 40px rgba(0,0,0,0.3), inset 0 0 0 0.5px rgba(255,255,255,0.2), inset 0 0 18px 0 rgba(255,255,255,0.04), inset 0 1px 1px rgba(255,255,255,0.25), inset 0 -1px 1px rgba(255,255,255,0.06); }
     body.night-mode .seg { border-color: rgba(255,255,255,0.12); }
-    body.night-mode .seg button { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.6); }
+    body.night-mode .seg button { background: transparent; color: rgba(255,255,255,0.6); }
     body.night-mode .seg button:not(:last-child) { border-right-color: rgba(255,255,255,0.08); }
     body.night-mode .seg button:hover { background: rgba(255,255,255,0.1); }
     body.night-mode .seg button.on { background: rgba(255,255,255,0.15); color: #fff; }
-    body.night-mode .fab { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.18); }
+    body.night-mode .rgb-seg .rb { background: #8b1a25; }
+    body.night-mode .rgb-seg .yb { background: #8a6410; }
+    body.night-mode .rgb-seg .gb { background: #166b2a; }
+    body.night-mode .rgb-seg .ob { background: #555; }
+    body.night-mode .rgb-seg .party { background: linear-gradient(90deg,rgba(180,40,40,0.6),rgba(180,140,30,0.6),rgba(30,140,50,0.6),rgba(30,120,180,0.6),rgba(70,40,180,0.6),rgba(180,50,140,0.6),rgba(180,40,40,0.6)); }
+    body.night-mode .rgb-seg button { color: rgba(255,255,255,0.85); }
+    body.night-mode .fab { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.18); box-shadow: 0 8px 32px rgba(0,0,0,0.2), inset 0 0 0 0.5px rgba(255,255,255,0.2), inset 0 0 12px 0 rgba(255,255,255,0.04), inset 0 1px 1px rgba(255,255,255,0.25), inset 0 -1px 1px rgba(255,255,255,0.06); }
     body.night-mode .toggle-switch { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.1); }
     body.night-mode .toggle-switch.on { background: rgba(80,140,220,0.35); border-color: rgba(80,140,220,0.4); }
     body.night-mode .hint { color: rgba(255,255,255,0.35); }
     .fps { position: absolute; bottom: 8px; right: 10px; font-size: 10px; color: rgba(255,255,255,0.4); font-family: monospace; pointer-events: none; display: none; }
     .fps.show { display: block; }
+
+    /* Keyboard shortcuts dialog */
+    .shortcuts-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+    .shortcuts-overlay.visible { opacity: 1; pointer-events: auto; }
+    .shortcuts-dialog { background: rgba(30,30,38,0.92); backdrop-filter: blur(30px) saturate(1.6); -webkit-backdrop-filter: blur(30px) saturate(1.6); border-radius: 18px; border: 1px solid rgba(255,255,255,0.2); padding: 20px 24px; min-width: 260px; box-shadow: 0 16px 64px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15); }
+    .shortcuts-dialog h3 { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.9); margin-bottom: 12px; letter-spacing: 0.3px; }
+    .shortcuts-dialog table { width: 100%; border-collapse: collapse; }
+    .shortcuts-dialog td { padding: 5px 0; font-size: 12px; color: rgba(255,255,255,0.7); }
+    .shortcuts-dialog td:first-child { width: 40px; }
+    .shortcuts-dialog kbd { display: inline-block; min-width: 22px; padding: 2px 7px; font-size: 11px; font-family: inherit; font-weight: 600; color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.2), inset 0 -1px 0 rgba(0,0,0,0.15); }
+    .shortcuts-dialog .dismiss { font-size: 10px; color: rgba(255,255,255,0.4); text-align: center; margin-top: 10px; }
   </style>
 </head>
 <body>
+<!-- SVG filters for liquid glass refraction -->
+<svg style="position:absolute;width:0;height:0;pointer-events:none" aria-hidden="true">
+  <filter id="glass-refract" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.025 0.03" numOctaves="4" seed="5" result="noise"/>
+    <feSpecularLighting in="noise" surfaceScale="2.5" specularConstant="0.75" specularExponent="25" lighting-color="#ffffff" result="spec">
+      <fePointLight x="120" y="60" z="250"/>
+    </feSpecularLighting>
+    <feComposite in="spec" in2="SourceAlpha" operator="in" result="specClip"/>
+    <feBlend in="specClip" in2="SourceGraphic" mode="screen"/>
+  </filter>
+</svg>
 <div id="viewer">
 <canvas id="c"></canvas>
-<div class="hint">drag to rotate · scroll to zoom</div>
+<div class="hint">drag to rotate · scroll to zoom · press <b>?</b> for shortcuts</div>
 <div class="fps" id="fps"></div>
 <button class="fab hidden" id="fab" onclick="togglePanel()"><i class="ph ph-sliders-horizontal"></i></button>
 <div class="panel panel-l" id="panelL">
   <div class="panel-header"><span class="panel-title">Controls</span><button class="panel-close" onclick="togglePanel()" title="Hide controls"><i class="ph ph-x"></i></button></div>
 
-  <div class="section">View</div>
+  <div class="section">Purifier</div>
   <div class="picker-label">Fan layout</div>
   <div class="seg"><button id="btnLayoutFB" class="on" onclick="setLayout('fb')">Front + Back</button><button id="btnLayoutFT" onclick="setLayout('ft')">Front + Top</button></div>
   <div class="toggle-row"><span class="toggle-label">Exploded view</span><div class="toggle-switch" id="togExplode" onclick="toggleExplode()"></div></div>
   <div class="toggle-row"><span class="toggle-label">Show filters</span><div class="toggle-switch on" id="togFilter" onclick="toggleFilter()"></div></div>
-  <div class="toggle-row"><span class="toggle-label">Dimensions</span><div class="toggle-switch" id="togDims" onclick="toggleDimensions()"></div></div>
-  <div class="toggle-row"><span class="toggle-label">X-ray mode</span><div class="toggle-switch" id="togXray" onclick="toggleXray()"></div></div>
+  <div class="picker-label">Wood stain</div>
+  <div class="seg"><button id="btnStainRaw" class="on" onclick="setStain('raw')">Raw Birch</button><button id="btnStainOil" onclick="setStain('oil')">Oil</button><button id="btnStainWalnut" onclick="setStain('walnut')">Walnut</button></div>
+  <div class="picker-label">Feet style</div>
+  <div class="seg"><button id="btnFeetPeg" class="on" onclick="setFeetStyle('peg')">Peg Legs</button><button id="btnFeetBun" onclick="setFeetStyle('bun')">Round Feet</button><button id="btnFeetRubber" onclick="setFeetStyle('rubber')">Rubber Feet</button></div>
 
   <div class="section">Fans</div>
   <div class="toggle-row"><span class="toggle-label">Spin fans</span><div class="toggle-switch on" id="togSpin" onclick="toggleSpin()"></div></div>
@@ -129,16 +168,15 @@
   <div id="rgbSection" class="rgb-collapse"><div class="rgb-collapse-inner">
   <div class="picker-label">LED color</div>
   <div id="rgbRow" class="seg rgb-seg"><button id="btnRgbR" class="rb" onclick="setRGB('red')">Red</button><button id="btnRgbY" class="yb" onclick="setRGB('yellow')">Ylw</button><button id="btnRgbG" class="gb" onclick="setRGB('green')">Grn</button><button id="btnRgbRainbow" class="party" onclick="setRGB('rainbow')">Party</button><button id="btnRgbOff" class="ob" onclick="setRGB('off')">Off</button></div>
+  <div class="slider-row"><label>Brightness</label><input type="range" id="rgbBright" min="0" max="100" value="50" oninput="setRGBBrightness(this.value)"><span class="slider-val" id="rgbBrightVal">50%</span></div>
   </div></div>
-
-  <div class="section">Finish</div>
-  <div class="picker-label">Wood stain</div>
-  <div class="seg"><button id="btnStainRaw" class="on" onclick="setStain('raw')">Raw Birch</button><button id="btnStainOil" onclick="setStain('oil')">Oil</button><button id="btnStainWalnut" onclick="setStain('walnut')">Walnut</button></div>
-  <div class="picker-label">Feet style</div>
-  <div class="seg"><button id="btnLegsWood" class="on" onclick="toggleLegs()">Wood Legs</button><button id="btnLegsRubber" onclick="toggleLegs()">Rubber Feet</button></div>
 
   <div class="section">Scene</div>
   <div class="seg"><button id="btnDay" class="on" onclick="setTimeOfDay('day')"><i class="ph ph-sun"></i> Day</button><button id="btnNight" onclick="setTimeOfDay('night')"><i class="ph ph-moon-stars"></i> Night</button></div>
+  <div class="toggle-row"><span class="toggle-label">Isolate purifier</span><div class="toggle-switch" id="togIsolate" onclick="toggleIsolate()"></div></div>
+  <div class="toggle-row"><span class="toggle-label">Dimensions</span><div class="toggle-switch" id="togDims" onclick="toggleDimensions()"></div></div>
+  <div class="toggle-row"><span class="toggle-label">X-ray mode</span><div class="toggle-switch" id="togXray" onclick="toggleXray()"></div></div>
+
 
   <div class="panel-legend" id="panelLegend">
     <div class="legend-item"><span class="swatch" style="background:#ddc89e"></span>Plywood (½″ birch)</div>
@@ -156,6 +194,17 @@
   <div><span class="swatch" style="background:#c4a870"></span><span style="color:rgba(255,255,255,0.85)">Ledge strips</span></div>
   <div><span class="swatch" style="background:#3a3a3a"></span><span style="color:rgba(255,255,255,0.85)">Foam tape seal</span></div>
   <div><span class="swatch" style="background:#999;border:1px solid rgba(255,255,255,0.3)"></span><span style="color:rgba(255,255,255,0.85)">Butt joints + screws</span></div>
+</div>
+<div class="shortcuts-overlay" id="shortcutsOverlay" onclick="this.classList.remove('visible')">
+  <div class="shortcuts-dialog" onclick="event.stopPropagation()">
+    <h3>Keyboard shortcuts</h3>
+    <table>
+      <tr><td><kbd>?</kbd></td><td>Toggle this dialog</td></tr>
+      <tr><td><kbd>A</kbd></td><td>Show XYZ axes</td></tr>
+      <tr><td><kbd>F</kbd></td><td>Show FPS counter</td></tr>
+    </table>
+    <div class="dismiss">Press <b>?</b> or click outside to close</div>
+  </div>
 </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -177,24 +226,25 @@ const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false, p
 renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
 renderer.setClearColor(0xd4dce8, 1);
 renderer.shadowMap.enabled=true;
-renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-renderer.toneMapping=THREE.LinearToneMapping;
-renderer.toneMappingExposure=1.0;
+renderer.shadowMap.type=THREE.VSMShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.15;
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0xd4dce8, 0.0015);
 const camera = new THREE.PerspectiveCamera(42,1,0.1,500);
 // Daytime lighting — soft and even
-scene.add(new THREE.AmbientLight(0xffffff,0.5));
-const key=new THREE.DirectionalLight(0xfff8f0,0.7); key.position.set(-60,38,0); // from the window (left wall)
+scene.add(new THREE.AmbientLight(0xffffff,0.22));
+const key=new THREE.DirectionalLight(0xfff8f0,0.55); key.position.set(-95,38,0); // from outside the window
 key.castShadow=true; key.shadow.mapSize.set(2048,2048);
-key.shadow.bias=-0.002; key.shadow.normalBias=0.04;
-key.shadow.camera.near=1; key.shadow.camera.far=80;
-key.shadow.camera.left=-20; key.shadow.camera.right=20;
-key.shadow.camera.top=20; key.shadow.camera.bottom=-20;
+key.shadow.bias=-0.0005; key.shadow.normalBias=0.04;
+key.shadow.radius=6; key.shadow.blurSamples=16;
+key.shadow.camera.near=1; key.shadow.camera.far=160;
+key.shadow.camera.left=-80; key.shadow.camera.right=80;
+key.shadow.camera.top=50; key.shadow.camera.bottom=-50;
 scene.add(key);
-const fill=new THREE.DirectionalLight(0xe8eeff,0.35); fill.position.set(-10,12,-12); scene.add(fill);
-const rim=new THREE.DirectionalLight(0xccddff,0.25); rim.position.set(-6,15,-18); scene.add(rim);
-const bounce=new THREE.DirectionalLight(0xffeedd,0.15); bounce.position.set(0,-10,8); scene.add(bounce);
+const fill=new THREE.DirectionalLight(0xe8eeff,0.18); fill.position.set(-10,12,-12); scene.add(fill);
+const rim=new THREE.DirectionalLight(0xccddff,0.2); rim.position.set(-6,15,-18); scene.add(rim);
+const bounce=new THREE.DirectionalLight(0xffeedd,0.08); bounce.position.set(0,-10,8); scene.add(bounce);
 
 // Filtrete 20x25x1 actual: 19.69×24.69×0.78
 const W=5.44, H=19.69, D=24.69, ply=0.5, ft=0.78;
@@ -807,7 +857,7 @@ function makePleatedFilter(){
   filterTex.minFilter=THREE.LinearFilter;
   filterTex.magFilter=THREE.LinearFilter;
 
-  const filterMat=new THREE.MeshPhongMaterial({map:filterTex,color:0xffffff,side:THREE.DoubleSide,shininess:1,transparent:false});
+  const filterMat=new THREE.MeshPhongMaterial({map:filterTex,color:0xffffff,side:THREE.DoubleSide,shininess:1,transparent:true,opacity:0.99});
   filterMatRef=filterMat; // cache for direct RGB lookup (avoids scene.traverse)
 
   // Zigzag pleated mesh — vertical folds (step along Y, fold lines run along Z)
@@ -1028,13 +1078,38 @@ const legGroup=new THREE.Group();
 const allLegMeshes=[];
 const woodLegMat=birchMat(0.5,0.5);
 const rubberMat=new THREE.MeshPhongMaterial({color:0x2a2a2a,shininess:5});
-let legsAreRubber=false;
+
+// Peg leg geometry (tapered cylinder)
+const pegGeo=new THREE.CylinderGeometry(legR,legR*0.85,legH,16);
+
+// Round wooden foot — 2.5" tall, 0.55" radius, rounded cylinder
+const bunFootH=2.5, bunFootR=0.55;
+const bunInset=1.2; // pull bun feet well inside panel edges
+const bunGeo=(function(){
+  const pts=[];
+  const hH=bunFootH/2;
+  // Bottom center pole
+  pts.push(new THREE.Vector2(0, -hH));
+  // Quarter-circle rounding at bottom (radius = bunFootR)
+  const arcSegs=8;
+  for(let i=1;i<=arcSegs;i++){
+    const a=Math.PI/2*(i/arcSegs);
+    pts.push(new THREE.Vector2(Math.sin(a)*bunFootR, -hH+bunFootR-Math.cos(a)*bunFootR));
+  }
+  // Straight sides up to near top
+  pts.push(new THREE.Vector2(bunFootR, hH-0.08));
+  // Slight top bevel
+  pts.push(new THREE.Vector2(bunFootR-0.04, hH-0.02));
+  pts.push(new THREE.Vector2(bunFootR-0.12, hH));
+  return new THREE.LatheGeometry(pts, 20);
+})();
+
+let currentFeetH=legH;
+let feetStyle='peg';
+
 for(let xSgn of[-1,1]){
   for(let zSgn of[-1,1]){
-    const leg=new THREE.Mesh(
-      new THREE.CylinderGeometry(legR,legR*0.85,legH,16),
-      woodLegMat
-    );
+    const leg=new THREE.Mesh(pegGeo, woodLegMat);
     leg.position.set(xSgn*(panelW/2-legInset), legY, zSgn*(D/2+ply-legInset));
     legGroup.add(leg);
     allLegMeshes.push(leg);
@@ -1253,11 +1328,11 @@ canvas.addEventListener('touchmove',e=>{
   polar=Math.max(0.1,Math.min(Math.PI-0.1,polar-(e.touches[0].clientY-py)*0.013));
   px=e.touches[0].clientX;py=e.touches[0].clientY;
 },{passive:true});
-canvas.addEventListener('wheel',e=>{e.preventDefault();radius=Math.max(20,Math.min(130,radius+e.deltaY*0.06));},{passive:false});
-// macOS trackpad pinch-to-zoom → model zoom
+canvas.addEventListener('wheel',e=>{e.preventDefault();radius=Math.max(20,Math.min(130,radius+e.deltaY*0.55));},{passive:false});
+// macOS trackpad pinch-to-zoom → model zoom (Safari gesture events)
 let gestureStartRadius;
 canvas.addEventListener('gesturestart',e=>{e.preventDefault();gestureStartRadius=radius;});
-canvas.addEventListener('gesturechange',e=>{e.preventDefault();radius=Math.max(20,Math.min(130,gestureStartRadius/e.scale));});
+canvas.addEventListener('gesturechange',e=>{e.preventDefault();const dampedScale=1+(e.scale-1)*0.55;radius=Math.max(20,Math.min(130,gestureStartRadius/dampedScale));});
 canvas.addEventListener('gestureend',e=>{e.preventDefault();});
 
 function resize(){
@@ -1534,12 +1609,45 @@ function setLayout(mode){
   altTopGroup.visible=(mode==='ft');
 }
 
-// ─── Leg style toggle (wood / rubber) ───
-function toggleLegs(){
-  legsAreRubber=!legsAreRubber;
-  setToggle('btnLegsRubber','btnLegsWood',legsAreRubber);
+// ─── Feet style (peg / round bun / rubber) ───
+const FEET_H={peg:0.75, bun:2.5, rubber:0.75};
+function setFeetStyle(style){
+  if(style===feetStyle) return;
+  const oldH=currentFeetH, newH=FEET_H[style];
+  const delta=newH-oldH; // positive = taller feet
+  feetStyle=style; currentFeetH=newH;
+
+  // Update buttons
+  document.querySelectorAll('#btnFeetPeg,#btnFeetBun,#btnFeetRubber').forEach(b=>b.classList.remove('on'));
+  document.getElementById(style==='peg'?'btnFeetPeg':style==='bun'?'btnFeetBun':'btnFeetRubber').classList.add('on');
+
+  // Swap geometry + material + position
+  const geo=style==='bun'?bunGeo:pegGeo;
+  const mat=style==='rubber'?rubberMat:woodLegMat;
+  const ins=style==='bun'?bunInset:legInset;
+  const newLegY=-(H/2+ply+newH/2);
   for(const leg of allLegMeshes){
-    leg.material=legsAreRubber?rubberMat:woodLegMat;
+    leg.geometry=geo;
+    leg.material=mat;
+    leg.position.y=newLegY;
+    const sx=Math.sign(leg.position.x), sz=Math.sign(leg.position.z);
+    leg.position.x=sx*(panelW/2-ins);
+    leg.position.z=sz*(D/2+ply-ins);
+    leg.matrixAutoUpdate=true;
+    leg.updateMatrixWorld(true);
+    leg.matrixAutoUpdate=false;
+  }
+
+  // Shift floor + all room objects to match new clearance
+  if(Math.abs(delta)>0.001){
+    scene.traverse(function(o){
+      if(o._isRoom){
+        o.position.y-=delta;
+        o.matrixAutoUpdate=true;
+        o.updateMatrixWorld(true);
+        o.matrixAutoUpdate=false;
+      }
+    });
   }
 }
 
@@ -1548,12 +1656,15 @@ let isNightMode = false;
 const DAY = {
   clear: new THREE.Color(0xd4dce8),
   fogDensity: 0.0015,
-  ambient: 0.5,
-  keyIntensity: 0.7, keyColor: 0xfff8f0,
-  fillIntensity: 0.35,
-  rimIntensity: 0.25,
-  bounceIntensity: 0.15,
-  exposure: 1.0,
+  ambient: 0.22,
+  keyIntensity: 0.55, keyColor: 0xfff8f0,
+  fillIntensity: 0.18,
+  rimIntensity: 0.2,
+  bounceIntensity: 0.08,
+  exposure: 1.15,
+  ceilIntensity: 0.4,
+  domeEmissive: 0.15,
+  outdoorBright: 1.0,
   wall: 0xd8d4ce,
   baseboard: 0xc0bbb4,
   carpet: 0xb0a898
@@ -1561,12 +1672,15 @@ const DAY = {
 const NIGHT = {
   clear: new THREE.Color(0x181820),
   fogDensity: 0.003,
-  ambient: 0.15,
-  keyIntensity: 0.25, keyColor: 0x6688cc,
-  fillIntensity: 0.08,
-  rimIntensity: 0.12,
-  bounceIntensity: 0.05,
-  exposure: 0.9,
+  ambient: 0.08,
+  keyIntensity: 0.2, keyColor: 0x6688cc,
+  fillIntensity: 0.04,
+  rimIntensity: 0.08,
+  bounceIntensity: 0.03,
+  exposure: 1.0,
+  ceilIntensity: 0.3,
+  domeEmissive: 0.4,
+  outdoorBright: 0.08,
   wall: 0x2a2a35,
   baseboard: 0x1e1e28,
   carpet: 0x4a4840
@@ -1591,6 +1705,9 @@ function setTimeOfDay(mode) {
   fill.intensity = t.fillIntensity;
   rim.intensity = t.rimIntensity;
   bounce.intensity = t.bounceIntensity;
+  ceilSpot.intensity = t.ceilIntensity;
+  domeMat.emissiveIntensity = t.domeEmissive;
+  outdoor.material.color.setScalar(t.outdoorBright);
 
   // Room surfaces
   [wallMeshL,returnWallL].forEach(m=>m.material.color.setHex(t.wall));
@@ -1611,6 +1728,64 @@ function setTimeOfDay(mode) {
   floorMat.color.setHex(t.carpet);
   // Window sky color shifts at night
   sky.material.color.setHex(isNightMode ? 0x0a0a1a : 0xc8ddf0);
+  // If isolate mode was on, re-entering day/night should restore isolate state
+  if(isolateMode) applyIsolate(true);
+}
+
+// ─── Isolate purifier (hide room, spotlight product) ───
+let isolateMode=false;
+let _savedClear=null, _savedFog=null, _savedLights={};
+function toggleIsolate(){
+  isolateMode=!isolateMode;
+  document.getElementById('togIsolate').classList.toggle('on',isolateMode);
+  applyIsolate(isolateMode);
+}
+function applyIsolate(on){
+  // Toggle all room objects
+  scene.traverse(obj=>{
+    if(obj._isRoom) obj.visible=!on;
+  });
+  if(on){
+    // Save current state
+    _savedClear=renderer.getClearColor(new THREE.Color());
+    _savedFog=scene.fog.density;
+    _savedLights={
+      ambient:0, key:key.intensity, fill:fill.intensity,
+      rim:rim.intensity, bounce:bounce.intensity, ceil:ceilSpot.intensity
+    };
+    scene.children.forEach(c=>{ if(c.isAmbientLight) _savedLights.ambient=c.intensity; });
+    // Dark background, no fog
+    renderer.setClearColor(0x111118,1);
+    scene.fog.density=0;
+    // Spotlight lighting: soft ambient + strong key from above-front
+    scene.children.forEach(c=>{ if(c.isAmbientLight) c.intensity=0.3; });
+    key.intensity=0.7;
+    key.position.set(-30,40,30);
+    fill.intensity=0.3;
+    fill.position.set(20,10,-15);
+    rim.intensity=0.35;
+    rim.position.set(0,20,-30);
+    bounce.intensity=0.1;
+    ceilSpot.intensity=0;
+    // Expose purifier shadows onto nothing (disable shadow receiving on hidden floor)
+    renderer.toneMappingExposure=1.3;
+  } else {
+    // Restore
+    if(_savedClear) renderer.setClearColor(_savedClear,1);
+    scene.fog.density=_savedFog||0.0015;
+    scene.children.forEach(c=>{ if(c.isAmbientLight) c.intensity=_savedLights.ambient; });
+    const t=isNightMode?NIGHT:DAY;
+    key.intensity=t.keyIntensity;
+    key.position.set(-95,38,0);
+    fill.intensity=t.fillIntensity;
+    fill.position.set(-10,12,-12);
+    rim.intensity=t.rimIntensity;
+    rim.position.set(-6,15,-18);
+    bounce.intensity=t.bounceIntensity;
+    bounce.position.set(0,-10,8);
+    ceilSpot.intensity=t.ceilIntensity;
+    renderer.toneMappingExposure=t.exposure;
+  }
 }
 
 // ─── Fan color toggle (black / white) ───
@@ -1659,12 +1834,19 @@ function toggleFanRGB(){
 
 // ─── RGB LED control ───
 const RGB_COLORS={
-  red:   {hex:0xff2200, intensity:1.2},
-  yellow:{hex:0xffcc00, intensity:1.0},
-  green: {hex:0x00ff44, intensity:1.0},
+  red:   {hex:0xff2200, intensity:1.5},
+  yellow:{hex:0xffcc00, intensity:1.25},
+  green: {hex:0x00ff44, intensity:1.25},
   off:   {hex:0x000000, intensity:0}
 };
+const RGB_BASE_DIST=45;
 let currentRGB='off';
+let rgbBrightness=0.5; // 0–1, default 50%
+function setRGBBrightness(val){
+  rgbBrightness=parseInt(val)/100;
+  document.getElementById('rgbBrightVal').textContent=val+'%';
+  if(currentRGB!=='rainbow' && currentRGB!=='off') setRGB(currentRGB);
+}
 function setRGB(color){
   currentRGB=color;
   const c=RGB_COLORS[color];
@@ -1673,16 +1855,20 @@ function setRGB(color){
   const rgbBtnMap={red:'btnRgbR',yellow:'btnRgbY',green:'btnRgbG',rainbow:'btnRgbRainbow',off:'btnRgbOff'};
   if(rgbBtnMap[color]) document.getElementById(rgbBtnMap[color]).classList.add('on');
   if(color==='rainbow'){
-    // Rainbow mode — animate loop handles color cycling, just set initial glow
-    for(const gl of allFanGlows){ gl.intensity=5; }
+    // Rainbow mode — animate loop handles color cycling with brightness
+    const dist=RGB_BASE_DIST*(0.5+rgbBrightness*1.5);
+    for(const gl of allFanGlows){ gl.intensity=1.5*rgbBrightness+0.1; gl.distance=dist; }
     return;
   }
+  const br=rgbBrightness;
+  const dist=RGB_BASE_DIST*(0.5+br*1.5);
   for(const gl of allFanGlows){
     gl.color.setHex(c.hex);
-    gl.intensity=c.intensity;
+    gl.intensity=c.intensity*br;
+    gl.distance=dist;
   }
   const emissiveHex=color==='off'?0x000000:c.hex;
-  const emissiveIntensity=color==='off'?0:0.08;
+  const emissiveIntensity=color==='off'?0:0.08*br;
   // Fan blades + hub caps
   for(let i=0;i<allFanMats.length;i+=4){
     allFanMats[i+3].emissive.setHex(emissiveHex);
@@ -1696,7 +1882,7 @@ function setRGB(color){
     filterMatRef.emissiveIntensity=color==='off'?0:0.03;
   }
   // Plywood gets a subtle ambient tint from internal light
-  const woodGlow=color==='off'?0:0.015;
+  const woodGlow=color==='off'?0:0.02*br;
   for(const m of allBirchMats){
     m.emissive.setHex(emissiveHex);
     m.emissiveIntensity=woodGlow;
@@ -1813,12 +1999,12 @@ function roomRoundBox(w,h,d,radius,color,x,y,z,rx,ry,rz){
 // ─── Zinus Queen Piper Upholstered Platform Bed ───
 // 82.3"L × 60.3"W × 42"H, 6.5" ground clearance, slats at 14" from floor
 const bedL=82.3, bedW=60.3, bedH=42, bedClearance=6.5, bedSlatsFromFloor=14;
-const bedX=-bedW/2-12, bedZ=49.75-bedL/2; // bed to the left, headboard flush against wall (+Z)
+const bedX=-90+2+bedW/2, bedZ=49.75-bedL/2; // bed left edge 2" from left wall, headboard flush against back wall
 
 // Nightstand / side table (18"w × 24"h × 14"d) — between bed and purifier
 const tblW=18, tblH=24, tblD=14;
 const tblX=bedX+bedW/2+tblW/2+3, tblZ=49.75-tblD/2-2;
-roomBox(tblW, 0.75, tblD, 0x6b4e3d, tblX, floorY+tblH, tblZ, 0,0,0); // tabletop
+const tblTop=roomBox(tblW, 0.75, tblD, 0x6b4e3d, tblX, floorY+tblH, tblZ, 0,0,0); // tabletop\ntblTop.castShadow=true;
 roomBox(1.2, tblH-0.75, 1.2, 0x5a3f2e, tblX-tblW/2+1.5, floorY+tblH/2, tblZ-tblD/2+1.5,0,0,0); // legs
 roomBox(1.2, tblH-0.75, 1.2, 0x5a3f2e, tblX+tblW/2-1.5, floorY+tblH/2, tblZ-tblD/2+1.5,0,0,0);
 roomBox(1.2, tblH-0.75, 1.2, 0x5a3f2e, tblX-tblW/2+1.5, floorY+tblH/2, tblZ+tblD/2-1.5,0,0,0);
@@ -1839,8 +2025,8 @@ const recessLeft=24, recessRight=60; // recess flush with right wall
 const recessW=recessRight-recessLeft;
 
 // Left portion of back wall (X=-60 to recessLeft)
-const backWallLeftW=recessLeft-(-60);
-const wallMeshL=roomBox(backWallLeftW, 80, 0.5, 0xd8d4ce, -60+backWallLeftW/2, floorY+40, 50, 0,0,0);
+const backWallLeftW=recessLeft-(-90);
+const wallMeshL=roomBox(backWallLeftW, 80, 0.5, 0xd8d4ce, -90+backWallLeftW/2, floorY+40, 50, 0,0,0);
 
 // Left return wall (connecting back wall to recessed wall)
 const returnWallL=roomBox(0.5, 80, recessDepth, 0xd8d4ce, recessLeft, floorY+40, 50-recessDepth/2, 0,0,0);
@@ -1861,7 +2047,7 @@ if(recessWallRightW>0.5) var recessWallR=roomBox(recessWallRightW, 80, 0.5, 0xd8
 // (doorH=80 = wallHeight, so no transom needed)
 
 // Baseboards (follow the recess shape)
-const baseboardMeshL=roomBox(backWallLeftW, 3, 0.6, 0xc0bbb4, -60+backWallLeftW/2, floorY+1.5, 49.5, 0,0,0);
+const baseboardMeshL=roomBox(backWallLeftW, 3, 0.6, 0xc0bbb4, -90+backWallLeftW/2, floorY+1.5, 49.5, 0,0,0);
 const baseboardRetL=roomBox(0.6, 3, recessDepth, 0xc0bbb4, recessLeft+0.5, floorY+1.5, 50-recessDepth/2, 0,0,0);
 const baseboardRecessL=recessWallLeftW>0.5?roomBox(recessWallLeftW, 3, 0.6, 0xc0bbb4, recessLeft+recessWallLeftW/2, floorY+1.5, recessZ+0.5, 0,0,0):null;
 const baseboardRecessR=recessWallRightW>0.5?roomBox(recessWallRightW, 3, 0.6, 0xc0bbb4, doorRight+recessWallRightW/2, floorY+1.5, recessZ+0.5, 0,0,0):null;
@@ -1875,6 +2061,7 @@ const doorFrameColor=0xf5f5f0;
 const doorPanel=roomRoundBox(doorW-1, doorH-0.5, doorThick, 0.3, doorColor,
   doorCenterX, floorY+doorH/2, recessZ-doorThick/2-0.3, 0,0,0);
 doorPanel.material.roughness=0.5;
+doorPanel.castShadow=true;
 
 // Six-panel door detail — raised panels (room-facing side)
 const dpInset=0.3, dpW=doorW*0.35, dpH1=doorH*0.22, dpH2=doorH*0.30;
@@ -1933,8 +2120,8 @@ roomBox(4.5, 0.8, 6.5, 0x2d5a27, tblX+4, floorY+tblH+1.6, tblZ-1, 0, -0.05, 0);
 
 // ─── Opposite wall + 65" OLED TV ───
 const oppWallZ=-80;
-const oppWall=roomBox(120, 80, 0.5, 0xd8d4ce, 0, floorY+40, oppWallZ, 0,0,0);
-const oppBaseboard=roomBox(120, 3, 0.6, 0xc0bbb4, 0, floorY+1.5, oppWallZ+0.5, 0,0,0);
+const oppWall=roomBox(150, 80, 0.5, 0xd8d4ce, -15, floorY+40, oppWallZ, 0,0,0);
+const oppBaseboard=roomBox(150, 3, 0.6, 0xc0bbb4, -15, floorY+1.5, oppWallZ+0.5, 0,0,0);
 
 // 65" OLED: diagonal=65", 16:9 → ~56.7"W × 31.9"H, bezel ~0.3", depth ~1"
 const tvW=56.7, tvH=31.9, tvD=1.0, bezel=0.3;
@@ -1964,7 +2151,7 @@ const rightWall=roomBox(0.5, wallHeight, wallDepth, 0xd8d4ce, sideWallX, floorY+
 const sideBaseboard=roomBox(0.6, 3, wallDepth, 0xc0bbb4, sideWallX-0.5, floorY+1.5, -15, 0,0,0);
 
 // ─── Left side wall with window (near the bed) ───
-const leftWallX=-60;
+const leftWallX=-90;
 const winW=36, winH=48; // window opening size
 const winCenterY=floorY+38; // center of window
 const winCenterZ=bedZ; // centered on the bed along Z
@@ -2014,13 +2201,82 @@ wfr.position.set(leftWallX, winCenterY, winBack+frameT/2); wfr._isRoom=true; sce
 const wfm=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT*0.6, winW), frameMat);
 wfm.position.set(leftWallX, winCenterY, winCenterZ); wfm._isRoom=true; scene.add(wfm);
 
-// Sky visible through window — bright plane behind window
-const skyGeo=new THREE.PlaneGeometry(winW, winH);
-const skyMat=new THREE.MeshBasicMaterial({color:0xc8ddf0}); // pale sky blue, unlit
-const sky=new THREE.Mesh(skyGeo, skyMat);
-sky.rotation.y=Math.PI/2; // face inward (toward +X)
-sky.position.set(leftWallX-0.5, winCenterY, winCenterZ);
-sky._isRoom=true; scene.add(sky);
+// Outdoor scene visible through window — canvas-painted backdrop
+const outdoorCvs=document.createElement('canvas');
+outdoorCvs.width=512; outdoorCvs.height=512;
+const oCtx=outdoorCvs.getContext('2d');
+// Sky gradient
+const skyGrad=oCtx.createLinearGradient(0,0,0,300);
+skyGrad.addColorStop(0,'#5b8cc9');
+skyGrad.addColorStop(0.35,'#8cb8e0');
+skyGrad.addColorStop(0.55,'#c4ddf0');
+skyGrad.addColorStop(0.7,'#ddeaf5');
+oCtx.fillStyle=skyGrad; oCtx.fillRect(0,0,512,300);
+// Distant hazy hills
+oCtx.fillStyle='#8aab8a';
+oCtx.beginPath(); oCtx.moveTo(0,300);
+for(let x=0;x<=512;x+=8) oCtx.lineTo(x,280-Math.sin(x*0.012)*18-Math.sin(x*0.031)*8);
+oCtx.lineTo(512,300); oCtx.fill();
+// Closer tree line
+oCtx.fillStyle='#4a7a4a';
+oCtx.beginPath(); oCtx.moveTo(0,310);
+for(let x=0;x<=512;x+=4){
+  const base=295-Math.sin(x*0.02)*10;
+  const tree=Math.sin(x*0.08)*12+Math.sin(x*0.15)*6+Math.cos(x*0.05)*8;
+  oCtx.lineTo(x,base-Math.max(tree,0));
+}
+oCtx.lineTo(512,310); oCtx.fill();
+// Ground / grass
+const grassGrad=oCtx.createLinearGradient(0,310,0,512);
+grassGrad.addColorStop(0,'#5a8a45');
+grassGrad.addColorStop(0.4,'#4a7a3a');
+grassGrad.addColorStop(1,'#3a6a2a');
+oCtx.fillStyle=grassGrad; oCtx.fillRect(0,305,512,207);
+// Soft clouds
+oCtx.globalAlpha=0.3;
+oCtx.fillStyle='#ffffff';
+[[80,90,60,25],[200,70,80,30],[350,100,55,20],[430,60,70,28]].forEach(([cx,cy,rx,ry])=>{
+  oCtx.beginPath(); oCtx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2); oCtx.fill();
+});
+oCtx.globalAlpha=1.0;
+
+const outdoorTex=new THREE.CanvasTexture(outdoorCvs);
+outdoorTex.generateMipmaps=false;
+outdoorTex.minFilter=THREE.LinearFilter;
+const outdoorMat=new THREE.MeshBasicMaterial({map:outdoorTex}); // unlit — always bright
+const outdoorGeo=new THREE.PlaneGeometry(winW*2.5, winH*2);
+const outdoor=new THREE.Mesh(outdoorGeo, outdoorMat);
+outdoor.rotation.y=Math.PI/2;
+outdoor.position.set(leftWallX-4, winCenterY+5, winCenterZ);
+outdoor._isRoom=true; scene.add(outdoor);
+
+// Ceiling light fixture — flush-mount dome with warm SpotLight
+const ceilY=floorY+79.5; // just below ceiling
+const ceilLightX=0, ceilLightZ=-15; // room center
+// Fixture base (flush mount disc)
+const fixBase=new THREE.Mesh(
+  new THREE.CylinderGeometry(4,4,0.4,24),
+  new THREE.MeshStandardMaterial({color:0xd8d4c8,roughness:0.4,metalness:0.1})
+);
+fixBase.position.set(ceilLightX,ceilY,ceilLightZ);
+fixBase._isRoom=true; scene.add(fixBase);
+// Frosted glass dome
+const domeMat=new THREE.MeshPhongMaterial({color:0xfff8ee,emissive:0xfff0d0,emissiveIntensity:0.3,transparent:true,opacity:0.85,shininess:60});
+const dome=new THREE.Mesh(new THREE.SphereGeometry(3.5,16,8,0,Math.PI*2,0,Math.PI/2),domeMat);
+dome.rotation.x=Math.PI; // flip dome to hang down
+dome.position.set(ceilLightX,ceilY-0.2,ceilLightZ);
+dome._isRoom=true; scene.add(dome);
+// SpotLight pointing down — wide angle, soft edge
+const ceilSpot=new THREE.SpotLight(0xfff0dd,0.4,0,Math.PI/3,0.7,1.5);
+ceilSpot.position.set(ceilLightX,ceilY-1,ceilLightZ);
+ceilSpot.target.position.set(ceilLightX,floorY,ceilLightZ);
+scene.add(ceilSpot); scene.add(ceilSpot.target);
+ceilSpot.castShadow=true;
+ceilSpot.shadow.mapSize.set(1024,1024);
+ceilSpot.shadow.bias=-0.0005;
+ceilSpot.shadow.radius=5; ceilSpot.shadow.blurSamples=12;
+ceilSpot.shadow.camera.near=10;
+ceilSpot.shadow.camera.far=95;
 
 // Curtains — simple draped fabric panels on each side of the window
 const curtainH=winH+12, curtainW=14, curtainD=1.5;
@@ -2119,6 +2375,22 @@ const duvet=roomRoundBox(mattW+4, duvetH, duvetL, 2, 0xbfb8aa,
   bedX, mattY+mattH/2+duvetH/2, duvetZ, 0,0,0);
 duvet.material.roughness=0.95;
 
+// Enable shadows on key furniture (not walls/baseboards/trim — those don't need it)
+[headboard, lRail, rRail, footboard, mattress, duvet].forEach(m=>{ m.castShadow=true; });
+
+// XYZ axis helper — press 'A' to toggle (positioned beside purifier)
+const axesGroup=new THREE.Group();
+const axesOrig=new THREE.Vector3(panelW/2+4, -H/2-ply, D/2+ply+4); // front-right of purifier, at foot level
+axesGroup.position.copy(axesOrig);
+const axesHelper=new THREE.AxesHelper(10);
+axesGroup.add(axesHelper);
+// Labels
+const axLblX=makeTextSprite('X','#ff6666'); axLblX.position.set(11,0,0); axLblX.scale.multiplyScalar(0.8); axesGroup.add(axLblX);
+const axLblY=makeTextSprite('Y','#66ff66'); axLblY.position.set(0,11,0); axLblY.scale.multiplyScalar(0.8); axesGroup.add(axLblY);
+const axLblZ=makeTextSprite('Z','#6688ff'); axLblZ.position.set(0,0,11); axLblZ.scale.multiplyScalar(0.8); axesGroup.add(axLblZ);
+axesGroup.visible=false;
+scene.add(axesGroup);
+
 // Freeze world matrices on all static objects (room + purifier structure)
 scene.traverse(obj=>{
   if(obj.isMesh && !obj.isPoints){
@@ -2140,24 +2412,26 @@ function animate(){
     const t=performance.now()*0.001; // seconds
     _hueColor=_hueColor||new THREE.Color();
     const hueColor=_hueColor;
+    const rb=rgbBrightness;
+    const rbI=1.5*rb+0.1;
     for(let fi=0;fi<allFanGlows.length;fi++){
-      // Each fan offset by phase for a chase effect
       const hue=((t*0.3)+fi*0.12)%1;
       hueColor.setHSL(hue,1,0.5);
       allFanGlows[fi].color.copy(hueColor);
-      allFanGlows[fi].intensity=1.2;
+      allFanGlows[fi].intensity=rbI;
     }
     const avgHue=(t*0.3)%1;
     hueColor.setHSL(avgHue,1,0.5);
     const hex=hueColor.getHex();
+    const emBr=0.1*rb;
     for(let i=0;i<allFanMats.length;i+=4){
       allFanMats[i+3].emissive.setHex(hex);
-      allFanMats[i+3].emissiveIntensity=0.08;
+      allFanMats[i+3].emissiveIntensity=emBr;
       allFanMats[i+2].emissive.setHex(hex);
-      allFanMats[i+2].emissiveIntensity=0.04;
+      allFanMats[i+2].emissiveIntensity=emBr*0.5;
     }
-    if(filterMatRef){ filterMatRef.emissive.setHex(hex); filterMatRef.emissiveIntensity=0.03; }
-    for(const m of allBirchMats){ m.emissive.setHex(hex); m.emissiveIntensity=0.015; }
+    if(filterMatRef){ filterMatRef.emissive.setHex(hex); filterMatRef.emissiveIntensity=0.04*rb; }
+    for(const m of allBirchMats){ m.emissive.setHex(hex); m.emissiveIntensity=0.02*rb; }
   }
 
   // Lerp explode positions (only while animating)
@@ -2249,8 +2523,8 @@ function animate(){
   const rightDist=60-cx;
   const rightAlpha=rightDist<25?Math.max(fadeMin,rightDist/25):1;
   rightWall.material.opacity=rightAlpha; sideBaseboard.material.opacity=rightAlpha;
-  // Left wall (X=-60): fade when camera approaches
-  const leftDist=cx+60;
+  // Left wall (X=-90): fade when camera approaches
+  const leftDist=cx+90;
   const leftAlpha=leftDist<25?Math.max(fadeMin,leftDist/25):1;
   leftWallBelow.material.opacity=leftAlpha; leftWallAbove.material.opacity=leftAlpha;
   leftWallFront.material.opacity=leftAlpha; leftWallBack.material.opacity=leftAlpha;
@@ -2285,6 +2559,7 @@ function downgrade(tier){
   if(tier>=2){
     renderer.shadowMap.enabled=false;
     rim.intensity=0; bounce.intensity=0;
+    ceilSpot.castShadow=false;
   }
   if(tier>=3){
     // Hide particles on very weak hardware
@@ -2304,7 +2579,11 @@ function checkPerformance(fps){
   else { qualitySettled=true; } // can't go lower
 }
 
-document.addEventListener('keydown',e=>{ if(e.key==='f'||e.key==='F') document.getElementById('fps').classList.toggle('show'); });
+document.addEventListener('keydown',e=>{
+  if(e.key==='f'||e.key==='F') document.getElementById('fps').classList.toggle('show');
+  if(e.key==='a'||e.key==='A') axesGroup.visible=!axesGroup.visible;
+  if(e.key==='?') document.getElementById('shortcutsOverlay').classList.toggle('visible');
+});
 animate();
 </script>
 </body>
