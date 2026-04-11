@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DIY Air Purifier – 3D Model</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    #viewer { width: 100%; height: 100%; position: relative; }
+    canvas { width: 100%; height: 100%; display: block; }
+    .hint { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 12px; color: rgba(255,255,255,0.5); pointer-events: none; }
+    .panel { position: absolute; top: 12px; background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-radius: 12px; padding: 10px; border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+    .panel-l { left: 12px; width: 176px; display: flex; flex-direction: column; gap: 3px; }
+    .panel-r { right: 12px; font-size: 11px; color: #555; line-height: 2; padding: 8px 12px; }
+    .section { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: #999; margin-top: 6px; padding-left: 2px; }
+    .section:first-child { margin-top: 0; }
+    .seg { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid #ddd; }
+    .seg button { flex: 1; font-size: 11px; padding: 5px 0; border: none; cursor: pointer; background: #fff; color: #888; transition: all 0.15s; font-family: inherit; }
+    .seg button:not(:last-child) { border-right: 1px solid #ddd; }
+    .seg button:hover { background: #f5f5f5; }
+    .seg button.on { background: #2d2d2d; color: #fff; }
+    .seg button.on:hover { background: #3a3a3a; }
+    .rgb-seg button { color: #fff; font-weight: 600; font-size: 11px; padding: 4px 0; }
+    .rgb-seg button:hover { filter: brightness(1.1); }
+    .rgb-seg .rb { background: #dc3545; }
+    .rgb-seg .yb { background: #e6a817; }
+    .rgb-seg .gb { background: #28a745; }
+    .rgb-seg .ob { background: #999; }
+    .rgb-seg button.on { box-shadow: inset 0 0 0 2px #fff, 0 0 0 1.5px #333; }
+    .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  </style>
+</head>
+<body>
+<div id="viewer">
+<canvas id="c"></canvas>
+<div class="hint">drag to rotate · scroll to zoom</div>
+<div class="panel panel-l">
+  <div class="section">View</div>
+  <div class="seg"><button id="btnLayoutFB" class="on" onclick="setLayout('fb')">Front+Back</button><button id="btnLayoutFT" onclick="setLayout('ft')">Front+Top</button></div>
+  <div class="seg"><button id="btnExOn" class="on" onclick="toggleExplode()">Assembled</button><button id="btnExOff" onclick="toggleExplode()">Exploded</button></div>
+  <div class="seg"><button id="btnFlOn" class="on" onclick="toggleFilter()">Filters on</button><button id="btnFlOff" onclick="toggleFilter()">Filters off</button></div>
+  <div class="seg"><button id="btnDimOff" class="on" onclick="toggleDimensions()">Dims off</button><button id="btnDimOn" onclick="toggleDimensions()">Dims on</button></div>
+  <div class="seg"><button id="btnXrayOff" class="on" onclick="toggleXray()">Solid</button><button id="btnXrayOn" onclick="toggleXray()">X-ray</button></div>
+  <div class="section">Fans</div>
+  <div class="seg"><button id="btnSpinOff" class="on" onclick="toggleSpin()">Fans off</button><button id="btnSpinOn" onclick="toggleSpin()">Fans on</button></div>
+  <div class="seg"><button id="btnAirOff" class="on" onclick="toggleAirflow()">Airflow off</button><button id="btnAirOn" onclick="toggleAirflow()">Airflow on</button></div>
+  <div class="seg"><button id="btnFanBlack" class="on" onclick="toggleFanColor()">Black</button><button id="btnFanWhite" onclick="toggleFanColor()">White</button></div>
+  <div class="seg"><button id="btnBladeSolid" onclick="toggleFanRGB()">Solid</button><button id="btnBladeRGB" class="on" onclick="toggleFanRGB()">RGB</button></div>
+  <div id="rgbRow" class="seg rgb-seg"><button id="btnRgbR" class="rb" onclick="setRGB('red')">R</button><button id="btnRgbY" class="yb" onclick="setRGB('yellow')">Y</button><button id="btnRgbG" class="gb" onclick="setRGB('green')">G</button><button id="btnRgbOff" class="ob" onclick="setRGB('off')">Off</button></div>
+  <div class="section">Style</div>
+  <div class="seg"><button id="btnStainRaw" class="on" onclick="setStain('raw')">Raw birch</button><button id="btnStainOil" onclick="setStain('oil')">Oil stain</button><button id="btnStainWalnut" onclick="setStain('walnut')">Walnut</button></div>
+  <div class="seg"><button id="btnLegsWood" class="on" onclick="toggleLegs()">Wood legs</button><button id="btnLegsRubber" onclick="toggleLegs()">Rubber feet</button></div>
+</div>
+<div class="panel panel-r">
+  <div id="legendWood"><span class="swatch" style="background:#ddc89e"></span>Plywood (½″ birch)</div>
+  <div><span class="swatch" style="background:#f0ede6;border:1px solid #ccc"></span>Filters (MERV 13)</div>
+  <div><span class="swatch" style="background:#1a1a1a"></span>Fans (P12 Pro 120×120×27mm)</div>
+  <div><span class="swatch" style="background:#c4a870"></span>Ledge strips</div>
+  <div><span class="swatch" style="background:#3a3a3a"></span>Foam tape seal</div>
+  <div><span class="swatch" style="background:#999;border:1px solid #777"></span>Butt joints + screws</div>
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setClearColor(0x2a2a3a, 1);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.4;
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x2a2a3a, 0.002);
+const camera = new THREE.PerspectiveCamera(42,1,0.1,500);
+// Studio lighting — brighter
+scene.add(new THREE.AmbientLight(0xffffff,0.6));
+const key=new THREE.DirectionalLight(0xfff5e6,1.1); key.position.set(12,25,15);
+key.castShadow=true; key.shadow.mapSize.set(2048,2048);
+key.shadow.camera.near=1; key.shadow.camera.far=120;
+key.shadow.camera.left=-60; key.shadow.camera.right=60;
+key.shadow.camera.top=50; key.shadow.camera.bottom=-50;
+scene.add(key);
+const fill=new THREE.DirectionalLight(0xe8eeff,0.45); fill.position.set(-10,12,-12); scene.add(fill);
+const rim=new THREE.DirectionalLight(0xccddff,0.4); rim.position.set(-6,15,-18); scene.add(rim);
+const bounce=new THREE.DirectionalLight(0xffeedd,0.2); bounce.position.set(0,-10,8); scene.add(bounce);
+
+// Filtrete 20x25x1 actual: 19.69×24.69×0.78
+const W=5.44, H=19.69, D=24.69, ply=0.5, ft=0.78;
+const panelW = W+2*ft; // overall width = 7.0"
+
+// Arctic P12 Pro: 120×120×27mm (FIXED — do not change)
+const fanFrame=4.724;    // 120mm
+const fanDepth=1.063;    // 27mm
+const hubR=0.827;        // ~42mm hub diameter / 2
+const impellerR=2.126;   // ~108mm impeller OD / 2
+const mountSpacing=4.134; // 105mm hole spacing
+const bladeCount=5;
+const holeR=impellerR*1.02;
+const cornerR=0.2;
+const allRotors=[];
+const allFanMats=[]; // all fan plastic materials (frame, hub, cap, blades)
+const allFanGlows=[]; // PointLight per fan for RGB glow
+
+// Fans stacked touching, equal gap at top/bottom
+const numFans=4;
+const totalFanH=numFans*fanFrame;
+const endGapY=(H-totalFanH)/2;
+function fanY(i){return -H/2+endGapY+fanFrame*(i+0.5);}
+
+const C_FAN=0x1a1a1a, C_FOAM=0x3a3a3a;
+
+// ─── Procedural birch plywood texture (1024×1024) ───
+function makeBirchTexture(w,h,seed){
+  const cvs=document.createElement('canvas');
+  cvs.width=w||1024; cvs.height=h||1024;
+  const ctx=cvs.getContext('2d');
+  const W=cvs.width, H=cvs.height;
+  let s=seed||1;
+  function rand(){s=(s*16807+0)%2147483647;return(s&0x7fffffff)/0x7fffffff;}
+
+  ctx.fillStyle='#f0e4cc';
+  ctx.fillRect(0,0,W,H);
+
+  // Broad soft color bands
+  for(let i=0;i<8;i++){
+    const y=rand()*H, bH=30+rand()*80;
+    ctx.fillStyle=rand()>0.5
+      ?`rgba(245,235,210,${0.3+rand()*0.3})`
+      :`rgba(210,185,145,${0.15+rand()*0.2})`;
+    ctx.fillRect(0,y,W,bH);
+  }
+
+  // Heavy grain lines
+  for(let i=0;i<350;i++){
+    const y=rand()*H;
+    ctx.strokeStyle=rand()>0.4
+      ?`rgba(160,120,60,${0.25+rand()*0.35})`
+      :`rgba(190,155,100,${0.2+rand()*0.25})`;
+    ctx.lineWidth=0.3+rand()*2.5;
+    ctx.beginPath(); ctx.moveTo(0,y);
+    let cx=0;
+    while(cx<W){cx+=8+rand()*30;ctx.lineTo(cx,y+(rand()-0.5)*4);}
+    ctx.stroke();
+  }
+
+  // Dense grain bundles
+  for(let b=0;b<12;b++){
+    const baseY=rand()*H;
+    for(let i=0;i<5+Math.floor(rand()*10);i++){
+      const y=baseY+i*1.5+(rand()-0.5)*2;
+      ctx.strokeStyle=`rgba(140,100,40,${0.15+rand()*0.2})`;
+      ctx.lineWidth=0.3+rand()*0.8;
+      ctx.beginPath(); ctx.moveTo(0,y);
+      let cx=0;
+      while(cx<W){cx+=5+rand()*20;ctx.lineTo(cx,y+(rand()-0.5)*1.5);}
+      ctx.stroke();
+    }
+  }
+
+  // Dark mineral streaks
+  for(let k=0;k<4+Math.floor(rand()*4);k++){
+    const y=rand()*H;
+    ctx.strokeStyle=`rgba(100,70,25,${0.3+rand()*0.3})`;
+    ctx.lineWidth=1+rand()*2;
+    ctx.beginPath(); ctx.moveTo(0,y);
+    let cx=0;
+    while(cx<W){cx+=15+rand()*50;ctx.lineTo(cx,y+(rand()-0.5)*6);}
+    ctx.stroke();
+  }
+
+  // Knots
+  for(let k=0;k<1+Math.floor(rand()*3);k++){
+    const kx=rand()*W, ky=rand()*H, kr=12+rand()*25;
+    const grad=ctx.createRadialGradient(kx,ky,0,kx,ky,kr);
+    grad.addColorStop(0,'rgba(120,80,30,0.5)');
+    grad.addColorStop(0.3,'rgba(140,100,50,0.35)');
+    grad.addColorStop(0.7,'rgba(170,140,90,0.15)');
+    grad.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=grad;
+    ctx.beginPath(); ctx.ellipse(kx,ky,kr,kr*0.6,0,0,Math.PI*2); ctx.fill();
+    for(let r=0;r<4;r++){
+      const rr=kr*(0.3+r*0.2);
+      ctx.strokeStyle=`rgba(110,75,25,${0.15+rand()*0.15})`;
+      ctx.lineWidth=0.5+rand();
+      ctx.beginPath(); ctx.ellipse(kx,ky,rr,rr*0.6,0,0,Math.PI*2); ctx.stroke();
+    }
+  }
+
+  // Pale highlights
+  for(let i=0;i<25;i++){
+    const y=rand()*H;
+    ctx.strokeStyle=`rgba(250,245,230,${0.12+rand()*0.15})`;
+    ctx.lineWidth=2+rand()*5;
+    ctx.beginPath(); ctx.moveTo(0,y);
+    let cx=0;
+    while(cx<W){cx+=20+rand()*50;ctx.lineTo(cx,y+(rand()-0.5)*2);}
+    ctx.stroke();
+  }
+
+  const tex=new THREE.CanvasTexture(cvs);
+  tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
+  return tex;
+}
+const birchTex=makeBirchTexture(1024,1024,42);
+const birchTexB=makeBirchTexture(1024,1024,137);
+
+const allBirchMats=[];
+function birchMat(repeatX,repeatY,useB){
+  const t=(useB?birchTexB:birchTex).clone();
+  t.needsUpdate=true;
+  t.repeat.set(repeatX||1,repeatY||1);
+  const m=new THREE.MeshPhongMaterial({map:t,color:0xd2b48c,shininess:18,side:THREE.DoubleSide});
+  allBirchMats.push(m);
+  return m;
+}
+
+function mk(geo,color,opacity=1){
+  return new THREE.Mesh(geo,new THREE.MeshPhongMaterial({
+    color,transparent:opacity<1,opacity,side:THREE.DoubleSide,depthWrite:opacity>0.45
+  }));
+}
+
+const parts={}, origins={}, targets={};
+
+// ─── Top/bottom cap panels (flat, birch textured, with screws) ───
+function makeCapPanel(w,h,d,isTop){
+  const g=new THREE.Group();
+  // Bevel-compensated cap: shrink shape by bevelSize, reduce depth by 2*bevelThickness
+  const bvS=0.12, bvT=0.12, bvSeg=3;
+  const capShape=new THREE.Shape();
+  capShape.moveTo(-(w/2-bvS),-(d/2-bvS));
+  capShape.lineTo( (w/2-bvS),-(d/2-bvS));
+  capShape.lineTo( (w/2-bvS), (d/2-bvS));
+  capShape.lineTo(-(w/2-bvS), (d/2-bvS));
+  capShape.lineTo(-(w/2-bvS),-(d/2-bvS));
+  const capGeo=new THREE.ExtrudeGeometry(capShape,{depth:h-2*bvT,bevelEnabled:true,bevelSize:bvS,bevelThickness:bvT,bevelSegments:bvSeg});
+  capGeo.translate(0,0,-(h-2*bvT)/2);
+  // Rotate so extrude axis (Z) becomes Y
+  capGeo.rotateX(Math.PI/2);
+  if(!isTop) capGeo.rotateX(Math.PI);
+  const capMesh=new THREE.Mesh(capGeo,birchMat(w/12,d/12));
+  g.add(capMesh);
+
+  // Countersunk screws into front/back panel end-grain
+  const screwMat=new THREE.MeshPhongMaterial({color:0x999999,shininess:70});
+  const crossMat=new THREE.MeshPhongMaterial({color:0x666666});
+  const screwR=0.13, screwD=0.04;
+  for(const zSign of [-1,1]){
+    for(const sx of [-w/3,0,w/3]){
+      const head=new THREE.Mesh(new THREE.CylinderGeometry(screwR,screwR*0.6,screwD,12),screwMat);
+      head.rotation.x=Math.PI/2;
+      head.position.set(sx, isTop?h/2-screwD/2:-h/2+screwD/2, zSign*(d/2-ply/2));
+      g.add(head);
+      for(let r=0;r<2;r++){
+        const slot=new THREE.Mesh(new THREE.BoxGeometry(screwR*1.5,screwD*0.5,0.03),crossMat);
+        slot.rotation.y=r*Math.PI/2;
+        slot.position.copy(head.position);
+        slot.position.y+=isTop?screwD*0.3:-screwD*0.3;
+        g.add(slot);
+      }
+    }
+  }
+  return g;
+}
+
+const topPanel=makeCapPanel(panelW,ply,D+2*ply,true);
+topPanel.position.set(0,H/2+ply/2,0);
+scene.add(topPanel); parts.top=topPanel; origins.top=topPanel.position.clone();
+
+const botPanel=makeCapPanel(panelW,ply,D+2*ply,false);
+botPanel.position.set(0,-(H/2+ply/2),0);
+scene.add(botPanel); parts.bot=botPanel; origins.bot=botPanel.position.clone();
+
+// ─── Fan panels (front/back) ───
+function makeFanPanel(flip){
+  const g=new THREE.Group();
+
+  // Plywood panel with circular cutouts — bevel-compensated so final size is exact
+  const bv=0.12, bvT=0.12, bvSeg=3;
+  const shape=new THREE.Shape();
+  shape.moveTo(-(panelW/2-bv),-(H/2-bv));
+  shape.lineTo( (panelW/2-bv),-(H/2-bv));
+  shape.lineTo( (panelW/2-bv), (H/2-bv));
+  shape.lineTo(-(panelW/2-bv), (H/2-bv));
+  shape.lineTo(-(panelW/2-bv),-(H/2-bv));
+  for(let i=0;i<numFans;i++){
+    const fy=fanY(i);
+    const hole=new THREE.Path();
+    hole.absarc(0,fy,holeR+bv,0,Math.PI*2,false,64);
+    shape.holes.push(hole);
+  }
+  const panelGeo=new THREE.ExtrudeGeometry(shape,{depth:ply-2*bvT,bevelEnabled:true,bevelSize:bv,bevelThickness:bvT,bevelSegments:bvSeg,curveSegments:64});
+  panelGeo.translate(0,0,-(ply-2*bvT)/2);
+  const panel=new THREE.Mesh(panelGeo,birchMat(panelW/24,H/24));
+  g.add(panel);
+
+  // Fans mounted inside the box, flush against plywood inner face
+  const inDir=flip?-1:1;
+  const fanZ=inDir*(ply/2+fanDepth/2);
+
+  for(let i=0;i<numFans;i++){
+    const fy=fanY(i);
+
+    // Square fan frame with rounded corners and circular opening
+    const hf=fanFrame/2, cr=cornerR;
+    const fs=new THREE.Shape();
+    fs.moveTo(-hf+cr,-hf);
+    fs.lineTo( hf-cr,-hf);
+    fs.quadraticCurveTo( hf,-hf, hf,-hf+cr);
+    fs.lineTo( hf, hf-cr);
+    fs.quadraticCurveTo( hf, hf, hf-cr, hf);
+    fs.lineTo(-hf+cr, hf);
+    fs.quadraticCurveTo(-hf, hf,-hf, hf-cr);
+    fs.lineTo(-hf,-hf+cr);
+    fs.quadraticCurveTo(-hf,-hf,-hf+cr,-hf);
+    const fh=new THREE.Path();
+    fh.absarc(0,0,impellerR,0,Math.PI*2,false);
+    fs.holes.push(fh);
+    const frameGeo=new THREE.ExtrudeGeometry(fs,{depth:fanDepth,bevelEnabled:false});
+    frameGeo.translate(0,0,-fanDepth/2);
+    const frameMat=new THREE.MeshPhongMaterial({color:C_FAN,shininess:30});
+    allFanMats.push(frameMat);
+    const frame=new THREE.Mesh(frameGeo,frameMat);
+    frame.position.set(0,fy,fanZ);
+    g.add(frame);
+
+    // Rotor group (hub + blades) — spins as a unit
+    const rotor=new THREE.Group();
+    rotor.position.set(0,fy,fanZ);
+    rotor.userData.axis=new THREE.Vector3(0,0,inDir);
+
+    // Hub
+    const hubMat=new THREE.MeshPhongMaterial({color:0x111111,shininess:40});
+    allFanMats.push(hubMat);
+    const hub=new THREE.Mesh(
+      new THREE.CylinderGeometry(hubR,hubR,fanDepth*0.85,24),
+      hubMat
+    );
+    hub.rotation.x=Math.PI/2;
+    rotor.add(hub);
+
+    // Hub cap
+    const capMat=new THREE.MeshPhongMaterial({color:0x181818,shininess:50});
+    allFanMats.push(capMat);
+    const cap=new THREE.Mesh(
+      new THREE.CylinderGeometry(hubR*1.15,hubR*1.15,fanDepth*0.08,24),
+      capMat
+    );
+    cap.rotation.x=Math.PI/2;
+    cap.position.set(0,0,-inDir*fanDepth*0.4);
+    rotor.add(cap);
+
+    // Swept fan blades (5 blades) — frosted translucent like ARGB fan blades
+    const bladeMat=new THREE.MeshPhongMaterial({color:0xf0ece8,shininess:30,side:THREE.DoubleSide,transparent:true,opacity:0.65,depthWrite:false});
+    allFanMats.push(bladeMat);
+    for(let b=0;b<bladeCount;b++){
+      const baseAngle=b/bladeCount*Math.PI*2;
+      const bladeShape=new THREE.Shape();
+      const innerR=hubR*1.05, outerR=impellerR*0.95;
+      const bladeW=0.65, sweep=0.45, steps=8;
+      const pts=[], trailPts=[];
+      for(let st=0;st<=steps;st++){
+        const t=st/steps;
+        const r=innerR+(outerR-innerR)*t;
+        const ang=baseAngle+t*sweep;
+        pts.push([Math.cos(ang)*r,Math.sin(ang)*r]);
+      }
+      for(let st=steps;st>=0;st--){
+        const t=st/steps;
+        const r=innerR+(outerR-innerR)*t;
+        const ang=baseAngle+t*sweep+bladeW*(0.15+0.85*t);
+        trailPts.push([Math.cos(ang)*r,Math.sin(ang)*r]);
+      }
+      bladeShape.moveTo(pts[0][0],pts[0][1]);
+      for(let st=1;st<pts.length;st++) bladeShape.lineTo(pts[st][0],pts[st][1]);
+      for(let st=0;st<trailPts.length;st++) bladeShape.lineTo(trailPts[st][0],trailPts[st][1]);
+      bladeShape.lineTo(pts[0][0],pts[0][1]);
+      const bladeGeo=new THREE.ExtrudeGeometry(bladeShape,{depth:fanDepth*0.65,bevelEnabled:false});
+      bladeGeo.translate(0,0,-fanDepth*0.325);
+      rotor.add(new THREE.Mesh(bladeGeo,bladeMat));
+    }
+
+    g.add(rotor);
+    allRotors.push(rotor);
+
+    // Mounting posts
+    const mh=mountSpacing/2;
+    const postMat=new THREE.MeshPhongMaterial({color:0x222222});
+    for(let mx of[-1,1]){
+      for(let my of[-1,1]){
+        const post=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,fanDepth,8),postMat);
+        post.rotation.x=Math.PI/2;
+        post.position.set(mx*mh,fy+my*mh,fanZ);
+        g.add(post);
+      }
+    }
+
+    // RGB glow light (off by default) — large range to fill whole box
+    const glow=new THREE.PointLight(0x000000,0,30);
+    glow.position.set(0,fy,fanZ);
+    g.add(glow);
+    allFanGlows.push(glow);
+  }
+
+  // Foam tape seal on inner face at left/right edges — inset so not visible from outside
+  const foamT=0.09, foamW=0.45, foamInset=0.25;
+  const foamZ=inDir*(ply/2+foamT/2);
+  for(let sx of[-1,1]){
+    const fm=mk(new THREE.BoxGeometry(foamW,H,foamT),C_FOAM,0.85);
+    fm.position.set(sx*(panelW/2-foamW/2-foamInset),0,foamZ);
+    g.add(fm);
+  }
+  return g;
+}
+
+const frontGroup=makeFanPanel(false);
+frontGroup.position.set(0,0,-(D/2+ply/2));
+scene.add(frontGroup); parts.front=frontGroup; origins.front=frontGroup.position.clone();
+
+const backGroup=makeFanPanel(true);
+backGroup.position.set(0,0,D/2+ply/2);
+scene.add(backGroup); parts.back=backGroup; origins.back=backGroup.position.clone();
+
+// ─── Alternate layout: solid back + top fan panel ───
+// Solid back panel (no holes) — hidden by default
+const altBackGroup=(function(){
+  const g=new THREE.Group();
+  const bv=0.12, bvT=0.12, bvSeg=3;
+  const shape=new THREE.Shape();
+  shape.moveTo(-(panelW/2-bv),-(H/2-bv));
+  shape.lineTo( (panelW/2-bv),-(H/2-bv));
+  shape.lineTo( (panelW/2-bv), (H/2-bv));
+  shape.lineTo(-(panelW/2-bv), (H/2-bv));
+  shape.lineTo(-(panelW/2-bv),-(H/2-bv));
+  const geo=new THREE.ExtrudeGeometry(shape,{depth:ply-2*bvT,bevelEnabled:true,bevelSize:bv,bevelThickness:bvT,bevelSegments:bvSeg,curveSegments:32});
+  geo.translate(0,0,-(ply-2*bvT)/2);
+  g.add(new THREE.Mesh(geo,birchMat(panelW/24,H/24)));
+  // Foam tape on inner face
+  const foamT=0.09, foamW=0.45, foamInset=0.25;
+  for(let sx of[-1,1]){
+    const fm=mk(new THREE.BoxGeometry(foamW,H,foamT),C_FOAM,0.85);
+    fm.position.set(sx*(panelW/2-foamW/2-foamInset),0,-(ply/2+foamT/2));
+    g.add(fm);
+  }
+  return g;
+})();
+altBackGroup.position.set(0,0,D/2+ply/2);
+altBackGroup.visible=false;
+scene.add(altBackGroup);
+
+// Top fan panel (horizontal, fans point up) — hidden by default
+const altTopGroup=(function(){
+  const g=new THREE.Group();
+  const topW=panelW, topD=D+2*ply;
+  const bv=0.12, bvT=0.12, bvSeg=3;
+  // Fan positions along Z (local coords: shape is in XZ, extruded along Y)
+  const topTotalFanZ=numFans*fanFrame;
+  const topEndGap=(topD-topTotalFanZ)/2;
+  function topFanZ(i){return -topD/2+topEndGap+fanFrame*(i+0.5);}
+
+  // Shape in XZ plane with holes
+  const shape=new THREE.Shape();
+  shape.moveTo(-(topW/2-bv),-(topD/2-bv));
+  shape.lineTo( (topW/2-bv),-(topD/2-bv));
+  shape.lineTo( (topW/2-bv), (topD/2-bv));
+  shape.lineTo(-(topW/2-bv), (topD/2-bv));
+  shape.lineTo(-(topW/2-bv),-(topD/2-bv));
+  for(let i=0;i<numFans;i++){
+    const fz=topFanZ(i);
+    const hole=new THREE.Path();
+    hole.absarc(0,fz,holeR+bv,0,Math.PI*2,false,64);
+    shape.holes.push(hole);
+  }
+  const panelGeo=new THREE.ExtrudeGeometry(shape,{depth:ply-2*bvT,bevelEnabled:true,bevelSize:bv,bevelThickness:bvT,bevelSegments:bvSeg,curveSegments:64});
+  panelGeo.translate(0,0,-(ply-2*bvT)/2);
+  // Rotate so the panel lies flat: shape XY → XZ, extrude Z → Y
+  panelGeo.rotateX(-Math.PI/2);
+  g.add(new THREE.Mesh(panelGeo,birchMat(topW/24,topD/24)));
+
+  // Fans mounted on top, pointing upward
+  for(let i=0;i<numFans;i++){
+    const fz=topFanZ(i);
+    const fanYPos=-(ply/2+fanDepth/2); // inside the box (below panel)
+
+    // Fan frame
+    const hf=fanFrame/2, cr=cornerR;
+    const fs=new THREE.Shape();
+    fs.moveTo(-hf+cr,-hf);
+    fs.lineTo( hf-cr,-hf);
+    fs.quadraticCurveTo( hf,-hf, hf,-hf+cr);
+    fs.lineTo( hf, hf-cr);
+    fs.quadraticCurveTo( hf, hf, hf-cr, hf);
+    fs.lineTo(-hf+cr, hf);
+    fs.quadraticCurveTo(-hf, hf,-hf, hf-cr);
+    fs.lineTo(-hf,-hf+cr);
+    fs.quadraticCurveTo(-hf,-hf,-hf+cr,-hf);
+    const fh=new THREE.Path();
+    fh.absarc(0,0,impellerR,0,Math.PI*2,false);
+    fs.holes.push(fh);
+    const frameGeo=new THREE.ExtrudeGeometry(fs,{depth:fanDepth,bevelEnabled:false});
+    frameGeo.translate(0,0,-fanDepth/2);
+    // Rotate frame to point up: Z→Y
+    frameGeo.rotateX(-Math.PI/2);
+    const frameMat=new THREE.MeshPhongMaterial({color:C_FAN,shininess:30});
+    allFanMats.push(frameMat);
+    const frame=new THREE.Mesh(frameGeo,frameMat);
+    frame.position.set(0,fanYPos,fz);
+    g.add(frame);
+
+    // Rotor
+    const rotor=new THREE.Group();
+    rotor.position.set(0,fanYPos,fz);
+    rotor.userData.axis=new THREE.Vector3(0,-1,0); // spin around Y (downward into box)
+    rotor.rotation.x=Math.PI/2; // orient blades horizontally, facing down
+
+    const hubMat=new THREE.MeshPhongMaterial({color:0x111111,shininess:40});
+    allFanMats.push(hubMat);
+    const hub=new THREE.Mesh(new THREE.CylinderGeometry(hubR,hubR,fanDepth*0.85,24),hubMat);
+    hub.rotation.x=Math.PI/2;
+    rotor.add(hub);
+
+    const capMat=new THREE.MeshPhongMaterial({color:0x181818,shininess:50});
+    allFanMats.push(capMat);
+    const cap=new THREE.Mesh(new THREE.CylinderGeometry(hubR*1.15,hubR*1.15,fanDepth*0.08,24),capMat);
+    cap.rotation.x=Math.PI/2;
+    cap.position.set(0,0,-fanDepth*0.4);
+    rotor.add(cap);
+
+    const bladeMat=new THREE.MeshPhongMaterial({color:0xf0ece8,shininess:30,side:THREE.DoubleSide,transparent:true,opacity:0.65,depthWrite:false});
+    allFanMats.push(bladeMat);
+    for(let b=0;b<bladeCount;b++){
+      const baseAngle=b/bladeCount*Math.PI*2;
+      const bladeShape=new THREE.Shape();
+      const innerR=hubR*1.05, outerR=impellerR*0.95;
+      const bladeW=0.65, sweep=0.45, steps=8;
+      const pts=[], trailPts=[];
+      for(let st=0;st<=steps;st++){
+        const t=st/steps;
+        const r=innerR+(outerR-innerR)*t;
+        const ang=baseAngle+t*sweep;
+        pts.push([Math.cos(ang)*r,Math.sin(ang)*r]);
+      }
+      for(let st=steps;st>=0;st--){
+        const t=st/steps;
+        const r=innerR+(outerR-innerR)*t;
+        const ang=baseAngle+t*sweep+bladeW*(0.15+0.85*t);
+        trailPts.push([Math.cos(ang)*r,Math.sin(ang)*r]);
+      }
+      bladeShape.moveTo(pts[0][0],pts[0][1]);
+      for(let st=1;st<pts.length;st++) bladeShape.lineTo(pts[st][0],pts[st][1]);
+      for(let st=0;st<trailPts.length;st++) bladeShape.lineTo(trailPts[st][0],trailPts[st][1]);
+      bladeShape.lineTo(pts[0][0],pts[0][1]);
+      const bladeGeo=new THREE.ExtrudeGeometry(bladeShape,{depth:fanDepth*0.65,bevelEnabled:false});
+      bladeGeo.translate(0,0,-fanDepth*0.325);
+      rotor.add(new THREE.Mesh(bladeGeo,bladeMat));
+    }
+    g.add(rotor);
+    allRotors.push(rotor);
+
+    // Mounting posts
+    const mh=mountSpacing/2;
+    const postMat=new THREE.MeshPhongMaterial({color:0x222222});
+    for(let mx of[-1,1]){
+      for(let my of[-1,1]){
+        const post=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,fanDepth,8),postMat);
+        post.position.set(mx*mh,fanYPos,fz+my*mh);
+        post.rotation.x=0; // vertical posts
+        g.add(post);
+      }
+    }
+
+    // RGB glow
+    const glow=new THREE.PointLight(0x000000,0,30);
+    glow.position.set(0,fanYPos,fz);
+    g.add(glow);
+    allFanGlows.push(glow);
+  }
+  return g;
+})();
+altTopGroup.position.set(0, H/2+ply/2, 0);
+altTopGroup.visible=false;
+scene.add(altTopGroup);
+
+// ─── Pleated MERV 13 filters ───
+function makePleatedFilter(){
+  const g=new THREE.Group();
+  const pleats=40;
+  const pleatDepth=ft*0.4;
+  const pleatStep=D/pleats;
+  // Procedural filter media texture — heavy fibrous look
+  const fCvs=document.createElement('canvas');
+  fCvs.width=512; fCvs.height=512;
+  const fCtx=fCvs.getContext('2d');
+  fCtx.fillStyle='#ddd8c8';
+  fCtx.fillRect(0,0,512,512);
+  let fs=77;
+  function fRand(){fs=(fs*16807)%2147483647;return(fs&0x7fffffff)/0x7fffffff;}
+  // Heavy crisscrossing fibers
+  for(let i=0;i<2500;i++){
+    const x=fRand()*512, y=fRand()*512;
+    const len=4+fRand()*20, ang=fRand()*Math.PI;
+    const dark=fRand();
+    fCtx.strokeStyle=dark>0.6
+      ?`rgba(150,130,100,${0.4+fRand()*0.5})`
+      :dark>0.3
+      ?`rgba(180,165,140,${0.35+fRand()*0.4})`
+      :`rgba(210,200,180,${0.3+fRand()*0.35})`;
+    fCtx.lineWidth=0.5+fRand()*2.5;
+    fCtx.beginPath();
+    fCtx.moveTo(x,y);
+    fCtx.lineTo(x+Math.cos(ang)*len,y+Math.sin(ang)*len);
+    fCtx.stroke();
+  }
+  // Clumps of matted fibers
+  for(let c=0;c<40;c++){
+    const cx=fRand()*512, cy=fRand()*512;
+    for(let j=0;j<15;j++){
+      const x=cx+(fRand()-0.5)*20, y=cy+(fRand()-0.5)*20;
+      const len=3+fRand()*8, ang=fRand()*Math.PI;
+      fCtx.strokeStyle=`rgba(140,120,90,${0.3+fRand()*0.4})`;
+      fCtx.lineWidth=0.8+fRand()*1.5;
+      fCtx.beginPath(); fCtx.moveTo(x,y);
+      fCtx.lineTo(x+Math.cos(ang)*len,y+Math.sin(ang)*len);
+      fCtx.stroke();
+    }
+  }
+  // Dark specks / dust
+  for(let i=0;i<500;i++){
+    fCtx.fillStyle=`rgba(130,110,80,${0.2+fRand()*0.35})`;
+    const sz=1+fRand()*3;
+    fCtx.fillRect(fRand()*512,fRand()*512,sz,sz);
+  }
+  // Light highlights
+  for(let i=0;i<300;i++){
+    fCtx.fillStyle=`rgba(245,240,230,${0.15+fRand()*0.25})`;
+    fCtx.fillRect(fRand()*512,fRand()*512,1+fRand()*4,1+fRand()*2);
+  }
+  const filterTex=new THREE.CanvasTexture(fCvs);
+  filterTex.wrapS=filterTex.wrapT=THREE.RepeatWrapping;
+  filterTex.repeat.set(3,5);
+
+  // Bump map from same canvas for surface roughness
+  const bumpTex=filterTex.clone(); bumpTex.needsUpdate=true;
+
+  const filterMat=new THREE.MeshPhongMaterial({map:filterTex,bumpMap:bumpTex,bumpScale:0.6,color:0xffffff,side:THREE.DoubleSide,shininess:1,transparent:false});
+  filterMat._isFilterMat=true; // tag for RGB glow lookup
+
+  // Zigzag pleated mesh
+  const verts=[], indices=[];
+  for(let p=0;p<=pleats;p++){
+    const z=-D/2+p*pleatStep;
+    const xOff=(p%2===0)?-pleatDepth:pleatDepth;
+    verts.push(xOff,-H/2,z);
+    verts.push(xOff, H/2,z);
+  }
+  for(let p=0;p<pleats;p++){
+    const i0=p*2, i1=p*2+1, i2=(p+1)*2, i3=(p+1)*2+1;
+    indices.push(i0,i2,i1, i1,i2,i3);
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  g.add(new THREE.Mesh(geo,filterMat));
+
+  // 1″ white cardboard border on flat faces
+  const border=1.0;
+  const borderMat=new THREE.MeshPhongMaterial({color:0xf5f5f5,shininess:3});
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(ft,border,D),borderMat).translateY(H/2-border/2));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(ft,border,D),borderMat).translateY(-H/2+border/2));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(ft,H,border),borderMat).translateZ(D/2-border/2));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(ft,H,border),borderMat).translateZ(-D/2+border/2));
+
+  // Blue on thin perimeter edges (top/bottom/front/back of slab)
+  const blueMat=new THREE.MeshPhongMaterial({color:0x1a3d7c,shininess:8});
+  const blueT=0.025;
+  // Top edge
+  const eTop=new THREE.Mesh(new THREE.PlaneGeometry(ft,D),blueMat);
+  eTop.rotation.x=-Math.PI/2; eTop.position.set(0,H/2+blueT,0); g.add(eTop);
+  // Bottom edge
+  const eBot=new THREE.Mesh(new THREE.PlaneGeometry(ft,D),blueMat);
+  eBot.rotation.x=Math.PI/2; eBot.position.set(0,-H/2-blueT,0); g.add(eBot);
+  // Front edge
+  const eFront=new THREE.Mesh(new THREE.PlaneGeometry(ft,H),blueMat);
+  eFront.position.set(0,0,D/2+blueT); g.add(eFront);
+  // Back edge
+  const eBack=new THREE.Mesh(new THREE.PlaneGeometry(ft,H),blueMat);
+  eBack.rotation.y=Math.PI; eBack.position.set(0,0,-D/2-blueT); g.add(eBack);
+
+  // 3M logos on perimeter edges — each oriented to read correctly from its viewing side
+  function make3MLogoMat(){
+    const cvs=document.createElement('canvas');
+    cvs.width=256; cvs.height=256;
+    const ctx=cvs.getContext('2d');
+    ctx.fillStyle='#1a3d7c';
+    ctx.fillRect(0,0,256,256);
+    ctx.fillStyle='#cc0000';
+    ctx.font='bold 180px -apple-system,BlinkMacSystemFont,sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('3M',128,128);
+    return new THREE.MeshPhongMaterial({map:new THREE.CanvasTexture(cvs),shininess:5,side:THREE.DoubleSide});
+  }
+  function flipUGeo(w,h){
+    const geo=new THREE.PlaneGeometry(w,h);
+    const uv=geo.attributes.uv;
+    for(let i=0;i<uv.count;i++) uv.setX(i,1-uv.getX(i));
+    return geo;
+  }
+  const logoMat=make3MLogoMat();
+  const ls=ft*0.55; // square logo fits within 0.78″ edge
+
+  // Front edge — faces +Z, readable from front
+  const lFront=new THREE.Mesh(new THREE.PlaneGeometry(ls,ls),logoMat);
+  lFront.position.set(0,0,D/2+blueT+0.01);
+  g.add(lFront);
+
+  // Back edge — faces -Z, UV-flipped so text isn't mirrored
+  const lBack=new THREE.Mesh(flipUGeo(ls,ls),logoMat);
+  lBack.rotation.y=Math.PI;
+  lBack.position.set(0,0,-(D/2+blueT+0.01));
+  g.add(lBack);
+
+  // Top edge — faces +Y, readable looking down
+  const lTop=new THREE.Mesh(new THREE.PlaneGeometry(ls,ls),logoMat);
+  lTop.rotation.x=-Math.PI/2;
+  lTop.position.set(0,H/2+blueT+0.01,0);
+  g.add(lTop);
+
+  // Bottom edge — faces -Y, readable looking up
+  const lBot=new THREE.Mesh(new THREE.PlaneGeometry(ls,ls),logoMat);
+  lBot.rotation.x=Math.PI/2;
+  lBot.position.set(0,-(H/2+blueT+0.01),0);
+  g.add(lBot);
+
+  return g;
+}
+
+const filterL=makePleatedFilter();
+filterL.position.set(-(W/2+ft/2),0,0);
+scene.add(filterL); parts.filterL=filterL; origins.filterL=filterL.position.clone();
+
+const filterR=makePleatedFilter();
+filterR.position.set(W/2+ft/2,0,0);
+scene.add(filterR); parts.filterR=filterR; origins.filterR=filterR.position.clone();
+
+// ─── Ledge strips on top/bottom panels (70% width, centered) ───
+const ledgeW=0.56, ledgeDepth=(D+2*ply)*0.70;
+const ledgeX=W/2-ledgeW/2;
+const ledgeT=0.35;
+for(let sx of[-1,1]){
+  for(let sy of[-1,1]){
+    const lh=new THREE.Mesh(
+      new THREE.BoxGeometry(ledgeW,ledgeT,ledgeDepth),
+      birchMat(ledgeW/6,ledgeDepth/12,true)
+    );
+    lh.position.set(sx*ledgeX,sy*(H/2-ledgeT/2),0);
+    scene.add(lh);
+  }
+}
+
+// ─── Foam tape seal on inner face of top/bottom panels ───
+{
+  const foamT=0.09, foamW=0.45, foamInset=0.25;
+  for(let sx of[-1,1]){
+    for(let sy of[-1,1]){
+      const foam=mk(new THREE.BoxGeometry(foamW,foamT,D),C_FOAM,0.9);
+      // Inset from panel edge so it's hidden from outside view
+      foam.position.set(sx*(panelW/2-foamW/2-foamInset), sy*(H/2-foamT/2), 0);
+      scene.add(foam);
+    }
+  }
+}
+
+// ─── Corner legs/feet ───
+const legH=0.75, legR=0.3;
+const legInset=0.4; // inset from panel edges
+const legY=-(H/2+ply+legH/2);
+const legGroup=new THREE.Group();
+const allLegMeshes=[];
+const woodLegMat=birchMat(0.5,0.5);
+const rubberMat=new THREE.MeshPhongMaterial({color:0x2a2a2a,shininess:5});
+let legsAreRubber=false;
+for(let xSgn of[-1,1]){
+  for(let zSgn of[-1,1]){
+    const leg=new THREE.Mesh(
+      new THREE.CylinderGeometry(legR,legR*0.85,legH,16),
+      woodLegMat
+    );
+    leg.position.set(xSgn*(panelW/2-legInset), legY, zSgn*(D/2+ply-legInset));
+    legGroup.add(leg);
+    allLegMeshes.push(leg);
+  }
+}
+scene.add(legGroup);
+
+// ─── ESP32 + power supply on bottom interior ───
+{
+  // ESP32-C3 Super Mini
+  const espMat=new THREE.MeshPhongMaterial({color:0x1a5c1a,shininess:30});
+  const esp=new THREE.Mesh(new THREE.BoxGeometry(0.87,0.2,0.71),espMat);
+  esp.position.set(0.5,-(H/2-0.1),0);
+  scene.add(esp);
+  // USB-C stub
+  const usb=new THREE.Mesh(new THREE.BoxGeometry(0.35,0.1,0.15),
+    new THREE.MeshPhongMaterial({color:0xaaaaaa,shininess:50}));
+  usb.position.set(0.5,-(H/2-0.1),-0.71/2-0.075);
+  scene.add(usb);
+  // Chip
+  const chip=new THREE.Mesh(new THREE.BoxGeometry(0.25,0.06,0.25),
+    new THREE.MeshPhongMaterial({color:0x111111}));
+  chip.position.set(0.5,-(H/2-0.23),0);
+  scene.add(chip);
+
+  // 5V buck converter
+  const psu=new THREE.Mesh(new THREE.BoxGeometry(1.5,0.47,0.71),
+    new THREE.MeshPhongMaterial({color:0x1a1a8a,shininess:20}));
+  psu.position.set(-0.6,-(H/2-0.235),0);
+  scene.add(psu);
+  // Barrel jack
+  const jack=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,0.25,12),
+    new THREE.MeshPhongMaterial({color:0x222222}));
+  jack.rotation.x=Math.PI/2;
+  jack.position.set(-0.6,-(H/2-0.235),0.71/2+0.125);
+  scene.add(jack);
+
+  // Power cord hole in back panel
+  const holeMesh=new THREE.Mesh(new THREE.BoxGeometry(0.6,0.4,ply+0.02),
+    new THREE.MeshPhongMaterial({color:0x222222}));
+  holeMesh.position.set(-0.6,-(H/2-0.235),D/2+ply/2);
+  scene.add(holeMesh);
+
+  // Power cord — single smooth tube from hole to dangling plug
+  const cordMat=new THREE.MeshPhongMaterial({color:0x111111,shininess:15});
+  const cordR=0.09;
+  const cX=-0.6, cY=-(H/2-0.235), cZ_hole=D/2+ply;
+  // Build one continuous path: exit hole → gentle curve down → hang
+  const cordPts=[
+    new THREE.Vector3(cX, cY, cZ_hole),           // at hole
+    new THREE.Vector3(cX, cY, cZ_hole+1.5),       // straight out
+    new THREE.Vector3(cX, cY-0.3, cZ_hole+2.5),   // start bending down
+    new THREE.Vector3(cX, cY-1.5, cZ_hole+2.8),   // curving
+    new THREE.Vector3(cX, cY-3.0, cZ_hole+2.5),   // mostly down now
+    new THREE.Vector3(cX, cY-5.0, cZ_hole+2.3),   // hanging
+    new THREE.Vector3(cX, cY-7.0, cZ_hole+2.2),   // lower
+  ];
+  const cordCurve=new THREE.CatmullRomCurve3(cordPts);
+  const cordTube=new THREE.Mesh(new THREE.TubeGeometry(cordCurve,40,cordR,8,false),cordMat);
+  scene.add(cordTube);
+
+  // US NEMA 5-15P plug at the end
+  const plugEnd=cordCurve.getPoint(1);
+  const plugMat=new THREE.MeshPhongMaterial({color:0x222222,shininess:25});
+  // Plug body
+  const plugBody=new THREE.Mesh(new THREE.BoxGeometry(0.55,0.9,0.35),plugMat);
+  plugBody.position.copy(plugEnd).add(new THREE.Vector3(0,-0.5,0));
+  scene.add(plugBody);
+  // Two flat prongs (parallel, vertical)
+  const prongMat=new THREE.MeshPhongMaterial({color:0xbbbbbb,shininess:70});
+  for(let px of[-0.12,0.12]){
+    const prong=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.5,0.015),prongMat);
+    prong.position.copy(plugEnd).add(new THREE.Vector3(px,-1.2,0));
+    scene.add(prong);
+  }
+  // Ground pin (round, centered below the two prongs)
+  const gndPin=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.5,8),prongMat);
+  gndPin.position.copy(plugEnd).add(new THREE.Vector3(0,-1.2,0.12));
+  scene.add(gndPin);
+}
+
+// ─── Fan wiring — daisy-chained with connectors ───
+{
+  const wireR=0.045;
+  const wireMat=new THREE.MeshPhongMaterial({color:0x444444,shininess:15}); // dark gray, not black
+  const redMat=new THREE.MeshPhongMaterial({color:0xaa2222,shininess:10});
+  const connMat=new THREE.MeshPhongMaterial({color:0xeeeeee,shininess:40}); // white JST connector
+  const connBlack=new THREE.MeshPhongMaterial({color:0x333333,shininess:25});
+
+  function makeWire(pts, mat, segs){
+    if(pts.length<2) return;
+    const curve=new THREE.CatmullRomCurve3(pts);
+    const tube=new THREE.Mesh(new THREE.TubeGeometry(curve, segs||24, wireR, 6, false), mat||wireMat);
+    scene.add(tube);
+  }
+
+  function makeConn(x,y,z, mat){
+    const c=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.12,0.15), mat||connMat);
+    c.position.set(x,y,z);
+    scene.add(c);
+  }
+
+  const busX=fanFrame/2+0.15;
+  const botY=-(H/2)+0.3;
+  const espX=0.5, espY=-(H/2-0.1), espZ=0;
+  const psuX=-0.6, psuY=-(H/2-0.235), psuZ=0;
+
+  for(const side of ['front','back']){
+    const zSign=side==='front'?-1:1;
+    const wz=zSign*(D/2-fanDepth*0.5); // between fan and filter
+
+    // Daisy chain: vertical bus along right edge connecting all 4 fans
+    const topFanY=fanY(3)+fanFrame/2;
+    const botFanY=fanY(0)-fanFrame/2;
+    makeWire([
+      new THREE.Vector3(busX, topFanY, wz),
+      new THREE.Vector3(busX, botFanY, wz),
+    ], wireMat, 12);
+
+    // Stub + connectors per fan
+    for(let i=0;i<numFans;i++){
+      const fy=fanY(i);
+      // Stub wire from fan edge to bus
+      makeWire([
+        new THREE.Vector3(fanFrame/2-0.2, fy, wz),
+        new THREE.Vector3(busX, fy, wz),
+      ], wireMat, 6);
+      // White connector at fan
+      makeConn(fanFrame/2-0.1, fy, wz, connMat);
+      // Black connector at bus junction
+      makeConn(busX, fy, wz, connBlack);
+    }
+
+    // Lead wire from bottom of bus → down → to PSU or ESP32
+    const leadMat=side==='front'?redMat:wireMat;
+    makeWire([
+      new THREE.Vector3(busX, botFanY, wz),
+      new THREE.Vector3(busX, botY, wz),
+      new THREE.Vector3(busX, botY, wz*0.5),
+      new THREE.Vector3(busX, botY, 0),
+      new THREE.Vector3(side==='front'?psuX+0.75:espX+0.4, botY, 0),
+      new THREE.Vector3(side==='front'?psuX:espX, side==='front'?psuY:espY, 0),
+    ], leadMat, 30);
+  }
+
+  // Wire from PSU → ESP32
+  makeWire([
+    new THREE.Vector3(psuX+0.75, psuY, psuZ),
+    new THREE.Vector3(0, botY+0.1, 0),
+    new THREE.Vector3(espX-0.4, espY, espZ),
+  ], redMat, 20);
+}
+
+// ─── Explode / filter toggle ───
+const explodeV={
+  top:    new THREE.Vector3(0,10,0),
+  bot:    new THREE.Vector3(0,-10,0),
+  front:  new THREE.Vector3(0,0,-16),
+  back:   new THREE.Vector3(0,0,16),
+  filterL:new THREE.Vector3(-11,0,0),
+  filterR:new THREE.Vector3(11,0,0),
+};
+let exploded=false;
+function setToggle(onId,offId,isOn){
+  document.getElementById(onId).classList.toggle('on',isOn);
+  document.getElementById(offId).classList.toggle('on',!isOn);
+}
+function collapseView(){
+  if(!exploded) return;
+  exploded=false;
+  setToggle('btnExOn','btnExOff',true);
+  for(const k in explodeV){
+    if(!parts[k]) continue;
+    targets[k]=origins[k].clone();
+  }
+}
+function toggleExplode(){
+  exploded=!exploded;
+  setToggle('btnExOn','btnExOff',!exploded);
+  // Exploding turns off fans, airflow, and hides dimensions so internals are visible
+  if(exploded){
+    if(spinning) toggleSpin();
+    if(airflowOn) toggleAirflow();
+    if(dimVisible) toggleDimensions();
+  }
+  for(const k in explodeV){
+    if(!parts[k]) continue;
+    targets[k]=exploded?origins[k].clone().add(explodeV[k]):origins[k].clone();
+  }
+}
+let filterOn=true;
+function toggleFilter(){
+  filterOn=!filterOn;
+  parts.filterL.visible=filterOn;
+  parts.filterR.visible=filterOn;
+  setToggle('btnFlOn','btnFlOff',filterOn);
+}
+
+// ─── Camera controls ───
+let drag=false,px=0,py=0,polar=1.05,azimuth=-0.5+Math.PI,radius=65;
+canvas.addEventListener('mousedown',e=>{drag=true;px=e.clientX;py=e.clientY;});
+canvas.addEventListener('touchstart',e=>{drag=true;px=e.touches[0].clientX;py=e.touches[0].clientY;},{passive:true});
+window.addEventListener('mouseup',()=>drag=false);
+window.addEventListener('touchend',()=>drag=false);
+canvas.addEventListener('mousemove',e=>{
+  if(!drag)return;
+  azimuth-=(e.clientX-px)*0.013;
+  polar=Math.max(0.1,Math.min(Math.PI-0.1,polar-(e.clientY-py)*0.013));
+  px=e.clientX;py=e.clientY;
+});
+canvas.addEventListener('touchmove',e=>{
+  if(!drag)return;
+  azimuth-=(e.touches[0].clientX-px)*0.013;
+  polar=Math.max(0.1,Math.min(Math.PI-0.1,polar-(e.touches[0].clientY-py)*0.013));
+  px=e.touches[0].clientX;py=e.touches[0].clientY;
+},{passive:true});
+canvas.addEventListener('wheel',e=>{e.preventDefault();radius=Math.max(20,Math.min(130,radius+e.deltaY*0.06));},{passive:false});
+// macOS trackpad pinch-to-zoom → model zoom
+let gestureStartRadius;
+canvas.addEventListener('gesturestart',e=>{e.preventDefault();gestureStartRadius=radius;});
+canvas.addEventListener('gesturechange',e=>{e.preventDefault();radius=Math.max(20,Math.min(130,gestureStartRadius/e.scale));});
+canvas.addEventListener('gestureend',e=>{e.preventDefault();});
+
+function resize(){
+  const w=canvas.parentElement.clientWidth,h=canvas.parentElement.clientHeight;
+  renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+resize(); window.addEventListener('resize',resize);
+
+// ─── Fan spin + air particle system ───
+let spinning=false, spinSpeed=0, spinTarget=0;
+const SPIN_MAX=0.18;
+
+const PARTICLE_COUNT=600;
+const particleGeo=new THREE.BufferGeometry();
+const particlePositions=new Float32Array(PARTICLE_COUNT*3);
+const particleColors=new Float32Array(PARTICLE_COUNT*3);
+const particleT=new Float32Array(PARTICLE_COUNT); // 0→1 parametric progress
+const particleTSpeed=new Float32Array(PARTICLE_COUNT);
+const particleY0=new Float32Array(PARTICLE_COUNT);
+const particleZ0=new Float32Array(PARTICLE_COUNT); // starting Z spread across filter face
+const particleSide=new Int8Array(PARTICLE_COUNT);
+const particleExitDir=new Int8Array(PARTICLE_COUNT);
+const particleWobble=new Float32Array(PARTICLE_COUNT);
+
+// Parametric breakpoints along t=0→1
+// 0→0.20: outside air drifting toward filter
+// 0.20→0.30: passing through filter thickness
+// 0.30→0.55: inside box, drifting inward & turning toward fan panel
+// 0.55→0.80: crossing to fan panel
+// 0.80→1.0: exhaust out past fan panel into room
+const T0=0, T1=0.20, T2=0.30, T3=0.55, T4=0.80, T5=1.0;
+
+function pathX(t,side){
+  const outerX=W/2+ft+5;    // far outside
+  const filterOuter=W/2+ft/2+ft/2; // outer face of filter = W/2+ft
+  const filterInner=W/2;     // inner face of filter
+  const insideX=W/4;          // partway inside, NOT zero — avoids center clump
+  if(t<=T1){
+    const f=t/T1;
+    return side*(outerX+(filterOuter-outerX)*f);
+  }
+  if(t<=T2){
+    const f=(t-T1)/(T2-T1);
+    return side*(filterOuter+(filterInner-filterOuter)*f);
+  }
+  if(t<=T3){
+    const f=(t-T2)/(T3-T2);
+    return side*(filterInner+(insideX-filterInner)*f);
+  }
+  // Gradually ease X toward 0 while heading to fan panel
+  if(t<=T4){
+    const f=(t-T3)/(T4-T3);
+    return side*insideX*(1-f*0.8); // drift toward center but never quite to 0
+  }
+  return side*insideX*0.2*(1-(t-T4)/(T5-T4)); // tiny remainder fades out
+}
+
+function pathZ(t,z0,exitDir){
+  if(t<=T3) return z0; // stay at original Z during intake & filter & early inside
+  if(t<=T4){
+    const f=(t-T3)/(T4-T3);
+    const fanZ=exitDir*(D/2+ply);
+    return z0+(fanZ-z0)*f; // sweep from z0 to fan panel
+  }
+  const fanZ=exitDir*(D/2+ply);
+  const f=(t-T4)/(T5-T4);
+  return fanZ+exitDir*6*f; // shoot outward
+}
+
+function initParticle(i,stagger){
+  const side=Math.random()>0.5?1:-1;
+  particleSide[i]=side;
+  particleExitDir[i]=Math.random()>0.5?1:-1;
+  particleY0[i]=-H/2+Math.random()*H;
+  particleZ0[i]=-D/2+Math.random()*D;
+  particleWobble[i]=Math.random()*Math.PI*2;
+  particleTSpeed[i]=0.002+Math.random()*0.003;
+  particleT[i]=stagger? Math.random() : 0;
+  const t=particleT[i];
+  particlePositions[i*3]=pathX(t,side);
+  particlePositions[i*3+1]=particleY0[i];
+  particlePositions[i*3+2]=pathZ(t,particleZ0[i],particleExitDir[i]);
+  particleColors[i*3]=0.33; particleColors[i*3+1]=0.73; particleColors[i*3+2]=1.0;
+}
+for(let i=0;i<PARTICLE_COUNT;i++) initParticle(i,true);
+particleGeo.setAttribute('position',new THREE.BufferAttribute(particlePositions,3));
+particleGeo.setAttribute('color',new THREE.BufferAttribute(particleColors,3));
+const particleMat=new THREE.PointsMaterial({size:0.32,transparent:true,opacity:0.85,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false});
+const particles=new THREE.Points(particleGeo,particleMat);
+particles.visible=false;
+scene.add(particles);
+
+function toggleSpin(){
+  spinning=!spinning;
+  spinTarget=spinning?SPIN_MAX:0;
+  setToggle('btnSpinOn','btnSpinOff',spinning);
+  // Auto-collapse so internals are visible inside the assembled box
+  if(spinning) collapseView();
+}
+
+let airflowOn=false;
+function toggleAirflow(){
+  airflowOn=!airflowOn;
+  particles.visible=airflowOn;
+  setToggle('btnAirOn','btnAirOff',airflowOn);
+  if(airflowOn) collapseView();
+}
+
+// ─── Dimension annotations ───
+const dimGroup=new THREE.Group();
+dimGroup.visible=false;
+scene.add(dimGroup);
+
+function makeTextSprite(text,bgColor='#ffffff'){
+  const cvs=document.createElement('canvas');
+  const ctx=cvs.getContext('2d');
+  const fontSize=28;
+  ctx.font=`600 ${fontSize}px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif`;
+  const tw=ctx.measureText(text).width;
+  cvs.width=tw+24; cvs.height=fontSize+18;
+  ctx.font=`600 ${fontSize}px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif`;
+  ctx.fillStyle=bgColor; ctx.globalAlpha=0.92;
+  ctx.beginPath(); ctx.roundRect(2,2,cvs.width-4,cvs.height-4,6); ctx.fill();
+  ctx.globalAlpha=1; ctx.strokeStyle='#999'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.roundRect(2,2,cvs.width-4,cvs.height-4,6); ctx.stroke();
+  ctx.fillStyle='#333'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(text,cvs.width/2,cvs.height/2);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cvs),depthTest:false}));
+  sp.scale.set(3.2*cvs.width/cvs.height,3.2,1);
+  return sp;
+}
+
+function dimLine(a,b,label,offset,color=0xff3333){
+  const ao=a.clone().add(offset), bo=b.clone().add(offset);
+  dimGroup.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([ao,bo]),
+    new THREE.LineBasicMaterial({color,linewidth:2,depthTest:false})
+  ));
+  const dir=bo.clone().sub(ao).normalize();
+  const tickLen=0.8;
+  for(const p of [ao,bo]){
+    const cross=new THREE.Vector3().crossVectors(dir,offset.clone().normalize()).normalize().multiplyScalar(tickLen);
+    if(cross.length()<0.01) cross.set(0,tickLen,0);
+    dimGroup.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([p.clone().add(cross),p.clone().sub(cross)]),
+      new THREE.LineBasicMaterial({color,depthTest:false})
+    ));
+  }
+  const leaderMat=new THREE.LineDashedMaterial({color:0x999999,dashSize:0.5,gapSize:0.3,depthTest:false});
+  for(const [mp,dp] of [[a,ao],[b,bo]]){
+    const ll=new THREE.Line(new THREE.BufferGeometry().setFromPoints([mp,dp]),leaderMat);
+    ll.computeLineDistances(); dimGroup.add(ll);
+  }
+  const sp=makeTextSprite(label);
+  sp.position.copy(ao.clone().add(bo).multiplyScalar(0.5));
+  dimGroup.add(sp);
+}
+
+const extW=panelW, extH=H+2*ply, extD=D+2*ply, offy=4;
+dimLine(new THREE.Vector3(-extW/2,-extH/2,-extD/2),new THREE.Vector3(-extW/2,extH/2,-extD/2),
+  `${extH.toFixed(1)}″ height`,new THREE.Vector3(-offy,0,-offy));
+dimLine(new THREE.Vector3(-extW/2,-extH/2,-extD/2),new THREE.Vector3(-extW/2,-extH/2,extD/2),
+  `${extD.toFixed(1)}″ depth`,new THREE.Vector3(-offy,-offy,0));
+dimLine(new THREE.Vector3(-extW/2,-extH/2,-extD/2),new THREE.Vector3(extW/2,-extH/2,-extD/2),
+  `${extW.toFixed(1)}″ width`,new THREE.Vector3(0,-offy,-offy));
+dimLine(new THREE.Vector3(extW/2,-H/2,extD/2),new THREE.Vector3(extW/2,H/2,extD/2),
+  `${H.toFixed(1)}″ filter (20 nom)`,new THREE.Vector3(offy*1.6,0,offy*0.5),0x2277aa);
+dimLine(new THREE.Vector3(extW/2,H/2,-D/2),new THREE.Vector3(extW/2,H/2,D/2),
+  `${D.toFixed(1)}″ filter (25 nom)`,new THREE.Vector3(offy*1.6,offy*0.5,0),0x2277aa);
+const fanCY=fanY(0);
+dimLine(new THREE.Vector3(-fanFrame/2,fanCY,-extD/2),new THREE.Vector3(fanFrame/2,fanCY,-extD/2),
+  `${fanFrame.toFixed(1)}″ fan (120mm)`,new THREE.Vector3(0,0,-offy*1.5),0x333333);
+dimLine(new THREE.Vector3(-extW/2,extH/2,-(D/2+ply)),new THREE.Vector3(-extW/2,extH/2,-D/2),
+  `${ply}″ ply`,new THREE.Vector3(-offy*1.5,offy*1.2,0),0x888888);
+
+let dimVisible=false;
+function toggleDimensions(){
+  dimVisible=!dimVisible;
+  dimGroup.visible=dimVisible;
+  setToggle('btnDimOn','btnDimOff',dimVisible);
+  // Auto-collapse so dimension lines align with assembled box
+  if(dimVisible) collapseView();
+}
+
+// ─── Wood stain selector (3 options) ───
+let stainMode='raw';
+const STAIN_COLORS={
+  raw:    {col:new THREE.Color(0xd2b48c), shine:18, swatch:'#ddc89e'},
+  oil:    {col:new THREE.Color(0x8b6340), shine:25, swatch:'#8b6340'},
+  walnut: {col:new THREE.Color(0x4a2c17), shine:30, swatch:'#4a2c17'},
+};
+function setStain(mode){
+  stainMode=mode;
+  document.querySelectorAll('#btnStainRaw,#btnStainOil,#btnStainWalnut').forEach(b=>b.classList.remove('on'));
+  document.getElementById(mode==='raw'?'btnStainRaw':mode==='oil'?'btnStainOil':'btnStainWalnut').classList.add('on');
+  const s=STAIN_COLORS[mode];
+  for(const m of allBirchMats){
+    m.color.copy(s.col);
+    m.shininess=s.shine;
+    m.needsUpdate=true;
+  }
+  document.getElementById('legendWood').querySelector('.swatch').style.background=s.swatch;
+}
+
+// ─── Layout toggle (Front+Back vs Front+Top) ───
+let layoutMode='fb';
+function setLayout(mode){
+  layoutMode=mode;
+  document.querySelectorAll('#btnLayoutFB,#btnLayoutFT').forEach(b=>b.classList.remove('on'));
+  document.getElementById(mode==='fb'?'btnLayoutFB':'btnLayoutFT').classList.add('on');
+  // Front+Back: show backGroup + topPanel, hide alternates
+  // Front+Top: hide backGroup + topPanel, show altBackGroup + altTopGroup
+  backGroup.visible=(mode==='fb');
+  parts.top.visible=(mode==='fb');
+  altBackGroup.visible=(mode==='ft');
+  altTopGroup.visible=(mode==='ft');
+}
+
+// ─── Leg style toggle (wood / rubber) ───
+function toggleLegs(){
+  legsAreRubber=!legsAreRubber;
+  setToggle('btnLegsRubber','btnLegsWood',legsAreRubber);
+  for(const leg of allLegMeshes){
+    leg.material=legsAreRubber?rubberMat:woodLegMat;
+  }
+}
+
+// ─── Fan color toggle (black / white) ───
+let fansWhite=false;
+let fansRGB=true; // start as RGB (frosted translucent blades)
+const FAN_BLACK={frame:0x1a1a1a,hub:0x111111,cap:0x181818,blade:0x1e1e1e};
+const FAN_WHITE={frame:0xe8e8e8,hub:0xdddddd,cap:0xd0d0d0,blade:0xf0f0f0};
+const BLADE_FROSTED={color:0xf0ece8,opacity:0.65,shininess:30};
+
+function applyBladeStyle(){
+  const c=fansWhite?FAN_WHITE:FAN_BLACK;
+  for(let i=0;i<allFanMats.length;i+=4){
+    const blade=allFanMats[i+3];
+    if(fansRGB){
+      blade.color.setHex(BLADE_FROSTED.color);
+      blade.transparent=true;
+      blade.opacity=BLADE_FROSTED.opacity;
+      blade.shininess=BLADE_FROSTED.shininess;
+      blade.depthWrite=false;
+    } else {
+      blade.color.setHex(c.blade);
+      blade.transparent=false;
+      blade.opacity=1.0;
+      blade.shininess=20;
+      blade.depthWrite=true;
+    }
+    blade.needsUpdate=true;
+  }
+}
+
+function toggleFanColor(){
+  fansWhite=!fansWhite;
+  setToggle('btnFanWhite','btnFanBlack',fansWhite);
+  const c=fansWhite?FAN_WHITE:FAN_BLACK;
+  for(let i=0;i<allFanMats.length;i+=4){
+    allFanMats[i].color.setHex(c.frame);
+    allFanMats[i+1].color.setHex(c.hub);
+    allFanMats[i+2].color.setHex(c.cap);
+  }
+  applyBladeStyle();
+}
+
+function toggleFanRGB(){
+  fansRGB=!fansRGB;
+  setToggle('btnBladeRGB','btnBladeSolid',fansRGB);
+  document.getElementById('rgbRow').style.display=fansRGB?'flex':'none';
+  if(!fansRGB) setRGB('off');
+  applyBladeStyle();
+}
+
+// ─── RGB LED control ───
+const RGB_COLORS={
+  red:   {hex:0xff2200, intensity:5},
+  yellow:{hex:0xffcc00, intensity:4},
+  green: {hex:0x00ff44, intensity:4},
+  off:   {hex:0x000000, intensity:0}
+};
+let currentRGB='off';
+let filterMatRef=null; // set after filter is created
+function setRGB(color){
+  currentRGB=color;
+  const c=RGB_COLORS[color];
+  // Update RGB button active states — ring highlight on selected
+  document.querySelectorAll('#rgbRow button').forEach(b=>b.classList.remove('on'));
+  const rgbBtnMap={red:'btnRgbR',yellow:'btnRgbY',green:'btnRgbG',off:'btnRgbOff'};
+  if(rgbBtnMap[color]) document.getElementById(rgbBtnMap[color]).classList.add('on');
+  for(const gl of allFanGlows){
+    gl.color.setHex(c.hex);
+    gl.intensity=c.intensity;
+  }
+  const emissiveHex=color==='off'?0x000000:c.hex;
+  const emissiveIntensity=color==='off'?0:0.3;
+  // Fan blades + hub caps
+  for(let i=0;i<allFanMats.length;i+=4){
+    allFanMats[i+3].emissive.setHex(emissiveHex);
+    allFanMats[i+3].emissiveIntensity=emissiveIntensity;
+    allFanMats[i+2].emissive.setHex(emissiveHex);
+    allFanMats[i+2].emissiveIntensity=emissiveIntensity*0.5;
+  }
+  // Filters glow from light passing through
+  const filterGlow=color==='off'?0:0.12;
+  scene.traverse(obj=>{
+    if(!obj.isMesh) return;
+    const m=obj.material;
+    if(m&&m._isFilterMat){
+      m.emissive.setHex(emissiveHex);
+      m.emissiveIntensity=filterGlow;
+    }
+  });
+  // Plywood gets a subtle ambient tint from internal light
+  const woodGlow=color==='off'?0:0.06;
+  for(const m of allBirchMats){
+    m.emissive.setHex(emissiveHex);
+    m.emissiveIntensity=woodGlow;
+  }
+}
+
+// ─── X-ray transparency toggle ───
+let xrayOn=false;
+function toggleXray(){
+  xrayOn=!xrayOn;
+  setToggle('btnXrayOn','btnXrayOff',xrayOn);
+  scene.traverse(obj=>{
+    if(!obj.isMesh) return;
+    if(obj._isRoom) return; // skip room objects
+    const mat=obj.material;
+    if(!mat) return;
+    if(xrayOn){
+      if(mat._origOpacity===undefined) mat._origOpacity=mat.opacity;
+      if(mat._origTransp===undefined) mat._origTransp=mat.transparent;
+      if(mat._origDepthW===undefined) mat._origDepthW=mat.depthWrite;
+      mat.transparent=true;
+      mat.opacity=0.35;
+      mat.depthWrite=false;
+      mat.needsUpdate=true;
+    } else {
+      if(mat._origOpacity!==undefined){
+        mat.opacity=mat._origOpacity;
+        mat.transparent=mat._origTransp;
+        mat.depthWrite=mat._origDepthW;
+        delete mat._origOpacity;
+        delete mat._origTransp;
+        delete mat._origDepthW;
+        mat.needsUpdate=true;
+      }
+    }
+  });
+}
+
+// ─── Room environment for scale ───
+const floorY = -(H/2 + ply + 0.75); // bottom of legs
+
+// Enable shadows on all purifier meshes
+scene.traverse(obj=>{ if(obj.isMesh){ obj.castShadow=true; obj.receiveShadow=true; } });
+
+// Floor — large plane with subtle grid
+const floorGeo = new THREE.PlaneGeometry(200, 200);
+const floorMat = new THREE.MeshStandardMaterial({color:0x3a3a4a, roughness:0.85, metalness:0.0});
+const floor = new THREE.Mesh(floorGeo, floorMat);
+floor.rotation.x = -Math.PI/2;
+floor.position.y = floorY;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// Subtle grid on floor
+const gridHelper = new THREE.GridHelper(200, 80, 0x3a3a4a, 0x2e2e3e);
+gridHelper.position.y = floorY + 0.01;
+scene.add(gridHelper);
+
+// Helper: simple box with shadow
+function roomBox(w,h,d,color,x,y,z,rx,ry,rz){
+  const g=new THREE.BoxGeometry(w,h,d);
+  const m=new THREE.MeshStandardMaterial({color,roughness:0.7,metalness:0.05});
+  const mesh=new THREE.Mesh(g,m);
+  mesh.position.set(x,y,z);
+  if(rx) mesh.rotation.x=rx;
+  if(ry) mesh.rotation.y=ry;
+  if(rz) mesh.rotation.z=rz;
+  mesh.castShadow=true;
+  mesh.receiveShadow=true;
+  mesh._isRoom=true;
+  scene.add(mesh);
+  return mesh;
+}
+
+// ─── Zinus Queen Piper Upholstered Platform Bed ───
+// 82.3"L × 60.3"W × 42"H, 6.5" ground clearance, slats at 14" from floor
+const bedL=82.3, bedW=60.3, bedH=42, bedClearance=6.5, bedSlatsFromFloor=14;
+const bedX=-bedW/2-12, bedZ=49.75-bedL/2; // bed to the left, headboard flush against wall (+Z)
+
+// Nightstand / side table (18"w × 24"h × 14"d) — between bed and purifier
+const tblW=18, tblH=24, tblD=14;
+const tblX=bedX+bedW/2+tblW/2+3, tblZ=49.75-tblD/2-2;
+roomBox(tblW, 0.75, tblD, 0x6b4e3d, tblX, floorY+tblH, tblZ, 0,0,0); // tabletop
+roomBox(1.2, tblH-0.75, 1.2, 0x5a3f2e, tblX-tblW/2+1.5, floorY+tblH/2, tblZ-tblD/2+1.5,0,0,0); // legs
+roomBox(1.2, tblH-0.75, 1.2, 0x5a3f2e, tblX+tblW/2-1.5, floorY+tblH/2, tblZ-tblD/2+1.5,0,0,0);
+roomBox(1.2, tblH-0.75, 1.2, 0x5a3f2e, tblX-tblW/2+1.5, floorY+tblH/2, tblZ+tblD/2-1.5,0,0,0);
+roomBox(1.2, tblH-0.75, 1.2, 0x5a3f2e, tblX+tblW/2-1.5, floorY+tblH/2, tblZ+tblD/2-1.5,0,0,0);
+
+// Coffee mug on table (3.5" tall, 3" dia)
+const mugGeo = new THREE.CylinderGeometry(1.5, 1.4, 3.5, 16);
+const mugMat = new THREE.MeshStandardMaterial({color:0xeeeeee, roughness:0.3});
+const mug = new THREE.Mesh(mugGeo, mugMat);
+mug.position.set(tblX-3, floorY+tblH+1.75, tblZ+2);
+mug.castShadow=true; mug._isRoom=true;
+scene.add(mug);
+
+// Wall section behind (suggestion of a room)
+roomBox(120, 80, 0.5, 0x3e3e50, 0, floorY+40, 50, 0,0,0);
+
+// Baseboard
+roomBox(120, 3, 0.6, 0x2a2a3a, 0, floorY+1.5, 49.5, 0,0,0);
+
+// Book stack on table (for fun)
+roomBox(5, 1.2, 7, 0x8b4513, tblX+4, floorY+tblH+0.6, tblZ-1, 0, 0.1, 0);
+roomBox(4.5, 0.8, 6.5, 0x2d5a27, tblX+4, floorY+tblH+1.6, tblZ-1, 0, -0.05, 0);
+
+// Upholstered headboard (full height, at back of bed)
+const hbThick=3, hbH=bedH-bedClearance, hbW=bedW;
+const headboard=roomBox(hbW, hbH, hbThick, 0x4a4a55,
+  bedX, floorY+bedClearance+hbH/2, bedZ+bedL/2-hbThick/2, 0,0,0);
+// Give headboard a fabric look
+headboard.material.roughness=0.95;
+
+// Side rails — upholstered panels running the length
+const railH=bedSlatsFromFloor-bedClearance; // height from clearance to slat level = 7.5"
+const railThick=1.5;
+const railY=floorY+bedClearance+railH/2;
+// Left rail
+const lRail=roomBox(railThick, railH, bedL, 0x4a4a55,
+  bedX-bedW/2+railThick/2, railY, bedZ, 0,0,0);
+lRail.material.roughness=0.95;
+// Right rail
+const rRail=roomBox(railThick, railH, bedL, 0x4a4a55,
+  bedX+bedW/2-railThick/2, railY, bedZ, 0,0,0);
+rRail.material.roughness=0.95;
+
+// Footboard — lower profile
+const fbH=railH, fbThick=2;
+const footboard=roomBox(bedW, fbH, fbThick, 0x4a4a55,
+  bedX, railY, bedZ-bedL/2+fbThick/2, 0,0,0);
+footboard.material.roughness=0.95;
+
+// Slat platform (at 14" from floor)
+const slatY=floorY+bedSlatsFromFloor;
+roomBox(bedW-2*railThick, 1.0, bedL-hbThick-fbThick, 0x3a3a44,
+  bedX, slatY, bedZ+(hbThick-fbThick)/2, 0,0,0);
+
+// Legs — short cylinders at corners (ground clearance = 6.5")
+const legBedH=bedClearance, legBedR=1.2;
+for(const [lx,lz] of [
+  [bedX-bedW/2+3, bedZ-bedL/2+3],
+  [bedX+bedW/2-3, bedZ-bedL/2+3],
+  [bedX-bedW/2+3, bedZ+bedL/2-3],
+  [bedX+bedW/2-3, bedZ+bedL/2-3],
+]){
+  const lg=new THREE.CylinderGeometry(legBedR,legBedR,legBedH,12);
+  const lm=new THREE.MeshStandardMaterial({color:0x222222,roughness:0.6});
+  const lmesh=new THREE.Mesh(lg,lm);
+  lmesh.position.set(lx, floorY+legBedH/2, lz);
+  lmesh.castShadow=true; lmesh.receiveShadow=true; lmesh._isRoom=true;
+  scene.add(lmesh);
+}
+
+// Mattress (approx 60"×80"×10")
+const mattW=58, mattL=78, mattH=10;
+const mattY=slatY+1+mattH/2;
+const mattress=roomBox(mattW, mattH, mattL, 0xf0ece6,
+  bedX, mattY, bedZ+(hbThick-fbThick)/2, 0,0,0);
+mattress.material.roughness=0.92;
+mattress.material.color.set(0xeee8dd);
+
+// Pillow pair
+for(const px of [-12, 12]){
+  const pillowGeo=new THREE.BoxGeometry(20, 5, 10);
+  // Round edges by scaling — it's simple geometry but reads as a pillow
+  const pillowMat=new THREE.MeshStandardMaterial({color:0xfaf8f4,roughness:0.9});
+  const pillow=new THREE.Mesh(pillowGeo, pillowMat);
+  pillow.position.set(bedX+px, mattY+mattH/2+2.5, bedZ+bedL/2-hbThick-8);
+  pillow.castShadow=true; pillow.receiveShadow=true; pillow._isRoom=true;
+  scene.add(pillow);
+}
+
+// Duvet / comforter draped over mattress
+const duvetH=3;
+roomBox(mattW+4, duvetH, mattL-18, 0xd5cfc5,
+  bedX, mattY+mattH/2+duvetH/2, bedZ+10, 0,0,0);
+
+
+// ─── Animate ───
+function animate(){
+  requestAnimationFrame(animate);
+
+  // Lerp explode positions
+  for(const k in targets){
+    if(parts[k]) parts[k].position.lerp(targets[k],0.1);
+  }
+
+  // Fan spin
+  spinSpeed+=(spinTarget-spinSpeed)*0.03;
+  if(spinSpeed>0.001){
+    for(const rotor of allRotors){
+      const ax=rotor.userData.axis;
+      if(ax.z!==0) rotor.rotation.z+=spinSpeed*(ax.z>0?1:-1);
+      else if(ax.y!==0) rotor.rotation.z+=spinSpeed*(ax.y>0?1:-1); // top-mounted fans
+    }
+  }
+
+  // Air particles: smooth parametric flow — fade in, travel path, fade out, seamless loop
+  if(airflowOn){
+    const pos=particleGeo.attributes.position;
+    const col=particleGeo.attributes.color;
+    const speedMul=spinning?(0.4+0.6*(spinSpeed/SPIN_MAX)):0.5;
+    for(let i=0;i<PARTICLE_COUNT;i++){
+      particleT[i]+=particleTSpeed[i]*speedMul;
+      if(particleT[i]>=1.0) initParticle(i,false); // seamless reset at t=1
+      const t=particleT[i];
+      const sd=particleSide[i];
+      const ed=particleExitDir[i];
+      const x=pathX(t,sd);
+      const z=pathZ(t,particleZ0[i],ed);
+      // Gentle wobble
+      particleWobble[i]+=0.05;
+      const wobY=Math.sin(particleWobble[i])*0.15;
+      pos.setXYZ(i,x,particleY0[i]+wobY,z);
+      // Fade: 0→0.12 fade in, 0.85→1.0 fade out, full brightness in between
+      let alpha=1.0;
+      if(t<0.12) alpha=t/0.12;
+      else if(t>0.85) alpha=1.0-(t-0.85)/0.15;
+      // Blue tint: brighter when inside box
+      const inBox=(t>0.2&&t<0.75);
+      const r=inBox?0.35*alpha:0.25*alpha;
+      const g=inBox?0.78*alpha:0.65*alpha;
+      const b=1.0*alpha;
+      col.setXYZ(i,r,g,b);
+    }
+    pos.needsUpdate=true;
+    col.needsUpdate=true;
+  }
+
+  camera.position.x=radius*Math.sin(polar)*Math.sin(azimuth);
+  camera.position.y=radius*Math.cos(polar);
+  camera.position.z=radius*Math.sin(polar)*Math.cos(azimuth);
+  camera.lookAt(0,0,0);
+  renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>
