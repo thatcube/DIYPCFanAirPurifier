@@ -79,6 +79,8 @@
     /* Panel open/close transitions */
     .panel-l { transition: opacity 0.25s ease, transform 0.25s ease; }
     .panel-l.collapsed { opacity: 0; pointer-events: none; transform: translateY(-8px) scale(0.96); }
+    .panel-r { transition: opacity 0.25s ease, transform 0.25s ease; }
+    .panel-r.collapsed { opacity: 0; pointer-events: none; transform: translateY(-8px) scale(0.96); }
 
     /* Legend inside panel on small screens */
     .panel-legend { display: none; border-top: 1px solid rgba(255,255,255,0.15); margin-top: 4px; padding-top: 6px; }
@@ -116,6 +118,9 @@
     body.night-mode .hint { color: rgba(255,255,255,0.35); }
     .fps { position: absolute; bottom: 8px; right: 10px; font-size: 10px; color: rgba(255,255,255,0.4); font-family: monospace; pointer-events: none; display: none; }
     .fps.show { display: block; }
+
+    /* Zen mode — hide all UI */
+    body.zen .panel, body.zen .fab, body.zen .hint, body.zen .fps { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.3s ease; }
 
     /* Keyboard shortcuts dialog */
     .shortcuts-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
@@ -202,6 +207,8 @@
       <tr><td><kbd>?</kbd></td><td>Toggle this dialog</td></tr>
       <tr><td><kbd>A</kbd></td><td>Show XYZ axes</td></tr>
       <tr><td><kbd>F</kbd></td><td>Show FPS counter</td></tr>
+      <tr><td><kbd>L</kbd></td><td>Toggle legend</td></tr>
+      <tr><td><kbd>H</kbd></td><td>Hide all UI (any key restores)</td></tr>
     </table>
     <div class="dismiss">Press <b>?</b> or click outside to close</div>
   </div>
@@ -2580,10 +2587,20 @@ function checkPerformance(fps){
 }
 
 document.addEventListener('keydown',e=>{
+  // Zen mode: any key (except H again) restores UI
+  if(document.body.classList.contains('zen')){
+    document.body.classList.remove('zen');
+    if(e.key==='h'||e.key==='H') return; // don't re-trigger
+    return; // consume the keypress that restored UI
+  }
   if(e.key==='f'||e.key==='F') document.getElementById('fps').classList.toggle('show');
   if(e.key==='a'||e.key==='A') axesGroup.visible=!axesGroup.visible;
+  if(e.key==='l'||e.key==='L') document.querySelector('.panel-r').classList.toggle('collapsed');
+  if(e.key==='h'||e.key==='H') document.body.classList.add('zen');
   if(e.key==='?') document.getElementById('shortcutsOverlay').classList.toggle('visible');
 });
+// Double-tap or double-click also exits zen mode
+document.addEventListener('dblclick',()=>document.body.classList.remove('zen'));
 animate();
 </script>
 </body>
