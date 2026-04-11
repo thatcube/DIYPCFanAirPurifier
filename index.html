@@ -90,24 +90,33 @@
 
     /* Responsive: small screens */
     @media (max-width: 520px) {
-      .panel-l { width: calc(100vw - 24px); left: 12px; right: 12px; max-height: calc(100vh - 70px); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; font-size: 1rem; }
+      .panel-l { width: calc(100vw - 24px); left: 12px; right: 12px; max-height: calc(100vh - 70px); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 16px; gap: 6px; }
       .panel-l.mobile-init { opacity: 0; pointer-events: none; transform: translateY(-8px) scale(0.96); }
       .panel-r { display: none; }
       .panel-legend { display: block; }
-      .section { font-size: 0.6rem; margin-top: 0.6em; }
-      .seg button { font-size: 0.7rem; padding: 0.5em 0.25em; gap: 2px; }
-      .picker-label { font-size: 0.65rem; }
-      .toggle-label { font-size: 0.75rem; }
-      .toggle-switch { width: 2.4em; height: 1.35em; border-radius: 0.7em; }
-      .toggle-switch::after { width: 0.95em; height: 0.95em; border-radius: 50%; top: 0.15em; left: 0.15em; }
-      .toggle-switch.on::after { left: 1.2em; }
-      .slider-row label { font-size: 0.65rem; }
-      .slider-row .slider-val { font-size: 0.65rem; }
-      .panel-title { font-size: 0.75rem; }
-      .panel-legend .legend-item { font-size: 0.65rem; }
-      .fab { top: 12px; left: 12px; font-size: 0.8rem; height: 2.8em; padding: 0 1em; border-radius: 1em; }
-      .fab i { font-size: 1.1em; }
+      .section { font-size: 11px; margin-top: 12px; }
+      .seg { gap: 6px; }
+      .seg button { font-size: 14px; padding: 12px 6px; border-radius: 10px; }
+      .picker-label { font-size: 12px; padding: 4px 2px 5px; }
+      .toggle-row { padding: 8px 2px; }
+      .toggle-label { font-size: 14px; }
+      .toggle-switch { width: 44px; height: 26px; border-radius: 13px; }
+      .toggle-switch::after { width: 20px; height: 20px; border-radius: 10px; top: 2px; left: 2px; }
+      .toggle-switch.on::after { left: 20px; }
+      .slider-row { padding: 8px 2px; }
+      .slider-row label { font-size: 13px; }
+      .slider-row input[type=range] { height: 6px; }
+      .slider-row input[type=range]::-webkit-slider-thumb { width: 22px; height: 22px; border-radius: 11px; }
+      .slider-row .slider-val { font-size: 13px; }
+      .panel-title { font-size: 14px; }
+      .panel-close { width: 34px; height: 34px; font-size: 16px; }
+      .panel-legend .legend-item { font-size: 13px; line-height: 2.2; }
+      .panel-legend .swatch { width: 12px; height: 12px; }
+      .rgb-seg button { font-size: 14px !important; padding: 10px 4px !important; }
+      .fab { top: 12px; left: 12px; font-size: 15px; height: 46px; padding: 0 16px; border-radius: 14px; gap: 8px; }
+      .fab i { font-size: 18px; }
       .fab.mobile-init { opacity: 1; pointer-events: auto; transform: scale(1); }
+      .hint { font-size: 13px; bottom: 14px; }
     }
     @media (min-width: 521px) and (max-width: 768px) {
       .panel-l { width: 210px; }
