@@ -65,8 +65,10 @@
     .slider-row .slider-val { font-size: 10px; color: rgba(255,255,255,0.5); min-width: 26px; text-align: right; }
 
     /* FAB toggle button */
-    .fab { position: absolute; top: 12px; left: 12px; width: 42px; height: 42px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.06); backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.06), inset 0 0 0 0.5px rgba(255,255,255,0.3), inset 0 0 12px 0 rgba(255,255,255,0.08), inset 0 1px 1px rgba(255,255,255,0.4), inset 0 -1px 1px rgba(255,255,255,0.1); color: rgba(255,255,255,0.9); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.25s ease; z-index: 10; overflow: hidden; }
+    .fab { position: absolute; top: 12px; left: 12px; height: 42px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.06); backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.06), inset 0 0 0 0.5px rgba(255,255,255,0.3), inset 0 0 12px 0 rgba(255,255,255,0.08), inset 0 1px 1px rgba(255,255,255,0.4), inset 0 -1px 1px rgba(255,255,255,0.1); color: rgba(255,255,255,0.9); font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 14px; transition: all 0.25s ease; z-index: 10; overflow: hidden; white-space: nowrap; }
     .fab::before { content: ''; position: absolute; inset: 0; border-radius: 15px; filter: url(#glass-refract); background: rgba(255,255,255,0.015); mix-blend-mode: overlay; opacity: 0.6; pointer-events: none; }
+    .fab i { font-size: 16px; line-height: 1; }
+    .fab-label { letter-spacing: 0.3px; }
     .fab:hover { background: rgba(255,255,255,0.12); }
     .fab.hidden { opacity: 0; pointer-events: none; transform: scale(0.8); }
 
@@ -89,10 +91,12 @@
     /* Responsive: small screens */
     @media (max-width: 520px) {
       .panel-l { width: calc(100vw - 24px); left: 12px; right: 12px; max-height: calc(100vh - 24px); overflow-y: auto; }
+      .panel-l.mobile-init { opacity: 0; pointer-events: none; transform: translateY(-8px) scale(0.96); }
       .panel-r { display: none; }
       .panel-legend { display: block; }
       .seg button { font-size: 10px; padding: 7px 3px; gap: 2px; }
       .fab { top: 12px; left: 12px; }
+      .fab.mobile-init { opacity: 1; pointer-events: auto; transform: scale(1); }
     }
     @media (min-width: 521px) and (max-width: 768px) {
       .panel-l { width: 210px; }
@@ -150,7 +154,7 @@
 <canvas id="c"></canvas>
 <div class="hint">drag to rotate · scroll to zoom · press <b>?</b> for shortcuts</div>
 <div class="fps" id="fps"></div>
-<button class="fab hidden" id="fab" onclick="togglePanel()"><i class="ph ph-sliders-horizontal"></i></button>
+<button class="fab hidden" id="fab" onclick="togglePanel()"><i class="ph ph-sliders-horizontal"></i><span class="fab-label">Controls</span></button>
 <div class="panel panel-l" id="panelL">
   <div class="panel-header"><span class="panel-title">Controls</span><button class="panel-close" onclick="togglePanel()" title="Hide controls"><i class="ph ph-x"></i></button></div>
 
@@ -220,12 +224,19 @@
 function togglePanel() {
   const panel = document.getElementById('panelL');
   const fab = document.getElementById('fab');
+  panel.classList.remove('mobile-init');
+  fab.classList.remove('mobile-init');
   const isCollapsed = panel.classList.toggle('collapsed');
   if (isCollapsed) {
     fab.classList.remove('hidden');
   } else {
     fab.classList.add('hidden');
   }
+}
+// On small screens, start with panel collapsed and FAB visible
+if(window.innerWidth<=520){
+  document.getElementById('panelL').classList.add('collapsed','mobile-init');
+  const fab=document.getElementById('fab'); fab.classList.remove('hidden'); fab.classList.add('mobile-init');
 }
 
 const canvas = document.getElementById('c');
@@ -1091,7 +1102,7 @@ const pegGeo=new THREE.CylinderGeometry(legR,legR*0.85,legH,16);
 
 // Round wooden foot — 2.5" tall, 0.55" radius, rounded cylinder
 const bunFootH=2.5, bunFootR=0.55;
-const bunInset=1.2; // pull bun feet well inside panel edges
+const bunInset=0.75; // inset from panel edges for round feet
 const bunGeo=(function(){
   const pts=[];
   const hH=bunFootH/2;
@@ -2596,7 +2607,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='f'||e.key==='F') document.getElementById('fps').classList.toggle('show');
   if(e.key==='a'||e.key==='A') axesGroup.visible=!axesGroup.visible;
   if(e.key==='l'||e.key==='L') document.querySelector('.panel-r').classList.toggle('collapsed');
-  if(e.key==='h'||e.key==='H') document.body.classList.add('zen');
+  if(e.key==='h'||e.key==='H'){ document.getElementById('shortcutsOverlay').classList.remove('visible'); document.body.classList.add('zen'); }
   if(e.key==='?') document.getElementById('shortcutsOverlay').classList.toggle('visible');
 });
 // Double-tap or double-click also exits zen mode
