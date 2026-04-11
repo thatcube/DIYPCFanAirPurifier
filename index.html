@@ -4,24 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DIY Air Purifier – 3D Model</title>
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
     #viewer { width: 100%; height: 100%; position: relative; }
     canvas { width: 100%; height: 100%; display: block; }
     .hint { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 12px; color: rgba(255,255,255,0.5); pointer-events: none; }
-    .panel { position: absolute; top: 12px; background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-radius: 12px; padding: 10px; border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
-    .panel-l { left: 12px; width: 176px; display: flex; flex-direction: column; gap: 3px; }
-    .panel-r { right: 12px; font-size: 11px; color: #555; line-height: 2; padding: 8px 12px; }
-    .section { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: #999; margin-top: 6px; padding-left: 2px; }
+    .panel { position: absolute; top: 12px; background: rgba(20,20,30,0.55); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); border-radius: 16px; padding: 10px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 4px 30px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.08); }
+    .panel-l { left: 12px; width: 210px; display: flex; flex-direction: column; gap: 3px; }
+    .panel-r { right: 12px; font-size: 11px; color: rgba(255,255,255,0.9); line-height: 2; padding: 8px 12px; }
+    .section { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.5); margin-top: 6px; padding-left: 2px; display: flex; align-items: center; gap: 4px; }
+    .section i { font-size: 11px; }
     .section:first-child { margin-top: 0; }
-    .seg { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid #ddd; }
-    .seg button { flex: 1; font-size: 11px; padding: 5px 0; border: none; cursor: pointer; background: #fff; color: #888; transition: all 0.15s; font-family: inherit; }
-    .seg button:not(:last-child) { border-right: 1px solid #ddd; }
-    .seg button:hover { background: #f5f5f5; }
-    .seg button.on { background: #2d2d2d; color: #fff; }
-    .seg button.on:hover { background: #3a3a3a; }
-    .rgb-seg button { color: #fff; font-weight: 600; font-size: 11px; padding: 4px 0; }
+    .seg { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); }
+    .seg button { flex: 1; font-size: 10px; padding: 6px 4px; border: none; cursor: pointer; background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7); transition: all 0.15s; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .seg button i { font-size: 13px; line-height: 1; flex-shrink: 0; }
+    .seg button:not(:last-child) { border-right: 1px solid rgba(255,255,255,0.08); }
+    .seg button:hover { background: rgba(255,255,255,0.12); }
+    .seg button.on { background: rgba(255,255,255,0.18); color: #fff; font-weight: 500; }
+    .seg button.on:hover { background: rgba(255,255,255,0.24); }
+    .rgb-seg button { color: #fff; font-weight: 600; font-size: 11px; padding: 5px 0; }
     .rgb-seg button:hover { filter: brightness(1.1); }
     .rgb-seg .rb { background: #dc3545; }
     .rgb-seg .yb { background: #e6a817; }
@@ -29,62 +32,116 @@
     .rgb-seg .ob { background: #999; }
     .rgb-seg button.on { box-shadow: inset 0 0 0 2px #fff, 0 0 0 1.5px #333; }
     .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+
+    /* FAB toggle button */
+    .fab { position: absolute; top: 12px; left: 12px; width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(20,20,30,0.55); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); box-shadow: 0 4px 30px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.08); color: rgba(255,255,255,0.9); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.25s ease; z-index: 10; }
+    .fab:hover { background: rgba(20,20,30,0.7); }
+    .fab.hidden { opacity: 0; pointer-events: none; transform: scale(0.8); }
+
+    /* Close button inside panel */
+    .panel-close { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7); font-size: 14px; cursor: pointer; transition: all 0.15s; flex-shrink: 0; margin-left: auto; }
+    .panel-close:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    .panel-header { display: flex; align-items: center; margin-bottom: 2px; }
+    .panel-title { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.85); letter-spacing: 0.3px; }
+
+    /* Panel open/close transitions */
+    .panel-l { left: 12px; width: 210px; display: flex; flex-direction: column; gap: 3px; transition: opacity 0.25s ease, transform 0.25s ease; }
+    .panel-l.collapsed { opacity: 0; pointer-events: none; transform: translateY(-8px) scale(0.96); }
+
+    /* Legend inside panel on small screens */
+    .panel-legend { display: none; border-top: 1px solid rgba(255,255,255,0.15); margin-top: 4px; padding-top: 6px; }
+    .panel-legend .legend-item { font-size: 10px; color: rgba(255,255,255,0.75); line-height: 1.8; }
+
+    /* Responsive: small screens */
+    @media (max-width: 520px) {
+      .panel-l { width: calc(100vw - 24px); left: 12px; right: 12px; max-height: calc(100vh - 24px); overflow-y: auto; }
+      .panel-r { display: none; }
+      .panel-legend { display: block; }
+      .seg button { font-size: 10px; padding: 7px 3px; gap: 2px; }
+      .fab { top: 12px; left: 12px; }
+    }
+    @media (min-width: 521px) and (max-width: 768px) {
+      .panel-l { width: 195px; }
+      .seg button { font-size: 10px; }
+    }
   </style>
 </head>
 <body>
 <div id="viewer">
 <canvas id="c"></canvas>
 <div class="hint">drag to rotate · scroll to zoom</div>
-<div class="panel panel-l">
-  <div class="section">View</div>
-  <div class="seg"><button id="btnLayoutFB" class="on" onclick="setLayout('fb')">Front+Back</button><button id="btnLayoutFT" onclick="setLayout('ft')">Front+Top</button></div>
-  <div class="seg"><button id="btnExOn" class="on" onclick="toggleExplode()">Assembled</button><button id="btnExOff" onclick="toggleExplode()">Exploded</button></div>
-  <div class="seg"><button id="btnFlOn" class="on" onclick="toggleFilter()">Filters on</button><button id="btnFlOff" onclick="toggleFilter()">Filters off</button></div>
-  <div class="seg"><button id="btnDimOff" class="on" onclick="toggleDimensions()">Dims off</button><button id="btnDimOn" onclick="toggleDimensions()">Dims on</button></div>
-  <div class="seg"><button id="btnXrayOff" class="on" onclick="toggleXray()">Solid</button><button id="btnXrayOn" onclick="toggleXray()">X-ray</button></div>
-  <div class="section">Fans</div>
-  <div class="seg"><button id="btnSpinOff" class="on" onclick="toggleSpin()">Fans off</button><button id="btnSpinOn" onclick="toggleSpin()">Fans on</button></div>
-  <div class="seg"><button id="btnAirOff" class="on" onclick="toggleAirflow()">Airflow off</button><button id="btnAirOn" onclick="toggleAirflow()">Airflow on</button></div>
-  <div class="seg"><button id="btnFanBlack" class="on" onclick="toggleFanColor()">Black</button><button id="btnFanWhite" onclick="toggleFanColor()">White</button></div>
-  <div class="seg"><button id="btnBladeSolid" onclick="toggleFanRGB()">Solid</button><button id="btnBladeRGB" class="on" onclick="toggleFanRGB()">RGB</button></div>
-  <div id="rgbRow" class="seg rgb-seg"><button id="btnRgbR" class="rb" onclick="setRGB('red')">R</button><button id="btnRgbY" class="yb" onclick="setRGB('yellow')">Y</button><button id="btnRgbG" class="gb" onclick="setRGB('green')">G</button><button id="btnRgbOff" class="ob" onclick="setRGB('off')">Off</button></div>
-  <div class="section">Style</div>
-  <div class="seg"><button id="btnStainRaw" class="on" onclick="setStain('raw')">Raw birch</button><button id="btnStainOil" onclick="setStain('oil')">Oil stain</button><button id="btnStainWalnut" onclick="setStain('walnut')">Walnut</button></div>
-  <div class="seg"><button id="btnLegsWood" class="on" onclick="toggleLegs()">Wood legs</button><button id="btnLegsRubber" onclick="toggleLegs()">Rubber feet</button></div>
+<button class="fab hidden" id="fab" onclick="togglePanel()"><i class="ph ph-sliders-horizontal"></i></button>
+<div class="panel panel-l" id="panelL">
+  <div class="panel-header"><span class="panel-title"><i class="ph ph-sliders-horizontal"></i> Controls</span><button class="panel-close" onclick="togglePanel()" title="Hide controls"><i class="ph ph-x"></i></button></div>
+  <div class="section"><i class="ph ph-eye"></i> View</div>
+  <div class="seg"><button id="btnLayoutFB" class="on" onclick="setLayout('fb')"><i class="ph ph-browsers"></i> Frt+Bck</button><button id="btnLayoutFT" onclick="setLayout('ft')"><i class="ph ph-rows"></i> Frt+Top</button></div>
+  <div class="seg"><button id="btnExOn" class="on" onclick="toggleExplode()"><i class="ph ph-package"></i> Built</button><button id="btnExOff" onclick="toggleExplode()"><i class="ph ph-arrows-out"></i> Explode</button></div>
+  <div class="seg"><button id="btnFlOn" class="on" onclick="toggleFilter()"><i class="ph ph-grid-nine"></i> Filters</button><button id="btnFlOff" onclick="toggleFilter()"><i class="ph ph-eye-slash"></i> Hide</button></div>
+  <div class="seg"><button id="btnDimOff" class="on" onclick="toggleDimensions()"><i class="ph ph-ruler"></i> Off</button><button id="btnDimOn" onclick="toggleDimensions()"><i class="ph ph-ruler"></i> On</button></div>
+  <div class="seg"><button id="btnXrayOff" class="on" onclick="toggleXray()"><i class="ph ph-cube"></i> Solid</button><button id="btnXrayOn" onclick="toggleXray()"><i class="ph ph-cube-transparent"></i> X-ray</button></div>
+  <div class="section"><i class="ph ph-fan"></i> Fans</div>
+  <div class="seg"><button id="btnSpinOff" class="on" onclick="toggleSpin()"><i class="ph ph-prohibit-inset"></i> Off</button><button id="btnSpinOn" onclick="toggleSpin()"><i class="ph ph-fan"></i> Spin</button></div>
+  <div class="seg"><button id="btnAirOff" class="on" onclick="toggleAirflow()"><i class="ph ph-wind"></i> Off</button><button id="btnAirOn" onclick="toggleAirflow()"><i class="ph ph-wind"></i> Flow</button></div>
+  <div class="seg"><button id="btnFanBlack" class="on" onclick="toggleFanColor()"><i class="ph ph-circle-half"></i> Black</button><button id="btnFanWhite" onclick="toggleFanColor()"><i class="ph ph-circle"></i> White</button></div>
+  <div class="seg"><button id="btnBladeSolid" onclick="toggleFanRGB()"><i class="ph ph-palette"></i> Solid</button><button id="btnBladeRGB" class="on" onclick="toggleFanRGB()"><i class="ph ph-rainbow"></i> RGB</button></div>
+  <div id="rgbRow" class="seg rgb-seg"><button id="btnRgbR" class="rb" onclick="setRGB('red')">R</button><button id="btnRgbY" class="yb" onclick="setRGB('yellow')">Y</button><button id="btnRgbG" class="gb" onclick="setRGB('green')">G</button><button id="btnRgbOff" class="ob" onclick="setRGB('off')"><i class="ph ph-power"></i></button></div>
+  <div class="section"><i class="ph ph-paint-brush-broad"></i> Style</div>
+  <div class="seg"><button id="btnStainRaw" class="on" onclick="setStain('raw')"><i class="ph ph-plant"></i> Raw</button><button id="btnStainOil" onclick="setStain('oil')"><i class="ph ph-drop"></i> Oil</button><button id="btnStainWalnut" onclick="setStain('walnut')"><i class="ph ph-drop-half-bottom"></i> Walnut</button></div>
+  <div class="seg"><button id="btnLegsWood" class="on" onclick="toggleLegs()"><i class="ph ph-arrows-out-line-vertical"></i> Wood</button><button id="btnLegsRubber" onclick="toggleLegs()"><i class="ph ph-circles-four"></i> Rubber</button></div>
+  <div class="panel-legend" id="panelLegend">
+    <div class="legend-item"><span class="swatch" style="background:#ddc89e"></span>Plywood (½″ birch)</div>
+    <div class="legend-item"><span class="swatch" style="background:#f0ede6;border:1px solid rgba(255,255,255,0.3)"></span>Filters (MERV 13)</div>
+    <div class="legend-item"><span class="swatch" style="background:#1a1a1a"></span>Fans (P12 Pro 120×120×27mm)</div>
+    <div class="legend-item"><span class="swatch" style="background:#c4a870"></span>Ledge strips</div>
+    <div class="legend-item"><span class="swatch" style="background:#3a3a3a"></span>Foam tape seal</div>
+    <div class="legend-item"><span class="swatch" style="background:#999;border:1px solid rgba(255,255,255,0.3)"></span>Butt joints + screws</div>
+  </div>
 </div>
 <div class="panel panel-r">
-  <div id="legendWood"><span class="swatch" style="background:#ddc89e"></span>Plywood (½″ birch)</div>
-  <div><span class="swatch" style="background:#f0ede6;border:1px solid #ccc"></span>Filters (MERV 13)</div>
-  <div><span class="swatch" style="background:#1a1a1a"></span>Fans (P12 Pro 120×120×27mm)</div>
-  <div><span class="swatch" style="background:#c4a870"></span>Ledge strips</div>
-  <div><span class="swatch" style="background:#3a3a3a"></span>Foam tape seal</div>
-  <div><span class="swatch" style="background:#999;border:1px solid #777"></span>Butt joints + screws</div>
+  <div id="legendWood"><span class="swatch" style="background:#ddc89e"></span><span style="color:rgba(255,255,255,0.85)">Plywood (½″ birch)</span></div>
+  <div><span class="swatch" style="background:#f0ede6;border:1px solid rgba(255,255,255,0.3)"></span><span style="color:rgba(255,255,255,0.85)">Filters (MERV 13)</span></div>
+  <div><span class="swatch" style="background:#1a1a1a"></span><span style="color:rgba(255,255,255,0.85)">Fans (P12 Pro 120×120×27mm)</span></div>
+  <div><span class="swatch" style="background:#c4a870"></span><span style="color:rgba(255,255,255,0.85)">Ledge strips</span></div>
+  <div><span class="swatch" style="background:#3a3a3a"></span><span style="color:rgba(255,255,255,0.85)">Foam tape seal</span></div>
+  <div><span class="swatch" style="background:#999;border:1px solid rgba(255,255,255,0.3)"></span><span style="color:rgba(255,255,255,0.85)">Butt joints + screws</span></div>
 </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
+// Panel toggle
+function togglePanel() {
+  const panel = document.getElementById('panelL');
+  const fab = document.getElementById('fab');
+  const isCollapsed = panel.classList.toggle('collapsed');
+  if (isCollapsed) {
+    fab.classList.remove('hidden');
+  } else {
+    fab.classList.add('hidden');
+  }
+}
+
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false});
 renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
-renderer.setClearColor(0x2a2a3a, 1);
+renderer.setClearColor(0xd4dce8, 1);
 renderer.shadowMap.enabled=true;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=1.4;
+renderer.toneMappingExposure=1.8;
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x2a2a3a, 0.002);
+scene.fog = new THREE.FogExp2(0xd4dce8, 0.0015);
 const camera = new THREE.PerspectiveCamera(42,1,0.1,500);
-// Studio lighting — brighter
-scene.add(new THREE.AmbientLight(0xffffff,0.6));
-const key=new THREE.DirectionalLight(0xfff5e6,1.1); key.position.set(12,25,15);
+// Daytime lighting — bright and warm
+scene.add(new THREE.AmbientLight(0xffffff,0.85));
+const key=new THREE.DirectionalLight(0xfff8f0,1.3); key.position.set(15,30,15);
 key.castShadow=true; key.shadow.mapSize.set(2048,2048);
 key.shadow.camera.near=1; key.shadow.camera.far=120;
 key.shadow.camera.left=-60; key.shadow.camera.right=60;
 key.shadow.camera.top=50; key.shadow.camera.bottom=-50;
 scene.add(key);
-const fill=new THREE.DirectionalLight(0xe8eeff,0.45); fill.position.set(-10,12,-12); scene.add(fill);
-const rim=new THREE.DirectionalLight(0xccddff,0.4); rim.position.set(-6,15,-18); scene.add(rim);
-const bounce=new THREE.DirectionalLight(0xffeedd,0.2); bounce.position.set(0,-10,8); scene.add(bounce);
+const fill=new THREE.DirectionalLight(0xe8eeff,0.6); fill.position.set(-10,12,-12); scene.add(fill);
+const rim=new THREE.DirectionalLight(0xccddff,0.5); rim.position.set(-6,15,-18); scene.add(rim);
+const bounce=new THREE.DirectionalLight(0xffeedd,0.35); bounce.position.set(0,-10,8); scene.add(bounce);
 
 // Filtrete 20x25x1 actual: 19.69×24.69×0.78
 const W=5.44, H=19.69, D=24.69, ply=0.5, ft=0.78;
@@ -1369,19 +1426,29 @@ const floorY = -(H/2 + ply + 0.75); // bottom of legs
 // Enable shadows on all purifier meshes
 scene.traverse(obj=>{ if(obj.isMesh){ obj.castShadow=true; obj.receiveShadow=true; } });
 
-// Floor — large plane with subtle grid
+// Floor — carpet texture
 const floorGeo = new THREE.PlaneGeometry(200, 200);
-const floorMat = new THREE.MeshStandardMaterial({color:0x3a3a4a, roughness:0.85, metalness:0.0});
+const carpetCanvas = document.createElement('canvas');
+carpetCanvas.width = 256; carpetCanvas.height = 256;
+const cctx = carpetCanvas.getContext('2d');
+cctx.fillStyle = '#8a8578';
+cctx.fillRect(0, 0, 256, 256);
+for (let i = 0; i < 12000; i++) {
+  const x = Math.random() * 256, y = Math.random() * 256;
+  const shade = 120 + Math.random() * 40;
+  cctx.fillStyle = `rgb(${shade},${shade-8},${shade-16})`;
+  cctx.fillRect(x, y, 1 + Math.random(), 1 + Math.random() * 2);
+}
+const carpetTex = new THREE.CanvasTexture(carpetCanvas);
+carpetTex.wrapS = carpetTex.wrapT = THREE.RepeatWrapping;
+carpetTex.repeat.set(20, 20);
+const floorMat = new THREE.MeshStandardMaterial({map:carpetTex, roughness:0.95, metalness:0.0, color:0xb0a898});
 const floor = new THREE.Mesh(floorGeo, floorMat);
 floor.rotation.x = -Math.PI/2;
 floor.position.y = floorY;
 floor.receiveShadow = true;
+floor._isRoom = true;
 scene.add(floor);
-
-// Subtle grid on floor
-const gridHelper = new THREE.GridHelper(200, 80, 0x3a3a4a, 0x2e2e3e);
-gridHelper.position.y = floorY + 0.01;
-scene.add(gridHelper);
 
 // Helper: simple box with shadow
 function roomBox(w,h,d,color,x,y,z,rx,ry,rz){
@@ -1421,11 +1488,11 @@ mug.position.set(tblX-3, floorY+tblH+1.75, tblZ+2);
 mug.castShadow=true; mug._isRoom=true;
 scene.add(mug);
 
-// Wall section behind (suggestion of a room)
-roomBox(120, 80, 0.5, 0x3e3e50, 0, floorY+40, 50, 0,0,0);
+// Wall section behind (bright daytime wall)
+roomBox(120, 80, 0.5, 0xd8d4ce, 0, floorY+40, 50, 0,0,0);
 
 // Baseboard
-roomBox(120, 3, 0.6, 0x2a2a3a, 0, floorY+1.5, 49.5, 0,0,0);
+roomBox(120, 3, 0.6, 0xc0bbb4, 0, floorY+1.5, 49.5, 0,0,0);
 
 // Book stack on table (for fun)
 roomBox(5, 1.2, 7, 0x8b4513, tblX+4, floorY+tblH+0.6, tblZ-1, 0, 0.1, 0);
