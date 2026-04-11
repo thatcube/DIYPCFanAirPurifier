@@ -99,18 +99,21 @@
     body.night-mode .toggle-switch { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.1); }
     body.night-mode .toggle-switch.on { background: rgba(80,140,220,0.35); border-color: rgba(80,140,220,0.4); }
     body.night-mode .hint { color: rgba(255,255,255,0.35); }
+    .fps { position: absolute; bottom: 8px; right: 10px; font-size: 10px; color: rgba(255,255,255,0.4); font-family: monospace; pointer-events: none; display: none; }
+    .fps.show { display: block; }
   </style>
 </head>
 <body>
 <div id="viewer">
 <canvas id="c"></canvas>
 <div class="hint">drag to rotate · scroll to zoom</div>
+<div class="fps" id="fps"></div>
 <button class="fab hidden" id="fab" onclick="togglePanel()"><i class="ph ph-sliders-horizontal"></i></button>
 <div class="panel panel-l" id="panelL">
   <div class="panel-header"><span class="panel-title">Controls</span><button class="panel-close" onclick="togglePanel()" title="Hide controls"><i class="ph ph-x"></i></button></div>
 
   <div class="section">View</div>
-  <div class="picker-label">Camera angle</div>
+  <div class="picker-label">Fan layout</div>
   <div class="seg"><button id="btnLayoutFB" class="on" onclick="setLayout('fb')">Front + Back</button><button id="btnLayoutFT" onclick="setLayout('ft')">Front + Top</button></div>
   <div class="toggle-row"><span class="toggle-label">Exploded view</span><div class="toggle-switch" id="togExplode" onclick="toggleExplode()"></div></div>
   <div class="toggle-row"><span class="toggle-label">Show filters</span><div class="toggle-switch on" id="togFilter" onclick="toggleFilter()"></div></div>
@@ -118,7 +121,7 @@
   <div class="toggle-row"><span class="toggle-label">X-ray mode</span><div class="toggle-switch" id="togXray" onclick="toggleXray()"></div></div>
 
   <div class="section">Fans</div>
-  <div class="toggle-row"><span class="toggle-label">Spin fans</span><div class="toggle-switch" id="togSpin" onclick="toggleSpin()"></div></div>
+  <div class="toggle-row"><span class="toggle-label">Spin fans</span><div class="toggle-switch on" id="togSpin" onclick="toggleSpin()"></div></div>
   <div class="toggle-row"><span class="toggle-label">Show airflow</span><div class="toggle-switch" id="togAirflow" onclick="toggleAirflow()"></div></div>
   <div class="picker-label">Fan color</div>
   <div class="seg"><button id="btnFanWhite" class="on" onclick="toggleFanColor()">White</button><button id="btnFanBlack" onclick="toggleFanColor()">Black</button></div>
@@ -170,7 +173,7 @@ function togglePanel() {
 }
 
 const canvas = document.getElementById('c');
-const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false});
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false, powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
 renderer.setClearColor(0xd4dce8, 1);
 renderer.shadowMap.enabled=true;
@@ -185,9 +188,9 @@ scene.add(new THREE.AmbientLight(0xffffff,0.5));
 const key=new THREE.DirectionalLight(0xfff8f0,0.7); key.position.set(-60,38,0); // from the window (left wall)
 key.castShadow=true; key.shadow.mapSize.set(2048,2048);
 key.shadow.bias=-0.002; key.shadow.normalBias=0.04;
-key.shadow.camera.near=1; key.shadow.camera.far=120;
-key.shadow.camera.left=-60; key.shadow.camera.right=60;
-key.shadow.camera.top=50; key.shadow.camera.bottom=-50;
+key.shadow.camera.near=1; key.shadow.camera.far=80;
+key.shadow.camera.left=-20; key.shadow.camera.right=20;
+key.shadow.camera.top=20; key.shadow.camera.bottom=-20;
 scene.add(key);
 const fill=new THREE.DirectionalLight(0xe8eeff,0.35); fill.position.set(-10,12,-12); scene.add(fill);
 const rim=new THREE.DirectionalLight(0xccddff,0.25); rim.position.set(-6,15,-18); scene.add(rim);
@@ -210,6 +213,7 @@ const allRotors=[];
 const allFanMats=[]; // all fan plastic materials (frame, hub, cap, blades)
 const allBraceMats=[]; // brace spoke materials (color-switched with frame)
 const allFanGlows=[]; // PointLight per fan for RGB glow
+let filterMatRef=null; // set inside makePleatedFilter for direct RGB lookup
 
 // Fans stacked touching, equal gap at top/bottom
 const numFans=4;
@@ -524,12 +528,14 @@ function makeFanPanel(flip){
       }
     }
 
-    // RGB glow light (off by default) — large range to fill whole box
-    const glow=new THREE.PointLight(0x000000,0,45);
-    glow.position.set(0,fy,fanZ);
-    g.add(glow);
-    allFanGlows.push(glow);
+    // (RGB glow handled by single panel-level light below)
   }
+
+  // Single RGB glow light per panel side (instead of per-fan)
+  const glow=new THREE.PointLight(0x000000,0,45);
+  glow.position.set(0,0,inDir*(ply/2+fanDepth/2));
+  g.add(glow);
+  allFanGlows.push(glow);
 
   // Foam tape seal on inner face at left/right edges — inset so not visible from outside
   const foamT=0.09, foamW=0.45, foamInset=0.25;
@@ -727,12 +733,15 @@ const altTopGroup=(function(){
       }
     }
 
-    // RGB glow
-    const glow=new THREE.PointLight(0x000000,0,45);
-    glow.position.set(0,fanYPos,fz);
-    g.add(glow);
-    allFanGlows.push(glow);
+    // (RGB glow handled by single panel-level light below)
   }
+
+  // Single RGB glow light for top panel
+  const topGlow=new THREE.PointLight(0x000000,0,45);
+  topGlow.position.set(0,0,0);
+  g.add(topGlow);
+  allFanGlows.push(topGlow);
+
   return g;
 })();
 altTopGroup.position.set(0, H/2+ply/2, 0);
@@ -799,7 +808,7 @@ function makePleatedFilter(){
   filterTex.magFilter=THREE.LinearFilter;
 
   const filterMat=new THREE.MeshPhongMaterial({map:filterTex,color:0xffffff,side:THREE.DoubleSide,shininess:1,transparent:false});
-  filterMat._isFilterMat=true; // tag for RGB glow lookup
+  filterMatRef=filterMat; // cache for direct RGB lookup (avoids scene.traverse)
 
   // Zigzag pleated mesh — vertical folds (step along Y, fold lines run along Z)
   const verts=[], uvs=[], indices=[];
@@ -854,23 +863,53 @@ function makePleatedFilter(){
   const wireGeo=new THREE.BufferGeometry().setFromPoints(wirePoints);
   const wireMat=new THREE.MeshPhongMaterial({color:0x777777,shininess:40});
   const wireRadius=0.01;
-  // Place on both -X and +X faces
+  const wireSeg=4; // segments around each cylinder
+  // Merge all wire strands into a single geometry per face
   for(const sign of [-1,1]){
-    const wireGroup=new THREE.Group();
-    wireGroup.position.x=sign*wireXoff;
+    const positions=[], normals=[], indices=[];
+    let vOffset=0;
     for(let i=0;i<wirePoints.length;i+=2){
       const a=wirePoints[i], b=wirePoints[i+1];
       const dir=new THREE.Vector3().subVectors(b,a);
       const len=dir.length();
-      const cyl=new THREE.Mesh(
-        new THREE.CylinderGeometry(wireRadius,wireRadius,len,4,1),
-        wireMat
-      );
-      cyl.position.set((a.x+b.x)/2,(a.y+b.y)/2,(a.z+b.z)/2);
-      cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.normalize());
-      wireGroup.add(cyl);
+      dir.normalize();
+      // Build a local coordinate frame
+      const up=Math.abs(dir.y)<0.9?new THREE.Vector3(0,1,0):new THREE.Vector3(1,0,0);
+      const perp1=new THREE.Vector3().crossVectors(dir,up).normalize();
+      const perp2=new THREE.Vector3().crossVectors(dir,perp1);
+      const mid=new THREE.Vector3((a.x+b.x)/2,(a.y+b.y)/2,(a.z+b.z)/2);
+      // Two rings: bottom and top
+      for(let ring=0;ring<2;ring++){
+        const along=(ring===0)?-len/2:len/2;
+        for(let s=0;s<wireSeg;s++){
+          const angle=(s/wireSeg)*Math.PI*2;
+          const nx=perp1.x*Math.cos(angle)+perp2.x*Math.sin(angle);
+          const ny=perp1.y*Math.cos(angle)+perp2.y*Math.sin(angle);
+          const nz=perp1.z*Math.cos(angle)+perp2.z*Math.sin(angle);
+          positions.push(
+            mid.x+dir.x*along+nx*wireRadius,
+            mid.y+dir.y*along+ny*wireRadius,
+            mid.z+dir.z*along+nz*wireRadius
+          );
+          normals.push(nx,ny,nz);
+        }
+      }
+      // Triangles connecting the two rings
+      for(let s=0;s<wireSeg;s++){
+        const s1=(s+1)%wireSeg;
+        const b0=vOffset+s, b1=vOffset+s1;
+        const t0=vOffset+wireSeg+s, t1=vOffset+wireSeg+s1;
+        indices.push(b0,t0,b1, b1,t0,t1);
+      }
+      vOffset+=wireSeg*2;
     }
-    g.add(wireGroup);
+    const mergedGeo=new THREE.BufferGeometry();
+    mergedGeo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+    mergedGeo.setAttribute('normal',new THREE.Float32BufferAttribute(normals,3));
+    mergedGeo.setIndex(indices);
+    const wireMesh=new THREE.Mesh(mergedGeo,wireMat);
+    wireMesh.position.x=sign*(pleatDepth+0.02);
+    g.add(wireMesh);
   }
 
   // 1″ white cardboard border on flat faces
@@ -1158,7 +1197,7 @@ const explodeV={
   filterL:new THREE.Vector3(-8,0,0),
   filterR:new THREE.Vector3(8,0,0),
 };
-let exploded=false;
+let exploded=false, explodeLerping=false;
 function setToggle(onId,offId,isOn){
   document.getElementById(onId).classList.toggle('on',isOn);
   document.getElementById(offId).classList.toggle('on',!isOn);
@@ -1166,6 +1205,7 @@ function setToggle(onId,offId,isOn){
 function collapseView(){
   if(!exploded) return;
   exploded=false;
+  explodeLerping=true;
   document.getElementById('togExplode').classList.remove('on');
   for(const k in explodeV){
     if(!parts[k]) continue;
@@ -1185,6 +1225,7 @@ function toggleExplode(){
     if(!parts[k]) continue;
     targets[k]=exploded?origins[k].clone().add(explodeV[k]):origins[k].clone();
   }
+  explodeLerping=true;
 }
 let filterOn=true;
 function toggleFilter(){
@@ -1226,10 +1267,11 @@ function resize(){
 resize(); window.addEventListener('resize',resize);
 
 // ─── Fan spin + air particle system ───
-let spinning=false, spinSpeed=0, spinTarget=0;
+let spinning=true, spinSpeed=0, spinTarget=0;
 const SPIN_MAX=0.18;
+spinTarget=SPIN_MAX; // fans spin by default
 
-const PARTICLE_COUNT=600;
+const PARTICLE_COUNT=400;
 const particleGeo=new THREE.BufferGeometry();
 const particlePositions=new Float32Array(PARTICLE_COUNT*3);
 const particleColors=new Float32Array(PARTICLE_COUNT*3);
@@ -1623,7 +1665,6 @@ const RGB_COLORS={
   off:   {hex:0x000000, intensity:0}
 };
 let currentRGB='off';
-let filterMatRef=null; // set after filter is created
 function setRGB(color){
   currentRGB=color;
   const c=RGB_COLORS[color];
@@ -1650,15 +1691,10 @@ function setRGB(color){
     allFanMats[i+2].emissiveIntensity=emissiveIntensity*0.5;
   }
   // Filters glow from light passing through
-  const filterGlow=color==='off'?0:0.03;
-  scene.traverse(obj=>{
-    if(!obj.isMesh) return;
-    const m=obj.material;
-    if(m&&m._isFilterMat){
-      m.emissive.setHex(emissiveHex);
-      m.emissiveIntensity=filterGlow;
-    }
-  });
+  if(filterMatRef){
+    filterMatRef.emissive.setHex(emissiveHex);
+    filterMatRef.emissiveIntensity=color==='off'?0:0.03;
+  }
   // Plywood gets a subtle ambient tint from internal light
   const woodGlow=color==='off'?0:0.015;
   for(const m of allBirchMats){
@@ -1738,7 +1774,7 @@ function roomBox(w,h,d,color,x,y,z,rx,ry,rz){
   if(rx) mesh.rotation.x=rx;
   if(ry) mesh.rotation.y=ry;
   if(rz) mesh.rotation.z=rz;
-  mesh.castShadow=true;
+  mesh.castShadow=false;
   mesh.receiveShadow=true;
   mesh._isRoom=true;
   scene.add(mesh);
@@ -1767,7 +1803,7 @@ function roomRoundBox(w,h,d,radius,color,x,y,z,rx,ry,rz){
   if(rx) mesh.rotation.x=rx;
   if(ry) mesh.rotation.y=ry;
   if(rz) mesh.rotation.z=rz;
-  mesh.castShadow=true;
+  mesh.castShadow=false;
   mesh.receiveShadow=true;
   mesh._isRoom=true;
   scene.add(mesh);
@@ -1793,7 +1829,7 @@ const mugGeo = new THREE.CylinderGeometry(1.5, 1.4, 3.5, 16);
 const mugMat = new THREE.MeshStandardMaterial({color:0xeeeeee, roughness:0.3});
 const mug = new THREE.Mesh(mugGeo, mugMat);
 mug.position.set(tblX-3, floorY+tblH+1.75, tblZ+2);
-mug.castShadow=true; mug._isRoom=true;
+mug.castShadow=false; mug._isRoom=true;
 scene.add(mug);
 
 // Wall section behind — split into left portion and recessed alcove with door (flush to right wall)
@@ -1850,7 +1886,7 @@ const dpMat=new THREE.MeshStandardMaterial({color:0xe8e3dc,roughness:0.45,metaln
     const pg=new THREE.BoxGeometry(dpW, ph, dpInset);
     const pm=new THREE.Mesh(pg, dpMat);
     pm.position.set(doorCenterX+side*(doorW*0.2), dpY[ri], recessZ-doorThick-0.3-dpInset/2-0.01);
-    pm.castShadow=true; pm._isRoom=true; scene.add(pm);
+    pm.castShadow=false; pm._isRoom=true; scene.add(pm);
   });
 });
 
@@ -1859,29 +1895,29 @@ const dfMat=new THREE.MeshStandardMaterial({color:doorFrameColor,roughness:0.35,
 // Left jamb
 const dfl=new THREE.Mesh(new THREE.BoxGeometry(doorFrameW, doorH, doorFrameD), dfMat);
 dfl.position.set(doorLeft-doorFrameW/2+0.5, floorY+doorH/2, recessZ-doorFrameD/2);
-dfl.castShadow=true; dfl._isRoom=true; scene.add(dfl);
+dfl.castShadow=false; dfl._isRoom=true; scene.add(dfl);
 // Right jamb
 const dfr=new THREE.Mesh(new THREE.BoxGeometry(doorFrameW, doorH, doorFrameD), dfMat);
 dfr.position.set(doorRight+doorFrameW/2-0.5, floorY+doorH/2, recessZ-doorFrameD/2);
-dfr.castShadow=true; dfr._isRoom=true; scene.add(dfr);
+dfr.castShadow=false; dfr._isRoom=true; scene.add(dfr);
 // Header
 const dfh=new THREE.Mesh(new THREE.BoxGeometry(doorW+doorFrameW*2-1, doorFrameW, doorFrameD), dfMat);
 dfh.position.set(doorCenterX, floorY+doorH+doorFrameW/2-0.5, recessZ-doorFrameD/2);
-dfh.castShadow=true; dfh._isRoom=true; scene.add(dfh);
+dfh.castShadow=false; dfh._isRoom=true; scene.add(dfh);
 
 // Door knob (round, brushed nickel — room-facing side)
 const knobMat=new THREE.MeshStandardMaterial({color:0xaaaaaa,roughness:0.25,metalness:0.8});
 const knobGeo=new THREE.SphereGeometry(1.2, 16, 12);
 const knob=new THREE.Mesh(knobGeo, knobMat);
 knob.position.set(doorCenterX+doorW*0.35, floorY+36, recessZ-doorThick-0.3-1.2);
-knob.castShadow=true; knob._isRoom=true; scene.add(knob);
+knob.castShadow=false; knob._isRoom=true; scene.add(knob);
 // Knob base plate
 const plateMat=new THREE.MeshStandardMaterial({color:0xbbbbbb,roughness:0.3,metalness:0.7});
 const plateGeo=new THREE.CylinderGeometry(1.8, 1.8, 0.3, 16);
 plateGeo.rotateX(Math.PI/2);
 const plate=new THREE.Mesh(plateGeo, plateMat);
 plate.position.set(doorCenterX+doorW*0.35, floorY+36, recessZ-doorThick-0.3-0.2);
-plate.castShadow=true; plate._isRoom=true; scene.add(plate);
+plate.castShadow=false; plate._isRoom=true; scene.add(plate);
 
 // Collect all back wall + recess meshes for fading
 const backWallParts=[wallMeshL,returnWallL,
@@ -1896,7 +1932,7 @@ roomBox(5, 1.2, 7, 0x8b4513, tblX+4, floorY+tblH+0.6, tblZ-1, 0, 0.1, 0);
 roomBox(4.5, 0.8, 6.5, 0x2d5a27, tblX+4, floorY+tblH+1.6, tblZ-1, 0, -0.05, 0);
 
 // ─── Opposite wall + 65" OLED TV ───
-const oppWallZ=-50;
+const oppWallZ=-80;
 const oppWall=roomBox(120, 80, 0.5, 0xd8d4ce, 0, floorY+40, oppWallZ, 0,0,0);
 const oppBaseboard=roomBox(120, 3, 0.6, 0xc0bbb4, 0, floorY+1.5, oppWallZ+0.5, 0,0,0);
 
@@ -1922,10 +1958,10 @@ scene.add(screen);
 
 // ─── Right side wall (solid) ───
 const sideWallX=60;
-const wallDepth=100; // Z span from -50 to 50
+const wallDepth=130; // Z span from oppWallZ to 50
 const wallHeight=80;
-const rightWall=roomBox(0.5, wallHeight, wallDepth, 0xd8d4ce, sideWallX, floorY+wallHeight/2, 0, 0,0,0);
-const sideBaseboard=roomBox(0.6, 3, wallDepth, 0xc0bbb4, sideWallX-0.5, floorY+1.5, 0, 0,0,0);
+const rightWall=roomBox(0.5, wallHeight, wallDepth, 0xd8d4ce, sideWallX, floorY+wallHeight/2, -15, 0,0,0);
+const sideBaseboard=roomBox(0.6, 3, wallDepth, 0xc0bbb4, sideWallX-0.5, floorY+1.5, -15, 0,0,0);
 
 // ─── Left side wall with window (near the bed) ───
 const leftWallX=-60;
@@ -1940,19 +1976,21 @@ const winBack=winCenterZ+winW/2;
 // Wall sections around the window (4 pieces: below, above, front, back)
 // Below window
 const belowH=winBottom-floorY;
-const leftWallBelow=roomBox(0.5, belowH, wallDepth, 0xd8d4ce, leftWallX, floorY+belowH/2, 0, 0,0,0);
+const leftWallBelow=roomBox(0.5, belowH, wallDepth, 0xd8d4ce, leftWallX, floorY+belowH/2, -15, 0,0,0);
 // Above window
 const aboveH=floorY+wallHeight-winTop;
-const leftWallAbove=roomBox(0.5, aboveH, wallDepth, 0xd8d4ce, leftWallX, winTop+aboveH/2, 0, 0,0,0);
-// Front of window (toward Z=-50)
-const frontW=winFront-(-wallDepth/2);
-const leftWallFront=roomBox(0.5, winH, frontW, 0xd8d4ce, leftWallX, winCenterY, -wallDepth/2+frontW/2, 0,0,0);
+const leftWallAbove=roomBox(0.5, aboveH, wallDepth, 0xd8d4ce, leftWallX, winTop+aboveH/2, -15, 0,0,0);
+// Front of window (toward TV wall)
+const frontZmin=oppWallZ;
+const frontW=winFront-frontZmin;
+const leftWallFront=roomBox(0.5, winH, frontW, 0xd8d4ce, leftWallX, winCenterY, frontZmin+frontW/2, 0,0,0);
 // Back of window (toward Z=+50)
-const backW=wallDepth/2-winBack;
+const backZmax=50;
+const backW=backZmax-winBack;
 const leftWallBack=roomBox(0.5, winH, backW, 0xd8d4ce, leftWallX, winCenterY, winBack+backW/2, 0,0,0);
 
 // Baseboard on left wall
-const leftBaseboard=roomBox(0.6, 3, wallDepth, 0xc0bbb4, leftWallX+0.5, floorY+1.5, 0, 0,0,0);
+const leftBaseboard=roomBox(0.6, 3, wallDepth, 0xc0bbb4, leftWallX+0.5, floorY+1.5, -15, 0,0,0);
 
 // Window sill
 roomBox(0.8, 0.5, winW+2, 0xc8c4be, leftWallX+0.4, winBottom-0.25, winCenterZ, 0,0,0);
@@ -2001,7 +2039,13 @@ rodGeo.rotateX(Math.PI/2);
 const rodMat=new THREE.MeshStandardMaterial({color:0x444444,roughness:0.3,metalness:0.7});
 const rod=new THREE.Mesh(rodGeo,rodMat);
 rod.position.set(leftWallX+1.5, winTop+4, winCenterZ);
-rod.castShadow=true; rod._isRoom=true; scene.add(rod);
+rod.castShadow=false; rod._isRoom=true; scene.add(rod);
+
+// Mark only wall meshes that actually fade as transparent (keeps other room objects in fast opaque pass)
+const fadingWalls=[...backWallParts, doorPanel, oppWall, oppBaseboard,
+  rightWall, sideBaseboard,
+  leftWallBelow, leftWallAbove, leftWallFront, leftWallBack, leftBaseboard, cL, cR];
+fadingWalls.forEach(m=>{ m.material.transparent=true; });
 
 // Upholstered headboard (full height, at back of bed)
 const hbThick=3, hbH=bedH-bedClearance, hbW=bedW;
@@ -2046,7 +2090,7 @@ for(const [lx,lz] of [
   const lm=new THREE.MeshStandardMaterial({color:0x222222,roughness:0.6});
   const lmesh=new THREE.Mesh(lg,lm);
   lmesh.position.set(lx, floorY+legBedH/2, lz);
-  lmesh.castShadow=true; lmesh.receiveShadow=true; lmesh._isRoom=true;
+  lmesh.castShadow=false; lmesh.receiveShadow=true; lmesh._isRoom=true;
   scene.add(lmesh);
 }
 
@@ -2075,6 +2119,17 @@ const duvet=roomRoundBox(mattW+4, duvetH, duvetL, 2, 0xbfb8aa,
   bedX, mattY+mattH/2+duvetH/2, duvetZ, 0,0,0);
 duvet.material.roughness=0.95;
 
+// Freeze world matrices on all static objects (room + purifier structure)
+scene.traverse(obj=>{
+  if(obj.isMesh && !obj.isPoints){
+    obj.updateMatrixWorld(true);
+    obj.matrixAutoUpdate=false;
+  }
+});
+// Re-enable on objects that animate: fan rotors, explodable parts, particles
+for(const rotor of allRotors) rotor.matrixAutoUpdate=true;
+for(const k in parts) if(parts[k]) parts[k].matrixAutoUpdate=true;
+if(particles) particles.matrixAutoUpdate=true;
 
 // ─── Animate ───
 function animate(){
@@ -2083,7 +2138,8 @@ function animate(){
   // Rainbow RGB cycling
   if(currentRGB==='rainbow'){
     const t=performance.now()*0.001; // seconds
-    const hueColor=new THREE.Color();
+    _hueColor=_hueColor||new THREE.Color();
+    const hueColor=_hueColor;
     for(let fi=0;fi<allFanGlows.length;fi++){
       // Each fan offset by phase for a chase effect
       const hue=((t*0.3)+fi*0.12)%1;
@@ -2100,17 +2156,20 @@ function animate(){
       allFanMats[i+2].emissive.setHex(hex);
       allFanMats[i+2].emissiveIntensity=0.04;
     }
-    scene.traverse(obj=>{
-      if(!obj.isMesh) return;
-      const m=obj.material;
-      if(m&&m._isFilterMat){ m.emissive.setHex(hex); m.emissiveIntensity=0.03; }
-    });
+    if(filterMatRef){ filterMatRef.emissive.setHex(hex); filterMatRef.emissiveIntensity=0.03; }
     for(const m of allBirchMats){ m.emissive.setHex(hex); m.emissiveIntensity=0.015; }
   }
 
-  // Lerp explode positions
-  for(const k in targets){
-    if(parts[k]) parts[k].position.lerp(targets[k],0.1);
+  // Lerp explode positions (only while animating)
+  if(explodeLerping){
+    let done=true;
+    for(const k in targets){
+      if(parts[k]){
+        parts[k].position.lerp(targets[k],0.1);
+        if(parts[k].position.distanceToSquared(targets[k])>0.001) done=false;
+      }
+    }
+    if(done) explodeLerping=false;
   }
 
   // Fan spin
@@ -2180,27 +2239,72 @@ function animate(){
   // Back wall (Z=50) + recess: fade based on camera proximity
   const backDist=50-cz;
   const backAlpha=backDist<25?Math.max(fadeMin,backDist/25):1;
-  backWallParts.forEach(m=>{m.material.transparent=true;m.material.opacity=backAlpha;});
-  [doorPanel].forEach(m=>{m.material.transparent=true;m.material.opacity=backAlpha;});
-  // Opposite wall (Z=-50): fade when camera approaches
-  const frontDist=cz+50;
+  backWallParts.forEach(m=>{m.material.opacity=backAlpha;});
+  doorPanel.material.opacity=backAlpha;
+  // Opposite wall: fade when camera approaches
+  const frontDist=cz-oppWallZ;
   const frontAlpha=frontDist<25?Math.max(fadeMin,frontDist/25):1;
-  [oppWall,oppBaseboard].forEach(m=>{m.material.transparent=true;m.material.opacity=frontAlpha;});
+  oppWall.material.opacity=frontAlpha; oppBaseboard.material.opacity=frontAlpha;
   // Side wall (X=60): fade when camera approaches
   const rightDist=60-cx;
   const rightAlpha=rightDist<25?Math.max(fadeMin,rightDist/25):1;
-  [rightWall,sideBaseboard].forEach(m=>{
-    m.material.transparent=true;m.material.opacity=rightAlpha;
-  });
+  rightWall.material.opacity=rightAlpha; sideBaseboard.material.opacity=rightAlpha;
   // Left wall (X=-60): fade when camera approaches
   const leftDist=cx+60;
   const leftAlpha=leftDist<25?Math.max(fadeMin,leftDist/25):1;
-  [leftWallBelow,leftWallAbove,leftWallFront,leftWallBack,leftBaseboard,cL,cR].forEach(m=>{
-    m.material.transparent=true;m.material.opacity=leftAlpha;
-  });
+  leftWallBelow.material.opacity=leftAlpha; leftWallAbove.material.opacity=leftAlpha;
+  leftWallFront.material.opacity=leftAlpha; leftWallBack.material.opacity=leftAlpha;
+  leftBaseboard.material.opacity=leftAlpha; cL.material.opacity=leftAlpha; cR.material.opacity=leftAlpha;
 
   renderer.render(scene,camera);
+  fpsFrames++;
+  const fpsNow=performance.now();
+  if(fpsNow-fpsLast>=1000){
+    const ms=(fpsNow-fpsLast)/fpsFrames;
+    const ri=renderer.info.render;
+    document.getElementById('fps').textContent=fpsFrames+'fps '+ms.toFixed(1)+'ms | '+ri.calls+'dc '+ri.triangles+'tri Q'+qualityTier;
+    checkPerformance(fpsFrames);
+    fpsFrames=0; fpsLast=fpsNow;
+  }
 }
+let fpsFrames=0, fpsLast=performance.now(), _hueColor=null;
+
+// ─── Adaptive quality ───
+// Monitors FPS over several seconds and downgrades rendering if needed.
+// Tiers: 0 = full quality, 1 = reduced pixel ratio, 2 = also disable shadows, 3 = also reduce particles
+let qualityTier=0, qualitySamples=0, qualitySum=0, qualitySettled=false;
+const QUALITY_WINDOW=3000; // ms to average over before deciding
+let qualityWindowStart=performance.now();
+function downgrade(tier){
+  qualityTier=tier;
+  if(tier>=1){
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio,1));
+    key.shadow.mapSize.set(512,512);
+    key.shadow.map?.dispose(); key.shadow.map=null; // force rebuild
+  }
+  if(tier>=2){
+    renderer.shadowMap.enabled=false;
+    rim.intensity=0; bounce.intensity=0;
+  }
+  if(tier>=3){
+    // Hide particles on very weak hardware
+    particles.visible=false;
+  }
+  resize();
+}
+function checkPerformance(fps){
+  if(qualitySettled) return;
+  qualitySum+=fps; qualitySamples++;
+  const elapsed=performance.now()-qualityWindowStart;
+  if(elapsed<QUALITY_WINDOW) return;
+  const avg=qualitySum/qualitySamples;
+  qualitySum=0; qualitySamples=0; qualityWindowStart=performance.now();
+  if(avg>=40){ qualitySettled=true; return; } // good enough, stop checking
+  if(qualityTier<3){ downgrade(qualityTier+1); }
+  else { qualitySettled=true; } // can't go lower
+}
+
+document.addEventListener('keydown',e=>{ if(e.key==='f'||e.key==='F') document.getElementById('fps').classList.toggle('show'); });
 animate();
 </script>
 </body>
