@@ -12,24 +12,47 @@
     canvas { width: 100%; height: 100%; display: block; }
     .hint { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 12px; color: rgba(255,255,255,0.5); pointer-events: none; }
     .panel { position: absolute; top: 12px; background: rgba(20,20,30,0.55); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); border-radius: 16px; padding: 10px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 4px 30px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.08); }
-    .panel-l { left: 12px; width: 210px; display: flex; flex-direction: column; gap: 3px; }
+    .panel-l { left: 12px; width: 240px; display: flex; flex-direction: column; gap: 3px; }
     .panel-r { right: 12px; font-size: 11px; color: rgba(255,255,255,0.9); line-height: 2; padding: 8px 12px; }
-    .section { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.5); margin-top: 6px; padding-left: 2px; display: flex; align-items: center; gap: 4px; }
-    .section i { font-size: 11px; }
+    .section { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.5); margin-top: 8px; padding-left: 2px; }
     .section:first-child { margin-top: 0; }
     .seg { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); }
-    .seg button { flex: 1; font-size: 10px; padding: 6px 4px; border: none; cursor: pointer; background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7); transition: all 0.15s; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .seg button { flex: 1; font-size: 10px; padding: 6px 4px; border: none; cursor: pointer; background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7); transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1); font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .seg button:active { transform: scale(0.92); transition-duration: 0.08s; }
     .seg button i { font-size: 13px; line-height: 1; flex-shrink: 0; }
     .seg button:not(:last-child) { border-right: 1px solid rgba(255,255,255,0.08); }
     .seg button:hover { background: rgba(255,255,255,0.12); }
     .seg button.on { background: rgba(255,255,255,0.18); color: #fff; font-weight: 500; }
     .seg button.on:hover { background: rgba(255,255,255,0.24); }
+
+    /* Toggle switch liquid bounce */
+    .toggle-switch { transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+    .toggle-switch::after { transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+    .toggle-switch:active { transform: scale(0.9); }
+    .toggle-switch:active::after { transform: scaleX(1.25); }
+
+    /* Collapsible RGB section */
+    .rgb-collapse { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease; opacity: 1; }
+    .rgb-collapse.hidden { grid-template-rows: 0fr; opacity: 0; pointer-events: none; }
+    .rgb-collapse-inner { overflow: hidden; }
+
+    /* Toggle switch row */
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 2px; }
+    .toggle-label { font-size: 11px; color: rgba(255,255,255,0.75); }
+    .toggle-switch { position: relative; width: 36px; height: 20px; border-radius: 10px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.1); cursor: pointer; transition: all 0.2s ease; flex-shrink: 0; }
+    .toggle-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 7px; background: rgba(255,255,255,0.5); transition: all 0.2s ease; }
+    .toggle-switch.on { background: rgba(100,180,255,0.4); border-color: rgba(100,180,255,0.5); }
+    .toggle-switch.on::after { left: 18px; background: #fff; }
+
+    /* Picker label */
+    .picker-label { font-size: 10px; color: rgba(255,255,255,0.5); padding: 2px 2px 3px; }
     .rgb-seg button { color: #fff; font-weight: 600; font-size: 11px; padding: 5px 0; }
     .rgb-seg button:hover { filter: brightness(1.1); }
     .rgb-seg .rb { background: #dc3545; }
     .rgb-seg .yb { background: #e6a817; }
     .rgb-seg .gb { background: #28a745; }
     .rgb-seg .ob { background: #999; }
+    .rgb-seg .party { background: linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00); }
     .rgb-seg button.on { box-shadow: inset 0 0 0 2px #fff, 0 0 0 1.5px #333; }
     .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
 
@@ -45,7 +68,7 @@
     .panel-title { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.85); letter-spacing: 0.3px; }
 
     /* Panel open/close transitions */
-    .panel-l { left: 12px; width: 210px; display: flex; flex-direction: column; gap: 3px; transition: opacity 0.25s ease, transform 0.25s ease; }
+    .panel-l { transition: opacity 0.25s ease, transform 0.25s ease; }
     .panel-l.collapsed { opacity: 0; pointer-events: none; transform: translateY(-8px) scale(0.96); }
 
     /* Legend inside panel on small screens */
@@ -61,9 +84,21 @@
       .fab { top: 12px; left: 12px; }
     }
     @media (min-width: 521px) and (max-width: 768px) {
-      .panel-l { width: 195px; }
+      .panel-l { width: 210px; }
       .seg button { font-size: 10px; }
     }
+
+    /* Night mode — light glass UI */
+    body.night-mode .panel { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.18); box-shadow: 0 4px 30px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15); }
+    body.night-mode .seg { border-color: rgba(255,255,255,0.12); }
+    body.night-mode .seg button { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.6); }
+    body.night-mode .seg button:not(:last-child) { border-right-color: rgba(255,255,255,0.08); }
+    body.night-mode .seg button:hover { background: rgba(255,255,255,0.1); }
+    body.night-mode .seg button.on { background: rgba(255,255,255,0.15); color: #fff; }
+    body.night-mode .fab { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.18); }
+    body.night-mode .toggle-switch { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.1); }
+    body.night-mode .toggle-switch.on { background: rgba(80,140,220,0.35); border-color: rgba(80,140,220,0.4); }
+    body.night-mode .hint { color: rgba(255,255,255,0.35); }
   </style>
 </head>
 <body>
@@ -72,22 +107,36 @@
 <div class="hint">drag to rotate · scroll to zoom</div>
 <button class="fab hidden" id="fab" onclick="togglePanel()"><i class="ph ph-sliders-horizontal"></i></button>
 <div class="panel panel-l" id="panelL">
-  <div class="panel-header"><span class="panel-title"><i class="ph ph-sliders-horizontal"></i> Controls</span><button class="panel-close" onclick="togglePanel()" title="Hide controls"><i class="ph ph-x"></i></button></div>
-  <div class="section"><i class="ph ph-eye"></i> View</div>
-  <div class="seg"><button id="btnLayoutFB" class="on" onclick="setLayout('fb')"><i class="ph ph-browsers"></i> Frt+Bck</button><button id="btnLayoutFT" onclick="setLayout('ft')"><i class="ph ph-rows"></i> Frt+Top</button></div>
-  <div class="seg"><button id="btnExOn" class="on" onclick="toggleExplode()"><i class="ph ph-package"></i> Built</button><button id="btnExOff" onclick="toggleExplode()"><i class="ph ph-arrows-out"></i> Explode</button></div>
-  <div class="seg"><button id="btnFlOn" class="on" onclick="toggleFilter()"><i class="ph ph-grid-nine"></i> Filters</button><button id="btnFlOff" onclick="toggleFilter()"><i class="ph ph-eye-slash"></i> Hide</button></div>
-  <div class="seg"><button id="btnDimOff" class="on" onclick="toggleDimensions()"><i class="ph ph-ruler"></i> Off</button><button id="btnDimOn" onclick="toggleDimensions()"><i class="ph ph-ruler"></i> On</button></div>
-  <div class="seg"><button id="btnXrayOff" class="on" onclick="toggleXray()"><i class="ph ph-cube"></i> Solid</button><button id="btnXrayOn" onclick="toggleXray()"><i class="ph ph-cube-transparent"></i> X-ray</button></div>
-  <div class="section"><i class="ph ph-fan"></i> Fans</div>
-  <div class="seg"><button id="btnSpinOff" class="on" onclick="toggleSpin()"><i class="ph ph-prohibit-inset"></i> Off</button><button id="btnSpinOn" onclick="toggleSpin()"><i class="ph ph-fan"></i> Spin</button></div>
-  <div class="seg"><button id="btnAirOff" class="on" onclick="toggleAirflow()"><i class="ph ph-wind"></i> Off</button><button id="btnAirOn" onclick="toggleAirflow()"><i class="ph ph-wind"></i> Flow</button></div>
-  <div class="seg"><button id="btnFanBlack" class="on" onclick="toggleFanColor()"><i class="ph ph-circle-half"></i> Black</button><button id="btnFanWhite" onclick="toggleFanColor()"><i class="ph ph-circle"></i> White</button></div>
-  <div class="seg"><button id="btnBladeSolid" onclick="toggleFanRGB()"><i class="ph ph-palette"></i> Solid</button><button id="btnBladeRGB" class="on" onclick="toggleFanRGB()"><i class="ph ph-rainbow"></i> RGB</button></div>
-  <div id="rgbRow" class="seg rgb-seg"><button id="btnRgbR" class="rb" onclick="setRGB('red')">R</button><button id="btnRgbY" class="yb" onclick="setRGB('yellow')">Y</button><button id="btnRgbG" class="gb" onclick="setRGB('green')">G</button><button id="btnRgbOff" class="ob" onclick="setRGB('off')"><i class="ph ph-power"></i></button></div>
-  <div class="section"><i class="ph ph-paint-brush-broad"></i> Style</div>
-  <div class="seg"><button id="btnStainRaw" class="on" onclick="setStain('raw')"><i class="ph ph-plant"></i> Raw</button><button id="btnStainOil" onclick="setStain('oil')"><i class="ph ph-drop"></i> Oil</button><button id="btnStainWalnut" onclick="setStain('walnut')"><i class="ph ph-drop-half-bottom"></i> Walnut</button></div>
-  <div class="seg"><button id="btnLegsWood" class="on" onclick="toggleLegs()"><i class="ph ph-arrows-out-line-vertical"></i> Wood</button><button id="btnLegsRubber" onclick="toggleLegs()"><i class="ph ph-circles-four"></i> Rubber</button></div>
+  <div class="panel-header"><span class="panel-title">Controls</span><button class="panel-close" onclick="togglePanel()" title="Hide controls"><i class="ph ph-x"></i></button></div>
+
+  <div class="section">View</div>
+  <div class="picker-label">Camera angle</div>
+  <div class="seg"><button id="btnLayoutFB" class="on" onclick="setLayout('fb')">Front + Back</button><button id="btnLayoutFT" onclick="setLayout('ft')">Front + Top</button></div>
+  <div class="toggle-row"><span class="toggle-label">Exploded view</span><div class="toggle-switch" id="togExplode" onclick="toggleExplode()"></div></div>
+  <div class="toggle-row"><span class="toggle-label">Show filters</span><div class="toggle-switch on" id="togFilter" onclick="toggleFilter()"></div></div>
+  <div class="toggle-row"><span class="toggle-label">Dimensions</span><div class="toggle-switch" id="togDims" onclick="toggleDimensions()"></div></div>
+  <div class="toggle-row"><span class="toggle-label">X-ray mode</span><div class="toggle-switch" id="togXray" onclick="toggleXray()"></div></div>
+
+  <div class="section">Fans</div>
+  <div class="toggle-row"><span class="toggle-label">Spin fans</span><div class="toggle-switch" id="togSpin" onclick="toggleSpin()"></div></div>
+  <div class="toggle-row"><span class="toggle-label">Show airflow</span><div class="toggle-switch" id="togAirflow" onclick="toggleAirflow()"></div></div>
+  <div class="picker-label">Fan color</div>
+  <div class="seg"><button id="btnFanWhite" class="on" onclick="toggleFanColor()">White</button><button id="btnFanBlack" onclick="toggleFanColor()">Black</button></div>
+  <div class="toggle-row"><span class="toggle-label">RGB Fans</span><div class="toggle-switch on" id="togRGB" onclick="toggleFanRGB()"></div></div>
+  <div id="rgbSection" class="rgb-collapse"><div class="rgb-collapse-inner">
+  <div class="picker-label">LED color</div>
+  <div id="rgbRow" class="seg rgb-seg"><button id="btnRgbR" class="rb" onclick="setRGB('red')">Red</button><button id="btnRgbY" class="yb" onclick="setRGB('yellow')">Ylw</button><button id="btnRgbG" class="gb" onclick="setRGB('green')">Grn</button><button id="btnRgbRainbow" class="party" onclick="setRGB('rainbow')">Party</button><button id="btnRgbOff" class="ob" onclick="setRGB('off')">Off</button></div>
+  </div></div>
+
+  <div class="section">Finish</div>
+  <div class="picker-label">Wood stain</div>
+  <div class="seg"><button id="btnStainRaw" class="on" onclick="setStain('raw')">Raw Birch</button><button id="btnStainOil" onclick="setStain('oil')">Oil</button><button id="btnStainWalnut" onclick="setStain('walnut')">Walnut</button></div>
+  <div class="picker-label">Feet style</div>
+  <div class="seg"><button id="btnLegsWood" class="on" onclick="toggleLegs()">Wood Legs</button><button id="btnLegsRubber" onclick="toggleLegs()">Rubber Feet</button></div>
+
+  <div class="section">Scene</div>
+  <div class="seg"><button id="btnDay" class="on" onclick="setTimeOfDay('day')"><i class="ph ph-sun"></i> Day</button><button id="btnNight" onclick="setTimeOfDay('night')"><i class="ph ph-moon-stars"></i> Night</button></div>
+
   <div class="panel-legend" id="panelLegend">
     <div class="legend-item"><span class="swatch" style="background:#ddc89e"></span>Plywood (½″ birch)</div>
     <div class="legend-item"><span class="swatch" style="background:#f0ede6;border:1px solid rgba(255,255,255,0.3)"></span>Filters (MERV 13)</div>
@@ -126,22 +175,23 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
 renderer.setClearColor(0xd4dce8, 1);
 renderer.shadowMap.enabled=true;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=1.8;
+renderer.toneMapping=THREE.LinearToneMapping;
+renderer.toneMappingExposure=1.0;
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0xd4dce8, 0.0015);
 const camera = new THREE.PerspectiveCamera(42,1,0.1,500);
-// Daytime lighting — bright and warm
-scene.add(new THREE.AmbientLight(0xffffff,0.85));
-const key=new THREE.DirectionalLight(0xfff8f0,1.3); key.position.set(15,30,15);
+// Daytime lighting — soft and even
+scene.add(new THREE.AmbientLight(0xffffff,0.5));
+const key=new THREE.DirectionalLight(0xfff8f0,0.7); key.position.set(-60,38,0); // from the window (left wall)
 key.castShadow=true; key.shadow.mapSize.set(2048,2048);
+key.shadow.bias=-0.002; key.shadow.normalBias=0.04;
 key.shadow.camera.near=1; key.shadow.camera.far=120;
 key.shadow.camera.left=-60; key.shadow.camera.right=60;
 key.shadow.camera.top=50; key.shadow.camera.bottom=-50;
 scene.add(key);
-const fill=new THREE.DirectionalLight(0xe8eeff,0.6); fill.position.set(-10,12,-12); scene.add(fill);
-const rim=new THREE.DirectionalLight(0xccddff,0.5); rim.position.set(-6,15,-18); scene.add(rim);
-const bounce=new THREE.DirectionalLight(0xffeedd,0.35); bounce.position.set(0,-10,8); scene.add(bounce);
+const fill=new THREE.DirectionalLight(0xe8eeff,0.35); fill.position.set(-10,12,-12); scene.add(fill);
+const rim=new THREE.DirectionalLight(0xccddff,0.25); rim.position.set(-6,15,-18); scene.add(rim);
+const bounce=new THREE.DirectionalLight(0xffeedd,0.15); bounce.position.set(0,-10,8); scene.add(bounce);
 
 // Filtrete 20x25x1 actual: 19.69×24.69×0.78
 const W=5.44, H=19.69, D=24.69, ply=0.5, ft=0.78;
@@ -153,11 +203,12 @@ const fanDepth=1.063;    // 27mm
 const hubR=0.827;        // ~42mm hub diameter / 2
 const impellerR=2.126;   // ~108mm impeller OD / 2
 const mountSpacing=4.134; // 105mm hole spacing
-const bladeCount=5;
+const bladeCount=7;
 const holeR=impellerR*1.02;
 const cornerR=0.2;
 const allRotors=[];
 const allFanMats=[]; // all fan plastic materials (frame, hub, cap, blades)
+const allBraceMats=[]; // brace spoke materials (color-switched with frame)
 const allFanGlows=[]; // PointLight per fan for RGB glow
 
 // Fans stacked touching, equal gap at top/bottom
@@ -166,7 +217,13 @@ const totalFanH=numFans*fanFrame;
 const endGapY=(H-totalFanH)/2;
 function fanY(i){return -H/2+endGapY+fanFrame*(i+0.5);}
 
+// ─── Fan color constants (defined early so init block at ~line 741 can use them) ───
 const C_FAN=0x1a1a1a, C_FOAM=0x3a3a3a;
+let fansWhite=true;
+let fansRGB=true; // start as RGB (frosted translucent blades)
+const FAN_BLACK={frame:0x1a1a1a,hub:0x111111,cap:0x181818,blade:0x1e1e1e};
+const FAN_WHITE={frame:0xe8e8e8,hub:0xdddddd,cap:0xd0d0d0,blade:0xf0f0f0};
+const BLADE_FROSTED={color:0xf0ece8,opacity:0.65,shininess:30};
 
 // ─── Procedural birch plywood texture (1024×1024) ───
 function makeBirchTexture(w,h,seed){
@@ -300,25 +357,6 @@ function makeCapPanel(w,h,d,isTop){
   const capMesh=new THREE.Mesh(capGeo,birchMat(w/12,d/12));
   g.add(capMesh);
 
-  // Countersunk screws into front/back panel end-grain
-  const screwMat=new THREE.MeshPhongMaterial({color:0x999999,shininess:70});
-  const crossMat=new THREE.MeshPhongMaterial({color:0x666666});
-  const screwR=0.13, screwD=0.04;
-  for(const zSign of [-1,1]){
-    for(const sx of [-w/3,0,w/3]){
-      const head=new THREE.Mesh(new THREE.CylinderGeometry(screwR,screwR*0.6,screwD,12),screwMat);
-      head.rotation.x=Math.PI/2;
-      head.position.set(sx, isTop?h/2-screwD/2:-h/2+screwD/2, zSign*(d/2-ply/2));
-      g.add(head);
-      for(let r=0;r<2;r++){
-        const slot=new THREE.Mesh(new THREE.BoxGeometry(screwR*1.5,screwD*0.5,0.03),crossMat);
-        slot.rotation.y=r*Math.PI/2;
-        slot.position.copy(head.position);
-        slot.position.y+=isTop?screwD*0.3:-screwD*0.3;
-        g.add(slot);
-      }
-    }
-  }
   return g;
 }
 
@@ -409,25 +447,30 @@ function makeFanPanel(flip){
     cap.position.set(0,0,-inDir*fanDepth*0.4);
     rotor.add(cap);
 
-    // Swept fan blades (5 blades) — frosted translucent like ARGB fan blades
+    // Swept fan blades (7 blades) — P12 Pro sickle-shaped, wide with minimal gaps
     const bladeMat=new THREE.MeshPhongMaterial({color:0xf0ece8,shininess:30,side:THREE.DoubleSide,transparent:true,opacity:0.65,depthWrite:false});
     allFanMats.push(bladeMat);
     for(let b=0;b<bladeCount;b++){
       const baseAngle=b/bladeCount*Math.PI*2;
       const bladeShape=new THREE.Shape();
-      const innerR=hubR*1.05, outerR=impellerR*0.95;
-      const bladeW=0.65, sweep=0.45, steps=8;
+      const innerR=hubR*1.05, outerR=impellerR*0.96;
+      const sweep=0.52, steps=14;
+      // Leading edge: sickle curve from hub to tip
       const pts=[], trailPts=[];
       for(let st=0;st<=steps;st++){
         const t=st/steps;
         const r=innerR+(outerR-innerR)*t;
-        const ang=baseAngle+t*sweep;
+        const ang=baseAngle+t*t*sweep;
         pts.push([Math.cos(ang)*r,Math.sin(ang)*r]);
       }
+      // Trailing edge: wide blades — nearly fill the gap to adjacent blade
+      const gapAngle=Math.PI*2/bladeCount; // angular space per blade
       for(let st=steps;st>=0;st--){
         const t=st/steps;
         const r=innerR+(outerR-innerR)*t;
-        const ang=baseAngle+t*sweep+bladeW*(0.15+0.85*t);
+        // Width fills ~85% of available gap, tapering slightly at tip
+        const width=(gapAngle*0.82)*(0.85+0.15*(1-t));
+        const ang=baseAngle+t*t*sweep+width;
         trailPts.push([Math.cos(ang)*r,Math.sin(ang)*r]);
       }
       bladeShape.moveTo(pts[0][0],pts[0][1]);
@@ -442,6 +485,33 @@ function makeFanPanel(flip){
     g.add(rotor);
     allRotors.push(rotor);
 
+    // Back support brace — 4 spokes, pinwheel offset (each arm misses center)
+    const braceR=0.07, braceD=fanDepth*0.12;
+    // Slightly in front of hub back face so brace blends into the fan back
+    const braceZ=fanZ-inDir*(fanDepth*0.35);
+    const cornerDist=fanFrame*0.44;
+    const hubOff=hubR*0.75;
+    const spokeAngles=[Math.PI*0.75, Math.PI*0.25, -Math.PI*0.25, -Math.PI*0.75];
+    const tangentOff=0.35;
+    for(let s=0;s<4;s++){
+      const ca=spokeAngles[s];
+      const cx=Math.cos(ca)*cornerDist;
+      const cy=Math.sin(ca)*cornerDist;
+      const ha=ca+Math.PI+tangentOff;
+      const hx=Math.cos(ha)*hubOff;
+      const hy=Math.sin(ha)*hubOff;
+      const dx=cx-hx, dy=cy-hy;
+      const len=Math.sqrt(dx*dx+dy*dy);
+      const ang=Math.atan2(dy,dx);
+      const spokeGeo=new THREE.BoxGeometry(len,braceR*2,braceD);
+      const spokeMat=new THREE.MeshPhongMaterial({color:C_FAN,shininess:30});
+      allBraceMats.push(spokeMat);
+      const spoke=new THREE.Mesh(spokeGeo,spokeMat);
+      spoke.position.set((cx+hx)/2, fy+(cy+hy)/2, braceZ);
+      spoke.rotation.z=ang;
+      g.add(spoke);
+    }
+
     // Mounting posts
     const mh=mountSpacing/2;
     const postMat=new THREE.MeshPhongMaterial({color:0x222222});
@@ -455,7 +525,7 @@ function makeFanPanel(flip){
     }
 
     // RGB glow light (off by default) — large range to fill whole box
-    const glow=new THREE.PointLight(0x000000,0,30);
+    const glow=new THREE.PointLight(0x000000,0,45);
     glow.position.set(0,fy,fanZ);
     g.add(glow);
     allFanGlows.push(glow);
@@ -590,19 +660,21 @@ const altTopGroup=(function(){
     for(let b=0;b<bladeCount;b++){
       const baseAngle=b/bladeCount*Math.PI*2;
       const bladeShape=new THREE.Shape();
-      const innerR=hubR*1.05, outerR=impellerR*0.95;
-      const bladeW=0.65, sweep=0.45, steps=8;
+      const innerR=hubR*1.05, outerR=impellerR*0.96;
+      const sweep=0.52, steps=14;
       const pts=[], trailPts=[];
       for(let st=0;st<=steps;st++){
         const t=st/steps;
         const r=innerR+(outerR-innerR)*t;
-        const ang=baseAngle+t*sweep;
+        const ang=baseAngle+t*t*sweep;
         pts.push([Math.cos(ang)*r,Math.sin(ang)*r]);
       }
+      const gapAngle=Math.PI*2/bladeCount;
       for(let st=steps;st>=0;st--){
         const t=st/steps;
         const r=innerR+(outerR-innerR)*t;
-        const ang=baseAngle+t*sweep+bladeW*(0.15+0.85*t);
+        const width=(gapAngle*0.82)*(0.85+0.15*(1-t));
+        const ang=baseAngle+t*t*sweep+width;
         trailPts.push([Math.cos(ang)*r,Math.sin(ang)*r]);
       }
       bladeShape.moveTo(pts[0][0],pts[0][1]);
@@ -615,6 +687,33 @@ const altTopGroup=(function(){
     }
     g.add(rotor);
     allRotors.push(rotor);
+
+    // Back support brace — 4 spokes, pinwheel offset (top-mount: exhaust is UP/+Y)
+    const braceR2=0.07, braceD2=fanDepth*0.12;
+    // Slightly in front of hub back face
+    const braceY=fanYPos+(fanDepth*0.34);
+    const cornerDist2=fanFrame*0.44;
+    const hubOff2=hubR*0.75;
+    const spokeAngles2=[Math.PI*0.75, Math.PI*0.25, -Math.PI*0.25, -Math.PI*0.75];
+    const tangentOff2=0.35;
+    for(let s=0;s<4;s++){
+      const ca=spokeAngles2[s];
+      const cx2=Math.cos(ca)*cornerDist2;
+      const cz2=Math.sin(ca)*cornerDist2;
+      const ha=ca+Math.PI+tangentOff2;
+      const hx2=Math.cos(ha)*hubOff2;
+      const hz2=Math.sin(ha)*hubOff2;
+      const dx2=cx2-hx2, dz2=cz2-hz2;
+      const len2=Math.sqrt(dx2*dx2+dz2*dz2);
+      const ang2=Math.atan2(dz2,dx2);
+      const spokeGeo2=new THREE.BoxGeometry(len2,braceD2,braceR2*2);
+      const spokeMat2=new THREE.MeshPhongMaterial({color:C_FAN,shininess:30});
+      allBraceMats.push(spokeMat2);
+      const spoke2=new THREE.Mesh(spokeGeo2,spokeMat2);
+      spoke2.position.set((cx2+hx2)/2, braceY, fz+(cz2+hz2)/2);
+      spoke2.rotation.y=-ang2;
+      g.add(spoke2);
+    }
 
     // Mounting posts
     const mh=mountSpacing/2;
@@ -629,7 +728,7 @@ const altTopGroup=(function(){
     }
 
     // RGB glow
-    const glow=new THREE.PointLight(0x000000,0,30);
+    const glow=new THREE.PointLight(0x000000,0,45);
     glow.position.set(0,fanYPos,fz);
     g.add(glow);
     allFanGlows.push(glow);
@@ -640,77 +739,78 @@ altTopGroup.position.set(0, H/2+ply/2, 0);
 altTopGroup.visible=false;
 scene.add(altTopGroup);
 
+// Apply default fan color at init (materials are created with C_FAN black)
+{
+  const c=fansWhite?FAN_WHITE:FAN_BLACK;
+  for(let i=0;i<allFanMats.length;i+=4){
+    allFanMats[i].color.setHex(c.frame);
+    allFanMats[i+1].color.setHex(c.hub);
+    allFanMats[i+2].color.setHex(c.cap);
+    const blade=allFanMats[i+3];
+    if(fansRGB){
+      blade.color.setHex(BLADE_FROSTED.color);
+      blade.transparent=true;
+      blade.opacity=BLADE_FROSTED.opacity;
+      blade.shininess=BLADE_FROSTED.shininess;
+      blade.depthWrite=false;
+    } else {
+      blade.color.setHex(c.blade);
+    }
+  }
+  for(const m of allBraceMats) m.color.setHex(c.frame);
+}
+
 // ─── Pleated MERV 13 filters ───
 function makePleatedFilter(){
   const g=new THREE.Group();
-  const pleats=40;
+  const pleats=80;
   const pleatDepth=ft*0.4;
-  const pleatStep=D/pleats;
-  // Procedural filter media texture — heavy fibrous look
+  const pleatStep=H/pleats;
+  // Procedural filter media texture — soft papery/cloth look
   const fCvs=document.createElement('canvas');
   fCvs.width=512; fCvs.height=512;
   const fCtx=fCvs.getContext('2d');
-  fCtx.fillStyle='#ddd8c8';
+  fCtx.fillStyle='#eeeae4';
   fCtx.fillRect(0,0,512,512);
   let fs=77;
   function fRand(){fs=(fs*16807)%2147483647;return(fs&0x7fffffff)/0x7fffffff;}
-  // Heavy crisscrossing fibers
-  for(let i=0;i<2500;i++){
+  // Very fine fibers — cloth/paper weave feel
+  for(let i=0;i<600;i++){
     const x=fRand()*512, y=fRand()*512;
-    const len=4+fRand()*20, ang=fRand()*Math.PI;
-    const dark=fRand();
-    fCtx.strokeStyle=dark>0.6
-      ?`rgba(150,130,100,${0.4+fRand()*0.5})`
-      :dark>0.3
-      ?`rgba(180,165,140,${0.35+fRand()*0.4})`
-      :`rgba(210,200,180,${0.3+fRand()*0.35})`;
-    fCtx.lineWidth=0.5+fRand()*2.5;
+    const len=2+fRand()*8, ang=fRand()*Math.PI;
+    fCtx.strokeStyle=`rgba(190,182,170,${0.08+fRand()*0.12})`;
+    fCtx.lineWidth=0.3+fRand()*1;
     fCtx.beginPath();
     fCtx.moveTo(x,y);
     fCtx.lineTo(x+Math.cos(ang)*len,y+Math.sin(ang)*len);
     fCtx.stroke();
   }
-  // Clumps of matted fibers
-  for(let c=0;c<40;c++){
-    const cx=fRand()*512, cy=fRand()*512;
-    for(let j=0;j<15;j++){
-      const x=cx+(fRand()-0.5)*20, y=cy+(fRand()-0.5)*20;
-      const len=3+fRand()*8, ang=fRand()*Math.PI;
-      fCtx.strokeStyle=`rgba(140,120,90,${0.3+fRand()*0.4})`;
-      fCtx.lineWidth=0.8+fRand()*1.5;
-      fCtx.beginPath(); fCtx.moveTo(x,y);
-      fCtx.lineTo(x+Math.cos(ang)*len,y+Math.sin(ang)*len);
-      fCtx.stroke();
-    }
-  }
-  // Dark specks / dust
-  for(let i=0;i<500;i++){
-    fCtx.fillStyle=`rgba(130,110,80,${0.2+fRand()*0.35})`;
-    const sz=1+fRand()*3;
+  // Faint specks
+  for(let i=0;i<80;i++){
+    fCtx.fillStyle=`rgba(175,165,148,${0.06+fRand()*0.08})`;
+    const sz=1+fRand()*2;
     fCtx.fillRect(fRand()*512,fRand()*512,sz,sz);
-  }
-  // Light highlights
-  for(let i=0;i<300;i++){
-    fCtx.fillStyle=`rgba(245,240,230,${0.15+fRand()*0.25})`;
-    fCtx.fillRect(fRand()*512,fRand()*512,1+fRand()*4,1+fRand()*2);
   }
   const filterTex=new THREE.CanvasTexture(fCvs);
   filterTex.wrapS=filterTex.wrapT=THREE.RepeatWrapping;
-  filterTex.repeat.set(3,5);
+  filterTex.repeat.set(2,3);
+  filterTex.generateMipmaps=false;
+  filterTex.minFilter=THREE.LinearFilter;
+  filterTex.magFilter=THREE.LinearFilter;
 
-  // Bump map from same canvas for surface roughness
-  const bumpTex=filterTex.clone(); bumpTex.needsUpdate=true;
-
-  const filterMat=new THREE.MeshPhongMaterial({map:filterTex,bumpMap:bumpTex,bumpScale:0.6,color:0xffffff,side:THREE.DoubleSide,shininess:1,transparent:false});
+  const filterMat=new THREE.MeshPhongMaterial({map:filterTex,color:0xffffff,side:THREE.DoubleSide,shininess:1,transparent:false});
   filterMat._isFilterMat=true; // tag for RGB glow lookup
 
-  // Zigzag pleated mesh
-  const verts=[], indices=[];
+  // Zigzag pleated mesh — vertical folds (step along Y, fold lines run along Z)
+  const verts=[], uvs=[], indices=[];
   for(let p=0;p<=pleats;p++){
-    const z=-D/2+p*pleatStep;
+    const y=-H/2+p*pleatStep;
     const xOff=(p%2===0)?-pleatDepth:pleatDepth;
-    verts.push(xOff,-H/2,z);
-    verts.push(xOff, H/2,z);
+    const u=p/pleats;
+    verts.push(xOff,y,-D/2);
+    uvs.push(u, 0);
+    verts.push(xOff,y, D/2);
+    uvs.push(u, 1);
   }
   for(let p=0;p<pleats;p++){
     const i0=p*2, i1=p*2+1, i2=(p+1)*2, i3=(p+1)*2+1;
@@ -718,9 +818,60 @@ function makePleatedFilter(){
   }
   const geo=new THREE.BufferGeometry();
   geo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
+  geo.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
   geo.setIndex(indices);
   geo.computeVertexNormals();
   g.add(new THREE.Mesh(geo,filterMat));
+
+  // Expanded metal wire mesh (diamond pattern) on both outer faces
+  const wirePoints=[];
+  const dw=D/16, dh=H/32; // 16 visible diamonds on each axis
+  const cols=Math.ceil(D/dw)+1, rows=Math.ceil(H/dh)+1;
+  const wireXoff=pleatDepth+0.02;
+  const bIn=0.3; // wire reaches close to edge, behind the border
+  for(let r=0;r<=rows;r++){
+    for(let c=0;c<=cols;c++){
+      const cy=-H/2+r*dh;
+      const cz=-D/2+c*dw+(r%2===0?0:dw/2);
+      // Up-right
+      if(c<=cols && r<rows){
+        const ny=cy+dh, nz=cz+dw/2;
+        if(cy>=-H/2+bIn && ny<=H/2-bIn && cz>=-D/2+bIn && nz<=D/2-bIn){
+          wirePoints.push(new THREE.Vector3(0,cy,cz));
+          wirePoints.push(new THREE.Vector3(0,ny,nz));
+        }
+      }
+      // Up-left
+      if(c>0 && r<rows){
+        const ny=cy+dh, nz=cz-dw/2;
+        if(cy>=-H/2+bIn && ny<=H/2-bIn && nz>=-D/2+bIn && cz<=D/2-bIn){
+          wirePoints.push(new THREE.Vector3(0,cy,cz));
+          wirePoints.push(new THREE.Vector3(0,ny,nz));
+        }
+      }
+    }
+  }
+  const wireGeo=new THREE.BufferGeometry().setFromPoints(wirePoints);
+  const wireMat=new THREE.MeshPhongMaterial({color:0x777777,shininess:40});
+  const wireRadius=0.01;
+  // Place on both -X and +X faces
+  for(const sign of [-1,1]){
+    const wireGroup=new THREE.Group();
+    wireGroup.position.x=sign*wireXoff;
+    for(let i=0;i<wirePoints.length;i+=2){
+      const a=wirePoints[i], b=wirePoints[i+1];
+      const dir=new THREE.Vector3().subVectors(b,a);
+      const len=dir.length();
+      const cyl=new THREE.Mesh(
+        new THREE.CylinderGeometry(wireRadius,wireRadius,len,4,1),
+        wireMat
+      );
+      cyl.position.set((a.x+b.x)/2,(a.y+b.y)/2,(a.z+b.z)/2);
+      cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.normalize());
+      wireGroup.add(cyl);
+    }
+    g.add(wireGroup);
+  }
 
   // 1″ white cardboard border on flat faces
   const border=1.0;
@@ -1000,12 +1151,12 @@ scene.add(legGroup);
 
 // ─── Explode / filter toggle ───
 const explodeV={
-  top:    new THREE.Vector3(0,10,0),
-  bot:    new THREE.Vector3(0,-10,0),
-  front:  new THREE.Vector3(0,0,-16),
-  back:   new THREE.Vector3(0,0,16),
-  filterL:new THREE.Vector3(-11,0,0),
-  filterR:new THREE.Vector3(11,0,0),
+  top:    new THREE.Vector3(0,8,0),
+  bot:    new THREE.Vector3(0,-8,0),
+  front:  new THREE.Vector3(0,0,-10),
+  back:   new THREE.Vector3(0,0,10),
+  filterL:new THREE.Vector3(-8,0,0),
+  filterR:new THREE.Vector3(8,0,0),
 };
 let exploded=false;
 function setToggle(onId,offId,isOn){
@@ -1015,7 +1166,7 @@ function setToggle(onId,offId,isOn){
 function collapseView(){
   if(!exploded) return;
   exploded=false;
-  setToggle('btnExOn','btnExOff',true);
+  document.getElementById('togExplode').classList.remove('on');
   for(const k in explodeV){
     if(!parts[k]) continue;
     targets[k]=origins[k].clone();
@@ -1023,9 +1174,9 @@ function collapseView(){
 }
 function toggleExplode(){
   exploded=!exploded;
-  setToggle('btnExOn','btnExOff',!exploded);
-  // Exploding turns off fans, airflow, and hides dimensions so internals are visible
+  document.getElementById('togExplode').classList.toggle('on',exploded);
   if(exploded){
+    // Exploding turns off fans, airflow, and dimensions
     if(spinning) toggleSpin();
     if(airflowOn) toggleAirflow();
     if(dimVisible) toggleDimensions();
@@ -1040,7 +1191,7 @@ function toggleFilter(){
   filterOn=!filterOn;
   parts.filterL.visible=filterOn;
   parts.filterR.visible=filterOn;
-  setToggle('btnFlOn','btnFlOff',filterOn);
+  document.getElementById('togFilter').classList.toggle('on',filterOn);
 }
 
 // ─── Camera controls ───
@@ -1089,68 +1240,108 @@ const particleZ0=new Float32Array(PARTICLE_COUNT); // starting Z spread across f
 const particleSide=new Int8Array(PARTICLE_COUNT);
 const particleExitDir=new Int8Array(PARTICLE_COUNT);
 const particleWobble=new Float32Array(PARTICLE_COUNT);
+const particleExhX=new Float32Array(PARTICLE_COUNT); // random X on fan face for exhaust
 
 // Parametric breakpoints along t=0→1
-// 0→0.20: outside air drifting toward filter
-// 0.20→0.30: passing through filter thickness
-// 0.30→0.55: inside box, drifting inward & turning toward fan panel
-// 0.55→0.80: crossing to fan panel
-// 0.80→1.0: exhaust out past fan panel into room
-const T0=0, T1=0.20, T2=0.30, T3=0.55, T4=0.80, T5=1.0;
+// 0→0.40: outside air drifting from room toward filter (wide funnel, ease-in)
+// 0.40→0.48: passing through filter thickness
+// 0.48→0.62: inside box, converging toward center
+// 0.62→0.75: crossing to fan panel
+// 0.75→1.0: exhaust — pushed out of fans into room
+const T0=0, T1=0.40, T2=0.48, T3=0.62, T4=0.75, T5=1.0;
 
-function pathX(t,side){
-  const outerX=W/2+ft+5;    // far outside
-  const filterOuter=W/2+ft/2+ft/2; // outer face of filter = W/2+ft
+function pathX(t,side,exhX){
+  const outerX=W/2+ft+40;   // far out into the room
+  const filterOuter=W/2+ft;  // outer face of filter
   const filterInner=W/2;     // inner face of filter
-  const insideX=W/4;          // partway inside, NOT zero — avoids center clump
+  const insideX=W/4;
   if(t<=T1){
     const f=t/T1;
-    return side*(outerX+(filterOuter-outerX)*f);
+    const ef=f*f;
+    return side*(outerX+(filterOuter-outerX)*ef);
   }
   if(t<=T2){
     const f=(t-T1)/(T2-T1);
     return side*(filterOuter+(filterInner-filterOuter)*f);
   }
+  // Inside box: transition from filter-side X to a random exhaust X across the panel
   if(t<=T3){
     const f=(t-T2)/(T3-T2);
-    return side*(filterInner+(insideX-filterInner)*f);
+    const startX=side*filterInner;
+    return startX+(exhX-startX)*f;
   }
-  // Gradually ease X toward 0 while heading to fan panel
-  if(t<=T4){
-    const f=(t-T3)/(T4-T3);
-    return side*insideX*(1-f*0.8); // drift toward center but never quite to 0
-  }
-  return side*insideX*0.2*(1-(t-T4)/(T5-T4)); // tiny remainder fades out
+  // At fan panel and exhaust: stay at exhaust X position
+  return exhX;
 }
 
 function pathZ(t,z0,exitDir){
-  if(t<=T3) return z0; // stay at original Z during intake & filter & early inside
+  const filterZ=Math.max(-D/2,Math.min(D/2, z0));
+  if(t<=T1){
+    const f=t/T1;
+    return z0+(filterZ-z0)*f*f;
+  }
+  if(t<=T3) return filterZ;
   if(t<=T4){
     const f=(t-T3)/(T4-T3);
     const fanZ=exitDir*(D/2+ply);
-    return z0+(fanZ-z0)*f; // sweep from z0 to fan panel
+    return filterZ+(fanZ-filterZ)*f;
   }
+  // Exhaust: accelerate outward from fan face — ease-out for punch
   const fanZ=exitDir*(D/2+ply);
   const f=(t-T4)/(T5-T4);
-  return fanZ+exitDir*6*f; // shoot outward
+  const ef=1-Math.pow(1-f,0.5); // fast start, gradual slowdown
+  return fanZ+exitDir*20*ef;
+}
+
+function pathY(t,y0){
+  // Funnel wide Y toward filter height range during intake, then clamp to fan stack during exhaust
+  const filterY=Math.max(-H/2,Math.min(H/2, y0));
+  const fanBot=fanY(0)-fanFrame/2, fanTop=fanY(numFans-1)+fanFrame/2;
+  const fanClampY=Math.max(fanBot,Math.min(fanTop, y0));
+  if(t<=T1){
+    const f=t/T1;
+    return y0+(filterY-y0)*f*f;
+  }
+  if(t<=T2) return filterY;
+  // Inside box: transition from filter Y to fan-stack Y range
+  if(t<=T3){
+    const f=(t-T2)/(T3-T2);
+    return filterY+(fanClampY-filterY)*f;
+  }
+  return fanClampY;
 }
 
 function initParticle(i,stagger){
   const side=Math.random()>0.5?1:-1;
   particleSide[i]=side;
   particleExitDir[i]=Math.random()>0.5?1:-1;
-  particleY0[i]=-H/2+Math.random()*H;
-  particleZ0[i]=-D/2+Math.random()*D;
+  // Random X position across the fan panel for exhaust (spread across panel width)
+  particleExhX[i]=(Math.random()-0.5)*panelW*0.85;
+  // Wide room-scale start positions for Y and Z
+  particleY0[i]=-H/2-10+Math.random()*(H+20);
+  particleZ0[i]=(Math.random()-0.5)*50;
   particleWobble[i]=Math.random()*Math.PI*2;
-  particleTSpeed[i]=0.002+Math.random()*0.003;
+  particleTSpeed[i]=0.0015+Math.random()*0.002;
   particleT[i]=stagger? Math.random() : 0;
   const t=particleT[i];
-  particlePositions[i*3]=pathX(t,side);
+  particlePositions[i*3]=pathX(t,side,particleExhX[i]);
   particlePositions[i*3+1]=particleY0[i];
   particlePositions[i*3+2]=pathZ(t,particleZ0[i],particleExitDir[i]);
   particleColors[i*3]=0.33; particleColors[i*3+1]=0.73; particleColors[i*3+2]=1.0;
 }
-for(let i=0;i<PARTICLE_COUNT;i++) initParticle(i,true);
+// Stagnant (ambient) particle base positions — gentle floating when fans off
+const stagnantBase=new Float32Array(PARTICLE_COUNT*3);
+function initStagnant(i){
+  stagnantBase[i*3]  =(Math.random()-0.5)*70;
+  stagnantBase[i*3+1]=-H/2-5+Math.random()*(H+20);
+  stagnantBase[i*3+2]=(Math.random()-0.5)*60;
+  particleWobble[i]=Math.random()*Math.PI*2;
+  particlePositions[i*3]  =stagnantBase[i*3];
+  particlePositions[i*3+1]=stagnantBase[i*3+1];
+  particlePositions[i*3+2]=stagnantBase[i*3+2];
+  particleColors[i*3]=0.2; particleColors[i*3+1]=0.5; particleColors[i*3+2]=0.8;
+}
+for(let i=0;i<PARTICLE_COUNT;i++) initStagnant(i);
 particleGeo.setAttribute('position',new THREE.BufferAttribute(particlePositions,3));
 particleGeo.setAttribute('color',new THREE.BufferAttribute(particleColors,3));
 const particleMat=new THREE.PointsMaterial({size:0.32,transparent:true,opacity:0.85,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false});
@@ -1161,17 +1352,27 @@ scene.add(particles);
 function toggleSpin(){
   spinning=!spinning;
   spinTarget=spinning?SPIN_MAX:0;
-  setToggle('btnSpinOn','btnSpinOff',spinning);
+  document.getElementById('togSpin').classList.toggle('on',spinning);
   // Auto-collapse so internals are visible inside the assembled box
   if(spinning) collapseView();
+  // Re-init particles when transitioning between stagnant ↔ directional
+  if(particles.visible){
+    if(spinning){ for(let i=0;i<PARTICLE_COUNT;i++) initParticle(i,true); }
+    else { for(let i=0;i<PARTICLE_COUNT;i++) initStagnant(i); }
+  }
 }
 
 let airflowOn=false;
 function toggleAirflow(){
   airflowOn=!airflowOn;
   particles.visible=airflowOn;
-  setToggle('btnAirOn','btnAirOff',airflowOn);
+  document.getElementById('togAirflow').classList.toggle('on',airflowOn);
   if(airflowOn) collapseView();
+  // Init to correct mode on show
+  if(airflowOn){
+    if(spinning){ for(let i=0;i<PARTICLE_COUNT;i++) initParticle(i,true); }
+    else { for(let i=0;i<PARTICLE_COUNT;i++) initStagnant(i); }
+  }
 }
 
 // ─── Dimension annotations ───
@@ -1194,30 +1395,37 @@ function makeTextSprite(text,bgColor='#ffffff'){
   ctx.fillStyle='#333'; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText(text,cvs.width/2,cvs.height/2);
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cvs),depthTest:false}));
-  sp.scale.set(3.2*cvs.width/cvs.height,3.2,1);
+  sp.scale.set(1.8*cvs.width/cvs.height,1.8,1);
   return sp;
+}
+
+// Thick line helper for dimension lines (WebGL ignores linewidth)
+function dimTube(a,b,color,rad=0.06){
+  const dir=new THREE.Vector3().subVectors(b,a);
+  const len=dir.length();
+  const mat=new THREE.MeshBasicMaterial({color,depthTest:false,transparent:true,opacity:0.85});
+  const geo=new THREE.CylinderGeometry(rad,rad,len,4,1);
+  const mesh=new THREE.Mesh(geo,mat);
+  mesh.position.copy(a.clone().add(b).multiplyScalar(0.5));
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.normalize());
+  return mesh;
 }
 
 function dimLine(a,b,label,offset,color=0xff3333){
   const ao=a.clone().add(offset), bo=b.clone().add(offset);
-  dimGroup.add(new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints([ao,bo]),
-    new THREE.LineBasicMaterial({color,linewidth:2,depthTest:false})
-  ));
+  // Main dimension line
+  dimGroup.add(dimTube(ao,bo,color,0.06));
+  // Tick marks at endpoints
   const dir=bo.clone().sub(ao).normalize();
   const tickLen=0.8;
   for(const p of [ao,bo]){
     const cross=new THREE.Vector3().crossVectors(dir,offset.clone().normalize()).normalize().multiplyScalar(tickLen);
     if(cross.length()<0.01) cross.set(0,tickLen,0);
-    dimGroup.add(new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([p.clone().add(cross),p.clone().sub(cross)]),
-      new THREE.LineBasicMaterial({color,depthTest:false})
-    ));
+    dimGroup.add(dimTube(p.clone().add(cross),p.clone().sub(cross),color,0.04));
   }
-  const leaderMat=new THREE.LineDashedMaterial({color:0x999999,dashSize:0.5,gapSize:0.3,depthTest:false});
+  // Leader lines (dashed → solid thin)
   for(const [mp,dp] of [[a,ao],[b,bo]]){
-    const ll=new THREE.Line(new THREE.BufferGeometry().setFromPoints([mp,dp]),leaderMat);
-    ll.computeLineDistances(); dimGroup.add(ll);
+    dimGroup.add(dimTube(mp,dp,0x999999,0.03));
   }
   const sp=makeTextSprite(label);
   sp.position.copy(ao.clone().add(bo).multiplyScalar(0.5));
@@ -1245,9 +1453,9 @@ let dimVisible=false;
 function toggleDimensions(){
   dimVisible=!dimVisible;
   dimGroup.visible=dimVisible;
-  setToggle('btnDimOn','btnDimOff',dimVisible);
-  // Auto-collapse so dimension lines align with assembled box
-  if(dimVisible) collapseView();
+  document.getElementById('togDims').classList.toggle('on',dimVisible);
+  // Dimensions require assembled view — collapse if exploded
+  if(dimVisible && exploded) collapseView();
 }
 
 // ─── Wood stain selector (3 options) ───
@@ -1293,12 +1501,77 @@ function toggleLegs(){
   }
 }
 
+// ─── Day / Night mode ───
+let isNightMode = false;
+const DAY = {
+  clear: new THREE.Color(0xd4dce8),
+  fogDensity: 0.0015,
+  ambient: 0.5,
+  keyIntensity: 0.7, keyColor: 0xfff8f0,
+  fillIntensity: 0.35,
+  rimIntensity: 0.25,
+  bounceIntensity: 0.15,
+  exposure: 1.0,
+  wall: 0xd8d4ce,
+  baseboard: 0xc0bbb4,
+  carpet: 0xb0a898
+};
+const NIGHT = {
+  clear: new THREE.Color(0x181820),
+  fogDensity: 0.003,
+  ambient: 0.15,
+  keyIntensity: 0.25, keyColor: 0x6688cc,
+  fillIntensity: 0.08,
+  rimIntensity: 0.12,
+  bounceIntensity: 0.05,
+  exposure: 0.9,
+  wall: 0x2a2a35,
+  baseboard: 0x1e1e28,
+  carpet: 0x4a4840
+};
+
+function setTimeOfDay(mode) {
+  isNightMode = (mode === 'night');
+  document.querySelectorAll('#btnDay,#btnNight').forEach(b => b.classList.remove('on'));
+  document.getElementById(isNightMode ? 'btnNight' : 'btnDay').classList.add('on');
+  document.body.classList.toggle('night-mode', isNightMode);
+
+  const t = isNightMode ? NIGHT : DAY;
+  renderer.setClearColor(t.clear, 1);
+  scene.fog.color.copy(t.clear);
+  scene.fog.density = t.fogDensity;
+  renderer.toneMappingExposure = t.exposure;
+
+  // Lights
+  scene.children.forEach(c => { if (c.isAmbientLight) c.intensity = t.ambient; });
+  key.intensity = t.keyIntensity;
+  key.color.setHex(t.keyColor);
+  fill.intensity = t.fillIntensity;
+  rim.intensity = t.rimIntensity;
+  bounce.intensity = t.bounceIntensity;
+
+  // Room surfaces
+  [wallMeshL,returnWallL].forEach(m=>m.material.color.setHex(t.wall));
+  if(recessWallL) recessWallL.material.color.setHex(t.wall);
+  if(recessWallR) recessWallR.material.color.setHex(t.wall);
+  oppWall.material.color.setHex(t.wall);
+  rightWall.material.color.setHex(t.wall);
+  leftWallBelow.material.color.setHex(t.wall);
+  leftWallAbove.material.color.setHex(t.wall);
+  leftWallFront.material.color.setHex(t.wall);
+  leftWallBack.material.color.setHex(t.wall);
+  [baseboardMeshL,baseboardRetL].forEach(m=>m.material.color.setHex(t.baseboard));
+  if(baseboardRecessL) baseboardRecessL.material.color.setHex(t.baseboard);
+  if(baseboardRecessR) baseboardRecessR.material.color.setHex(t.baseboard);
+  oppBaseboard.material.color.setHex(t.baseboard);
+  sideBaseboard.material.color.setHex(t.baseboard);
+  leftBaseboard.material.color.setHex(t.baseboard);
+  floorMat.color.setHex(t.carpet);
+  // Window sky color shifts at night
+  sky.material.color.setHex(isNightMode ? 0x0a0a1a : 0xc8ddf0);
+}
+
 // ─── Fan color toggle (black / white) ───
-let fansWhite=false;
-let fansRGB=true; // start as RGB (frosted translucent blades)
-const FAN_BLACK={frame:0x1a1a1a,hub:0x111111,cap:0x181818,blade:0x1e1e1e};
-const FAN_WHITE={frame:0xe8e8e8,hub:0xdddddd,cap:0xd0d0d0,blade:0xf0f0f0};
-const BLADE_FROSTED={color:0xf0ece8,opacity:0.65,shininess:30};
 
 function applyBladeStyle(){
   const c=fansWhite?FAN_WHITE:FAN_BLACK;
@@ -1330,22 +1603,23 @@ function toggleFanColor(){
     allFanMats[i+1].color.setHex(c.hub);
     allFanMats[i+2].color.setHex(c.cap);
   }
+  for(const m of allBraceMats) m.color.setHex(c.frame);
   applyBladeStyle();
 }
 
 function toggleFanRGB(){
   fansRGB=!fansRGB;
-  setToggle('btnBladeRGB','btnBladeSolid',fansRGB);
-  document.getElementById('rgbRow').style.display=fansRGB?'flex':'none';
+  document.getElementById('togRGB').classList.toggle('on',fansRGB);
+  document.getElementById('rgbSection').classList.toggle('hidden',!fansRGB);
   if(!fansRGB) setRGB('off');
   applyBladeStyle();
 }
 
 // ─── RGB LED control ───
 const RGB_COLORS={
-  red:   {hex:0xff2200, intensity:5},
-  yellow:{hex:0xffcc00, intensity:4},
-  green: {hex:0x00ff44, intensity:4},
+  red:   {hex:0xff2200, intensity:1.2},
+  yellow:{hex:0xffcc00, intensity:1.0},
+  green: {hex:0x00ff44, intensity:1.0},
   off:   {hex:0x000000, intensity:0}
 };
 let currentRGB='off';
@@ -1355,14 +1629,19 @@ function setRGB(color){
   const c=RGB_COLORS[color];
   // Update RGB button active states — ring highlight on selected
   document.querySelectorAll('#rgbRow button').forEach(b=>b.classList.remove('on'));
-  const rgbBtnMap={red:'btnRgbR',yellow:'btnRgbY',green:'btnRgbG',off:'btnRgbOff'};
+  const rgbBtnMap={red:'btnRgbR',yellow:'btnRgbY',green:'btnRgbG',rainbow:'btnRgbRainbow',off:'btnRgbOff'};
   if(rgbBtnMap[color]) document.getElementById(rgbBtnMap[color]).classList.add('on');
+  if(color==='rainbow'){
+    // Rainbow mode — animate loop handles color cycling, just set initial glow
+    for(const gl of allFanGlows){ gl.intensity=5; }
+    return;
+  }
   for(const gl of allFanGlows){
     gl.color.setHex(c.hex);
     gl.intensity=c.intensity;
   }
   const emissiveHex=color==='off'?0x000000:c.hex;
-  const emissiveIntensity=color==='off'?0:0.3;
+  const emissiveIntensity=color==='off'?0:0.08;
   // Fan blades + hub caps
   for(let i=0;i<allFanMats.length;i+=4){
     allFanMats[i+3].emissive.setHex(emissiveHex);
@@ -1371,7 +1650,7 @@ function setRGB(color){
     allFanMats[i+2].emissiveIntensity=emissiveIntensity*0.5;
   }
   // Filters glow from light passing through
-  const filterGlow=color==='off'?0:0.12;
+  const filterGlow=color==='off'?0:0.03;
   scene.traverse(obj=>{
     if(!obj.isMesh) return;
     const m=obj.material;
@@ -1381,7 +1660,7 @@ function setRGB(color){
     }
   });
   // Plywood gets a subtle ambient tint from internal light
-  const woodGlow=color==='off'?0:0.06;
+  const woodGlow=color==='off'?0:0.015;
   for(const m of allBirchMats){
     m.emissive.setHex(emissiveHex);
     m.emissiveIntensity=woodGlow;
@@ -1392,7 +1671,7 @@ function setRGB(color){
 let xrayOn=false;
 function toggleXray(){
   xrayOn=!xrayOn;
-  setToggle('btnXrayOn','btnXrayOff',xrayOn);
+  document.getElementById('togXray').classList.toggle('on',xrayOn);
   scene.traverse(obj=>{
     if(!obj.isMesh) return;
     if(obj._isRoom) return; // skip room objects
@@ -1466,6 +1745,35 @@ function roomBox(w,h,d,color,x,y,z,rx,ry,rz){
   return mesh;
 }
 
+// Rounded box helper — uses ExtrudeGeometry with a rounded rect profile
+function roomRoundBox(w,h,d,radius,color,x,y,z,rx,ry,rz){
+  const r=Math.min(radius,w/2,h/2);
+  const shape=new THREE.Shape();
+  shape.moveTo(-w/2+r,-h/2);
+  shape.lineTo(w/2-r,-h/2);
+  shape.quadraticCurveTo(w/2,-h/2,w/2,-h/2+r);
+  shape.lineTo(w/2,h/2-r);
+  shape.quadraticCurveTo(w/2,h/2,w/2-r,h/2);
+  shape.lineTo(-w/2+r,h/2);
+  shape.quadraticCurveTo(-w/2,h/2,-w/2,h/2-r);
+  shape.lineTo(-w/2,-h/2+r);
+  shape.quadraticCurveTo(-w/2,-h/2,-w/2+r,-h/2);
+  const extrudeSettings={depth:d,bevelEnabled:false};
+  const g=new THREE.ExtrudeGeometry(shape,extrudeSettings);
+  g.translate(0,0,-d/2); // center along Z
+  const m=new THREE.MeshStandardMaterial({color,roughness:0.7,metalness:0.05});
+  const mesh=new THREE.Mesh(g,m);
+  mesh.position.set(x,y,z);
+  if(rx) mesh.rotation.x=rx;
+  if(ry) mesh.rotation.y=ry;
+  if(rz) mesh.rotation.z=rz;
+  mesh.castShadow=true;
+  mesh.receiveShadow=true;
+  mesh._isRoom=true;
+  scene.add(mesh);
+  return mesh;
+}
+
 // ─── Zinus Queen Piper Upholstered Platform Bed ───
 // 82.3"L × 60.3"W × 42"H, 6.5" ground clearance, slats at 14" from floor
 const bedL=82.3, bedW=60.3, bedH=42, bedClearance=6.5, bedSlatsFromFloor=14;
@@ -1488,19 +1796,216 @@ mug.position.set(tblX-3, floorY+tblH+1.75, tblZ+2);
 mug.castShadow=true; mug._isRoom=true;
 scene.add(mug);
 
-// Wall section behind (bright daytime wall)
-roomBox(120, 80, 0.5, 0xd8d4ce, 0, floorY+40, 50, 0,0,0);
+// Wall section behind — split into left portion and recessed alcove with door (flush to right wall)
+const recessDepth=18; // 1.5 feet inward
+const recessZ=50-recessDepth; // recessed wall at Z=20
+const recessLeft=24, recessRight=60; // recess flush with right wall
+const recessW=recessRight-recessLeft;
 
-// Baseboard
-roomBox(120, 3, 0.6, 0xc0bbb4, 0, floorY+1.5, 49.5, 0,0,0);
+// Left portion of back wall (X=-60 to recessLeft)
+const backWallLeftW=recessLeft-(-60);
+const wallMeshL=roomBox(backWallLeftW, 80, 0.5, 0xd8d4ce, -60+backWallLeftW/2, floorY+40, 50, 0,0,0);
+
+// Left return wall (connecting back wall to recessed wall)
+const returnWallL=roomBox(0.5, 80, recessDepth, 0xd8d4ce, recessLeft, floorY+40, 50-recessDepth/2, 0,0,0);
+
+// Recessed wall (with door opening)
+const doorW=32, doorH=80; // standard interior door
+const doorCenterX=recessLeft+recessW/2;
+const doorLeft=doorCenterX-doorW/2;
+const doorRight=doorCenterX+doorW/2;
+
+// Wall left of door
+const recessWallLeftW=doorLeft-recessLeft;
+if(recessWallLeftW>0.5) var recessWallL=roomBox(recessWallLeftW, 80, 0.5, 0xd8d4ce, recessLeft+recessWallLeftW/2, floorY+40, recessZ, 0,0,0);
+// Wall right of door
+const recessWallRightW=recessRight-doorRight;
+if(recessWallRightW>0.5) var recessWallR=roomBox(recessWallRightW, 80, 0.5, 0xd8d4ce, doorRight+recessWallRightW/2, floorY+40, recessZ, 0,0,0);
+// Wall above door (transom)
+// (doorH=80 = wallHeight, so no transom needed)
+
+// Baseboards (follow the recess shape)
+const baseboardMeshL=roomBox(backWallLeftW, 3, 0.6, 0xc0bbb4, -60+backWallLeftW/2, floorY+1.5, 49.5, 0,0,0);
+const baseboardRetL=roomBox(0.6, 3, recessDepth, 0xc0bbb4, recessLeft+0.5, floorY+1.5, 50-recessDepth/2, 0,0,0);
+const baseboardRecessL=recessWallLeftW>0.5?roomBox(recessWallLeftW, 3, 0.6, 0xc0bbb4, recessLeft+recessWallLeftW/2, floorY+1.5, recessZ+0.5, 0,0,0):null;
+const baseboardRecessR=recessWallRightW>0.5?roomBox(recessWallRightW, 3, 0.6, 0xc0bbb4, doorRight+recessWallRightW/2, floorY+1.5, recessZ+0.5, 0,0,0):null;
+
+// ─── Door ───
+const doorThick=1.5, doorFrameW=2.5, doorFrameD=recessDepth>4?4:recessDepth;
+const doorColor=0xf0ebe4; // warm off-white painted door
+const doorFrameColor=0xf5f5f0;
+
+// Door panel (on room-facing side of recessed wall)
+const doorPanel=roomRoundBox(doorW-1, doorH-0.5, doorThick, 0.3, doorColor,
+  doorCenterX, floorY+doorH/2, recessZ-doorThick/2-0.3, 0,0,0);
+doorPanel.material.roughness=0.5;
+
+// Six-panel door detail — raised panels (room-facing side)
+const dpInset=0.3, dpW=doorW*0.35, dpH1=doorH*0.22, dpH2=doorH*0.30;
+const dpY=[floorY+doorH*0.14, floorY+doorH*0.42, floorY+doorH*0.74]; // centers of 3 rows
+const dpHArr=[dpH1, dpH2, dpH1];
+const dpMat=new THREE.MeshStandardMaterial({color:0xe8e3dc,roughness:0.45,metalness:0.02});
+[-1,1].forEach(side=>{
+  dpHArr.forEach((ph,ri)=>{
+    const pg=new THREE.BoxGeometry(dpW, ph, dpInset);
+    const pm=new THREE.Mesh(pg, dpMat);
+    pm.position.set(doorCenterX+side*(doorW*0.2), dpY[ri], recessZ-doorThick-0.3-dpInset/2-0.01);
+    pm.castShadow=true; pm._isRoom=true; scene.add(pm);
+  });
+});
+
+// Door frame (trim around opening — room-facing side)
+const dfMat=new THREE.MeshStandardMaterial({color:doorFrameColor,roughness:0.35,metalness:0.05});
+// Left jamb
+const dfl=new THREE.Mesh(new THREE.BoxGeometry(doorFrameW, doorH, doorFrameD), dfMat);
+dfl.position.set(doorLeft-doorFrameW/2+0.5, floorY+doorH/2, recessZ-doorFrameD/2);
+dfl.castShadow=true; dfl._isRoom=true; scene.add(dfl);
+// Right jamb
+const dfr=new THREE.Mesh(new THREE.BoxGeometry(doorFrameW, doorH, doorFrameD), dfMat);
+dfr.position.set(doorRight+doorFrameW/2-0.5, floorY+doorH/2, recessZ-doorFrameD/2);
+dfr.castShadow=true; dfr._isRoom=true; scene.add(dfr);
+// Header
+const dfh=new THREE.Mesh(new THREE.BoxGeometry(doorW+doorFrameW*2-1, doorFrameW, doorFrameD), dfMat);
+dfh.position.set(doorCenterX, floorY+doorH+doorFrameW/2-0.5, recessZ-doorFrameD/2);
+dfh.castShadow=true; dfh._isRoom=true; scene.add(dfh);
+
+// Door knob (round, brushed nickel — room-facing side)
+const knobMat=new THREE.MeshStandardMaterial({color:0xaaaaaa,roughness:0.25,metalness:0.8});
+const knobGeo=new THREE.SphereGeometry(1.2, 16, 12);
+const knob=new THREE.Mesh(knobGeo, knobMat);
+knob.position.set(doorCenterX+doorW*0.35, floorY+36, recessZ-doorThick-0.3-1.2);
+knob.castShadow=true; knob._isRoom=true; scene.add(knob);
+// Knob base plate
+const plateMat=new THREE.MeshStandardMaterial({color:0xbbbbbb,roughness:0.3,metalness:0.7});
+const plateGeo=new THREE.CylinderGeometry(1.8, 1.8, 0.3, 16);
+plateGeo.rotateX(Math.PI/2);
+const plate=new THREE.Mesh(plateGeo, plateMat);
+plate.position.set(doorCenterX+doorW*0.35, floorY+36, recessZ-doorThick-0.3-0.2);
+plate.castShadow=true; plate._isRoom=true; scene.add(plate);
+
+// Collect all back wall + recess meshes for fading
+const backWallParts=[wallMeshL,returnWallL,
+  baseboardMeshL,baseboardRetL];
+if(recessWallL) backWallParts.push(recessWallL);
+if(recessWallR) backWallParts.push(recessWallR);
+if(baseboardRecessL) backWallParts.push(baseboardRecessL);
+if(baseboardRecessR) backWallParts.push(baseboardRecessR);
 
 // Book stack on table (for fun)
 roomBox(5, 1.2, 7, 0x8b4513, tblX+4, floorY+tblH+0.6, tblZ-1, 0, 0.1, 0);
 roomBox(4.5, 0.8, 6.5, 0x2d5a27, tblX+4, floorY+tblH+1.6, tblZ-1, 0, -0.05, 0);
 
+// ─── Opposite wall + 65" OLED TV ───
+const oppWallZ=-50;
+const oppWall=roomBox(120, 80, 0.5, 0xd8d4ce, 0, floorY+40, oppWallZ, 0,0,0);
+const oppBaseboard=roomBox(120, 3, 0.6, 0xc0bbb4, 0, floorY+1.5, oppWallZ+0.5, 0,0,0);
+
+// 65" OLED: diagonal=65", 16:9 → ~56.7"W × 31.9"H, bezel ~0.3", depth ~1"
+const tvW=56.7, tvH=31.9, tvD=1.0, bezel=0.3;
+const tvCenterX=bedX; // centered on the bed
+const tvCenterY=floorY+42; // center of screen ~42" from floor (eye level from bed)
+const tvZ=oppWallZ+0.5+tvD/2+0.1;
+
+// Thin black bezel frame
+const tvFrame=roomRoundBox(tvW+bezel*2, tvH+bezel*2, tvD, 0.4, 0x111111,
+  tvCenterX, tvCenterY, tvZ, 0,0,0);
+tvFrame.material.roughness=0.3;
+tvFrame.material.metalness=0.6;
+
+// Screen — dark glossy panel
+const screenGeo=new THREE.PlaneGeometry(tvW, tvH);
+const screenMat=new THREE.MeshPhongMaterial({color:0x0a0a0a, shininess:120, reflectivity:0.8});
+const screen=new THREE.Mesh(screenGeo, screenMat);
+screen.position.set(tvCenterX, tvCenterY, tvZ+tvD/2+0.02);
+screen._isRoom=true;
+scene.add(screen);
+
+// ─── Right side wall (solid) ───
+const sideWallX=60;
+const wallDepth=100; // Z span from -50 to 50
+const wallHeight=80;
+const rightWall=roomBox(0.5, wallHeight, wallDepth, 0xd8d4ce, sideWallX, floorY+wallHeight/2, 0, 0,0,0);
+const sideBaseboard=roomBox(0.6, 3, wallDepth, 0xc0bbb4, sideWallX-0.5, floorY+1.5, 0, 0,0,0);
+
+// ─── Left side wall with window (near the bed) ───
+const leftWallX=-60;
+const winW=36, winH=48; // window opening size
+const winCenterY=floorY+38; // center of window
+const winCenterZ=bedZ; // centered on the bed along Z
+const winBottom=winCenterY-winH/2;
+const winTop=winCenterY+winH/2;
+const winFront=winCenterZ-winW/2;
+const winBack=winCenterZ+winW/2;
+
+// Wall sections around the window (4 pieces: below, above, front, back)
+// Below window
+const belowH=winBottom-floorY;
+const leftWallBelow=roomBox(0.5, belowH, wallDepth, 0xd8d4ce, leftWallX, floorY+belowH/2, 0, 0,0,0);
+// Above window
+const aboveH=floorY+wallHeight-winTop;
+const leftWallAbove=roomBox(0.5, aboveH, wallDepth, 0xd8d4ce, leftWallX, winTop+aboveH/2, 0, 0,0,0);
+// Front of window (toward Z=-50)
+const frontW=winFront-(-wallDepth/2);
+const leftWallFront=roomBox(0.5, winH, frontW, 0xd8d4ce, leftWallX, winCenterY, -wallDepth/2+frontW/2, 0,0,0);
+// Back of window (toward Z=+50)
+const backW=wallDepth/2-winBack;
+const leftWallBack=roomBox(0.5, winH, backW, 0xd8d4ce, leftWallX, winCenterY, winBack+backW/2, 0,0,0);
+
+// Baseboard on left wall
+const leftBaseboard=roomBox(0.6, 3, wallDepth, 0xc0bbb4, leftWallX+0.5, floorY+1.5, 0, 0,0,0);
+
+// Window sill
+roomBox(0.8, 0.5, winW+2, 0xc8c4be, leftWallX+0.4, winBottom-0.25, winCenterZ, 0,0,0);
+
+// Window frame (thin white trim)
+const frameMat=new THREE.MeshPhongMaterial({color:0xf5f5f0,shininess:10});
+const frameT=0.8, frameD=0.6;
+// Top
+const wft=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT, winW+frameT*2), frameMat);
+wft.position.set(leftWallX, winTop+frameT/2, winCenterZ); wft._isRoom=true; scene.add(wft);
+// Bottom
+const wfb=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT, winW+frameT*2), frameMat);
+wfb.position.set(leftWallX, winBottom-frameT/2, winCenterZ); wfb._isRoom=true; scene.add(wfb);
+// Left (toward outside)
+const wfl=new THREE.Mesh(new THREE.BoxGeometry(frameD, winH, frameT), frameMat);
+wfl.position.set(leftWallX, winCenterY, winFront-frameT/2); wfl._isRoom=true; scene.add(wfl);
+// Right (toward inside)
+const wfr=new THREE.Mesh(new THREE.BoxGeometry(frameD, winH, frameT), frameMat);
+wfr.position.set(leftWallX, winCenterY, winBack+frameT/2); wfr._isRoom=true; scene.add(wfr);
+// Horizontal mullion (center bar)
+const wfm=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT*0.6, winW), frameMat);
+wfm.position.set(leftWallX, winCenterY, winCenterZ); wfm._isRoom=true; scene.add(wfm);
+
+// Sky visible through window — bright plane behind window
+const skyGeo=new THREE.PlaneGeometry(winW, winH);
+const skyMat=new THREE.MeshBasicMaterial({color:0xc8ddf0}); // pale sky blue, unlit
+const sky=new THREE.Mesh(skyGeo, skyMat);
+sky.rotation.y=Math.PI/2; // face inward (toward +X)
+sky.position.set(leftWallX-0.5, winCenterY, winCenterZ);
+sky._isRoom=true; scene.add(sky);
+
+// Curtains — simple draped fabric panels on each side of the window
+const curtainH=winH+12, curtainW=14, curtainD=1.5;
+const curtainMat=new THREE.MeshStandardMaterial({color:0xc5bfb5,roughness:0.95,metalness:0,side:THREE.DoubleSide});
+// Front curtain (toward Z=-50 side of window)
+const cL=roomRoundBox(curtainD, curtainH, curtainW, 0.5, 0xc5bfb5,
+  leftWallX+1.2, winCenterY, winFront-curtainW/2-1, 0,0,0);
+cL.material.roughness=0.95;
+// Back curtain (toward Z=+50 side of window)
+const cR=roomRoundBox(curtainD, curtainH, curtainW, 0.5, 0xc5bfb5,
+  leftWallX+1.2, winCenterY, winBack+curtainW/2+1, 0,0,0);
+cR.material.roughness=0.95;
+// Curtain rod
+const rodGeo=new THREE.CylinderGeometry(0.25,0.25,winW+curtainW*2+8,8);
+rodGeo.rotateX(Math.PI/2);
+const rodMat=new THREE.MeshStandardMaterial({color:0x444444,roughness:0.3,metalness:0.7});
+const rod=new THREE.Mesh(rodGeo,rodMat);
+rod.position.set(leftWallX+1.5, winTop+4, winCenterZ);
+rod.castShadow=true; rod._isRoom=true; scene.add(rod);
+
 // Upholstered headboard (full height, at back of bed)
 const hbThick=3, hbH=bedH-bedClearance, hbW=bedW;
-const headboard=roomBox(hbW, hbH, hbThick, 0x4a4a55,
+const headboard=roomRoundBox(hbW, hbH, hbThick, 2, 0x4a4a55,
   bedX, floorY+bedClearance+hbH/2, bedZ+bedL/2-hbThick/2, 0,0,0);
 // Give headboard a fabric look
 headboard.material.roughness=0.95;
@@ -1510,17 +2015,17 @@ const railH=bedSlatsFromFloor-bedClearance; // height from clearance to slat lev
 const railThick=1.5;
 const railY=floorY+bedClearance+railH/2;
 // Left rail
-const lRail=roomBox(railThick, railH, bedL, 0x4a4a55,
+const lRail=roomRoundBox(railThick, railH, bedL, 1, 0x4a4a55,
   bedX-bedW/2+railThick/2, railY, bedZ, 0,0,0);
 lRail.material.roughness=0.95;
 // Right rail
-const rRail=roomBox(railThick, railH, bedL, 0x4a4a55,
+const rRail=roomRoundBox(railThick, railH, bedL, 1, 0x4a4a55,
   bedX+bedW/2-railThick/2, railY, bedZ, 0,0,0);
 rRail.material.roughness=0.95;
 
 // Footboard — lower profile
 const fbH=railH, fbThick=2;
-const footboard=roomBox(bedW, fbH, fbThick, 0x4a4a55,
+const footboard=roomRoundBox(bedW, fbH, fbThick, 1.5, 0x4a4a55,
   bedX, railY, bedZ-bedL/2+fbThick/2, 0,0,0);
 footboard.material.roughness=0.95;
 
@@ -1548,31 +2053,60 @@ for(const [lx,lz] of [
 // Mattress (approx 60"×80"×10")
 const mattW=58, mattL=78, mattH=10;
 const mattY=slatY+1+mattH/2;
-const mattress=roomBox(mattW, mattH, mattL, 0xf0ece6,
-  bedX, mattY, bedZ+(hbThick-fbThick)/2, 0,0,0);
+const mattCenterZ=bedZ+(hbThick-fbThick)/2;
+const mattress=roomRoundBox(mattW, mattH, mattL, 3, 0xd4cdc0,
+  bedX, mattY, mattCenterZ, 0,0,0);
 mattress.material.roughness=0.92;
-mattress.material.color.set(0xeee8dd);
+mattress.material.color.set(0xd4cdc0);
 
-// Pillow pair
+// Pillow pair — rounded soft shapes near headboard
+const pillowW=20, pillowH=4, pillowD=12, pillowR=2;
 for(const px of [-12, 12]){
-  const pillowGeo=new THREE.BoxGeometry(20, 5, 10);
-  // Round edges by scaling — it's simple geometry but reads as a pillow
-  const pillowMat=new THREE.MeshStandardMaterial({color:0xfaf8f4,roughness:0.9});
-  const pillow=new THREE.Mesh(pillowGeo, pillowMat);
-  pillow.position.set(bedX+px, mattY+mattH/2+2.5, bedZ+bedL/2-hbThick-8);
-  pillow.castShadow=true; pillow.receiveShadow=true; pillow._isRoom=true;
-  scene.add(pillow);
+  const pillow=roomRoundBox(pillowW, pillowH, pillowD, pillowR, 0xddd8cf,
+    bedX+px, mattY+mattH/2+pillowH/2, bedZ+bedL/2-hbThick-pillowD/2-2, 0,0,0);
+  pillow.material.roughness=0.9;
 }
 
-// Duvet / comforter draped over mattress
+// Duvet / comforter — sits on mattress, covers from foot up to just below pillows
 const duvetH=3;
-roomBox(mattW+4, duvetH, mattL-18, 0xd5cfc5,
-  bedX, mattY+mattH/2+duvetH/2, bedZ+10, 0,0,0);
+const duvetL=mattL-pillowD-8; // leave room for pillows at headboard end
+const duvetZ=mattCenterZ-(mattL/2-duvetL/2); // flush with foot end, leave pillow gap at head
+const duvet=roomRoundBox(mattW+4, duvetH, duvetL, 2, 0xbfb8aa,
+  bedX, mattY+mattH/2+duvetH/2, duvetZ, 0,0,0);
+duvet.material.roughness=0.95;
 
 
 // ─── Animate ───
 function animate(){
   requestAnimationFrame(animate);
+
+  // Rainbow RGB cycling
+  if(currentRGB==='rainbow'){
+    const t=performance.now()*0.001; // seconds
+    const hueColor=new THREE.Color();
+    for(let fi=0;fi<allFanGlows.length;fi++){
+      // Each fan offset by phase for a chase effect
+      const hue=((t*0.3)+fi*0.12)%1;
+      hueColor.setHSL(hue,1,0.5);
+      allFanGlows[fi].color.copy(hueColor);
+      allFanGlows[fi].intensity=1.2;
+    }
+    const avgHue=(t*0.3)%1;
+    hueColor.setHSL(avgHue,1,0.5);
+    const hex=hueColor.getHex();
+    for(let i=0;i<allFanMats.length;i+=4){
+      allFanMats[i+3].emissive.setHex(hex);
+      allFanMats[i+3].emissiveIntensity=0.08;
+      allFanMats[i+2].emissive.setHex(hex);
+      allFanMats[i+2].emissiveIntensity=0.04;
+    }
+    scene.traverse(obj=>{
+      if(!obj.isMesh) return;
+      const m=obj.material;
+      if(m&&m._isFilterMat){ m.emissive.setHex(hex); m.emissiveIntensity=0.03; }
+    });
+    for(const m of allBirchMats){ m.emissive.setHex(hex); m.emissiveIntensity=0.015; }
+  }
 
   // Lerp explode positions
   for(const k in targets){
@@ -1589,33 +2123,45 @@ function animate(){
     }
   }
 
-  // Air particles: smooth parametric flow — fade in, travel path, fade out, seamless loop
+  // Air particles
   if(airflowOn){
     const pos=particleGeo.attributes.position;
     const col=particleGeo.attributes.color;
-    const speedMul=spinning?(0.4+0.6*(spinSpeed/SPIN_MAX)):0.5;
-    for(let i=0;i<PARTICLE_COUNT;i++){
-      particleT[i]+=particleTSpeed[i]*speedMul;
-      if(particleT[i]>=1.0) initParticle(i,false); // seamless reset at t=1
-      const t=particleT[i];
-      const sd=particleSide[i];
-      const ed=particleExitDir[i];
-      const x=pathX(t,sd);
-      const z=pathZ(t,particleZ0[i],ed);
-      // Gentle wobble
-      particleWobble[i]+=0.05;
-      const wobY=Math.sin(particleWobble[i])*0.15;
-      pos.setXYZ(i,x,particleY0[i]+wobY,z);
-      // Fade: 0→0.12 fade in, 0.85→1.0 fade out, full brightness in between
-      let alpha=1.0;
-      if(t<0.12) alpha=t/0.12;
-      else if(t>0.85) alpha=1.0-(t-0.85)/0.15;
-      // Blue tint: brighter when inside box
-      const inBox=(t>0.2&&t<0.75);
-      const r=inBox?0.35*alpha:0.25*alpha;
-      const g=inBox?0.78*alpha:0.65*alpha;
-      const b=1.0*alpha;
-      col.setXYZ(i,r,g,b);
+    if(spinning){
+      // Directional flow through filter → fan → exhaust
+      const speedMul=0.4+0.6*(spinSpeed/SPIN_MAX);
+      for(let i=0;i<PARTICLE_COUNT;i++){
+        particleT[i]+=particleTSpeed[i]*speedMul;
+        if(particleT[i]>=1.0) initParticle(i,false);
+        const t=particleT[i];
+        const sd=particleSide[i];
+        const ed=particleExitDir[i];
+        const x=pathX(t,sd,particleExhX[i]);
+        const y=pathY(t,particleY0[i]);
+        const z=pathZ(t,particleZ0[i],ed);
+        particleWobble[i]+=0.05;
+        const wobY=Math.sin(particleWobble[i])*0.15;
+        pos.setXYZ(i,x,y+wobY,z);
+        let alpha=1.0;
+        if(t<0.08) alpha=t/0.08;
+        else if(t>0.88) alpha=1.0-(t-0.88)/0.12;
+        const inBox=(t>T2&&t<T4);
+        const r=inBox?0.35*alpha:0.25*alpha;
+        const g=inBox?0.78*alpha:0.65*alpha;
+        const b=1.0*alpha;
+        col.setXYZ(i,r,g,b);
+      }
+    } else {
+      // Stagnant ambient float — gentle Brownian drift, no directional movement
+      for(let i=0;i<PARTICLE_COUNT;i++){
+        particleWobble[i]+=0.006+0.003*Math.sin(i*0.37);
+        const p=particleWobble[i];
+        const bx=stagnantBase[i*3]  +Math.sin(p*0.71)*0.8+Math.sin(p*1.37)*0.3;
+        const by=stagnantBase[i*3+1]+Math.sin(p*1.13)*0.5+Math.cos(p*0.83)*0.2;
+        const bz=stagnantBase[i*3+2]+Math.cos(p*0.93)*0.6+Math.sin(p*1.51)*0.25;
+        pos.setXYZ(i,bx,by,bz);
+        col.setXYZ(i,0.2,0.5,0.8);
+      }
     }
     pos.needsUpdate=true;
     col.needsUpdate=true;
@@ -1625,6 +2171,34 @@ function animate(){
   camera.position.y=radius*Math.cos(polar);
   camera.position.z=radius*Math.sin(polar)*Math.cos(azimuth);
   camera.lookAt(0,0,0);
+
+  // Auto-fade walls based on camera proximity to each wall plane.
+  // Walls are fully opaque when camera is >25 units away, fade to near-invisible
+  // when camera is right at the wall surface. Each wall fades independently.
+  const cx=camera.position.x, cz=camera.position.z;
+  const fadeMin=0.06;
+  // Back wall (Z=50) + recess: fade based on camera proximity
+  const backDist=50-cz;
+  const backAlpha=backDist<25?Math.max(fadeMin,backDist/25):1;
+  backWallParts.forEach(m=>{m.material.transparent=true;m.material.opacity=backAlpha;});
+  [doorPanel].forEach(m=>{m.material.transparent=true;m.material.opacity=backAlpha;});
+  // Opposite wall (Z=-50): fade when camera approaches
+  const frontDist=cz+50;
+  const frontAlpha=frontDist<25?Math.max(fadeMin,frontDist/25):1;
+  [oppWall,oppBaseboard].forEach(m=>{m.material.transparent=true;m.material.opacity=frontAlpha;});
+  // Side wall (X=60): fade when camera approaches
+  const rightDist=60-cx;
+  const rightAlpha=rightDist<25?Math.max(fadeMin,rightDist/25):1;
+  [rightWall,sideBaseboard].forEach(m=>{
+    m.material.transparent=true;m.material.opacity=rightAlpha;
+  });
+  // Left wall (X=-60): fade when camera approaches
+  const leftDist=cx+60;
+  const leftAlpha=leftDist<25?Math.max(fadeMin,leftDist/25):1;
+  [leftWallBelow,leftWallAbove,leftWallFront,leftWallBack,leftBaseboard,cL,cR].forEach(m=>{
+    m.material.transparent=true;m.material.opacity=leftAlpha;
+  });
+
   renderer.render(scene,camera);
 }
 animate();
