@@ -15,12 +15,19 @@
     .panel::before { content: ''; position: absolute; inset: 0; border-radius: 22px; filter: url(#glass-refract); background: rgba(255,255,255,0.015); mix-blend-mode: overlay; opacity: 0.6; pointer-events: none; }
     .panel > * { position: relative; }
     .panel-l { left: 12px; width: 240px; display: flex; flex-direction: column; gap: 0; padding: 0; max-height: calc(100vh - 36px); }
-    .panel-scroll { display: flex; flex-direction: column; gap: 3px; overflow-y: auto; padding: 0 12px 12px; flex: 1; min-height: 0; }
+    .panel-scroll { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; padding: 4px 6px 8px; flex: 1; min-height: 0; }
     .panel-r { right: 12px; font-size: 11px; color: rgba(255,255,255,0.9); line-height: 2; padding: 8px 12px; }
-    .section { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.5); margin-top: 8px; padding-left: 2px; }
-    .section:first-child { margin-top: 0; }
+    .section-group { background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+    .section { display: flex; align-items: center; gap: 6px; padding: 8px 10px; cursor: pointer; user-select: none; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(255,255,255,0.65); transition: background 0.15s ease; border-radius: 12px; }
+    .section:hover { background: rgba(255,255,255,0.04); }
+    .section-icon { font-size: 14px; line-height: 1; opacity: 0.5; }
+    .section-caret { margin-left: auto; font-size: 12px; color: rgba(255,255,255,0.25); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+    .section-group.collapsed .section-caret { transform: rotate(-90deg); }
+    .section-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+    .section-group.collapsed .section-body { grid-template-rows: 0fr; }
+    .section-body-inner { overflow: hidden; display: flex; flex-direction: column; gap: 2px; padding: 0 10px 10px; }
     .seg { display: flex; gap: 4px; border-radius: 10px; overflow: hidden; border: none; background: none; }
-    .seg button { flex: 1; font-size: 10px; padding: 6px 4px; border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85); transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .seg button { flex: 1; font-size: 10px; padding: 7px 4px; border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85); transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
     .seg button:active { transform: scale(0.88); transition-duration: 0.08s; }
     .seg button i { font-size: 13px; line-height: 1; flex-shrink: 0; }
     .seg button:not(:last-child) { border-right: 1px solid rgba(255,255,255,0.18); }
@@ -37,7 +44,7 @@
     /* Collapsible RGB section */
     .rgb-collapse { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease; opacity: 1; }
     .rgb-collapse.hidden { grid-template-rows: 0fr; opacity: 0; pointer-events: none; }
-    .rgb-collapse-inner { overflow: hidden; }
+    .rgb-collapse-inner { overflow: hidden; display: flex; flex-direction: column; gap: 2px; padding-top: 2px; }
 
     /* Toggle switch row */
     .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 2px; }
@@ -48,7 +55,7 @@
     .toggle-switch.on::after { left: 18px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.15), 0 0 4px rgba(100,180,255,0.3); }
 
     /* Picker label */
-    .picker-label { font-size: 10px; color: rgba(255,255,255,0.5); padding: 2px 2px 3px; }
+    .picker-label { font-size: 10px; color: rgba(255,255,255,0.5); padding: 4px 2px 2px; }
     .rgb-seg button { color: #fff; font-weight: 600; font-size: 11px; padding: 5px 0; }
     .rgb-seg button:hover { filter: brightness(1.15); transform: scale(1.06); }
     .rgb-seg .rb { background: #dc3545; }
@@ -93,11 +100,15 @@
     @media (max-width: 520px) {
       .panel-l { width: calc(100vw - 24px); left: 12px; right: 12px; max-height: calc(100vh - 70px); padding: 0; gap: 0; }
       .panel-header { padding: 20px 20px 10px; }
-      .panel-scroll { padding: 0 20px 20px; gap: 8px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+      .panel-scroll { padding: 6px 8px 8px; gap: 6px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
       .panel-l.mobile-init { opacity: 0; pointer-events: none; transform: translateY(-8px) scale(0.96); }
       .panel-r { display: none; }
       .panel-legend { display: block; margin-top: 10px; padding-top: 12px; }
-      .section { font-size: 11px; margin-top: 16px; padding-bottom: 2px; }
+      .section-group { margin-bottom: 0; }
+      .section { font-size: 13px; padding: 14px 14px; }
+      .section-icon { font-size: 17px; }
+      .section-caret { font-size: 14px; }
+      .section-body-inner { padding: 0 14px 14px; gap: 8px; }
       .seg { gap: 8px; }
       .seg button { font-size: 15px; padding: 14px 8px; border-radius: 12px; }
       .picker-label { font-size: 13px; padding: 6px 2px 6px; }
@@ -143,6 +154,7 @@
     body.night-mode .toggle-switch { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.1); }
     body.night-mode .toggle-switch.on { background: rgba(80,140,220,0.35); border-color: rgba(80,140,220,0.4); }
     body.night-mode .hint { color: rgba(255,255,255,0.35); }
+    body.night-mode .section-group { background: rgba(255,255,255,0.02); border-color: rgba(255,255,255,0.04); }
     .fps { position: absolute; bottom: 8px; right: 10px; font-size: 10px; color: rgba(255,255,255,0.4); font-family: monospace; pointer-events: none; display: none; }
     .fps.show { display: block; }
 
@@ -181,7 +193,10 @@
 <div class="panel panel-l" id="panelL">
   <div class="panel-header"><span class="panel-title">Controls</span><button class="panel-close" onclick="togglePanel()" title="Hide controls"><i class="ph ph-x"></i></button></div>
   <div class="panel-scroll">
-  <div class="section">Purifier</div>
+
+  <div class="section-group">
+  <div class="section" onclick="toggleSection(this)"><i class="ph ph-cube section-icon"></i><span>Purifier</span><i class="ph ph-caret-down section-caret"></i></div>
+  <div class="section-body"><div class="section-body-inner">
   <div class="picker-label">Fan layout</div>
   <div class="seg"><button id="btnLayoutFB" class="on" onclick="setLayout('fb')">Front + Back</button><button id="btnLayoutFT" onclick="setLayout('ft')">Front + Top</button></div>
   <div class="toggle-row"><span class="toggle-label">Exploded view</span><div class="toggle-switch" id="togExplode" onclick="toggleExplode()"></div></div>
@@ -189,9 +204,13 @@
   <div class="picker-label">Wood stain</div>
   <div class="seg"><button id="btnStainRaw" class="on" onclick="setStain('raw')">Raw Birch</button><button id="btnStainOil" onclick="setStain('oil')">Oil</button><button id="btnStainWalnut" onclick="setStain('walnut')">Walnut</button></div>
   <div class="picker-label">Feet style</div>
-  <div class="seg"><button id="btnFeetPeg" class="on" onclick="setFeetStyle('peg')">Peg Legs</button><button id="btnFeetBun" onclick="setFeetStyle('bun')">Round Feet</button><button id="btnFeetRubber" onclick="setFeetStyle('rubber')">Rubber Feet</button></div>
+  <div class="seg"><button id="btnFeetPeg" onclick="setFeetStyle('peg')">Peg Legs</button><button id="btnFeetBun" class="on" onclick="setFeetStyle('bun')">Round Feet</button><button id="btnFeetRubber" onclick="setFeetStyle('rubber')">Rubber Feet</button></div>
+  </div></div>
+  </div>
 
-  <div class="section">Fans</div>
+  <div class="section-group">
+  <div class="section" onclick="toggleSection(this)"><i class="ph ph-fan section-icon"></i><span>Fans</span><i class="ph ph-caret-down section-caret"></i></div>
+  <div class="section-body"><div class="section-body-inner">
   <div class="toggle-row"><span class="toggle-label">Spin fans</span><div class="toggle-switch on" id="togSpin" onclick="toggleSpin()"></div></div>
   <div class="toggle-row"><span class="toggle-label">Show airflow</span><div class="toggle-switch" id="togAirflow" onclick="toggleAirflow()"></div></div>
   <div class="picker-label">Fan color</div>
@@ -202,13 +221,18 @@
   <div id="rgbRow" class="seg rgb-seg"><button id="btnRgbR" class="rb" onclick="setRGB('red')">Red</button><button id="btnRgbY" class="yb" onclick="setRGB('yellow')">Ylw</button><button id="btnRgbG" class="gb" onclick="setRGB('green')">Grn</button><button id="btnRgbRainbow" class="party" onclick="setRGB('rainbow')">Party</button><button id="btnRgbOff" class="ob" onclick="setRGB('off')">Off</button></div>
   <div class="slider-row"><label>Brightness</label><input type="range" id="rgbBright" min="0" max="100" value="50" oninput="setRGBBrightness(this.value)"><span class="slider-val" id="rgbBrightVal">50%</span></div>
   </div></div>
+  </div></div>
+  </div>
 
-  <div class="section">Scene</div>
+  <div class="section-group">
+  <div class="section" onclick="toggleSection(this)"><i class="ph ph-eye section-icon"></i><span>Scene</span><i class="ph ph-caret-down section-caret"></i></div>
+  <div class="section-body"><div class="section-body-inner">
   <div class="seg"><button id="btnDay" class="on" onclick="setTimeOfDay('day')"><i class="ph ph-sun"></i> Day</button><button id="btnNight" onclick="setTimeOfDay('night')"><i class="ph ph-moon-stars"></i> Night</button></div>
   <div class="toggle-row"><span class="toggle-label">Isolate purifier</span><div class="toggle-switch" id="togIsolate" onclick="toggleIsolate()"></div></div>
   <div class="toggle-row"><span class="toggle-label">Dimensions</span><div class="toggle-switch" id="togDims" onclick="toggleDimensions()"></div></div>
   <div class="toggle-row"><span class="toggle-label">X-ray mode</span><div class="toggle-switch" id="togXray" onclick="toggleXray()"></div></div>
-
+  </div></div>
+  </div>
 
   <div class="panel-legend" id="panelLegend">
     <div class="legend-item"><span class="swatch" style="background:#ddc89e"></span>Plywood (½″ birch)</div>
@@ -244,6 +268,8 @@
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
+// Section collapse toggle
+function toggleSection(el){ el.closest('.section-group').classList.toggle('collapsed'); }
 // Panel toggle
 function togglePanel() {
   const panel = document.getElementById('panelL');
@@ -1126,7 +1152,7 @@ const pegGeo=new THREE.CylinderGeometry(legR,legR*0.85,legH,16);
 
 // Round wooden foot — 2.5" tall, 0.55" radius, rounded cylinder
 const bunFootH=2.5, bunFootR=0.55;
-const bunInset=0.75; // inset from panel edges for round feet
+const bunInset=0.68; // inset from panel edges for round feet
 const bunGeo=(function(){
   const pts=[];
   const hH=bunFootH/2;
@@ -1146,13 +1172,13 @@ const bunGeo=(function(){
   return new THREE.LatheGeometry(pts, 20);
 })();
 
-let currentFeetH=legH;
-let feetStyle='peg';
+let currentFeetH=bunFootH;
+let feetStyle='bun';
 
 for(let xSgn of[-1,1]){
   for(let zSgn of[-1,1]){
-    const leg=new THREE.Mesh(pegGeo, woodLegMat);
-    leg.position.set(xSgn*(panelW/2-legInset), legY, zSgn*(D/2+ply-legInset));
+    const leg=new THREE.Mesh(bunGeo, woodLegMat);
+    leg.position.set(xSgn*(panelW/2-bunInset), -(H/2+ply+bunFootH/2), zSgn*(D/2+ply-bunInset));
     legGroup.add(leg);
     allLegMeshes.push(leg);
   }
@@ -1964,7 +1990,7 @@ function toggleXray(){
 }
 
 // ─── Room environment for scale ───
-const floorY = -(H/2 + ply + 0.75); // bottom of legs
+const floorY = -(H/2 + ply + bunFootH); // bottom of legs
 
 // Enable shadows on all purifier meshes
 scene.traverse(obj=>{ if(obj.isMesh){ obj.castShadow=true; obj.receiveShadow=true; } });
