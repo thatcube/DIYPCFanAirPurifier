@@ -14,8 +14,9 @@
     .panel { position: absolute; top: 12px; background: rgba(255,255,255,0.06); backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); border-radius: 22px; padding: 12px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 8px 40px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.08), inset 0 0 0 0.5px rgba(255,255,255,0.3), inset 0 0 18px 0 rgba(255,255,255,0.08), inset 0 1px 1px rgba(255,255,255,0.4), inset 0 -1px 1px rgba(255,255,255,0.1); }
     .panel::before { content: ''; position: absolute; inset: 0; border-radius: 22px; filter: url(#glass-refract); background: rgba(255,255,255,0.015); mix-blend-mode: overlay; opacity: 0.6; pointer-events: none; }
     .panel > * { position: relative; }
-    .panel-l { left: 12px; width: 240px; display: flex; flex-direction: column; gap: 0; padding: 0; max-height: calc(100vh - 36px); }
-    .panel-scroll { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; padding: 4px 6px 8px; flex: 1; min-height: 0; }
+    .panel-l { left: 12px; width: 240px; display: flex; flex-direction: column; gap: 0; padding: 0; max-height: calc(100vh - 90px); }
+    .panel-scroll { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; padding: 4px 6px 8px; flex: 1; min-height: 0; -webkit-mask-image: linear-gradient(to bottom, black 0%, black 100%); mask-image: linear-gradient(to bottom, black 0%, black 100%); transition: -webkit-mask-image 0.3s ease, mask-image 0.3s ease; }
+    .panel-scroll.scroll-fade { -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 32px), transparent); mask-image: linear-gradient(to bottom, black calc(100% - 32px), transparent); }
     .panel-r { right: 12px; font-size: 11px; color: rgba(255,255,255,0.9); line-height: 2; padding: 8px 12px; }
     .section-group { background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
     .section { display: flex; align-items: center; gap: 6px; padding: 8px 10px; cursor: pointer; user-select: none; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(255,255,255,0.65); transition: background 0.15s ease; border-radius: 12px; }
@@ -83,8 +84,8 @@
     /* Close button inside panel */
     .panel-close { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8); font-size: 14px; cursor: pointer; transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); flex-shrink: 0; margin-left: auto; }
     .panel-close:hover { background: rgba(255,255,255,0.25); color: #fff; transform: scale(1.1); }
-    .panel-header { display: flex; align-items: center; padding: 12px 12px 6px; border-radius: 22px 22px 0 0; flex-shrink: 0; }
-    .panel-title { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.85); letter-spacing: 0.3px; }
+    .panel-header { display: flex; align-items: center; padding: 12px 12px 6px; border-radius: 22px 22px 0 0; flex-shrink: 0; gap: 8px; }
+    .panel-title { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.85); letter-spacing: 0.3px; flex: 1; }
 
     /* Panel open/close transitions */
     .panel-l { transition: opacity 0.25s ease, transform 0.25s ease; }
@@ -98,8 +99,9 @@
 
     /* Responsive: small screens */
     @media (max-width: 520px) {
-      .panel-l { width: calc(100vw - 24px); left: 12px; right: 12px; max-height: calc(100vh - 70px); padding: 0; gap: 0; }
-      .panel-header { padding: 20px 20px 10px; }
+      .panel-l { width: calc(100vw - 24px); left: 12px; right: 12px; max-height: calc(100vh - 24px); padding: 0; gap: 0; z-index: 11; border-radius: 14px; }
+      .panel-l::before { border-radius: 14px; }
+      .panel-header { padding: 20px 20px 10px; border-radius: 14px 14px 0 0; }
       .panel-scroll { padding: 6px 8px 8px; gap: 6px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
       .panel-l.mobile-init { opacity: 0; pointer-events: none; transform: translateY(-8px) scale(0.96); }
       .panel-r { display: none; }
@@ -151,6 +153,7 @@
     body.night-mode .rgb-seg .party { background: linear-gradient(90deg,rgba(180,40,40,0.6),rgba(180,140,30,0.6),rgba(30,140,50,0.6),rgba(30,120,180,0.6),rgba(70,40,180,0.6),rgba(180,50,140,0.6),rgba(180,40,40,0.6)); }
     body.night-mode .rgb-seg button { color: rgba(255,255,255,0.85); }
     body.night-mode .fab { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.18); box-shadow: 0 8px 32px rgba(0,0,0,0.2), inset 0 0 0 0.5px rgba(255,255,255,0.2), inset 0 0 12px 0 rgba(255,255,255,0.04), inset 0 1px 1px rgba(255,255,255,0.25), inset 0 -1px 1px rgba(255,255,255,0.06); }
+    body.night-mode .guide-fab { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.18); box-shadow: 0 8px 32px rgba(0,0,0,0.2), inset 0 0 0 0.5px rgba(255,255,255,0.2), inset 0 0 12px 0 rgba(255,255,255,0.04), inset 0 1px 1px rgba(255,255,255,0.25), inset 0 -1px 1px rgba(255,255,255,0.06); }
     body.night-mode .toggle-switch { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.1); }
     body.night-mode .toggle-switch.on { background: rgba(80,140,220,0.35); border-color: rgba(80,140,220,0.4); }
     body.night-mode .hint { color: rgba(255,255,255,0.35); }
@@ -159,7 +162,7 @@
     .fps.show { display: block; }
 
     /* Zen mode — hide all UI */
-    body.zen .panel, body.zen .fab, body.zen .hint, body.zen .fps { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.3s ease; }
+    body.zen .panel, body.zen .fab, body.zen .guide-fab, body.zen .hint, body.zen .fps { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.3s ease; }
 
     /* Keyboard shortcuts dialog */
     .shortcuts-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
@@ -171,6 +174,62 @@
     .shortcuts-dialog td:first-child { width: 40px; }
     .shortcuts-dialog kbd { display: inline-block; min-width: 22px; padding: 2px 7px; font-size: 11px; font-family: inherit; font-weight: 600; color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.2), inset 0 -1px 0 rgba(0,0,0,0.15); }
     .shortcuts-dialog .dismiss { font-size: 10px; color: rgba(255,255,255,0.4); text-align: center; margin-top: 10px; }
+
+    /* Build guide overlay */
+    .guide-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: flex-start; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 40px 16px; }
+    .guide-overlay.visible { opacity: 1; pointer-events: auto; }
+    .guide-panel { background: rgba(22,22,30,0.94); backdrop-filter: blur(40px) saturate(1.6); -webkit-backdrop-filter: blur(40px) saturate(1.6); border-radius: 20px; border: 1px solid rgba(255,255,255,0.15); padding: 32px 36px 40px; max-width: 660px; width: 100%; box-shadow: 0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1); color: rgba(255,255,255,0.85); font-size: 14px; line-height: 1.65; transform: translateY(20px) scale(0.97); transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+    .guide-overlay.visible .guide-panel { transform: translateY(0) scale(1); }
+    .guide-panel h1 { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 6px; letter-spacing: -0.3px; }
+    .guide-panel .guide-subtitle { font-size: 12px; color: rgba(255,255,255,0.4); margin-bottom: 28px; }
+    .guide-panel h2 { font-size: 15px; font-weight: 700; color: rgba(255,255,255,0.95); margin: 28px 0 12px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 8px; }
+    .guide-panel h2 i { font-size: 16px; color: rgba(100,180,255,0.7); }
+    .guide-panel h3 { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.75); margin: 20px 0 8px; }
+    .guide-panel p { margin: 8px 0; color: rgba(255,255,255,0.7); }
+    .guide-panel strong { color: rgba(255,255,255,0.95); }
+    .guide-panel code { font-family: 'SF Mono', Monaco, monospace; font-size: 12px; background: rgba(255,255,255,0.08); border-radius: 4px; padding: 2px 6px; color: rgba(100,180,255,0.9); }
+    .guide-panel ul, .guide-panel ol { margin: 8px 0; padding-left: 20px; color: rgba(255,255,255,0.7); }
+    .guide-panel li { margin: 4px 0; }
+    .guide-panel .dim-table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: 13px; }
+    .guide-panel .dim-table th { text-align: left; font-weight: 600; color: rgba(255,255,255,0.5); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .guide-panel .dim-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .guide-panel .dim-table td:last-child { color: rgba(255,255,255,0.95); font-weight: 500; font-variant-numeric: tabular-nums; }
+    .guide-panel .parts-table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: 12px; }
+    .guide-panel .parts-table th { text-align: left; font-weight: 600; color: rgba(255,255,255,0.5); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .guide-panel .parts-table td { padding: 7px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: top; }
+    .guide-panel .parts-table .status { font-size: 14px; text-align: center; width: 30px; }
+    .guide-panel .parts-table .item { color: rgba(255,255,255,0.9); font-weight: 500; }
+    .guide-panel .parts-table .note { color: rgba(255,255,255,0.5); font-size: 11px; }
+    .guide-panel .step-num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 7px; background: rgba(100,180,255,0.15); color: rgba(100,180,255,0.9); font-size: 11px; font-weight: 700; margin-right: 8px; flex-shrink: 0; }
+    .guide-panel .build-step { display: flex; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .guide-panel .build-step:last-child { border-bottom: none; }
+    .guide-panel .wire-block { background: rgba(255,255,255,0.04); border-radius: 10px; padding: 14px 16px; margin: 10px 0; border: 1px solid rgba(255,255,255,0.06); }
+    .guide-panel .wire-block p { margin: 6px 0; }
+    .guide-panel .chain-diagram { font-family: 'SF Mono', Monaco, monospace; font-size: 12px; color: rgba(100,180,255,0.8); background: rgba(0,0,0,0.25); border-radius: 8px; padding: 10px 14px; margin: 8px 0; text-align: center; }
+    .guide-panel .foot-opt { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 8px 12px; margin: 4px 0; border-left: 3px solid rgba(100,180,255,0.3); }
+    .guide-panel .foot-opt strong { color: rgba(255,255,255,0.9); }
+    .guide-close { position: sticky; top: 0; float: right; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); font-size: 16px; cursor: pointer; transition: all 0.2s ease; z-index: 2; margin: -8px -8px 0 0; }
+    .guide-close:hover { background: rgba(255,255,255,0.2); color: #fff; transform: scale(1.1); }
+    .guide-btn { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85); font-size: 10px; font-weight: 500; font-family: inherit; cursor: pointer; transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); white-space: nowrap; }
+    .guide-btn:hover { background: rgba(255,255,255,0.2); transform: scale(1.04); }
+    .guide-btn:active { transform: scale(0.92); }
+    .guide-btn i { font-size: 13px; }
+    .guide-fab { position: absolute; bottom: 12px; left: 12px; height: 42px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.06); backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.06), inset 0 0 0 0.5px rgba(255,255,255,0.3), inset 0 0 12px 0 rgba(255,255,255,0.08), inset 0 1px 1px rgba(255,255,255,0.4), inset 0 -1px 1px rgba(255,255,255,0.1); color: rgba(255,255,255,0.9); font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 14px; transition: all 0.25s ease; z-index: 10; overflow: hidden; white-space: nowrap; }
+    .guide-fab::before { content: ''; position: absolute; inset: 0; border-radius: 15px; filter: url(#glass-refract); background: rgba(255,255,255,0.015); mix-blend-mode: overlay; opacity: 0.6; pointer-events: none; }
+    .guide-fab i { font-size: 16px; line-height: 1; }
+    .guide-fab:hover { background: rgba(255,255,255,0.12); }
+    .guide-fab:active { transform: scale(0.92); }
+    @media (max-width: 520px) {
+      .guide-overlay { padding: 20px 10px; }
+      .guide-panel { padding: 24px 20px 32px; font-size: 14px; border-radius: 16px; }
+      .guide-panel h1 { font-size: 20px; }
+      .guide-panel h2 { font-size: 14px; }
+      .guide-panel .parts-table { font-size: 12px; }
+      .guide-btn { font-size: 13px; padding: 10px 14px; border-radius: 10px; }
+      .guide-btn i { font-size: 16px; }
+      .guide-fab { bottom: 12px; left: 12px; font-size: 16px; height: 48px; padding: 0 18px; border-radius: 14px; gap: 8px; }
+      .guide-fab i { font-size: 19px; }
+    }
   </style>
 </head>
 <body>
@@ -190,6 +249,7 @@
 <div class="hint">drag to rotate · scroll to zoom · press <b>?</b> for shortcuts</div>
 <div class="fps" id="fps"></div>
 <button class="fab hidden" id="fab" onclick="togglePanel()"><i class="ph ph-sliders-horizontal"></i><span class="fab-label">Controls</span></button>
+<button class="guide-fab" id="guideFab" onclick="toggleGuide()"><i class="ph ph-book-open-text"></i><span>Build Guide</span></button>
 <div class="panel panel-l" id="panelL">
   <div class="panel-header"><span class="panel-title">Controls</span><button class="panel-close" onclick="togglePanel()" title="Hide controls"><i class="ph ph-x"></i></button></div>
   <div class="panel-scroll">
@@ -254,6 +314,135 @@
   <div><span class="swatch" style="background:#3a3a3a"></span><span style="color:rgba(255,255,255,0.85)">Foam tape seal</span></div>
   <div><span class="swatch" style="background:#999;border:1px solid rgba(255,255,255,0.3)"></span><span style="color:rgba(255,255,255,0.85)">Butt joints + screws</span></div>
 </div>
+<div class="guide-overlay" id="guideOverlay" onclick="toggleGuide()">
+<div class="guide-panel" onclick="event.stopPropagation()">
+<button class="guide-close" onclick="toggleGuide()"><i class="ph ph-x"></i></button>
+<h1>DIY Air Purifier</h1>
+<p class="guide-subtitle">Build plan &amp; instructions</p>
+
+<h2><i class="ph ph-ruler"></i>Box Dimensions</h2>
+<table class="dim-table">
+<tr><th>Measurement</th><th>Size</th></tr>
+<tr><td>Interior width (void between filters)</td><td>5.44"</td></tr>
+<tr><td>Interior height</td><td>19.69"</td></tr>
+<tr><td>Interior depth (front to back)</td><td>24.69"</td></tr>
+<tr><td>Exterior width</td><td>7.0"</td></tr>
+<tr><td>Exterior height</td><td>20.69"</td></tr>
+<tr><td>Exterior depth</td><td>25.69"</td></tr>
+<tr><td>Fan panel width</td><td>7.0"</td></tr>
+<tr><td>Fan layout</td><td>3 fans/panel, 1.5" buffer</td></tr>
+</table>
+<p>The box is an open-sided rectangle &mdash; <strong>4 plywood panels</strong> (top, bottom, front, back) with the left and right sides left open for the filters to slide in. There are no side panels.</p>
+
+<h2><i class="ph ph-cpu"></i>Electronics</h2>
+<table class="parts-table">
+<tr><th class="status"></th><th>Item</th><th>Notes</th></tr>
+<tr><td class="status">&#x2705;</td><td class="item">ADS-25-12 power supply (12V 2.1A)</td><td class="note">Main power source</td></tr>
+<tr><td class="status">&#x2705;</td><td class="item">6&times; Arctic P12 Pro ARGB fans</td><td class="note">3 front + 3 back (of 10 owned)</td></tr>
+<tr><td class="status">&#x1F69A;</td><td class="item">DC5521 to 4-pin PWM fan adapter</td><td class="note">Delivers 12V + PWM signal</td></tr>
+<tr><td class="status">&#x1F69A;</td><td class="item">5.5&times;2.1mm 1-to-2 DC power splitter</td><td class="note">Splits PSU &mdash; fans + step-down</td></tr>
+<tr><td class="status">&#x1F69A;</td><td class="item">12V&rarr;5V 3A step-down (USB-C out)</td><td class="note">Powers ESP32; provides 5V for ARGB</td></tr>
+<tr><td class="status">&#x1F69A;</td><td class="item">ESP32-C6-N16 dev board</td><td class="note">PWM + ARGB via HomeKit/ESPHome</td></tr>
+<tr><td class="status">&#x1F69A;</td><td class="item">5&times; Dupont F-F jumper wires 26AWG</td><td class="note">ESP32 GPIO connections</td></tr>
+<tr><td class="status">&#x274C;</td><td class="item">5V 3-pin ARGB extension cable</td><td class="note">~$3&ndash;5; see wiring section</td></tr>
+<tr><td class="status">&#x274C;</td><td class="item">74AHCT125 level shifter (maybe)</td><td class="note">~$1&ndash;2; only if ARGB flickers</td></tr>
+</table>
+
+<h2><i class="ph ph-tree"></i>Wood &amp; Hardware</h2>
+<table class="parts-table">
+<tr><th class="status"></th><th>Item</th><th>Notes</th></tr>
+<tr><td class="status">&#x2705;</td><td class="item">&frac12;" plywood &mdash; 1 sheet (4&times;8 ft)</td><td class="note">Top, bottom, front, back panels</td></tr>
+<tr><td class="status">&#x2705;</td><td class="item">~&frac12;"&times;&frac38;" wood strip, ~8 ft</td><td class="note">4 ledge strips for filter retention</td></tr>
+<tr><td class="status">&#x274C;</td><td class="item">EPDM foam tape &mdash; &frac12;" &times; 3/32"</td><td class="note">Continuous seal ring on all 4 inner faces</td></tr>
+<tr><td class="status">&#x274C;</td><td class="item">Wood glue</td><td class="note">Corner joints (maybe?)</td></tr>
+<tr><td class="status">&#x274C;</td><td class="item">Screws (1&frac14;") + finish nails</td><td class="note">Panel assembly</td></tr>
+<tr><td class="status">&#x274C;</td><td class="item">Feet &mdash; pick one:</td><td class="note">See options below</td></tr>
+</table>
+<div class="foot-opt"><strong>Round wooden bun feet</strong> &mdash; 2.5" tall, ~1.1" dia. Good ground clearance. Inset ~0.68" from edges.</div>
+<div class="foot-opt"><strong>Tapered peg legs</strong> &mdash; 0.75" tall, ~0.6" dia. Low profile.</div>
+<div class="foot-opt"><strong>Rubber bumper feet</strong> &mdash; 0.75" tall. Easiest, non-slip. Great for desk or shelf.</div>
+
+<h3>Misc</h3>
+<table class="parts-table">
+<tr><th class="status"></th><th>Item</th><th>Notes</th></tr>
+<tr><td class="status">&#x2705;</td><td class="item">Zip ties or cable clips</td><td class="note">Route cables cleanly inside</td></tr>
+<tr><td class="status">&#x274C;</td><td class="item">WAGO lever connectors 3-port</td><td class="note">No-solder wire joins (optional)</td></tr>
+</table>
+
+<h2><i class="ph ph-lightning"></i>ARGB Wiring</h2>
+
+<div class="wire-block">
+<h3>Step 1 &mdash; Split the 12V supply</h3>
+<p>The DC splitter takes one PSU output and splits it:</p>
+<ul>
+<li><strong>Output A</strong> &rarr; PWM fan adapter &rarr; powers all fan motors at 12V</li>
+<li><strong>Output B</strong> &rarr; step-down module &rarr; converts 12V to 5V</li>
+</ul>
+</div>
+
+<div class="wire-block">
+<h3>Step 2 &mdash; Power the ESP32</h3>
+<p>The step-down module&rsquo;s USB-C output plugs directly into the ESP32-C6&rsquo;s USB-C port. Done.</p>
+</div>
+
+<div class="wire-block">
+<h3>Step 3 &mdash; Get 5V to the ARGB LEDs</h3>
+<p>The ESP32&rsquo;s <code>5V</code>/<code>VIN</code> pin exposes the USB bus voltage. The step-down is rated 3A; the LEDs across 6 fans draw ~0.3A &mdash; plenty of headroom.</p>
+<p><strong>Buy a 5V 3-pin ARGB extension cable</strong> (~$3). Cut it in the middle. The loose end has 3 wires:</p>
+<ul>
+<li><strong>Red (5V)</strong> &rarr; step-down output pads (or ESP32 5V pin as fallback)</li>
+<li><strong>Black (GND)</strong> &rarr; any GND pin on ESP32 or step-down</li>
+<li><strong>Data (green/white)</strong> &rarr; through <strong>74AHCT125 level shifter</strong> &rarr; ESP32 GPIO. The chip guarantees a clean 5V signal. Try without first &mdash; often works.</li>
+</ul>
+<p>Use <strong>WAGO lever connectors</strong> for solder-free joins.</p>
+</div>
+
+<div class="wire-block">
+<h3>Step 4 &mdash; Daisy-chain the fans</h3>
+<p>Each P12 Pro has ARGB <strong>in</strong> and <strong>out</strong> ports. Chain like Christmas lights:</p>
+<div class="chain-diagram">[cable] &rarr; fan 1 in &hellip; out &rarr; fan 2 in &hellip; out &rarr; fan 3 &hellip;</div>
+<p>One GPIO pin controls all 6 fans&rsquo; colors at once.</p>
+</div>
+
+<div class="wire-block">
+<h3>Step 5 &mdash; Daisy-chain power/PWM (PST)</h3>
+<p>Same idea &mdash; chain all fans per panel via PST. One PWM signal controls speed for all. Route the cable between panels through the interior void, zip-tied along the bottom.</p>
+</div>
+
+<h2><i class="ph ph-funnel"></i>Filter Retention</h2>
+<p>The left and right sides are <strong>open</strong> &mdash; no side panels. Filters slide straight in.</p>
+<ol>
+<li>Glue &amp; nail ~&frac12;"&times;&frac38;" wood strips along each side edge of the top and bottom panels (4 strips total). They run ~70% of the panel depth, centered.</li>
+<li>Strips sit inboard so filters rest against them, roughly flush with the exterior.</li>
+<li>A continuous <strong>foam tape</strong> ring (~&frac12;" &times; 3/32") seals all 4 inner panel faces.</li>
+<li>Filters are held by ledge strips above/below and foam compression. Slide in from the side.</li>
+</ol>
+
+<h2><i class="ph ph-code"></i>Firmware</h2>
+<p>Flash <strong>ESPHome</strong> to the ESP32-C6:</p>
+<ul>
+<li><code>fan</code> component &rarr; PWM duty cycle for speed control</li>
+<li><code>light</code> component with <code>WS2812B</code> driver &rarr; ARGB chain</li>
+<li>HomeKit via Home Assistant, or native <strong>Matter</strong> (C6 supports Matter without a hub on iOS 16.2+)</li>
+</ul>
+<p>Gives you Siri speed control, RGB scenes, and full Home app integration.</p>
+
+<h2><i class="ph ph-list-checks"></i>Build Order</h2>
+<div class="build-step"><span class="step-num">1</span><span>Cut all 4 plywood panels (top: 7.0"&times;25.69", bottom: same, front: 7.0"&times;19.69", back: same)</span></div>
+<div class="build-step"><span class="step-num">2</span><span>Cut fan openings in front &amp; back panels (3 &times; 120mm circles, evenly spaced, 1.5" buffer top/bottom)</span></div>
+<div class="build-step"><span class="step-num">3</span><span>Glue &amp; assemble the box &mdash; top, bottom, front, back. Sides left open for filters</span></div>
+<div class="build-step"><span class="step-num">4</span><span>Install ledge strips on inner faces of top &amp; bottom panels (2 per panel, along each side edge)</span></div>
+<div class="build-step"><span class="step-num">5</span><span>Apply foam tape around all 4 inner panel faces as a continuous seal ring</span></div>
+<div class="build-step"><span class="step-num">6</span><span>Mount fans (3 per panel); daisy-chain PST cables</span></div>
+<div class="build-step"><span class="step-num">7</span><span>Run ARGB &amp; PWM cables through interior; zip-tie along bottom panel</span></div>
+<div class="build-step"><span class="step-num">8</span><span>Wire electronics: PSU, step-down, ESP32 per wiring plan above</span></div>
+<div class="build-step"><span class="step-num">9</span><span>Flash ESPHome to ESP32-C6, configure fan + light entities</span></div>
+<div class="build-step"><span class="step-num">10</span><span>Slide filters in from the sides, test airflow &amp; ARGB</span></div>
+<div class="build-step"><span class="step-num">11</span><span>Attach feet to bottom panel corners</span></div>
+
+</div>
+</div>
+
 <div class="shortcuts-overlay" id="shortcutsOverlay" onclick="this.classList.remove('visible')">
   <div class="shortcuts-dialog" onclick="event.stopPropagation()">
     <h3>Keyboard shortcuts</h3>
@@ -285,6 +474,23 @@ function togglePanel() {
     fab.classList.add('hidden');
   }
 }
+// Build guide toggle
+function toggleGuide(){
+  document.getElementById('guideOverlay').classList.toggle('visible');
+}
+// Scroll fade on panel-scroll
+(function(){
+  const ps=document.querySelector('.panel-scroll');
+  function checkFade(){
+    const canScroll=ps.scrollHeight>ps.clientHeight+1;
+    const atBottom=ps.scrollTop+ps.clientHeight>=ps.scrollHeight-2;
+    ps.classList.toggle('scroll-fade', canScroll && !atBottom);
+  }
+  ps.addEventListener('scroll',checkFade,{passive:true});
+  window.addEventListener('resize',checkFade);
+  new MutationObserver(checkFade).observe(ps,{childList:true,subtree:true,attributes:true});
+  checkFade();
+})();
 // On small screens, start with panel collapsed and FAB visible
 if(window.innerWidth<=520){
   document.getElementById('panelL').classList.add('collapsed','mobile-init');
@@ -1412,8 +1618,7 @@ function toggleExplode(){
   exploded=!exploded;
   document.getElementById('togExplode').classList.toggle('on',exploded);
   if(exploded){
-    // Exploding turns off fans, airflow, and dimensions
-    if(spinning) toggleSpin();
+    // Exploding turns off airflow and dimensions
     if(airflowOn) toggleAirflow();
     if(dimVisible) toggleDimensions();
     // Auto-enable isolate mode (track that explode did it)
