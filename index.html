@@ -700,6 +700,7 @@ const altBackGroup=(function(){
 altBackGroup.position.set(0,0,D/2+ply/2);
 altBackGroup.visible=false;
 scene.add(altBackGroup);
+parts.altBack=altBackGroup; origins.altBack=altBackGroup.position.clone();
 
 // Top fan panel (horizontal, fans point up) — hidden by default
 const altTopGroup=(function(){
@@ -865,6 +866,7 @@ const altTopGroup=(function(){
 altTopGroup.position.set(0, H/2+ply/2, 0);
 altTopGroup.visible=false;
 scene.add(altTopGroup);
+parts.altTop=altTopGroup; origins.altTop=altTopGroup.position.clone();
 
 // Apply default fan color at init (materials are created with C_FAN black)
 {
@@ -1337,6 +1339,8 @@ const explodeV={
   bot:    new THREE.Vector3(0,-8,0),
   front:  new THREE.Vector3(0,0,-10),
   back:   new THREE.Vector3(0,0,10),
+  altTop:  new THREE.Vector3(0,8,0),
+  altBack: new THREE.Vector3(0,0,10),
   filterL:new THREE.Vector3(-8,0,0),
   filterR:new THREE.Vector3(8,0,0),
 };
