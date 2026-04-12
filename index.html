@@ -260,7 +260,7 @@
   <div class="picker-label">Fan layout</div>
   <div class="seg"><button id="btnLayoutFB" class="on" onclick="setLayout('fb')">Front + Back</button><button id="btnLayoutFT" onclick="setLayout('ft')">Front + Top</button></div>
   <div class="picker-label">Fans per panel</div>
-  <div class="seg"><button id="btnFan4" class="on" onclick="setFanCount(4)">4 Fans</button><button id="btnFan3" onclick="setFanCount(3)">3 Fans</button></div>
+  <div class="seg"><button id="btnFan3" class="on" onclick="setFanCount(3)">3 Fans</button><button id="btnFan4" onclick="setFanCount(4)">4 Fans</button></div>
   <div class="toggle-row"><span class="toggle-label">Exploded view</span><div class="toggle-switch" id="togExplode" onclick="toggleExplode()"></div></div>
   <div class="toggle-row"><span class="toggle-label">Show filters</span><div class="toggle-switch on" id="togFilter" onclick="toggleFilter()"></div></div>
   <div class="picker-label">Wood stain</div>
@@ -515,8 +515,8 @@ key.castShadow=true; key.shadow.mapSize.set(2048,2048);
 key.shadow.bias=-0.0005; key.shadow.normalBias=0.04;
 key.shadow.radius=6; key.shadow.blurSamples=16;
 key.shadow.camera.near=1; key.shadow.camera.far=160;
-key.shadow.camera.left=-80; key.shadow.camera.right=80;
-key.shadow.camera.top=50; key.shadow.camera.bottom=-50;
+key.shadow.camera.left=-50; key.shadow.camera.right=50;
+key.shadow.camera.top=40; key.shadow.camera.bottom=-40;
 scene.add(key);
 const fill=new THREE.DirectionalLight(0xe8eeff,0.18); fill.position.set(-10,12,-12); scene.add(fill);
 const rim=new THREE.DirectionalLight(0xccddff,0.2); rim.position.set(-6,15,-18); scene.add(rim);
@@ -647,8 +647,8 @@ function makeBirchTexture(w,h,seed){
   tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
   return tex;
 }
-const birchTex=makeBirchTexture(1024,1024,42);
-const birchTexB=makeBirchTexture(1024,1024,137);
+const birchTex=makeBirchTexture(512,512,42);
+const birchTexB=makeBirchTexture(512,512,137);
 
 const allBirchMats=[];
 function birchMat(repeatX,repeatY,useB){
@@ -721,7 +721,7 @@ function makeFanPanel(flip, nFans){
     hole.absarc(0,fy,holeR+bv,0,Math.PI*2,false,64);
     shape.holes.push(hole);
   }
-  const panelGeo=new THREE.ExtrudeGeometry(shape,{depth:ply-2*bvT,bevelEnabled:true,bevelSize:bv,bevelThickness:bvT,bevelSegments:bvSeg,curveSegments:64});
+  const panelGeo=new THREE.ExtrudeGeometry(shape,{depth:ply-2*bvT,bevelEnabled:true,bevelSize:bv,bevelThickness:bvT,bevelSegments:bvSeg,curveSegments:48});
   panelGeo.translate(0,0,-(ply-2*bvT)/2);
   const panel=new THREE.Mesh(panelGeo,birchMat(panelW/24,H/24));
   g.add(panel);
@@ -872,29 +872,29 @@ function makeFanPanel(flip, nFans){
 }
 
 // ─── Build 4-fan and 3-fan variants of front, back, altTop panels ───
-let activeFanCount=4;
+let activeFanCount=3;
 
 const front4=makeFanPanel(false,4);
 front4.position.set(0,0,-(D/2+ply/2));
+front4.visible=false;
 scene.add(front4);
 
 const front3=makeFanPanel(false,3);
 front3.position.set(0,0,-(D/2+ply/2));
-front3.visible=false;
 scene.add(front3);
 
-parts.front=front4; origins.front=front4.position.clone();
+parts.front=front3; origins.front=front3.position.clone();
 
 const back4=makeFanPanel(true,4);
 back4.position.set(0,0,D/2+ply/2);
+back4.visible=false;
 scene.add(back4);
 
 const back3=makeFanPanel(true,3);
 back3.position.set(0,0,D/2+ply/2);
-back3.visible=false;
 scene.add(back3);
 
-parts.back=back4; origins.back=back4.position.clone();
+parts.back=back3; origins.back=back3.position.clone();
 
 // ─── Alternate layout: solid back + top fan panel ───
 // Solid back panel (no holes) — hidden by default
@@ -942,7 +942,7 @@ function makeAltTopPanel(nFans){
     hole.absarc(0,fz,holeR+bv,0,Math.PI*2,false,64);
     shape.holes.push(hole);
   }
-  const panelGeo=new THREE.ExtrudeGeometry(shape,{depth:ply-2*bvT,bevelEnabled:true,bevelSize:bv,bevelThickness:bvT,bevelSegments:bvSeg,curveSegments:64});
+  const panelGeo=new THREE.ExtrudeGeometry(shape,{depth:ply-2*bvT,bevelEnabled:true,bevelSize:bv,bevelThickness:bvT,bevelSegments:bvSeg,curveSegments:48});
   panelGeo.translate(0,0,-(ply-2*bvT)/2);
   // Rotate so the panel lies flat: shape XY → XZ, extrude Z → Y
   panelGeo.rotateX(-Math.PI/2);
@@ -2637,8 +2637,8 @@ const ceilSpot=new THREE.SpotLight(0xfff0dd,0.4,0,Math.PI/3,0.7,1.5);
 ceilSpot.position.set(ceilLightX,ceilY-1,ceilLightZ);
 ceilSpot.target.position.set(ceilLightX,floorY,ceilLightZ);
 scene.add(ceilSpot); scene.add(ceilSpot.target);
-ceilSpot.castShadow=true;
-ceilSpot.shadow.mapSize.set(1024,1024);
+ceilSpot.castShadow=false;
+ceilSpot.shadow.mapSize.set(512,512);
 ceilSpot.shadow.bias=-0.0005;
 ceilSpot.shadow.radius=5; ceilSpot.shadow.blurSamples=12;
 ceilSpot.shadow.camera.near=10;
@@ -2772,6 +2772,7 @@ for(const k in parts) if(parts[k]) parts[k].matrixAutoUpdate=true;
 if(particles) particles.matrixAutoUpdate=true;
 
 // ─── Animate ───
+let _prevCx=0,_prevCz=0;
 function animate(){
   requestAnimationFrame(animate);
 
@@ -2877,6 +2878,8 @@ function animate(){
   // Walls are fully opaque when camera is >25 units away, fade to near-invisible
   // when camera is right at the wall surface. Each wall fades independently.
   const cx=camera.position.x, cz=camera.position.z;
+  if(!_prevCx || Math.abs(cx-_prevCx)>0.3 || Math.abs(cz-_prevCz)>0.3){
+  _prevCx=cx; _prevCz=cz;
   const fadeMin=0.06;
   // Back wall (Z=50) + recess: fade based on camera proximity
   const backDist=50-cz;
@@ -2897,6 +2900,7 @@ function animate(){
   leftWallBelow.material.opacity=leftAlpha; leftWallAbove.material.opacity=leftAlpha;
   leftWallFront.material.opacity=leftAlpha; leftWallBack.material.opacity=leftAlpha;
   leftBaseboard.material.opacity=leftAlpha; cL.material.opacity=leftAlpha; cR.material.opacity=leftAlpha;
+  }
 
   renderer.render(scene,camera);
   fpsFrames++;
