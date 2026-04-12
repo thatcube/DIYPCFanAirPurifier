@@ -199,6 +199,8 @@
   <div class="section-body"><div class="section-body-inner">
   <div class="picker-label">Fan layout</div>
   <div class="seg"><button id="btnLayoutFB" class="on" onclick="setLayout('fb')">Front + Back</button><button id="btnLayoutFT" onclick="setLayout('ft')">Front + Top</button></div>
+  <div class="picker-label">Fans per panel</div>
+  <div class="seg"><button id="btnFan4" class="on" onclick="setFanCount(4)">4 Fans</button><button id="btnFan3" onclick="setFanCount(3)">3 Fans</button></div>
   <div class="toggle-row"><span class="toggle-label">Exploded view</span><div class="toggle-switch" id="togExplode" onclick="toggleExplode()"></div></div>
   <div class="toggle-row"><span class="toggle-label">Show filters</span><div class="toggle-switch on" id="togFilter" onclick="toggleFilter()"></div></div>
   <div class="picker-label">Wood stain</div>
@@ -491,7 +493,12 @@ botPanel.position.set(0,-(H/2+ply/2),0);
 scene.add(botPanel); parts.bot=botPanel; origins.bot=botPanel.position.clone();
 
 // ─── Fan panels (front/back) ───
-function makeFanPanel(flip){
+function makeFanPanel(flip, nFans){
+  nFans = nFans || numFans;
+  const buf = (nFans === 3) ? 1.5 : (H - nFans*fanFrame) / 2;
+  const usableH = H - 2*buf;
+  const slotH = usableH / nFans;
+  function localFanY(i){ return -H/2 + buf + slotH*(i+0.5); }
   const g=new THREE.Group();
 
   // Plywood panel with circular cutouts — bevel-compensated so final size is exact
@@ -502,8 +509,8 @@ function makeFanPanel(flip){
   shape.lineTo( (panelW/2-bv), (H/2-bv));
   shape.lineTo(-(panelW/2-bv), (H/2-bv));
   shape.lineTo(-(panelW/2-bv),-(H/2-bv));
-  for(let i=0;i<numFans;i++){
-    const fy=fanY(i);
+  for(let i=0;i<nFans;i++){
+    const fy=localFanY(i);
     const hole=new THREE.Path();
     hole.absarc(0,fy,holeR+bv,0,Math.PI*2,false,64);
     shape.holes.push(hole);
@@ -517,8 +524,8 @@ function makeFanPanel(flip){
   const inDir=flip?-1:1;
   const fanZ=inDir*(ply/2+fanDepth/2);
 
-  for(let i=0;i<numFans;i++){
-    const fy=fanY(i);
+  for(let i=0;i<nFans;i++){
+    const fy=localFanY(i);
 
     // Square fan frame with rounded corners and circular opening
     const hf=fanFrame/2, cr=cornerR;
@@ -655,24 +662,33 @@ function makeFanPanel(flip){
   g.add(glow);
   allFanGlows.push(glow);
 
-  // Foam tape seal on inner face at left/right edges — inset so not visible from outside
-  const foamT=0.09, foamW=0.45, foamInset=0.25;
-  const foamZ=inDir*(ply/2+foamT/2);
-  for(let sx of[-1,1]){
-    const fm=mk(new THREE.BoxGeometry(foamW,H,foamT),C_FOAM,0.85);
-    fm.position.set(sx*(panelW/2-foamW/2-foamInset),0,foamZ);
-    g.add(fm);
-  }
   return g;
 }
 
-const frontGroup=makeFanPanel(false);
-frontGroup.position.set(0,0,-(D/2+ply/2));
-scene.add(frontGroup); parts.front=frontGroup; origins.front=frontGroup.position.clone();
+// ─── Build 4-fan and 3-fan variants of front, back, altTop panels ───
+let activeFanCount=4;
 
-const backGroup=makeFanPanel(true);
-backGroup.position.set(0,0,D/2+ply/2);
-scene.add(backGroup); parts.back=backGroup; origins.back=backGroup.position.clone();
+const front4=makeFanPanel(false,4);
+front4.position.set(0,0,-(D/2+ply/2));
+scene.add(front4);
+
+const front3=makeFanPanel(false,3);
+front3.position.set(0,0,-(D/2+ply/2));
+front3.visible=false;
+scene.add(front3);
+
+parts.front=front4; origins.front=front4.position.clone();
+
+const back4=makeFanPanel(true,4);
+back4.position.set(0,0,D/2+ply/2);
+scene.add(back4);
+
+const back3=makeFanPanel(true,3);
+back3.position.set(0,0,D/2+ply/2);
+back3.visible=false;
+scene.add(back3);
+
+parts.back=back4; origins.back=back4.position.clone();
 
 // ─── Alternate layout: solid back + top fan panel ───
 // Solid back panel (no holes) — hidden by default
@@ -688,13 +704,6 @@ const altBackGroup=(function(){
   const geo=new THREE.ExtrudeGeometry(shape,{depth:ply-2*bvT,bevelEnabled:true,bevelSize:bv,bevelThickness:bvT,bevelSegments:bvSeg,curveSegments:32});
   geo.translate(0,0,-(ply-2*bvT)/2);
   g.add(new THREE.Mesh(geo,birchMat(panelW/24,H/24)));
-  // Foam tape on inner face
-  const foamT=0.09, foamW=0.45, foamInset=0.25;
-  for(let sx of[-1,1]){
-    const fm=mk(new THREE.BoxGeometry(foamW,H,foamT),C_FOAM,0.85);
-    fm.position.set(sx*(panelW/2-foamW/2-foamInset),0,-(ply/2+foamT/2));
-    g.add(fm);
-  }
   return g;
 })();
 altBackGroup.position.set(0,0,D/2+ply/2);
@@ -703,14 +712,16 @@ scene.add(altBackGroup);
 parts.altBack=altBackGroup; origins.altBack=altBackGroup.position.clone();
 
 // Top fan panel (horizontal, fans point up) — hidden by default
-const altTopGroup=(function(){
+function makeAltTopPanel(nFans){
+  nFans = nFans || numFans;
   const g=new THREE.Group();
   const topW=panelW, topD=D+2*ply;
   const bv=0.12, bvT=0.12, bvSeg=3;
   // Fan positions along Z (local coords: shape is in XZ, extruded along Y)
-  const topTotalFanZ=numFans*fanFrame;
-  const topEndGap=(topD-topTotalFanZ)/2;
-  function topFanZ(i){return -topD/2+topEndGap+fanFrame*(i+0.5);}
+  const topBuffer=1.0;
+  const topUsable=topD-2*topBuffer;
+  const topSlot=topUsable/nFans;
+  function topFanZ(i){return -topD/2+topBuffer+topSlot*(i+0.5);}
 
   // Shape in XZ plane with holes
   const shape=new THREE.Shape();
@@ -719,7 +730,7 @@ const altTopGroup=(function(){
   shape.lineTo( (topW/2-bv), (topD/2-bv));
   shape.lineTo(-(topW/2-bv), (topD/2-bv));
   shape.lineTo(-(topW/2-bv),-(topD/2-bv));
-  for(let i=0;i<numFans;i++){
+  for(let i=0;i<nFans;i++){
     const fz=topFanZ(i);
     const hole=new THREE.Path();
     hole.absarc(0,fz,holeR+bv,0,Math.PI*2,false,64);
@@ -732,7 +743,7 @@ const altTopGroup=(function(){
   g.add(new THREE.Mesh(panelGeo,birchMat(topW/24,topD/24)));
 
   // Fans mounted on top, pointing upward
-  for(let i=0;i<numFans;i++){
+  for(let i=0;i<nFans;i++){
     const fz=topFanZ(i);
     const fanYPos=-(ply/2+fanDepth/2); // inside the box (below panel)
 
@@ -862,11 +873,14 @@ const altTopGroup=(function(){
   allFanGlows.push(topGlow);
 
   return g;
-})();
-altTopGroup.position.set(0, H/2+ply/2, 0);
-altTopGroup.visible=false;
-scene.add(altTopGroup);
-parts.altTop=altTopGroup; origins.altTop=altTopGroup.position.clone();
+}
+
+const altTop4=makeAltTopPanel(4);
+altTop4.position.set(0, H/2+ply/2, 0);
+altTop4.visible=false;
+scene.add(altTop4);
+
+parts.altTop=altTop4; origins.altTop=altTop4.position.clone();
 
 // Apply default fan color at init (materials are created with C_FAN black)
 {
@@ -1112,33 +1126,59 @@ const filterR=makePleatedFilter();
 filterR.position.set(W/2+ft/2,0,0);
 scene.add(filterR); parts.filterR=filterR; origins.filterR=filterR.position.clone();
 
+// ─── Foam tape seal ring (all 8 strips — stays as one group in exploded view) ───
+const foamGroup=new THREE.Group();
+{
+  const foamT=0.09, foamW=0.45, foamInset=0.25;
+  const fx=panelW/2-foamW/2-foamInset;
+  // Vertical strips on front/back inner faces
+  for(let sx of[-1,1]){
+    const ff=mk(new THREE.BoxGeometry(foamW,H,foamT),C_FOAM,0.85);
+    ff.position.set(sx*fx, 0, -D/2+foamT/2);
+    foamGroup.add(ff);
+    const fb=mk(new THREE.BoxGeometry(foamW,H,foamT),C_FOAM,0.85);
+    fb.position.set(sx*fx, 0, D/2-foamT/2);
+    foamGroup.add(fb);
+  }
+  // Horizontal strips on top/bottom inner faces
+  for(let sx of[-1,1]){
+    for(let sy of[-1,1]){
+      const ft=mk(new THREE.BoxGeometry(foamW,foamT,D),C_FOAM,0.9);
+      ft.position.set(sx*fx, sy*(H/2-foamT/2), 0);
+      foamGroup.add(ft);
+    }
+  }
+}
+foamGroup.position.set(0,0,0);
+scene.add(foamGroup);
+parts.foam=foamGroup; origins.foam=foamGroup.position.clone();
+
 // ─── Ledge strips on top/bottom panels (70% width, centered) ───
 const ledgeW=0.56, ledgeDepth=(D+2*ply)*0.70;
 const ledgeX=W/2-ledgeW/2;
 const ledgeT=0.35;
+const ledgeTopGroup=new THREE.Group();
+const ledgeBotGroup=new THREE.Group();
 for(let sx of[-1,1]){
-  for(let sy of[-1,1]){
-    const lh=new THREE.Mesh(
-      new THREE.BoxGeometry(ledgeW,ledgeT,ledgeDepth),
-      birchMat(ledgeW/6,ledgeDepth/12,true)
-    );
-    lh.position.set(sx*ledgeX,sy*(H/2-ledgeT/2),0);
-    scene.add(lh);
-  }
+  const lt=new THREE.Mesh(
+    new THREE.BoxGeometry(ledgeW,ledgeT,ledgeDepth),
+    birchMat(ledgeW/6,ledgeDepth/12,true)
+  );
+  lt.position.set(sx*ledgeX, H/2-ledgeT/2, 0);
+  ledgeTopGroup.add(lt);
+  const lb=new THREE.Mesh(
+    new THREE.BoxGeometry(ledgeW,ledgeT,ledgeDepth),
+    birchMat(ledgeW/6,ledgeDepth/12,true)
+  );
+  lb.position.set(sx*ledgeX, -(H/2-ledgeT/2), 0);
+  ledgeBotGroup.add(lb);
 }
-
-// ─── Foam tape seal on inner face of top/bottom panels ───
-{
-  const foamT=0.09, foamW=0.45, foamInset=0.25;
-  for(let sx of[-1,1]){
-    for(let sy of[-1,1]){
-      const foam=mk(new THREE.BoxGeometry(foamW,foamT,D),C_FOAM,0.9);
-      // Inset from panel edge so it's hidden from outside view
-      foam.position.set(sx*(panelW/2-foamW/2-foamInset), sy*(H/2-foamT/2), 0);
-      scene.add(foam);
-    }
-  }
-}
+ledgeTopGroup.position.set(0,0,0);
+scene.add(ledgeTopGroup);
+parts.ledgeTop=ledgeTopGroup; origins.ledgeTop=ledgeTopGroup.position.clone();
+ledgeBotGroup.position.set(0,0,0);
+scene.add(ledgeBotGroup);
+parts.ledgeBot=ledgeBotGroup; origins.ledgeBot=ledgeBotGroup.position.clone();
 
 // ─── Corner legs/feet ───
 const legH=0.75, legR=0.3;
@@ -1185,7 +1225,9 @@ for(let xSgn of[-1,1]){
     allLegMeshes.push(leg);
   }
 }
+legGroup.position.set(0,0,0);
 scene.add(legGroup);
+parts.legs=legGroup; origins.legs=legGroup.position.clone();
 
 // ─── ESP32 + power supply on bottom interior ───
 {
@@ -1343,6 +1385,10 @@ const explodeV={
   altBack: new THREE.Vector3(0,0,10),
   filterL:new THREE.Vector3(-8,0,0),
   filterR:new THREE.Vector3(8,0,0),
+  foam:    new THREE.Vector3(0,0,0),
+  ledgeTop:new THREE.Vector3(0,5,0),
+  ledgeBot:new THREE.Vector3(0,-5,0),
+  legs:    new THREE.Vector3(0,-12,0),
 };
 let exploded=false, explodeLerping=false;
 function setToggle(onId,offId,isOn){
@@ -1354,6 +1400,9 @@ function collapseView(){
   exploded=false;
   explodeLerping=true;
   document.getElementById('togExplode').classList.remove('on');
+  // Only auto-disable isolate if explode was the one that turned it on
+  if(isolateMode && _isolateAutoExplode){ toggleIsolate(); }
+  _isolateAutoExplode=false;
   for(const k in explodeV){
     if(!parts[k]) continue;
     targets[k]=origins[k].clone();
@@ -1367,6 +1416,13 @@ function toggleExplode(){
     if(spinning) toggleSpin();
     if(airflowOn) toggleAirflow();
     if(dimVisible) toggleDimensions();
+    // Auto-enable isolate mode (track that explode did it)
+    if(!isolateMode){ _isolateAutoExplode=true; toggleIsolate(); }
+    else { _isolateAutoExplode=false; }
+  } else {
+    // Only auto-disable isolate if explode was the one that turned it on
+    if(isolateMode && _isolateAutoExplode){ toggleIsolate(); }
+    _isolateAutoExplode=false;
   }
   for(const k in explodeV){
     if(!parts[k]) continue;
@@ -1669,16 +1725,40 @@ function setStain(mode){
 
 // ─── Layout toggle (Front+Back vs Front+Top) ───
 let layoutMode='fb';
+function applyVisibility(){
+  const is3=(activeFanCount===3);
+  const isFB=(layoutMode==='fb');
+  // Front panels: active fan-count variant visible, other hidden
+  front4.visible=!is3;
+  front3.visible=is3;
+  parts.front=is3?front3:front4;
+  origins.front=parts.front.position.clone();
+  // Back panels (only visible in FB mode)
+  back4.visible=(!is3 && isFB);
+  back3.visible=(is3 && isFB);
+  parts.back=is3?back3:back4;
+  origins.back=parts.back.position.clone();
+  // Top cap (visible in FB, hidden in FT)
+  parts.top.visible=isFB;
+  // Alt back (solid, visible in FT only)
+  altBackGroup.visible=!isFB;
+  // Alt top fan panel (always 4 fans, only visible in FT mode)
+  altTop4.visible=!isFB;
+}
 function setLayout(mode){
   layoutMode=mode;
   document.querySelectorAll('#btnLayoutFB,#btnLayoutFT').forEach(b=>b.classList.remove('on'));
   document.getElementById(mode==='fb'?'btnLayoutFB':'btnLayoutFT').classList.add('on');
-  // Front+Back: show backGroup + topPanel, hide alternates
-  // Front+Top: hide backGroup + topPanel, show altBackGroup + altTopGroup
-  backGroup.visible=(mode==='fb');
-  parts.top.visible=(mode==='fb');
-  altBackGroup.visible=(mode==='ft');
-  altTopGroup.visible=(mode==='ft');
+  if(exploded) collapseView();
+  applyVisibility();
+}
+function setFanCount(n){
+  if(n===activeFanCount) return;
+  activeFanCount=n;
+  document.querySelectorAll('#btnFan4,#btnFan3').forEach(b=>b.classList.remove('on'));
+  document.getElementById(n===4?'btnFan4':'btnFan3').classList.add('on');
+  if(exploded) collapseView();
+  applyVisibility();
 }
 
 // ─── Feet style (peg / round bun / rubber) ───
@@ -1800,12 +1880,21 @@ function setTimeOfDay(mode) {
   floorMat.color.setHex(t.carpet);
   // Window sky color shifts at night
   sky.material.color.setHex(isNightMode ? 0x0a0a1a : 0xc8ddf0);
-  // If isolate mode was on, re-entering day/night should restore isolate state
-  if(isolateMode) applyIsolate(true);
+  // If isolate mode was on, re-apply isolate after theme change
+  if(isolateMode){
+    // Re-save the new theme's light state, then re-apply isolate
+    _savedClear=renderer.getClearColor(new THREE.Color());
+    _savedFog=scene.fog.density;
+    _savedLights={ambient:0, key:key.intensity, fill:fill.intensity,
+      rim:rim.intensity, bounce:bounce.intensity, ceil:ceilSpot.intensity};
+    scene.children.forEach(c=>{ if(c.isAmbientLight) _savedLights.ambient=c.intensity; });
+    applyIsolate(true);
+  }
 }
 
 // ─── Isolate purifier (hide room, spotlight product) ───
 let isolateMode=false;
+let _isolateAutoExplode=false;
 let _savedClear=null, _savedFog=null, _savedLights={};
 function toggleIsolate(){
   isolateMode=!isolateMode;
@@ -1826,8 +1915,8 @@ function applyIsolate(on){
       rim:rim.intensity, bounce:bounce.intensity, ceil:ceilSpot.intensity
     };
     scene.children.forEach(c=>{ if(c.isAmbientLight) _savedLights.ambient=c.intensity; });
-    // Dark background, no fog
-    renderer.setClearColor(0x111118,1);
+    // Soft dark background, no fog
+    renderer.setClearColor(0x1a1a2e,1);
     scene.fog.density=0;
     // Spotlight lighting: soft ambient + strong key from above-front
     scene.children.forEach(c=>{ if(c.isAmbientLight) c.intensity=0.3; });
@@ -2473,6 +2562,8 @@ scene.traverse(obj=>{
 // Re-enable on objects that animate: fan rotors, explodable parts, particles
 for(const rotor of allRotors) rotor.matrixAutoUpdate=true;
 for(const k in parts) if(parts[k]) parts[k].matrixAutoUpdate=true;
+// Also enable on inactive fan-count variants (they get swapped into parts dynamically)
+[front3,front4,back3,back4,altTop4].forEach(g=>{ g.matrixAutoUpdate=true; });
 if(particles) particles.matrixAutoUpdate=true;
 
 // ─── Animate ───
