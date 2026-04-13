@@ -2411,8 +2411,16 @@ function toggleXray(){
 // ─── Room environment for scale ───
 const floorY = -(H/2 + ply + bunFootH); // bottom of legs
 
-// Enable shadows on all purifier meshes
-scene.traverse(obj=>{ if(obj.isMesh){ obj.castShadow=true; obj.receiveShadow=true; } });
+// Enable shadows only on main purifier panels (not every mesh)
+[front3,front4,back3,back4,altTop4,altBackGroup].forEach(g=>{
+  g.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+});
+[parts.top,parts.bot,foamGroup,ledgeTopGroup,ledgeBotGroup,legGroup].forEach(g=>{
+  g.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+});
+[filterL,filterR].forEach(g=>{
+  g.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.receiveShadow=true; } });
+});
 
 // Floor — carpet texture
 const floorGeo = new THREE.PlaneGeometry(200, 200);
@@ -3074,7 +3082,7 @@ let fpsFrames=0, fpsLast=performance.now(), _hueColor=null, _avgCol2=null;
 // Monitors FPS over several seconds and downgrades rendering if needed.
 // Tiers: 0 = full quality, 1 = reduced pixel ratio, 2 = also disable shadows, 3 = also reduce particles
 let qualityTier=0, qualitySamples=0, qualitySum=0, qualitySettled=false;
-const QUALITY_WINDOW=3000; // ms to average over before deciding
+const QUALITY_WINDOW=2000; // ms to average over before deciding
 let qualityWindowStart=performance.now();
 function downgrade(tier){
   qualityTier=tier;
@@ -3101,7 +3109,7 @@ function checkPerformance(fps){
   if(elapsed<QUALITY_WINDOW) return;
   const avg=qualitySum/qualitySamples;
   qualitySum=0; qualitySamples=0; qualityWindowStart=performance.now();
-  if(avg>=40){ qualitySettled=true; return; } // good enough, stop checking
+  if(avg>=55){ qualitySettled=true; return; } // good enough, stop checking
   if(qualityTier<3){ downgrade(qualityTier+1); }
   else { qualitySettled=true; } // can't go lower
 }
