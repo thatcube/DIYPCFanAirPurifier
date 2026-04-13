@@ -26,7 +26,7 @@
     .section-group.collapsed .section-caret { transform: rotate(-90deg); }
     .section-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.35s cubic-bezier(0.34,1.56,0.64,1); }
     .section-group.collapsed .section-body { grid-template-rows: 0fr; }
-    .section-body-inner { overflow: hidden; display: flex; flex-direction: column; gap: 2px; padding: 0 10px 10px; }
+    .section-body-inner { overflow: hidden; display: flex; flex-direction: column; gap: 2px; padding: 0 10px 10px; min-width: 0; }
     .seg { display: flex; gap: 4px; border-radius: 10px; overflow: hidden; border: none; background: none; }
     .seg button { flex: 1; font-size: 10px; padding: 7px 4px; border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85); transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
     .seg button:active { transform: scale(0.88); transition-duration: 0.08s; }
@@ -45,7 +45,7 @@
     /* Collapsible RGB section */
     .rgb-collapse { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease; opacity: 1; }
     .rgb-collapse.hidden { grid-template-rows: 0fr; opacity: 0; pointer-events: none; }
-    .rgb-collapse-inner { overflow: hidden; display: flex; flex-direction: column; gap: 2px; padding-top: 2px; }
+    .rgb-collapse-inner { overflow: hidden; display: flex; flex-direction: column; gap: 2px; padding-top: 2px; min-width: 0; }
 
     /* Toggle switch row */
     .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 2px; }
@@ -59,21 +59,23 @@
     .picker-label { font-size: 10px; color: rgba(255,255,255,0.5); padding: 4px 2px 2px; }
     .rgb-seg button { color: #fff; font-weight: 600; font-size: 11px; padding: 5px 0; }
     .rgb-seg button:hover { filter: brightness(1.15); transform: scale(1.06); }
-    .rgb-seg .rb { background: #dc3545; }
-    .rgb-seg .yb { background: #e6a817; }
-    .rgb-seg .gb { background: #28a745; }
     .rgb-seg .ob { background: #999; }
     .rgb-seg .party { background: linear-gradient(90deg,rgba(255,60,60,0.55),rgba(255,200,50,0.55),rgba(50,200,80,0.55),rgba(50,180,255,0.55),rgba(100,60,255,0.55),rgba(255,80,200,0.55),rgba(255,60,60,0.55)); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
     .rgb-seg button.on { box-shadow: inset 0 0 0 2px #fff, 0 0 0 1.5px #333; }
+    .rgb-color-wrap { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18); cursor: pointer; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85); font-size: 10px; font-weight: 600; padding: 7px 4px; transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); }
+    .rgb-color-wrap:hover { background: rgba(255,255,255,0.2); transform: scale(1.04); }
+    .rgb-color-wrap.on { background: rgba(255,255,255,0.28); color: #fff; border-color: rgba(255,255,255,0.35); box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 0 8px rgba(255,255,255,0.06); }
+    .rgb-color-swatch { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.4); flex-shrink: 0; }
+    .rgb-color-wrap input[type=color] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; }
     .swatch { display: inline-block; width: 16px; height: 16px; border-radius: 3px; margin-right: 6px; vertical-align: middle; position: relative; border: 2px solid rgba(255,255,255,0.18); }
     .swatch.rgb-border { border: none; background: var(--swatch-fill) !important; overflow: visible; }
     .swatch.rgb-border::after { content: ''; position: absolute; inset: -1px; border-radius: 4px; background: conic-gradient(from 90deg, #00ff00,#0088ff,#8800ff,#ff00ff,#ff0000,#ff8800,#ffff00,#00ff00); z-index: -1; }
-    .slider-row { display: flex; align-items: center; gap: 8px; padding: 4px 2px; }
-    .slider-row label { font-size: 10px; color: rgba(255,255,255,0.5); white-space: nowrap; min-width: 52px; }
-    .slider-row input[type=range] { flex: 1; -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.12); outline: none; cursor: pointer; }
+    .slider-row { display: flex; align-items: center; gap: 6px; padding: 4px 2px; }
+    .slider-row label { font-size: 10px; color: rgba(255,255,255,0.5); white-space: nowrap; flex-shrink: 0; }
+    .slider-row input[type=range] { flex: 1; min-width: 0; -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.12); outline: none; cursor: pointer; }
     .slider-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 8px; background: rgba(255,255,255,0.9); box-shadow: 0 1px 6px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.3); cursor: pointer; }
     .slider-row input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 8px; background: rgba(255,255,255,0.9); box-shadow: 0 1px 6px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.3); cursor: pointer; border: none; }
-    .slider-row .slider-val { font-size: 10px; color: rgba(255,255,255,0.5); min-width: 26px; text-align: right; }
+    .slider-row .slider-val { font-size: 10px; color: rgba(255,255,255,0.5); min-width: 28px; text-align: right; flex-shrink: 0; margin-left: 2px; }
 
     /* FAB toggle button */
     .fab { position: absolute; top: 12px; left: 12px; height: 42px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.06); backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.06), inset 0 0 0 0.5px rgba(255,255,255,0.3), inset 0 0 12px 0 rgba(255,255,255,0.08), inset 0 1px 1px rgba(255,255,255,0.4), inset 0 -1px 1px rgba(255,255,255,0.1); color: rgba(255,255,255,0.9); font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 14px; transition: all 0.25s ease; z-index: 10; overflow: hidden; white-space: nowrap; }
@@ -277,13 +279,14 @@
   <div class="section" onclick="toggleSection(this)"><i class="ph ph-fan section-icon"></i><span>Fans</span><i class="ph ph-caret-down section-caret"></i></div>
   <div class="section-body"><div class="section-body-inner">
   <div class="toggle-row"><span class="toggle-label">Spin fans</span><div class="toggle-switch on" id="togSpin" onclick="toggleSpin()"></div></div>
+  <div class="slider-row"><label>Fan speed</label><input type="range" id="fanSpeedSlider" min="0" max="1800" value="900" step="10" oninput="setFanSpeed(this.value)"><span class="slider-val" id="fanSpeedVal">900 rpm</span></div>
   <div class="toggle-row"><span class="toggle-label">Show airflow</span><div class="toggle-switch" id="togAirflow" onclick="toggleAirflow()"></div></div>
   <div class="picker-label">Fan color</div>
   <div class="seg"><button id="btnFanWhite" class="on" onclick="toggleFanColor()">White</button><button id="btnFanBlack" onclick="toggleFanColor()">Black</button></div>
   <div class="toggle-row"><span class="toggle-label">RGB Fans</span><div class="toggle-switch on" id="togRGB" onclick="toggleFanRGB()"></div></div>
   <div id="rgbSection" class="rgb-collapse"><div class="rgb-collapse-inner">
   <div class="picker-label">LED color</div>
-  <div id="rgbRow" class="seg rgb-seg"><button id="btnRgbR" class="rb" onclick="setRGB('red')">Red</button><button id="btnRgbY" class="yb" onclick="setRGB('yellow')">Ylw</button><button id="btnRgbG" class="gb" onclick="setRGB('green')">Grn</button><button id="btnRgbRainbow" class="party" onclick="setRGB('rainbow')">Party</button><button id="btnRgbOff" class="ob" onclick="setRGB('off')">Off</button></div>
+  <div id="rgbRow" class="seg rgb-seg"><button id="btnRgbAuto" class="on" onclick="setRGB('auto')" style="background:linear-gradient(135deg,rgba(255,238,221,0.35),rgba(255,106,26,0.35));color:rgba(255,255,255,0.9)">Auto</button><div class="rgb-color-wrap" id="rgbColorWrap"><span class="rgb-color-swatch" id="rgbSwatch" style="background:#ffeedd"></span>Custom<input type="color" id="rgbColorPicker" value="#ffeedd" oninput="setRGBFromPicker(this.value)"></div><button id="btnRgbRainbow" class="party" onclick="setRGB('rainbow')">Party</button><button id="btnRgbOff" class="ob" onclick="setRGB('off')">Off</button></div>
   <div class="slider-row"><label>Brightness</label><input type="range" id="rgbBright" min="0" max="100" value="50" oninput="setRGBBrightness(this.value)"><span class="slider-val" id="rgbBrightVal">50%</span></div>
   </div></div>
   </div></div>
@@ -292,7 +295,9 @@
   <div class="section-group">
   <div class="section" onclick="toggleSection(this)"><i class="ph ph-eye section-icon"></i><span>Scene</span><i class="ph ph-caret-down section-caret"></i></div>
   <div class="section-body"><div class="section-body-inner">
-  <div class="seg"><button id="btnDay" class="on" onclick="setTimeOfDay('day')"><i class="ph ph-sun"></i> Day</button><button id="btnNight" onclick="setTimeOfDay('night')"><i class="ph ph-moon-stars"></i> Night</button></div>
+  <div class="picker-label">Time of day</div>
+  <div class="slider-row" style="gap:6px"><span style="font-size:16px;color:rgba(255,255,255,0.5);display:flex;align-items:center"><i class="ph ph-sun"></i></span><input type="range" id="todSlider" min="0" max="1440" value="720" step="1" oninput="setTimeFromSlider(this.value)"><span style="font-size:16px;color:rgba(255,255,255,0.5);display:flex;align-items:center"><i class="ph ph-moon-stars"></i></span></div>
+  <div style="text-align:center;font-size:10px;color:rgba(255,255,255,0.45);margin-top:-2px" id="todLabel">12:00 PM</div>
   <div class="toggle-row"><span class="toggle-label">Isolate purifier</span><div class="toggle-switch" id="togIsolate" onclick="toggleIsolate()"></div></div>
   <div class="toggle-row"><span class="toggle-label">Dimensions</span><div class="toggle-switch" id="togDims" onclick="toggleDimensions()"></div></div>
   <div class="toggle-row"><span class="toggle-label">X-ray mode</span><div class="toggle-switch" id="togXray" onclick="toggleXray()"></div></div>
@@ -534,14 +539,15 @@ const panelW = W+2*ft; // overall width = 7.0"
 // Arctic P12 Pro: 120×120×27mm (FIXED — do not change)
 const fanFrame=4.724;    // 120mm
 const fanDepth=1.063;    // 27mm
-const hubR=0.827;        // ~42mm hub diameter / 2
+const hubR=0.787;        // ~40mm hub diameter / 2 (20mm radius)
 const impellerR=2.126;   // ~108mm impeller OD / 2
 const mountSpacing=4.134; // 105mm hole spacing
 const bladeCount=7;
 const holeR=impellerR*1.02;
 const cornerR=0.2;
 const allRotors=[];
-const allFanMats=[]; // all fan plastic materials (frame, hub, cap, blades)
+const allFanMats=[]; // all fan plastic materials (frame, hub, cap, blade0)
+const allBladeMatsPerFan=[]; // array of arrays: allBladeMatsPerFan[fanIdx] = [mat0..mat6]
 const allBraceMats=[]; // brace spoke materials (color-switched with frame)
 const allFanGlows=[]; // PointLight per fan for RGB glow
 let filterMatRef=null; // set inside makePleatedFilter for direct RGB lookup
@@ -558,7 +564,7 @@ let fansWhite=true;
 let fansRGB=true; // start as RGB (frosted translucent blades)
 const FAN_BLACK={frame:0x1a1a1a,hub:0x111111,cap:0x181818,blade:0x1e1e1e};
 const FAN_WHITE={frame:0xe8e8e8,hub:0xdddddd,cap:0xd0d0d0,blade:0xf0f0f0};
-const BLADE_FROSTED={color:0xf0ece8,opacity:0.65,shininess:30};
+const BLADE_FROSTED={color:0xffffff,opacity:0.3,shininess:5};
 
 // ─── Procedural birch plywood texture (1024×1024) ───
 function makeBirchTexture(w,h,seed){
@@ -788,9 +794,12 @@ function makeFanPanel(flip, nFans){
     rotor.add(cap);
 
     // Swept fan blades (7 blades) — P12 Pro sickle-shaped, wide with minimal gaps
-    const bladeMat=new THREE.MeshPhongMaterial({color:0xf0ece8,shininess:30,side:THREE.DoubleSide,transparent:true,opacity:0.65,depthWrite:false});
-    allFanMats.push(bladeMat);
+    // Each blade gets its own material for per-blade RGB coloring
+    const fanBlades=[];
+    allFanMats.push(null); // placeholder at [i+3], replaced below with blade[0]
     for(let b=0;b<bladeCount;b++){
+      const bladeMat=new THREE.MeshPhongMaterial({color:0xf0ece8,shininess:30,side:THREE.DoubleSide,transparent:true,opacity:0.65,depthWrite:false});
+      fanBlades.push(bladeMat);
       const baseAngle=b/bladeCount*Math.PI*2;
       const bladeShape=new THREE.Shape();
       const innerR=hubR*1.05, outerR=impellerR*0.96;
@@ -821,6 +830,8 @@ function makeFanPanel(flip, nFans){
       bladeGeo.translate(0,0,-fanDepth*0.325);
       rotor.add(new THREE.Mesh(bladeGeo,bladeMat));
     }
+    allFanMats[allFanMats.length-1]=fanBlades[0]; // slot blade[0] into the placeholder
+    allBladeMatsPerFan.push(fanBlades);
 
     g.add(rotor);
     allRotors.push(rotor);
@@ -830,9 +841,9 @@ function makeFanPanel(flip, nFans){
     // Slightly in front of hub back face so brace blends into the fan back
     const braceZ=fanZ-inDir*(fanDepth*0.35);
     const cornerDist=fanFrame*0.44;
-    const hubOff=hubR*0.75;
+    const hubOff=hubR*0.9;
     const spokeAngles=[Math.PI*0.75, Math.PI*0.25, -Math.PI*0.25, -Math.PI*0.75];
-    const tangentOff=0.35;
+    const tangentOff=0.65;
     for(let s=0;s<4;s++){
       const ca=spokeAngles[s];
       const cx=Math.cos(ca)*cornerDist;
@@ -1002,9 +1013,11 @@ function makeAltTopPanel(nFans){
     cap.position.set(0,0,-fanDepth*0.4);
     rotor.add(cap);
 
-    const bladeMat=new THREE.MeshPhongMaterial({color:0xf0ece8,shininess:30,side:THREE.DoubleSide,transparent:true,opacity:0.65,depthWrite:false});
-    allFanMats.push(bladeMat);
+    const fanBlades2=[];
+    allFanMats.push(null); // placeholder for blade[0]
     for(let b=0;b<bladeCount;b++){
+      const bladeMat=new THREE.MeshPhongMaterial({color:0xf0ece8,shininess:30,side:THREE.DoubleSide,transparent:true,opacity:0.65,depthWrite:false});
+      fanBlades2.push(bladeMat);
       const baseAngle=b/bladeCount*Math.PI*2;
       const bladeShape=new THREE.Shape();
       const innerR=hubR*1.05, outerR=impellerR*0.96;
@@ -1032,6 +1045,8 @@ function makeAltTopPanel(nFans){
       bladeGeo.translate(0,0,-fanDepth*0.325);
       rotor.add(new THREE.Mesh(bladeGeo,bladeMat));
     }
+    allFanMats[allFanMats.length-1]=fanBlades2[0];
+    allBladeMatsPerFan.push(fanBlades2);
     g.add(rotor);
     allRotors.push(rotor);
 
@@ -1040,9 +1055,9 @@ function makeAltTopPanel(nFans){
     // Slightly in front of hub back face
     const braceY=fanYPos+(fanDepth*0.34);
     const cornerDist2=fanFrame*0.44;
-    const hubOff2=hubR*0.75;
+    const hubOff2=hubR*0.9;
     const spokeAngles2=[Math.PI*0.75, Math.PI*0.25, -Math.PI*0.25, -Math.PI*0.75];
-    const tangentOff2=0.35;
+    const tangentOff2=0.65;
     for(let s=0;s<4;s++){
       const ca=spokeAngles2[s];
       const cx2=Math.cos(ca)*cornerDist2;
@@ -1093,6 +1108,9 @@ scene.add(altTop4);
 
 parts.altTop=altTop4; origins.altTop=altTop4.position.clone();
 
+// Track fan count per panel for RGB glow sync (order matches allFanGlows push order)
+const _panelFanCounts=[4, 3, 4, 3, 4]; // front4, front3, back4, back3, altTop4
+
 // Apply default fan color at init (materials are created with C_FAN black)
 {
   const c=fansWhite?FAN_WHITE:FAN_BLACK;
@@ -1100,15 +1118,18 @@ parts.altTop=altTop4; origins.altTop=altTop4.position.clone();
     allFanMats[i].color.setHex(c.frame);
     allFanMats[i+1].color.setHex(c.hub);
     allFanMats[i+2].color.setHex(c.cap);
-    const blade=allFanMats[i+3];
-    if(fansRGB){
-      blade.color.setHex(BLADE_FROSTED.color);
-      blade.transparent=true;
-      blade.opacity=BLADE_FROSTED.opacity;
-      blade.shininess=BLADE_FROSTED.shininess;
-      blade.depthWrite=false;
-    } else {
-      blade.color.setHex(c.blade);
+  }
+  for(const blades of allBladeMatsPerFan){
+    for(const blade of blades){
+      if(fansRGB){
+        blade.color.setHex(BLADE_FROSTED.color);
+        blade.transparent=true;
+        blade.opacity=BLADE_FROSTED.opacity;
+        blade.shininess=BLADE_FROSTED.shininess;
+        blade.depthWrite=false;
+      } else {
+        blade.color.setHex(c.blade);
+      }
     }
   }
   for(const m of allBraceMats) m.color.setHex(c.frame);
@@ -1681,8 +1702,22 @@ resize(); window.addEventListener('resize',resize);
 
 // ─── Fan spin + air particle system ───
 let spinning=true, spinSpeed=0, spinTarget=0;
-const SPIN_MAX=0.18;
-spinTarget=SPIN_MAX; // fans spin by default
+const SPIN_MAX=0.25;
+let fanSpeedPct=50;
+let fanSpeedRPM=900;
+spinTarget=SPIN_MAX*(fanSpeedPct/100);
+
+function setFanSpeed(val){
+  fanSpeedRPM=parseInt(val);
+  fanSpeedPct=Math.round(fanSpeedRPM/1800*100);
+  document.getElementById('fanSpeedVal').textContent=fanSpeedRPM>0?fanSpeedRPM+' rpm':'Off';
+  if(fanSpeedRPM===0 && spinning){
+    toggleSpin();
+  } else if(fanSpeedRPM>0 && !spinning){
+    toggleSpin();
+  }
+  if(spinning) spinTarget=SPIN_MAX*(fanSpeedPct/100);
+}
 
 const PARTICLE_COUNT=400;
 const particleGeo=new THREE.BufferGeometry();
@@ -1806,7 +1841,13 @@ scene.add(particles);
 
 function toggleSpin(){
   spinning=!spinning;
-  spinTarget=spinning?SPIN_MAX:0;
+  if(spinning && fanSpeedRPM===0){
+    fanSpeedPct=50;
+    fanSpeedRPM=900;
+    document.getElementById('fanSpeedSlider').value=900;
+    document.getElementById('fanSpeedVal').textContent='900 rpm';
+  }
+  spinTarget=spinning?SPIN_MAX*(fanSpeedPct/100):0;
   document.getElementById('togSpin').classList.toggle('on',spinning);
   // Auto-collapse so internals are visible inside the assembled box
   if(spinning) collapseView();
@@ -2013,86 +2054,97 @@ function setFeetStyle(style){
   }
 }
 
-// ─── Day / Night mode ───
+// ─── Continuous time-of-day lighting ───
 let isNightMode = false;
-const DAY = {
-  clear: new THREE.Color(0xd4dce8),
-  fogDensity: 0.0015,
-  ambient: 0.22,
-  keyIntensity: 0.55, keyColor: 0xfff8f0,
-  fillIntensity: 0.18,
-  rimIntensity: 0.2,
-  bounceIntensity: 0.08,
-  exposure: 1.15,
-  ceilIntensity: 0.4,
-  domeEmissive: 0.15,
-  outdoorBright: 1.0,
-  wall: 0xd8d4ce,
-  baseboard: 0xc0bbb4,
-  carpet: 0xb0a898
-};
-const NIGHT = {
-  clear: new THREE.Color(0x181820),
-  fogDensity: 0.003,
-  ambient: 0.08,
-  keyIntensity: 0.2, keyColor: 0x6688cc,
-  fillIntensity: 0.04,
-  rimIntensity: 0.08,
-  bounceIntensity: 0.03,
-  exposure: 1.0,
-  ceilIntensity: 0.3,
-  domeEmissive: 0.4,
-  outdoorBright: 0.08,
-  wall: 0x2a2a35,
-  baseboard: 0x1e1e28,
-  carpet: 0x4a4840
-};
+const _c1=new THREE.Color(), _c2=new THREE.Color(), _cmix=new THREE.Color();
+function lerpHex(a,b,t){ _c1.setHex(a); _c2.setHex(b); _cmix.copy(_c1).lerp(_c2,t); return _cmix; }
+function mix(a,b,t){ return a+(b-a)*t; }
 
-function setTimeOfDay(mode) {
-  isNightMode = (mode === 'night');
-  document.querySelectorAll('#btnDay,#btnNight').forEach(b => b.classList.remove('on'));
-  document.getElementById(isNightMode ? 'btnNight' : 'btnDay').classList.add('on');
+// Sunlight curve: 0=midnight, 0.5=noon, 1=midnight
+// Returns 0 (full night) to 1 (full day) with smooth sunrise/sunset
+function sunCurve(minuteOfDay){
+  const h=minuteOfDay/60;
+  // Dawn: 5:30-7:30, Dusk: 17:00-19:30
+  if(h<=5.5) return 0;
+  if(h<=7.5) return (h-5.5)/2; // sunrise ramp
+  if(h<=12) return 0.7+0.3*((h-7.5)/4.5); // morning→peak
+  if(h<=14) return 1.0; // solar noon plateau
+  if(h<=17) return 1.0-0.15*((h-14)/3); // gentle afternoon decrease
+  if(h<=19.5) return 0.85*(1-(h-17)/2.5); // sunset ramp
+  return 0;
+}
+
+// Golden hour warmth: peaks at sunrise/sunset
+function warmthCurve(minuteOfDay){
+  const h=minuteOfDay/60;
+  if(h>=6 && h<=8) return 1-Math.abs(h-7); // morning golden hour
+  if(h>=17 && h<=19) return 1-Math.abs(h-18); // evening golden hour
+  return 0;
+}
+
+const DAY_CLEAR=0xd4dce8, NIGHT_CLEAR=0x181820;
+const DAY_WALL=0xd8d4ce, NIGHT_WALL=0x2a2a35;
+const DAY_BASE=0xc0bbb4, NIGHT_BASE=0x1e1e28;
+const DAY_CARPET=0xb0a898, NIGHT_CARPET=0x4a4840;
+const DAY_SKY=0xc8ddf0, NIGHT_SKY=0x0a0a1a;
+const GOLDEN_KEY=0xffddaa;
+
+function applyTimeOfDay(minuteOfDay){
+  const sun=sunCurve(minuteOfDay);
+  const warm=warmthCurve(minuteOfDay);
+  isNightMode=sun<0.3;
   document.body.classList.toggle('night-mode', isNightMode);
 
-  const t = isNightMode ? NIGHT : DAY;
-  renderer.setClearColor(t.clear, 1);
-  scene.fog.color.copy(t.clear);
-  scene.fog.density = t.fogDensity;
-  renderer.toneMappingExposure = t.exposure;
+  // Auto-adjust RGB fan LED color based on time of day
+  // Day: warm white, Night: amber/dark orange nightlight
+  if(currentRGB==='auto'){
+    const dayColor=new THREE.Color(0xffeedd); // warm white
+    const nightColor=new THREE.Color(0xff6a1a); // amber orange
+    const ledColor=dayColor.clone().lerp(nightColor, 1-sun);
+    const hex=ledColor.getHex();
+    customRGBHex=hex;
+    const hexStr='#'+hex.toString(16).padStart(6,'0');
+    document.getElementById('rgbColorPicker').value=hexStr;
+    document.getElementById('rgbSwatch').style.background=hexStr;
+    setRGBColor(hex);
+  }
 
-  // Lights
-  scene.children.forEach(c => { if (c.isAmbientLight) c.intensity = t.ambient; });
-  key.intensity = t.keyIntensity;
-  key.color.setHex(t.keyColor);
-  fill.intensity = t.fillIntensity;
-  rim.intensity = t.rimIntensity;
-  bounce.intensity = t.bounceIntensity;
-  ceilSpot.intensity = t.ceilIntensity;
-  domeMat.emissiveIntensity = t.domeEmissive;
-  outdoor.material.color.setScalar(t.outdoorBright);
+  // Clear color + fog
+  const clearCol=lerpHex(NIGHT_CLEAR, DAY_CLEAR, sun);
+  renderer.setClearColor(clearCol.clone(), 1);
+  scene.fog.color.copy(clearCol);
+  scene.fog.density=mix(0.003, 0.0015, sun);
+  renderer.toneMappingExposure=mix(1.0, 1.15, sun);
+
+  // Key light: direction is sun through window; warm during golden hour
+  const keyColor=warm>0.1 ? lerpHex(0xfff8f0, GOLDEN_KEY, warm) : lerpHex(0x6688cc, 0xfff8f0, sun);
+  key.color.copy(keyColor);
+  key.intensity=mix(0.12, 0.55, sun)+warm*0.15;
+
+  // Other lights
+  scene.children.forEach(c=>{ if(c.isAmbientLight) c.intensity=mix(0.06, 0.22, sun); });
+  fill.intensity=mix(0.03, 0.18, sun);
+  rim.intensity=mix(0.06, 0.2, sun);
+  bounce.intensity=mix(0.02, 0.08, sun);
+  ceilSpot.intensity=mix(0.3, 0.4, sun<0.5 ? 1-sun : sun); // ceiling light brighter at night
+  domeMat.emissiveIntensity=mix(0.4, 0.15, sun);
+
+  // Outdoor backdrop brightness (sun through window)
+  outdoor.material.color.setScalar(mix(0.05, 1.0, sun)+warm*0.15);
 
   // Room surfaces
-  [wallMeshL,returnWallL].forEach(m=>m.material.color.setHex(t.wall));
-  if(recessWallL) recessWallL.material.color.setHex(t.wall);
-  if(recessWallR) recessWallR.material.color.setHex(t.wall);
-  oppWall.material.color.setHex(t.wall);
-  rightWall.material.color.setHex(t.wall);
-  leftWallBelow.material.color.setHex(t.wall);
-  leftWallAbove.material.color.setHex(t.wall);
-  leftWallFront.material.color.setHex(t.wall);
-  leftWallBack.material.color.setHex(t.wall);
-  [baseboardMeshL,baseboardRetL].forEach(m=>m.material.color.setHex(t.baseboard));
-  if(baseboardRecessL) baseboardRecessL.material.color.setHex(t.baseboard);
-  if(baseboardRecessR) baseboardRecessR.material.color.setHex(t.baseboard);
-  oppBaseboard.material.color.setHex(t.baseboard);
-  sideBaseboard.material.color.setHex(t.baseboard);
-  leftBaseboard.material.color.setHex(t.baseboard);
-  floorMat.color.setHex(t.carpet);
-  // Window sky color shifts at night
-  sky.material.color.setHex(isNightMode ? 0x0a0a1a : 0xc8ddf0);
+  const wallCol=lerpHex(NIGHT_WALL, DAY_WALL, sun);
+  [wallMeshL,returnWallL,oppWall,rightWall,leftWallBelow,leftWallAbove,leftWallFront,leftWallBack].forEach(m=>m.material.color.copy(wallCol));
+  if(recessWallL) recessWallL.material.color.copy(wallCol);
+  if(recessWallR) recessWallR.material.color.copy(wallCol);
+  const baseCol=lerpHex(NIGHT_BASE, DAY_BASE, sun);
+  [baseboardMeshL,baseboardRetL,oppBaseboard,sideBaseboard,leftBaseboard].forEach(m=>m.material.color.copy(baseCol));
+  if(baseboardRecessL) baseboardRecessL.material.color.copy(baseCol);
+  if(baseboardRecessR) baseboardRecessR.material.color.copy(baseCol);
+  floorMat.color.copy(lerpHex(NIGHT_CARPET, DAY_CARPET, sun));
+
   // If isolate mode was on, re-apply isolate after theme change
   if(isolateMode){
-    // Re-save the new theme's light state, then re-apply isolate
     _savedClear=renderer.getClearColor(new THREE.Color());
     _savedFog=scene.fog.density;
     _savedLights={ambient:0, key:key.intensity, fill:fill.intensity,
@@ -2100,6 +2152,28 @@ function setTimeOfDay(mode) {
     scene.children.forEach(c=>{ if(c.isAmbientLight) _savedLights.ambient=c.intensity; });
     applyIsolate(true);
   }
+}
+
+function formatTime(minutes){
+  const h24=Math.floor(minutes/60)%24;
+  const mn=Math.floor(minutes%60);
+  const ampm=h24>=12?'PM':'AM';
+  const h12=h24%12||12;
+  return h12+':'+(mn<10?'0':'')+mn+' '+ampm;
+}
+function setTimeFromSlider(val){
+  const m=parseInt(val);
+  document.getElementById('todLabel').textContent=formatTime(m);
+  applyTimeOfDay(m);
+}
+
+// Auto-detect local time on load
+function autoTimeOfDay(){
+  const now=new Date();
+  const minutes=now.getHours()*60+now.getMinutes();
+  document.getElementById('todSlider').value=minutes;
+  document.getElementById('todLabel').textContent=formatTime(minutes);
+  applyTimeOfDay(minutes);
 }
 
 // ─── Isolate purifier (hide room, spotlight product) ───
@@ -2141,21 +2215,15 @@ function applyIsolate(on){
     // Expose purifier shadows onto nothing (disable shadow receiving on hidden floor)
     renderer.toneMappingExposure=1.3;
   } else {
-    // Restore
+    // Restore by re-applying the current slider time
     if(_savedClear) renderer.setClearColor(_savedClear,1);
     scene.fog.density=_savedFog||0.0015;
     scene.children.forEach(c=>{ if(c.isAmbientLight) c.intensity=_savedLights.ambient; });
-    const t=isNightMode?NIGHT:DAY;
-    key.intensity=t.keyIntensity;
     key.position.set(-95,38,0);
-    fill.intensity=t.fillIntensity;
     fill.position.set(-10,12,-12);
-    rim.intensity=t.rimIntensity;
     rim.position.set(-6,15,-18);
-    bounce.intensity=t.bounceIntensity;
     bounce.position.set(0,-10,8);
-    ceilSpot.intensity=t.ceilIntensity;
-    renderer.toneMappingExposure=t.exposure;
+    applyTimeOfDay(parseInt(document.getElementById('todSlider').value));
   }
 }
 
@@ -2163,22 +2231,23 @@ function applyIsolate(on){
 
 function applyBladeStyle(){
   const c=fansWhite?FAN_WHITE:FAN_BLACK;
-  for(let i=0;i<allFanMats.length;i+=4){
-    const blade=allFanMats[i+3];
-    if(fansRGB){
-      blade.color.setHex(BLADE_FROSTED.color);
-      blade.transparent=true;
-      blade.opacity=BLADE_FROSTED.opacity;
-      blade.shininess=BLADE_FROSTED.shininess;
-      blade.depthWrite=false;
-    } else {
-      blade.color.setHex(c.blade);
-      blade.transparent=false;
-      blade.opacity=1.0;
-      blade.shininess=20;
-      blade.depthWrite=true;
+  for(const blades of allBladeMatsPerFan){
+    for(const blade of blades){
+      if(fansRGB){
+        blade.color.setHex(BLADE_FROSTED.color);
+        blade.transparent=true;
+        blade.opacity=BLADE_FROSTED.opacity;
+        blade.shininess=BLADE_FROSTED.shininess;
+        blade.depthWrite=false;
+      } else {
+        blade.color.setHex(c.blade);
+        blade.transparent=false;
+        blade.opacity=1.0;
+        blade.shininess=20;
+        blade.depthWrite=true;
+      }
+      blade.needsUpdate=true;
     }
-    blade.needsUpdate=true;
   }
 }
 
@@ -2222,56 +2291,78 @@ function updateFanLegend(){
 }
 
 // ─── RGB LED control ───
-const RGB_COLORS={
-  red:   {hex:0xff2200, intensity:1.5},
-  yellow:{hex:0xffcc00, intensity:1.25},
-  green: {hex:0x00ff44, intensity:1.25},
-  off:   {hex:0x000000, intensity:0}
-};
-const RGB_BASE_DIST=45;
-let currentRGB='off';
+const RGB_BASE_DIST=30;
+let currentRGB='auto';
+let customRGBHex=0xff2200;
 let rgbBrightness=0.5; // 0–1, default 50%
 function setRGBBrightness(val){
   rgbBrightness=parseInt(val)/100;
   document.getElementById('rgbBrightVal').textContent=val+'%';
-  if(currentRGB!=='rainbow' && currentRGB!=='off') setRGB(currentRGB);
+  if(currentRGB==='custom') setRGBColor(customRGBHex);
+  else if(currentRGB!=='rainbow' && currentRGB!=='off') setRGBColor(customRGBHex);
+}
+function setRGBFromPicker(hex){
+  customRGBHex=parseInt(hex.replace('#',''),16);
+  document.getElementById('rgbSwatch').style.background=hex;
+  // Deselect other buttons, select custom
+  document.querySelectorAll('#rgbRow button').forEach(b=>b.classList.remove('on'));
+  document.getElementById('rgbColorWrap').classList.add('on');
+  currentRGB='custom';
+  setRGBColor(customRGBHex);
 }
 function setRGB(color){
   currentRGB=color;
-  const c=RGB_COLORS[color];
-  // Update RGB button active states — ring highlight on selected
+  // Update button active states
   document.querySelectorAll('#rgbRow button').forEach(b=>b.classList.remove('on'));
-  const rgbBtnMap={red:'btnRgbR',yellow:'btnRgbY',green:'btnRgbG',rainbow:'btnRgbRainbow',off:'btnRgbOff'};
+  document.getElementById('rgbColorWrap').classList.remove('on');
+  const rgbBtnMap={rainbow:'btnRgbRainbow',off:'btnRgbOff',auto:'btnRgbAuto'};
   if(rgbBtnMap[color]) document.getElementById(rgbBtnMap[color]).classList.add('on');
-  if(color==='rainbow'){
-    // Rainbow mode — animate loop handles color cycling with brightness
-    const dist=RGB_BASE_DIST*(0.5+rgbBrightness*1.5);
-    for(const gl of allFanGlows){ gl.intensity=1.5*rgbBrightness+0.1; gl.distance=dist; }
+  if(color==='auto'){
+    // Re-apply current time to set the LED color
+    applyTimeOfDay(parseInt(document.getElementById('todSlider').value));
     return;
   }
+  if(color==='rainbow'){
+    const dist=RGB_BASE_DIST*(0.5+rgbBrightness*1.5);
+    for(const gl of allFanGlows){ gl.intensity=0.8*rgbBrightness+0.05; gl.distance=dist; }
+    return;
+  }
+  setRGBColor(color==='off'?0x000000:customRGBHex);
+}
+function setRGBColor(hex){
   const br=rgbBrightness;
+  const isOff=(hex===0x000000);
+  const intensity=isOff?0:0.8;
   const dist=RGB_BASE_DIST*(0.5+br*1.5);
   for(const gl of allFanGlows){
-    gl.color.setHex(c.hex);
-    gl.intensity=c.intensity*br;
+    gl.color.setHex(hex);
+    gl.intensity=intensity*br;
     gl.distance=dist;
   }
-  const emissiveHex=color==='off'?0x000000:c.hex;
-  const emissiveIntensity=color==='off'?0:0.08*br;
+  const emissiveHex=isOff?0x000000:hex;
+  const emissiveIntensity=isOff?0:6.0*br;
   // Fan blades + hub caps
+  for(const blades of allBladeMatsPerFan){
+    for(const blade of blades){
+      blade.emissive.setHex(emissiveHex);
+      blade.emissiveIntensity=emissiveIntensity;
+      blade.color.setHex(BLADE_FROSTED.color);
+      blade.opacity=isOff?BLADE_FROSTED.opacity:0.55;
+    }
+  }
   for(let i=0;i<allFanMats.length;i+=4){
-    allFanMats[i+3].emissive.setHex(emissiveHex);
-    allFanMats[i+3].emissiveIntensity=emissiveIntensity;
-    allFanMats[i+2].emissive.setHex(emissiveHex);
-    allFanMats[i+2].emissiveIntensity=emissiveIntensity*0.5;
+    allFanMats[i+1].emissive.setHex(0x000000);
+    allFanMats[i+1].emissiveIntensity=0;
+    allFanMats[i+2].emissive.setHex(0x000000);
+    allFanMats[i+2].emissiveIntensity=0;
   }
   // Filters glow from light passing through
   if(filterMatRef){
     filterMatRef.emissive.setHex(emissiveHex);
-    filterMatRef.emissiveIntensity=color==='off'?0:0.03;
+    filterMatRef.emissiveIntensity=isOff?0:0.015;
   }
-  // Plywood gets a subtle ambient tint from internal light
-  const woodGlow=color==='off'?0:0.02*br;
+  // Plywood gets a very subtle ambient tint from internal light
+  const woodGlow=isOff?0:0.01*br;
   for(const m of allBirchMats){
     m.emissive.setHex(emissiveHex);
     m.emissiveIntensity=woodGlow;
@@ -2388,11 +2479,11 @@ function roomRoundBox(w,h,d,radius,color,x,y,z,rx,ry,rz){
 // ─── Zinus Queen Piper Upholstered Platform Bed ───
 // 82.3"L × 60.3"W × 42"H, 6.5" ground clearance, slats at 14" from floor
 const bedL=82.3, bedW=60.3, bedH=42, bedClearance=6.5, bedSlatsFromFloor=14;
-const bedX=-90+2+bedW/2, bedZ=49.75-bedL/2; // bed left edge 2" from left wall, headboard flush against back wall
+const bedX=-81+2+bedW/2, bedZ=48.5-bedL/2; // bed left edge 2" from left wall, headboard flush against back wall
 
 // Nightstand / side table (18"w × 24"h × 14"d) — between bed and purifier
 const tblW=18, tblH=24, tblD=14;
-const tblX=bedX+bedW/2+tblW/2+3, tblZ=49.75-tblD/2-2;
+const tblX=bedX+bedW/2+tblW/2+3, tblZ=48.5-tblD/2-2;
 const tblTop=roomBox(tblW, 0.75, tblD, 0x6b4e3d, tblX, floorY+tblH, tblZ, 0,0,0); // tabletop\ntblTop.castShadow=true;
 roomBox(1.2, tblH-0.75, 1.2, 0x5a3f2e, tblX-tblW/2+1.5, floorY+tblH/2, tblZ-tblD/2+1.5,0,0,0); // legs
 roomBox(1.2, tblH-0.75, 1.2, 0x5a3f2e, tblX+tblW/2-1.5, floorY+tblH/2, tblZ-tblD/2+1.5,0,0,0);
@@ -2409,16 +2500,16 @@ scene.add(mug);
 
 // Wall section behind — split into left portion and recessed alcove with door (flush to right wall)
 const recessDepth=18; // 1.5 feet inward
-const recessZ=50-recessDepth; // recessed wall at Z=20
-const recessLeft=24, recessRight=60; // recess flush with right wall
+const recessZ=49-recessDepth; // recessed wall
+const recessLeft=24, recessRight=51; // recess flush with right wall
 const recessW=recessRight-recessLeft;
 
 // Left portion of back wall (X=-60 to recessLeft)
-const backWallLeftW=recessLeft-(-90);
-const wallMeshL=roomBox(backWallLeftW, 80, 0.5, 0xd8d4ce, -90+backWallLeftW/2, floorY+40, 50, 0,0,0);
+const backWallLeftW=recessLeft-(-81);
+const wallMeshL=roomBox(backWallLeftW, 80, 0.5, 0xd8d4ce, -81+backWallLeftW/2, floorY+40, 49, 0,0,0);
 
 // Left return wall (connecting back wall to recessed wall)
-const returnWallL=roomBox(0.5, 80, recessDepth, 0xd8d4ce, recessLeft, floorY+40, 50-recessDepth/2, 0,0,0);
+const returnWallL=roomBox(0.5, 80, recessDepth, 0xd8d4ce, recessLeft, floorY+40, 49-recessDepth/2, 0,0,0);
 
 // Recessed wall (with door opening)
 const doorW=32, doorH=80; // standard interior door
@@ -2436,8 +2527,8 @@ if(recessWallRightW>0.5) var recessWallR=roomBox(recessWallRightW, 80, 0.5, 0xd8
 // (doorH=80 = wallHeight, so no transom needed)
 
 // Baseboards (follow the recess shape)
-const baseboardMeshL=roomBox(backWallLeftW, 3, 0.6, 0xc0bbb4, -90+backWallLeftW/2, floorY+1.5, 49.5, 0,0,0);
-const baseboardRetL=roomBox(0.6, 3, recessDepth, 0xc0bbb4, recessLeft+0.5, floorY+1.5, 50-recessDepth/2, 0,0,0);
+const baseboardMeshL=roomBox(backWallLeftW, 3, 0.6, 0xc0bbb4, -81+backWallLeftW/2, floorY+1.5, 48.5, 0,0,0);
+const baseboardRetL=roomBox(0.6, 3, recessDepth, 0xc0bbb4, recessLeft+0.5, floorY+1.5, 49-recessDepth/2, 0,0,0);
 const baseboardRecessL=recessWallLeftW>0.5?roomBox(recessWallLeftW, 3, 0.6, 0xc0bbb4, recessLeft+recessWallLeftW/2, floorY+1.5, recessZ+0.5, 0,0,0):null;
 const baseboardRecessR=recessWallRightW>0.5?roomBox(recessWallRightW, 3, 0.6, 0xc0bbb4, doorRight+recessWallRightW/2, floorY+1.5, recessZ+0.5, 0,0,0):null;
 
@@ -2508,9 +2599,9 @@ roomBox(5, 1.2, 7, 0x8b4513, tblX+4, floorY+tblH+0.6, tblZ-1, 0, 0.1, 0);
 roomBox(4.5, 0.8, 6.5, 0x2d5a27, tblX+4, floorY+tblH+1.6, tblZ-1, 0, -0.05, 0);
 
 // ─── Opposite wall + 65" OLED TV ───
-const oppWallZ=-80;
-const oppWall=roomBox(150, 80, 0.5, 0xd8d4ce, -15, floorY+40, oppWallZ, 0,0,0);
-const oppBaseboard=roomBox(150, 3, 0.6, 0xc0bbb4, -15, floorY+1.5, oppWallZ+0.5, 0,0,0);
+const oppWallZ=-78;
+const oppWall=roomBox(132, 80, 0.5, 0xd8d4ce, -15, floorY+40, oppWallZ, 0,0,0);
+const oppBaseboard=roomBox(132, 3, 0.6, 0xc0bbb4, -15, floorY+1.5, oppWallZ+0.5, 0,0,0);
 
 // 65" OLED: diagonal=65", 16:9 → ~56.7"W × 31.9"H, bezel ~0.3", depth ~1"
 const tvW=56.7, tvH=31.9, tvD=1.0, bezel=0.3;
@@ -2533,15 +2624,15 @@ screen._isRoom=true;
 scene.add(screen);
 
 // ─── Right side wall (solid) ───
-const sideWallX=60;
-const wallDepth=130; // Z span from oppWallZ to 50
+const sideWallX=51;
+const wallDepth=127; // Z span from oppWallZ to 49
 const wallHeight=80;
 const rightWall=roomBox(0.5, wallHeight, wallDepth, 0xd8d4ce, sideWallX, floorY+wallHeight/2, -15, 0,0,0);
 const sideBaseboard=roomBox(0.6, 3, wallDepth, 0xc0bbb4, sideWallX-0.5, floorY+1.5, -15, 0,0,0);
 
 // ─── Left side wall with window (near the bed) ───
-const leftWallX=-90;
-const winW=36, winH=48; // window opening size
+const leftWallX=-81;
+const winW=36, winH=50; // window opening size
 const winCenterY=floorY+38; // center of window
 const winCenterZ=bedZ; // centered on the bed along Z
 const winBottom=winCenterY-winH/2;
@@ -2561,7 +2652,7 @@ const frontZmin=oppWallZ;
 const frontW=winFront-frontZmin;
 const leftWallFront=roomBox(0.5, winH, frontW, 0xd8d4ce, leftWallX, winCenterY, frontZmin+frontW/2, 0,0,0);
 // Back of window (toward Z=+50)
-const backZmax=50;
+const backZmax=49;
 const backW=backZmax-winBack;
 const leftWallBack=roomBox(0.5, winH, backW, 0xd8d4ce, leftWallX, winCenterY, winBack+backW/2, 0,0,0);
 
@@ -2799,31 +2890,65 @@ let _prevCx=0,_prevCz=0;
 function animate(){
   requestAnimationFrame(animate);
 
-  // Rainbow RGB cycling
+  // Rainbow RGB cycling — smooth gradient flowing across all fans
   if(currentRGB==='rainbow'){
-    const t=performance.now()*0.001; // seconds
+    const t=performance.now()*0.001;
+    // Slow smooth drift with gentle breathing modulation
+    const breathe=0.5+0.5*Math.sin(t*0.35);
+    const hueBase=t*0.06+breathe*0.1;
     _hueColor=_hueColor||new THREE.Color();
     const hueColor=_hueColor;
     const rb=rgbBrightness;
-    const rbI=1.5*rb+0.1;
-    for(let fi=0;fi<allFanGlows.length;fi++){
-      const hue=((t*0.3)+fi*0.12)%1;
-      hueColor.setHSL(hue,1,0.5);
-      allFanGlows[fi].color.copy(hueColor);
-      allFanGlows[fi].intensity=rbI;
+    const emBr=6.0*rb;
+
+    // Only color visible fans — small hue offset between adjacent fans for smooth gradient
+    const visibleFanCount=activeFanCount; // fans per visible panel
+    const hueRange=0.35; // visible fans span ~35% of spectrum, rest flows smoothly
+    const fanStep=hueRange/Math.max(visibleFanCount-1,1);
+
+    // Color each fan's blades individually — each blade gets its own hue
+    const totalFans=allBladeMatsPerFan.length;
+    for(let fi=0;fi<totalFans;fi++){
+      const panelFanIdx=fi%Math.max(visibleFanCount,3);
+      const fanHue=(hueBase+panelFanIdx*fanStep)%1;
+      const blades=allBladeMatsPerFan[fi];
+      for(let bi=0;bi<blades.length;bi++){
+        const bladeHue=(fanHue+bi/blades.length)%1;
+        hueColor.setHSL(bladeHue,1,0.5);
+        const hex=hueColor.getHex();
+        const blade=blades[bi];
+        blade.emissive.setHex(hex);
+        blade.emissiveIntensity=emBr;
+        blade.color.setHex(BLADE_FROSTED.color);
+        blade.opacity=0.55;
+      }
+      // Hub stays its base color (white/black) - no RGB emissive on hub
+      allFanMats[fi*4+1].emissive.setHex(0x000000);
+      allFanMats[fi*4+1].emissiveIntensity=0;
+      allFanMats[fi*4+2].emissive.setHex(0x000000);
+      allFanMats[fi*4+2].emissiveIntensity=0;
     }
-    const avgHue=(t*0.3)%1;
+
+    // Panel glows match the middle fan's base hue
+    const panelFanCounts=_panelFanCounts;
+    let fanIdx=0;
+    for(let gi=0;gi<allFanGlows.length;gi++){
+      const nf=panelFanCounts[gi]||3;
+      const midFanIdx=fanIdx+Math.floor(nf/2);
+      const midPanelFanIdx=Math.floor(nf/2)%Math.max(visibleFanCount,3);
+      const midHue=(hueBase+midPanelFanIdx*fanStep)%1;
+      hueColor.setHSL(midHue,1,0.5);
+      allFanGlows[gi].color.copy(hueColor);
+      allFanGlows[gi].intensity=0.8*rb+0.05;
+      fanIdx+=nf;
+    }
+
+    // Subtle tint on filter/wood
+    const avgHue=(hueBase+hueRange*0.5)%1;
     hueColor.setHSL(avgHue,1,0.5);
-    const hex=hueColor.getHex();
-    const emBr=0.1*rb;
-    for(let i=0;i<allFanMats.length;i+=4){
-      allFanMats[i+3].emissive.setHex(hex);
-      allFanMats[i+3].emissiveIntensity=emBr;
-      allFanMats[i+2].emissive.setHex(hex);
-      allFanMats[i+2].emissiveIntensity=emBr*0.5;
-    }
-    if(filterMatRef){ filterMatRef.emissive.setHex(hex); filterMatRef.emissiveIntensity=0.04*rb; }
-    for(const m of allBirchMats){ m.emissive.setHex(hex); m.emissiveIntensity=0.02*rb; }
+    const avgHex=hueColor.getHex();
+    if(filterMatRef){ filterMatRef.emissive.setHex(avgHex); filterMatRef.emissiveIntensity=0.02*rb; }
+    for(const m of allBirchMats){ m.emissive.setHex(avgHex); m.emissiveIntensity=0.015*rb; }
   }
 
   // Lerp explode positions (only while animating)
@@ -2904,8 +3029,8 @@ function animate(){
   if(!_prevCx || Math.abs(cx-_prevCx)>0.3 || Math.abs(cz-_prevCz)>0.3){
   _prevCx=cx; _prevCz=cz;
   const fadeMin=0.06;
-  // Back wall (Z=50) + recess: fade based on camera proximity
-  const backDist=50-cz;
+  // Back wall (Z=49) + recess: fade based on camera proximity
+  const backDist=49-cz;
   const backAlpha=backDist<25?Math.max(fadeMin,backDist/25):1;
   backWallParts.forEach(m=>{m.material.opacity=backAlpha;});
   doorPanel.material.opacity=backAlpha;
@@ -2914,11 +3039,11 @@ function animate(){
   const frontAlpha=frontDist<25?Math.max(fadeMin,frontDist/25):1;
   oppWall.material.opacity=frontAlpha; oppBaseboard.material.opacity=frontAlpha;
   // Side wall (X=60): fade when camera approaches
-  const rightDist=60-cx;
+  const rightDist=51-cx;
   const rightAlpha=rightDist<25?Math.max(fadeMin,rightDist/25):1;
   rightWall.material.opacity=rightAlpha; sideBaseboard.material.opacity=rightAlpha;
   // Left wall (X=-90): fade when camera approaches
-  const leftDist=cx+90;
+  const leftDist=cx+81;
   const leftAlpha=leftDist<25?Math.max(fadeMin,leftDist/25):1;
   leftWallBelow.material.opacity=leftAlpha; leftWallAbove.material.opacity=leftAlpha;
   leftWallFront.material.opacity=leftAlpha; leftWallBack.material.opacity=leftAlpha;
@@ -2936,7 +3061,7 @@ function animate(){
     fpsFrames=0; fpsLast=fpsNow;
   }
 }
-let fpsFrames=0, fpsLast=performance.now(), _hueColor=null;
+let fpsFrames=0, fpsLast=performance.now(), _hueColor=null, _avgCol2=null;
 
 // ─── Adaptive quality ───
 // Monitors FPS over several seconds and downgrades rendering if needed.
@@ -2990,6 +3115,7 @@ document.addEventListener('keydown',e=>{
 // Double-tap or double-click also exits zen mode
 document.addEventListener('dblclick',()=>document.body.classList.remove('zen'));
 updateFanLegend();
+autoTimeOfDay();
 animate();
 </script>
 </body>
