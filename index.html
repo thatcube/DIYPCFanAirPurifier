@@ -1740,10 +1740,13 @@ const _mouse=new THREE.Vector2();
 
 canvas.addEventListener('mousedown',e=>{
   _clickStartX=e.clientX;_clickStartY=e.clientY;
+  // Reset all interaction state
+  if(_dragFilter) handleDragEnd();
   _dragFilter=null;
-  // Try to start filter drag — but don't commit until mousemove confirms it's a drag
+  _pendingFilterDrag=false;
   _pendingFilterDrag=handleDragStart(e.clientX,e.clientY);
-  drag=true; canvas.style.cursor='grabbing';
+  drag=!_pendingFilterDrag;
+  if(!_pendingFilterDrag && !_hoverInteractive) canvas.style.cursor='grabbing';
   px=e.clientX;py=e.clientY;
 });
 canvas.addEventListener('touchstart',e=>{
@@ -1751,17 +1754,18 @@ canvas.addEventListener('touchstart',e=>{
   _clickStartX=px;_clickStartY=py;
   _dragFilter=null;
   _pendingFilterDrag=handleDragStart(px,py);
-  drag=true;
+  drag=!_pendingFilterDrag;
 },{passive:true});
 window.addEventListener('mouseup',e=>{
   drag=false;
-  canvas.style.cursor='grab';
+  // Restore cursor based on what we're hovering
+  canvas.style.cursor=_hoverInteractive?'pointer':'grab';
   const wasDragging=_dragFilter && !_pendingFilterDrag;
   if(wasDragging){
     handleDragEnd();
   } else {
     _dragFilter=null;
-    if(Math.abs(e.clientX-_clickStartX)<4 && Math.abs(e.clientY-_clickStartY)<4){
+    if(Math.abs(e.clientX-_clickStartX)<15 && Math.abs(e.clientY-_clickStartY)<15){
       handleClick(e.clientX,e.clientY);
     }
   }
@@ -1776,15 +1780,16 @@ window.addEventListener('touchend',e=>{
     _dragFilter=null;
     if(e.changedTouches.length>0){
       const t=e.changedTouches[0];
-      if(Math.abs(t.clientX-_clickStartX)<10 && Math.abs(t.clientY-_clickStartY)<10) handleClick(t.clientX,t.clientY);
+      if(Math.abs(t.clientX-_clickStartX)<25 && Math.abs(t.clientY-_clickStartY)<25) handleClick(t.clientX,t.clientY);
     }
   }
   _pendingFilterDrag=false;
 });
 let _pendingFilterDrag=false;
+let _hoverInteractive=false;
+let _hoverCheckTimer=0;
 canvas.addEventListener('mousemove',e=>{
-  if(_pendingFilterDrag && _dragFilter && Math.abs(e.clientX-_clickStartX)>6){
-    // Confirmed drag — stop orbit, start filter drag
+  if(_pendingFilterDrag && _dragFilter && Math.abs(e.clientX-_clickStartX)>15){
     drag=false;
     _pendingFilterDrag=false;
     canvas.style.cursor='ew-resize';
@@ -1793,22 +1798,28 @@ canvas.addEventListener('mousemove',e=>{
     handleDragMove(e.clientX);
     return;
   }
-  if(!drag){
-    // Hover cursor: check if over interactive object
+  // Hover cursor check — throttled to every 3rd frame for performance
+  _hoverCheckTimer++;
+  if(!drag && _hoverCheckTimer%3===0){
     const rect=canvas.getBoundingClientRect();
     _mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
     _mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
     _raycaster.setFromCamera(_mouse,camera);
     const hits=_raycaster.intersectObjects(scene.children,true);
-    canvas.style.cursor=(hits.length>0 && (hits[0].object._isFan||hits[0].object._isFilterL||hits[0].object._isFilterR))?'pointer':'grab';
-    return;
+    _hoverInteractive=false;
+    for(const h of hits){
+      if(h.object._isRoom) continue;
+      if(h.object._isFan||h.object._isFilterL||h.object._isFilterR){ _hoverInteractive=true; break; }
+    }
+    canvas.style.cursor=_hoverInteractive?'pointer':'grab';
   }
+  if(!drag) return;
   azimuth-=(e.clientX-px)*0.013;
   polar=Math.max(0.1,Math.min(Math.PI-0.1,polar-(e.clientY-py)*0.013));
   px=e.clientX;py=e.clientY;
 });
 canvas.addEventListener('touchmove',e=>{
-  if(_pendingFilterDrag && _dragFilter && Math.abs(e.touches[0].clientX-_clickStartX)>10){
+  if(_pendingFilterDrag && _dragFilter && Math.abs(e.touches[0].clientX-_clickStartX)>20){
     drag=false;
     _pendingFilterDrag=false;
   }
@@ -1863,15 +1874,18 @@ function handleClick(clientX,clientY){
   _mouse.y=-((clientY-rect.top)/rect.height)*2+1;
   _raycaster.setFromCamera(_mouse,camera);
   const hits=_raycaster.intersectObjects(scene.children,true);
-  if(hits.length===0) return;
-  const obj=hits[0].object;
-  // Clicked a fan → toggle that individual fan
-  if(obj._isFan && obj._rotor){
-    obj._rotor.userData.spinning=!obj._rotor.userData.spinning;
-    return;
+  // Find the first interactive hit, skipping room objects
+  let obj=null;
+  for(const h of hits){
+    if(h.object._isRoom) continue;
+    if(h.object._isFan||h.object._isFilterL||h.object._isFilterR){ obj=h.object; break; }
   }
+  if(!obj) return;
+  // Clicked a fan → toggle that individual fan's rotor
   if(obj._isFan){
-    toggleSpin();
+    if(obj._rotor){
+      obj._rotor.userData.spinning=!obj._rotor.userData.spinning;
+    }
     return;
   }
   // Clicked filter → toggle slide (fallback if not dragged)
@@ -1895,8 +1909,9 @@ function handleDragStart(clientX,clientY){
   _mouse.y=-((clientY-rect.top)/rect.height)*2+1;
   _raycaster.setFromCamera(_mouse,camera);
   const hits=_raycaster.intersectObjects(scene.children,true);
-  if(hits.length===0) return false;
-  const obj=hits[0].object;
+  let obj=null;
+  for(const h of hits){ if(!h.object._isRoom && (h.object._isFilterL||h.object._isFilterR)){ obj=h.object; break; } }
+  if(!obj) return false;
   if(obj._isFilterL){
     _dragFilter={obj:filterL, side:-1, origin:filterLOrigin, startX:clientX, startPos:filterL.position.x};
     return true;
