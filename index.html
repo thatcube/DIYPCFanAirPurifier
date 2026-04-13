@@ -3521,19 +3521,39 @@ function animate(){
   camera.position.z=radius*Math.sin(polar)*Math.cos(azimuth);
   camera.lookAt(0,0,0);
 
-  // Auto-fade room objects near the camera so they don't block the purifier view.
-  // Simple distance-based: if camera is close to any room object, fade it out.
+  // Auto-fade room objects.
+  // Outer walls: transparent when camera is outside them (looking in).
+  // Interior objects: fade when camera is close.
   const cx=camera.position.x, cy=camera.position.y, cz=camera.position.z;
   if(!_prevCx || Math.abs(cx-_prevCx)>0.3 || Math.abs(cz-_prevCz)>0.3){
   _prevCx=cx; _prevCz=cz;
-  const fadeNear=15; // fully invisible within this distance
-  const fadeFar=40; // start fading at this distance
+  const fadeNear=15, fadeFar=40;
+
+  // Outer wall transparency: check if camera is outside each wall
+  // After X flip: back wall Z=49→Z=49, TV wall Z=-78→Z=-78, right→X=-51, left→X=81
+  const outsideBack=cz>45;
+  const outsideFront=cz<-74;
+  const outsideRight=cx<-47;
+  const outsideLeft=cx>77;
+
   for(const m of fadingWalls){
-    const ox=m.position.x, oy=m.position.y, oz=m.position.z;
+    const ox=m.position.x, oz=m.position.z;
     const dx=cx-ox, dz=cz-oz;
-    const dist=Math.sqrt(dx*dx+dz*dz); // XZ distance only (ignore Y so floor doesn't fade)
+    const dist=Math.sqrt(dx*dx+dz*dz);
+
+    // Check if this is an outer wall and camera is outside it
+    if(m._isWall){
+      let outside=false;
+      // Determine which wall this belongs to by position (after flip)
+      if(Math.abs(oz)>40) outside=oz>0?outsideBack:outsideFront; // back or front wall
+      if(Math.abs(ox)>40) outside=ox<0?outsideRight:outsideLeft; // side walls
+      m.material.opacity=outside?0.08:1;
+      continue;
+    }
+
+    // Interior objects: distance-based fade
     if(dist<fadeFar){
-      const t=Math.max(0, (dist-fadeNear)/(fadeFar-fadeNear)); // 0 at fadeNear, 1 at fadeFar
+      const t=Math.max(0, (dist-fadeNear)/(fadeFar-fadeNear));
       m.material.opacity=Math.max(0.03, t);
     } else {
       m.material.opacity=1;
