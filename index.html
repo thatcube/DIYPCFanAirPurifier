@@ -1821,6 +1821,7 @@ canvas.addEventListener('mousemove',e=>{
     _hoverInteractive=false;
     let hoveredPartId=null;
     for(const h of hits){
+      if(h.object._isLamp){ _hoverInteractive=true; break; }
       if(h.object._isRoom) continue;
       if(h.object._isFan||h.object._isFilterL||h.object._isFilterR){ _hoverInteractive=true; }
       if(h.object._partId && !hoveredPartId){ hoveredPartId=h.object._partId; }
@@ -1948,13 +1949,22 @@ function handleClick(clientX,clientY){
   _mouse.y=-((clientY-rect.top)/rect.height)*2+1;
   _raycaster.setFromCamera(_mouse,camera);
   const hits=_raycaster.intersectObjects(scene.children,true);
-  // Find the first interactive hit, skipping room objects
+  // Find the first interactive hit
   let obj=null;
   for(const h of hits){
+    // Lamp is a room object but still interactive
+    if(h.object._isLamp){ obj=h.object; break; }
     if(h.object._isRoom) continue;
     if(h.object._isFan||h.object._isFilterL||h.object._isFilterR){ obj=h.object; break; }
   }
   if(!obj) return;
+  // Clicked lamp → toggle light
+  if(obj._isLamp){
+    lampOn=!lampOn;
+    lampLight.intensity=lampOn?1.0:0;
+    lampShade.material.emissiveIntensity=lampOn?0.4:0;
+    return;
+  }
   // Clicked a fan → toggle that individual fan's rotor
   if(obj._isFan){
     if(obj._rotor){
@@ -2951,35 +2961,46 @@ mug.castShadow=false; mug._isRoom=true;
 scene.add(mug);
 
 // Lamp on nightstand — near the corner closest to the door extrusion
+let lampLight, lampShade, lampOn=true;
 {
-  const lampX=tblX+tblW/2-3; // 3" from the extrusion-side edge
-  const lampZ=tblZ+tblD/2-3; // 3" from the back edge
+  const lampX=tblX+tblW/2-4; // 4" from the extrusion-side edge
+  const lampZ=tblZ+tblD/2-6; // 6" from the back edge (avoid wall clip)
   const lampBaseY=floorY+tblH;
-  // Base — dark metal disc
+  // Base — dark metal disc (larger)
   const baseMat=new THREE.MeshStandardMaterial({color:0x222222,roughness:0.4,metalness:0.6});
-  const base=new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.8, 0.6, 16), baseMat);
-  base.position.set(lampX, lampBaseY+0.3, lampZ);
-  base._isRoom=true; scene.add(base);
-  // Stem — thin metal rod
-  const stemH=12;
-  const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, stemH, 8), baseMat);
-  stem.position.set(lampX, lampBaseY+0.6+stemH/2, lampZ);
-  stem._isRoom=true; scene.add(stem);
-  // Shade — fabric cylinder, slightly tapered
-  const shadeR1=3.5, shadeR2=4.5, shadeH=7;
-  const shadeMat=new THREE.MeshStandardMaterial({color:0xd8d0c0,roughness:0.9,metalness:0,side:THREE.DoubleSide});
-  const shade=new THREE.Mesh(new THREE.CylinderGeometry(shadeR1, shadeR2, shadeH, 20, 1, true), shadeMat);
-  shade.position.set(lampX, lampBaseY+0.6+stemH+shadeH/2-1, lampZ);
-  shade._isRoom=true; scene.add(shade);
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(3.5, 4, 0.8, 16), baseMat);
+  base.position.set(lampX, lampBaseY+0.4, lampZ);
+  base._isRoom=true; base._isLamp=true; scene.add(base);
+  // Stem — thin metal rod (taller)
+  const stemH=16;
+  const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, stemH, 8), baseMat);
+  stem.position.set(lampX, lampBaseY+0.8+stemH/2, lampZ);
+  stem._isRoom=true; stem._isLamp=true; scene.add(stem);
+  // Shade — fabric cylinder, slightly tapered (larger)
+  const shadeR1=5, shadeR2=6.5, shadeH=10;
+  const shadeMat=new THREE.MeshStandardMaterial({
+    color:0xd8d0c0, roughness:0.9, metalness:0, side:THREE.DoubleSide,
+    transparent:true, opacity:0.85,
+    emissive:0xffeedd, emissiveIntensity:0.4
+  });
+  lampShade=new THREE.Mesh(new THREE.CylinderGeometry(shadeR1, shadeR2, shadeH, 24, 1, true), shadeMat);
+  lampShade.position.set(lampX, lampBaseY+0.8+stemH+shadeH/2-1, lampZ);
+  lampShade._isRoom=true; lampShade._isLamp=true; scene.add(lampShade);
   // Top cap
-  const topCap=new THREE.Mesh(new THREE.CircleGeometry(shadeR1, 20), shadeMat);
+  const topCap=new THREE.Mesh(new THREE.CircleGeometry(shadeR1, 24), shadeMat);
   topCap.rotation.x=-Math.PI/2;
-  topCap.position.set(lampX, lampBaseY+0.6+stemH+shadeH-1, lampZ);
-  topCap._isRoom=true; scene.add(topCap);
-  // Warm glow bulb inside shade
-  const bulbGlow=new THREE.PointLight(0xffeedd, 0.15, 30);
-  bulbGlow.position.set(lampX, lampBaseY+0.6+stemH+shadeH/2-1, lampZ);
-  bulbGlow._isRoom=true; scene.add(bulbGlow);
+  topCap.position.set(lampX, lampBaseY+0.8+stemH+shadeH-1, lampZ);
+  topCap._isRoom=true; topCap._isLamp=true; scene.add(topCap);
+  // Warm glow light — strong enough to visibly illuminate surroundings
+  lampLight=new THREE.PointLight(0xffddaa, 1.0, 80);
+  lampLight.position.set(lampX, lampBaseY+0.8+stemH+shadeH/2-1, lampZ);
+  lampLight.castShadow=false;
+  lampLight._isRoom=true; scene.add(lampLight);
+  // Bulb visible inside shade
+  const bulbMat=new THREE.MeshStandardMaterial({color:0xffffcc,emissive:0xffeedd,emissiveIntensity:1,roughness:0.3});
+  const bulb=new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), bulbMat);
+  bulb.position.set(lampX, lampBaseY+0.8+stemH+3, lampZ);
+  bulb._isRoom=true; bulb._isLamp=true; scene.add(bulb);
 }
 
 // Wall section — back wall with door extrusion bumping INTO the room (-Z direction)
