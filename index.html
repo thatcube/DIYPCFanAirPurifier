@@ -3352,6 +3352,11 @@ scene.traverse(obj=>{
     fadingWalls.push(obj);
   }
 });
+// Tag exterior walls so they stay semi-transparent from outside
+[wallMeshL, oppWall, oppBaseboard, rightWall, sideBaseboard,
+ leftWallBelow, leftWallAbove, leftWallFront, leftWallBack, leftBaseboard].forEach(m=>{
+  if(m) m._isWall=true;
+});
 
 // Freeze world matrices on all static objects (room + purifier structure)
 scene.traverse(obj=>{
@@ -3516,27 +3521,28 @@ function animate(){
   camera.position.z=radius*Math.sin(polar)*Math.cos(azimuth);
   camera.lookAt(0,0,0);
 
-  // Auto-fade room objects that are between the camera and the purifier.
-  // Objects close to the camera fade out; distant ones stay opaque.
+  // Auto-fade room objects.
+  // Exterior walls: always semi-transparent (see through from outside).
+  // Interior objects between camera and purifier: fade to invisible when close.
   const cx=camera.position.x, cy=camera.position.y, cz=camera.position.z;
   if(!_prevCx || Math.abs(cx-_prevCx)>0.3 || Math.abs(cz-_prevCz)>0.3){
   _prevCx=cx; _prevCz=cz;
-  const camDist=Math.sqrt(cx*cx+cy*cy+cz*cz);
-  const fadeRange=25; // start fading when camera is within 25" of an object
+  const fadeRange=30;
   for(const m of fadingWalls){
-    // Distance from camera to this object's position
     const ox=m.position.x, oy=m.position.y, oz=m.position.z;
     const dx=cx-ox, dy=cy-oy, dz=cz-oz;
     const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
-    // Check if object is roughly between camera and origin (dot product test)
+    // Is this object between camera and purifier?
     const toOriginX=-cx, toOriginZ=-cz;
     const toObjX=ox-cx, toObjZ=oz-cz;
     const dot=toObjX*toOriginX+toObjZ*toOriginZ;
-    const between=dot>0; // object is in the direction of origin from camera
+    const between=dot>0;
     if(between && dist<fadeRange){
-      m.material.opacity=Math.max(0.04, dist/fadeRange);
+      // Blocking the view — fade to nearly invisible
+      m.material.opacity=Math.max(0.02, (dist/fadeRange)*0.15);
     } else {
-      m.material.opacity=1;
+      // Not blocking — exterior walls stay semi-transparent, rest opaque
+      m.material.opacity=m._isWall?0.2:0.85;
     }
   }
   }
