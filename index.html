@@ -511,7 +511,7 @@ if(window.innerWidth<=520){
 const canvas = document.getElementById('c');
 const _isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 const renderer = new THREE.WebGLRenderer({canvas, antialias:!_isMobile, alpha:false, powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, _isMobile?1.5:2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, _isMobile?1:2));
 renderer.setClearColor(0xd4dce8, 1);
 renderer.shadowMap.enabled=true;
 renderer.shadowMap.type=_isMobile?THREE.PCFSoftShadowMap:THREE.VSMShadowMap;
