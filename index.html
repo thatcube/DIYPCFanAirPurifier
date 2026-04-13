@@ -2884,9 +2884,9 @@ const tblOak=0x5a3f2a;
     // Start at back-left, go clockwise
     shape.moveTo(-w/2, d/2); // back-left
     shape.lineTo(w/2, d/2);  // back-right
-    shape.lineTo(w/2, -d/2+bulge); // front-right (pulled in for curve start)
-    // Curved front: quadratic bezier bulging outward
-    shape.quadraticCurveTo(0, -d/2-bulge, -w/2, -d/2+bulge); // curve through center
+    shape.lineTo(w/2, -d/2); // front-right
+    // Curved front: quadratic bezier bulging outward (-Z direction)
+    shape.quadraticCurveTo(0, -d/2-bulge, -w/2, -d/2); // curve through center outward
     shape.lineTo(-w/2, d/2); // back to start
     const geo=new THREE.ExtrudeGeometry(shape, {depth:h, bevelEnabled:false});
     geo.translate(0,0,-h/2);
