@@ -2897,7 +2897,7 @@ const wallMeshL=roomBox(backWallFullW, 80, 0.5, 0xd8d4ce, -15, floorY+40, 49, 0,
 
 // Extrusion side walls (going from back wall into room)
 const returnWallL=roomBox(0.5, 80, recessDepth, 0xd8d4ce, extLeft, floorY+40, 49-recessDepth/2, 0,0,0);
-roomBox(0.5, 80, recessDepth, 0xd8d4ce, extRight, floorY+40, 49-recessDepth/2, 0,0,0);
+// Right side wall omitted — flush with side wall, would clip
 // Top of extrusion
 roomBox(extrusionW, 0.5, recessDepth, 0xd8d4ce, extCenterX, floorY+80, 49-recessDepth/2, 0,0,0);
 
@@ -2917,7 +2917,7 @@ if(recessWallRightW>0.5) var recessWallR=roomBox(recessWallRightW, 80, 0.5, 0xd8
 // Baseboards
 const baseboardMeshL=roomBox(backWallFullW, 3, 0.6, 0xc0bbb4, -15, floorY+1.5, 48.5, 0,0,0);
 const baseboardRetL=roomBox(0.6, 3, recessDepth, 0xc0bbb4, extLeft+0.5, floorY+1.5, 49-recessDepth/2, 0,0,0);
-roomBox(0.6, 3, recessDepth, 0xc0bbb4, extRight-0.5, floorY+1.5, 49-recessDepth/2, 0,0,0);
+// Right extrusion baseboard omitted — flush with side wall
 const baseboardRecessL=recessWallLeftW>0.5?roomBox(recessWallLeftW, 3, 0.6, 0xc0bbb4, extLeft+recessWallLeftW/2, floorY+1.5, recessZ+0.5, 0,0,0):null;
 const baseboardRecessR=recessWallRightW>0.5?roomBox(recessWallRightW, 3, 0.6, 0xc0bbb4, doorRight+recessWallRightW/2, floorY+1.5, recessZ+0.5, 0,0,0):null;
 
