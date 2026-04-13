@@ -165,6 +165,12 @@
     .fps { position: absolute; bottom: 8px; right: 10px; font-size: 10px; color: rgba(255,255,255,0.4); font-family: monospace; pointer-events: none; display: none; }
     .fps.show { display: block; }
 
+    /* Part tooltip on hover */
+    .part-tooltip { position: absolute; pointer-events: none; z-index: 50; opacity: 0; transition: opacity 0.2s ease; padding: 6px 10px; border-radius: 8px; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.12); font-size: 11px; color: rgba(255,255,255,0.9); white-space: nowrap; transform: translate(-50%, -100%); margin-top: -12px; }
+    .part-tooltip.visible { opacity: 1; }
+    .part-tooltip .tip-name { font-weight: 600; font-size: 11px; }
+    .part-tooltip .tip-dims { font-size: 10px; color: rgba(255,255,255,0.55); margin-top: 2px; }
+
     /* Zen mode — hide all UI */
     body.zen .panel, body.zen .fab, body.zen .guide-fab, body.zen .hint, body.zen .fps { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.3s ease; }
 
@@ -253,6 +259,7 @@
 <canvas id="c"></canvas>
 <div class="hint">drag to rotate · scroll to zoom · press <b>?</b> for shortcuts</div>
 <div class="fps" id="fps"></div>
+<div class="part-tooltip" id="partTooltip"><div class="tip-name" id="tipName"></div><div class="tip-dims" id="tipDims"></div></div>
 <button class="fab hidden" id="fab" onclick="togglePanel()"><i class="ph ph-sliders-horizontal"></i><span class="fab-label">Controls</span></button>
 <button class="guide-fab" id="guideFab" onclick="toggleGuide()"><i class="ph ph-book-open-text"></i><span>Build Guide</span></button>
 <div class="panel panel-l" id="panelL">
@@ -272,6 +279,8 @@
   <div class="seg"><button id="btnStainRaw" class="on" onclick="setStain('raw')">Raw Birch</button><button id="btnStainOil" onclick="setStain('oil')">Oil</button><button id="btnStainWalnut" onclick="setStain('walnut')">Walnut</button></div>
   <div class="picker-label">Feet style</div>
   <div class="seg"><button id="btnFeetPeg" onclick="setFeetStyle('peg')">Peg Legs</button><button id="btnFeetBun" class="on" onclick="setFeetStyle('bun')">Round Feet</button><button id="btnFeetRubber" onclick="setFeetStyle('rubber')">Rubber Feet</button></div>
+  <div class="picker-label">Placement</div>
+  <div class="seg"><button id="btnPlaceTable" onclick="setPlacement('table')">Nightstand</button><button id="btnPlaceFloor" class="on" onclick="setPlacement('floor')">Floor</button><button id="btnPlaceWall" onclick="setPlacement('wall')">Wall</button></div>
   </div></div>
   </div>
 
@@ -1740,6 +1749,7 @@ const _mouse=new THREE.Vector2();
 
 canvas.addEventListener('mousedown',e=>{
   _clickStartX=e.clientX;_clickStartY=e.clientY;
+  hideTooltip();
   // Reset all interaction state
   if(_dragFilter) handleDragEnd();
   _dragFilter=null;
@@ -1798,7 +1808,7 @@ canvas.addEventListener('mousemove',e=>{
     handleDragMove(e.clientX);
     return;
   }
-  // Hover cursor check — throttled to every 3rd frame for performance
+  // Hover cursor check + tooltip — throttled
   _hoverCheckTimer++;
   if(!drag && _hoverCheckTimer%3===0){
     const rect=canvas.getBoundingClientRect();
@@ -1807,11 +1817,22 @@ canvas.addEventListener('mousemove',e=>{
     _raycaster.setFromCamera(_mouse,camera);
     const hits=_raycaster.intersectObjects(scene.children,true);
     _hoverInteractive=false;
+    let hoveredPartId=null;
     for(const h of hits){
       if(h.object._isRoom) continue;
-      if(h.object._isFan||h.object._isFilterL||h.object._isFilterR){ _hoverInteractive=true; break; }
+      if(h.object._isFan||h.object._isFilterL||h.object._isFilterR){ _hoverInteractive=true; }
+      if(h.object._partId && !hoveredPartId){ hoveredPartId=h.object._partId; }
+      if(_hoverInteractive || hoveredPartId) break;
     }
     canvas.style.cursor=_hoverInteractive?'pointer':'grab';
+    // Tooltip: show after 1.2s hover on same part
+    if(hoveredPartId && hoveredPartId!==_hoverPartId){
+      hideTooltip();
+      _hoverPartId=hoveredPartId;
+      _hoverTimer=setTimeout(()=>showTooltip(hoveredPartId, e.clientX, e.clientY), 1200);
+    } else if(!hoveredPartId){
+      hideTooltip();
+    }
   }
   if(!drag) return;
   azimuth-=(e.clientX-px)*0.013;
@@ -1861,6 +1882,57 @@ for(const rotor of allRotors){
 });
 filterL.traverse(o=>{o._isFilterL=true;});
 filterR.traverse(o=>{o._isFilterR=true;});
+
+// ─── Part info for hover tooltips ───
+const _partInfo={};
+function tagPart(group, name, dims){
+  group.traverse(o=>{ if(o.isMesh) o._partId=name; });
+  _partInfo[name]={name:name, dims:dims};
+}
+tagPart(parts.top, 'Top Panel', panelW.toFixed(1)+'″ × '+(D+2*ply).toFixed(1)+'″ × '+ply+'″ birch plywood');
+tagPart(parts.bot, 'Bottom Panel', panelW.toFixed(1)+'″ × '+(D+2*ply).toFixed(1)+'″ × '+ply+'″ birch plywood');
+tagPart(front3, 'Front Panel (3-fan)', panelW.toFixed(1)+'″ × '+H.toFixed(1)+'″ × '+ply+'″ birch plywood');
+tagPart(front4, 'Front Panel (4-fan)', panelW.toFixed(1)+'″ × '+H.toFixed(1)+'″ × '+ply+'″ birch plywood');
+tagPart(back3, 'Back Panel (3-fan)', panelW.toFixed(1)+'″ × '+H.toFixed(1)+'″ × '+ply+'″ birch plywood');
+tagPart(back4, 'Back Panel (4-fan)', panelW.toFixed(1)+'″ × '+H.toFixed(1)+'″ × '+ply+'″ birch plywood');
+tagPart(altBackGroup, 'Back Panel (solid)', panelW.toFixed(1)+'″ × '+H.toFixed(1)+'″ × '+ply+'″ birch plywood');
+tagPart(altTop4, 'Top Fan Panel', panelW.toFixed(1)+'″ × '+(D+2*ply).toFixed(1)+'″ × '+ply+'″ birch plywood');
+tagPart(filterL, 'MERV 13 Filter (left)', H.toFixed(1)+'″ × '+D.toFixed(1)+'″ × '+ft+'″ (20×25×1 nominal)');
+tagPart(filterR, 'MERV 13 Filter (right)', H.toFixed(1)+'″ × '+D.toFixed(1)+'″ × '+ft+'″ (20×25×1 nominal)');
+tagPart(foamGroup, 'Foam Tape Seal', '½″ wide × 3/32″ thick — continuous ring');
+tagPart(ledgeTopGroup, 'Ledge Strips (top)', ledgeW.toFixed(2)+'″ × '+ledgeT.toFixed(2)+'″ × '+(ledgeDepth).toFixed(1)+'″');
+tagPart(ledgeBotGroup, 'Ledge Strips (bottom)', ledgeW.toFixed(2)+'″ × '+ledgeT.toFixed(2)+'″ × '+(ledgeDepth).toFixed(1)+'″');
+tagPart(legGroup, 'Feet', feetStyle==='bun'?'2.5″ tall round bun feet':feetStyle==='peg'?'0.75″ peg legs':'0.75″ rubber feet');
+// Fans get special labeling
+[front3,front4,back3,back4,altTop4].forEach(g=>{
+  g.traverse(o=>{
+    if(o.isMesh && o._isFan && !o._partId){
+      o._partId='fan';
+      _partInfo['fan']={name:'Arctic P12 Pro ARGB', dims:'120×120×27mm (4.7″) — PWM 200-1800 RPM'};
+    }
+  });
+});
+
+// Hover tooltip logic
+let _hoverTimer=null, _hoverPartId=null;
+const _tooltip=document.getElementById('partTooltip');
+const _tipName=document.getElementById('tipName');
+const _tipDims=document.getElementById('tipDims');
+
+function showTooltip(partId, x, y){
+  const info=_partInfo[partId];
+  if(!info) return;
+  _tipName.textContent=info.name;
+  _tipDims.textContent=info.dims;
+  _tooltip.style.left=x+'px';
+  _tooltip.style.top=y+'px';
+  _tooltip.classList.add('visible');
+}
+function hideTooltip(){
+  _tooltip.classList.remove('visible');
+  _hoverPartId=null;
+  if(_hoverTimer){clearTimeout(_hoverTimer);_hoverTimer=null;}
+}
 
 let filterLOut=false, filterROut=false;
 const filterLOrigin=filterL.position.clone();
@@ -2321,6 +2393,36 @@ function setFeetStyle(style){
       }
     });
   }
+}
+
+// ─── Placement presets ───
+let currentPlacement='floor';
+function setPlacement(mode){
+  if(mode===currentPlacement) return;
+  const prevOff=getPlacementOffset(currentPlacement);
+  const newOff=getPlacementOffset(mode);
+  const delta={x:newOff.x-prevOff.x, y:newOff.y-prevOff.y, z:newOff.z-prevOff.z};
+  currentPlacement=mode;
+  document.querySelectorAll('#btnPlaceTable,#btnPlaceFloor,#btnPlaceWall').forEach(b=>b.classList.remove('on'));
+  document.getElementById(mode==='table'?'btnPlaceTable':mode==='floor'?'btnPlaceFloor':'btnPlaceWall').classList.add('on');
+  scene.traverse(function(o){
+    if(o._isRoom){
+      o.position.x-=delta.x;
+      o.position.y-=delta.y;
+      o.position.z-=delta.z;
+      o.matrixAutoUpdate=true;
+      o.updateMatrixWorld(true);
+      o.matrixAutoUpdate=false;
+    }
+  });
+  _prevCx=0; _prevCz=0;
+  if(exploded) collapseView();
+}
+function getPlacementOffset(mode){
+  if(mode==='floor') return {x:0, y:0, z:0}; // default — floor
+  if(mode==='table') return {x:0, y:24, z:0}; // raise up onto nightstand (tblH=24)
+  if(mode==='wall') return {x:12, y:34, z:35}; // wall-mounted: up high, near back wall
+  return {x:0,y:0,z:0};
 }
 
 // ─── Continuous time-of-day lighting ───
