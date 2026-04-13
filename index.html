@@ -2922,9 +2922,10 @@ const doorThick=1.5, doorFrameW=2.5, doorFrameD=recessDepth>4?4:recessDepth;
 const doorColor=0xf0ebe4; // warm off-white painted door
 const doorFrameColor=0xf5f5f0;
 
-// Door panel (on room-facing side of recessed wall)
+// Door panel — sits inside the recess opening, flush with room-facing edge of recessed wall
+const doorPanelZ=recessZ-doorThick/2;
 const doorPanel=roomRoundBox(doorW-1, doorH-0.5, doorThick, 0.3, doorColor,
-  doorCenterX, floorY+doorH/2, recessZ-doorThick/2-2, 0,0,0);
+  doorCenterX, floorY+doorH/2, doorPanelZ, 0,0,0);
 doorPanel.material.roughness=0.5;
 doorPanel.castShadow=true;
 
@@ -2937,38 +2938,39 @@ const dpMat=new THREE.MeshStandardMaterial({color:0xe8e3dc,roughness:0.45,metaln
   dpHArr.forEach((ph,ri)=>{
     const pg=new THREE.BoxGeometry(dpW, ph, dpInset);
     const pm=new THREE.Mesh(pg, dpMat);
-    pm.position.set(doorCenterX+side*(doorW*0.2), dpY[ri], recessZ-doorThick-2-dpInset/2-0.01);
+    pm.position.set(doorCenterX+side*(doorW*0.2), dpY[ri], doorPanelZ-doorThick/2-dpInset/2-0.01);
     pm.castShadow=false; pm._isRoom=true; scene.add(pm);
   });
 });
 
-// Door frame (trim around opening — room-facing side)
+// Door frame (trim around opening — spans from recessed wall into room)
 const dfMat=new THREE.MeshStandardMaterial({color:doorFrameColor,roughness:0.35,metalness:0.05});
+const frameZ=recessZ-doorFrameD/2;
 // Left jamb
 const dfl=new THREE.Mesh(new THREE.BoxGeometry(doorFrameW, doorH, doorFrameD), dfMat);
-dfl.position.set(doorLeft-doorFrameW/2+0.5, floorY+doorH/2, recessZ-doorFrameD/2);
+dfl.position.set(doorLeft-doorFrameW/2+0.5, floorY+doorH/2, frameZ);
 dfl.castShadow=false; dfl._isRoom=true; scene.add(dfl);
 // Right jamb
 const dfr=new THREE.Mesh(new THREE.BoxGeometry(doorFrameW, doorH, doorFrameD), dfMat);
-dfr.position.set(doorRight+doorFrameW/2-0.5, floorY+doorH/2, recessZ-doorFrameD/2);
+dfr.position.set(doorRight+doorFrameW/2-0.5, floorY+doorH/2, frameZ);
 dfr.castShadow=false; dfr._isRoom=true; scene.add(dfr);
 // Header
 const dfh=new THREE.Mesh(new THREE.BoxGeometry(doorW+doorFrameW*2-1, doorFrameW, doorFrameD), dfMat);
-dfh.position.set(doorCenterX, floorY+doorH+doorFrameW/2-0.5, recessZ-doorFrameD/2);
+dfh.position.set(doorCenterX, floorY+doorH+doorFrameW/2-0.5, frameZ);
 dfh.castShadow=false; dfh._isRoom=true; scene.add(dfh);
 
 // Door knob (round, brushed nickel — room-facing side)
 const knobMat=new THREE.MeshStandardMaterial({color:0xaaaaaa,roughness:0.25,metalness:0.8});
 const knobGeo=new THREE.SphereGeometry(1.2, 16, 12);
 const knob=new THREE.Mesh(knobGeo, knobMat);
-knob.position.set(doorCenterX+doorW*0.35, floorY+36, recessZ-doorThick-2-1.2);
+knob.position.set(doorCenterX+doorW*0.35, floorY+36, doorPanelZ-doorThick/2-1.2);
 knob.castShadow=false; knob._isRoom=true; scene.add(knob);
 // Knob base plate
 const plateMat=new THREE.MeshStandardMaterial({color:0xbbbbbb,roughness:0.3,metalness:0.7});
 const plateGeo=new THREE.CylinderGeometry(1.8, 1.8, 0.3, 16);
 plateGeo.rotateX(Math.PI/2);
 const plate=new THREE.Mesh(plateGeo, plateMat);
-plate.position.set(doorCenterX+doorW*0.35, floorY+36, recessZ-doorThick-2-0.2);
+plate.position.set(doorCenterX+doorW*0.35, floorY+36, doorPanelZ-doorThick/2-0.2);
 plate.castShadow=false; plate._isRoom=true; scene.add(plate);
 
 // Collect all back wall + recess meshes for fading
@@ -3014,6 +3016,49 @@ const wallDepth=127; // Z span from oppWallZ to 49
 const wallHeight=80;
 const rightWall=roomBox(0.5, wallHeight, wallDepth, 0xd8d4ce, sideWallX, floorY+wallHeight/2, -15, 0,0,0);
 const sideBaseboard=roomBox(0.6, 3, wallDepth, 0xc0bbb4, sideWallX-0.5, floorY+1.5, -15, 0,0,0);
+
+// ─── Bifold closet doors on right wall (becomes -X after flip) ───
+{
+  const closetW=48, closetH=80; // 4-foot wide bifold opening
+  const closetX=sideWallX-0.5; // flush against wall
+  const closetZ=oppWallZ+closetW/2+4; // as far -Z as possible, 4" from TV wall
+  const bifoldColor=0xf0ebe4;
+  const bifoldMat=new THREE.MeshStandardMaterial({color:bifoldColor,roughness:0.5,metalness:0.02});
+  const panelW2=closetW/4; // 4 panels (2 per side)
+  const panelThick=1.2;
+  // 4 bifold panels — slightly angled to show they're bifold
+  for(let i=0;i<4;i++){
+    const pz=closetZ-closetW/2+panelW2*(i+0.5);
+    const panel=roomRoundBox(panelThick, closetH-1, panelW2-0.5, 0.3, bifoldColor,
+      closetX-panelThick/2, floorY+closetH/2, pz, 0,0,0);
+    panel.material.roughness=0.5;
+    // Add raised panel detail (2 panels per door leaf)
+    const rpH1=closetH*0.35, rpH2=closetH*0.45;
+    const rpW=panelW2*0.7;
+    const rpMat=new THREE.MeshStandardMaterial({color:0xe8e3dc,roughness:0.45,metalness:0.02});
+    const rp1=new THREE.Mesh(new THREE.BoxGeometry(0.3, rpH1, rpW), rpMat);
+    rp1.position.set(closetX-panelThick-0.16, floorY+closetH*0.24, pz);
+    rp1.castShadow=false; rp1._isRoom=true; scene.add(rp1);
+    const rp2=new THREE.Mesh(new THREE.BoxGeometry(0.3, rpH2, rpW), rpMat);
+    rp2.position.set(closetX-panelThick-0.16, floorY+closetH*0.68, pz);
+    rp2.castShadow=false; rp2._isRoom=true; scene.add(rp2);
+  }
+  // Moulding / trim around the opening
+  const trimMat=new THREE.MeshStandardMaterial({color:0xf5f5f0,roughness:0.35,metalness:0.05});
+  const trimW=2.5, trimD=1;
+  // Top header
+  const trimTop=new THREE.Mesh(new THREE.BoxGeometry(trimD, trimW, closetW+trimW*2), trimMat);
+  trimTop.position.set(closetX-trimD/2, floorY+closetH+trimW/2, closetZ);
+  trimTop.castShadow=false; trimTop._isRoom=true; scene.add(trimTop);
+  // Left jamb
+  const trimL=new THREE.Mesh(new THREE.BoxGeometry(trimD, closetH, trimW), trimMat);
+  trimL.position.set(closetX-trimD/2, floorY+closetH/2, closetZ-closetW/2-trimW/2);
+  trimL.castShadow=false; trimL._isRoom=true; scene.add(trimL);
+  // Right jamb
+  const trimR=new THREE.Mesh(new THREE.BoxGeometry(trimD, closetH, trimW), trimMat);
+  trimR.position.set(closetX-trimD/2, floorY+closetH/2, closetZ+closetW/2+trimW/2);
+  trimR.castShadow=false; trimR._isRoom=true; scene.add(trimR);
+}
 
 // ─── Left side wall with window (near the bed) ───
 const leftWallX=-81;
