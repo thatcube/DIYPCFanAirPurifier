@@ -3014,6 +3014,40 @@ screen.position.set(tvCenterX, tvCenterY, tvZ+tvD/2+0.02);
 screen._isRoom=true;
 scene.add(screen);
 
+// ─── Mini split indoor unit (on TV wall, near closet wall, 1ft from ceiling) ───
+{
+  const msW=32, msH=11, msD=8; // typical wall-mount unit dimensions
+  const msX=sideWallX-12; // 1 foot from closet door wall (before flip)
+  const msY=floorY+80-12-msH/2; // 1 foot from ceiling
+  const msZ=oppWallZ+0.5+msD/2; // flush against TV wall
+  const msMat=new THREE.MeshStandardMaterial({color:0xf0f0f0,roughness:0.3,metalness:0.05});
+  // Main body — rounded rectangle
+  const msBody=roomRoundBox(msW, msH, msD, 2, 0xf0f0f0, msX, msY, msZ, 0,0,0);
+  msBody.material.roughness=0.3;
+  msBody.material.metalness=0.05;
+  // Bottom air vent — darker slit
+  const ventMat=new THREE.MeshStandardMaterial({color:0x333333,roughness:0.5});
+  const vent=new THREE.Mesh(new THREE.BoxGeometry(msW-4, 1.5, 0.3), ventMat);
+  vent.position.set(msX, msY-msH/2+2, msZ+msD/2+0.16);
+  vent._isRoom=true; scene.add(vent);
+  // Horizontal louver lines on the vent
+  for(let i=0;i<3;i++){
+    const louver=new THREE.Mesh(new THREE.BoxGeometry(msW-6, 0.15, 0.4), msMat);
+    louver.position.set(msX, msY-msH/2+1.2+i*0.5, msZ+msD/2+0.2);
+    louver._isRoom=true; scene.add(louver);
+  }
+  // Small LED indicator dot
+  const ledMat=new THREE.MeshStandardMaterial({color:0x00cc44,emissive:0x00cc44,emissiveIntensity:0.5});
+  const led=new THREE.Mesh(new THREE.SphereGeometry(0.25,8,6), ledMat);
+  led.position.set(msX+msW/2-3, msY-msH/2+3, msZ+msD/2+0.16);
+  led._isRoom=true; scene.add(led);
+  // Brand logo area (subtle lighter rectangle)
+  const logoArea=new THREE.Mesh(new THREE.BoxGeometry(8,2,0.1),
+    new THREE.MeshStandardMaterial({color:0xfafafa,roughness:0.2}));
+  logoArea.position.set(msX, msY+msH/2-3, msZ+msD/2+0.06);
+  logoArea._isRoom=true; scene.add(logoArea);
+}
+
 // ─── Right side wall (solid) ───
 const sideWallX=51;
 const wallDepth=127; // Z span from oppWallZ to 49
