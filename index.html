@@ -2924,7 +2924,7 @@ const doorFrameColor=0xf5f5f0;
 
 // Door panel — sits inside the recess opening, flush with room-facing edge of recessed wall
 const doorPanelZ=recessZ-doorThick/2;
-const doorPanel=roomRoundBox(doorW-1, doorH-0.5, doorThick, 0.3, doorColor,
+const doorPanel=roomBox(doorW-1, doorH-0.5, doorThick, doorColor,
   doorCenterX, floorY+doorH/2, doorPanelZ, 0,0,0);
 doorPanel.material.roughness=0.5;
 doorPanel.castShadow=true;
