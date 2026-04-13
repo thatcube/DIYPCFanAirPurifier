@@ -3521,28 +3521,22 @@ function animate(){
   camera.position.z=radius*Math.sin(polar)*Math.cos(azimuth);
   camera.lookAt(0,0,0);
 
-  // Auto-fade room objects.
-  // Exterior walls: always semi-transparent (see through from outside).
-  // Interior objects between camera and purifier: fade to invisible when close.
+  // Auto-fade room objects near the camera so they don't block the purifier view.
+  // Simple distance-based: if camera is close to any room object, fade it out.
   const cx=camera.position.x, cy=camera.position.y, cz=camera.position.z;
   if(!_prevCx || Math.abs(cx-_prevCx)>0.3 || Math.abs(cz-_prevCz)>0.3){
   _prevCx=cx; _prevCz=cz;
-  const fadeRange=30;
+  const fadeNear=15; // fully invisible within this distance
+  const fadeFar=40; // start fading at this distance
   for(const m of fadingWalls){
     const ox=m.position.x, oy=m.position.y, oz=m.position.z;
-    const dx=cx-ox, dy=cy-oy, dz=cz-oz;
-    const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
-    // Is this object between camera and purifier?
-    const toOriginX=-cx, toOriginZ=-cz;
-    const toObjX=ox-cx, toObjZ=oz-cz;
-    const dot=toObjX*toOriginX+toObjZ*toOriginZ;
-    const between=dot>0;
-    if(between && dist<fadeRange){
-      // Blocking the view — fade to nearly invisible
-      m.material.opacity=Math.max(0.02, (dist/fadeRange)*0.15);
+    const dx=cx-ox, dz=cz-oz;
+    const dist=Math.sqrt(dx*dx+dz*dz); // XZ distance only (ignore Y so floor doesn't fade)
+    if(dist<fadeFar){
+      const t=Math.max(0, (dist-fadeNear)/(fadeFar-fadeNear)); // 0 at fadeNear, 1 at fadeFar
+      m.material.opacity=Math.max(0.03, t);
     } else {
-      // Not blocking — exterior walls stay semi-transparent, rest opaque
-      m.material.opacity=m._isWall?0.2:0.85;
+      m.material.opacity=1;
     }
   }
   }
