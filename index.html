@@ -301,6 +301,7 @@
   <div class="toggle-row"><span class="toggle-label">Isolate purifier</span><div class="toggle-switch" id="togIsolate" onclick="toggleIsolate()"></div></div>
   <div class="toggle-row"><span class="toggle-label">Dimensions</span><div class="toggle-switch" id="togDims" onclick="toggleDimensions()"></div></div>
   <div class="toggle-row"><span class="toggle-label">X-ray mode</span><div class="toggle-switch" id="togXray" onclick="toggleXray()"></div></div>
+  <div class="toggle-row"><span class="toggle-label">Show FPS</span><div class="toggle-switch" id="togFps" onclick="toggleFps()"></div></div>
   </div></div>
   </div>
 
@@ -2371,6 +2372,12 @@ function setRGBColor(hex){
 
 // ─── X-ray transparency toggle ───
 let xrayOn=false;
+function toggleFps(){
+  const el=document.getElementById('fps');
+  el.classList.toggle('show');
+  document.getElementById('togFps').classList.toggle('on', el.classList.contains('show'));
+}
+
 function toggleXray(){
   xrayOn=!xrayOn;
   document.getElementById('togXray').classList.toggle('on',xrayOn);
@@ -3106,7 +3113,7 @@ document.addEventListener('keydown',e=>{
     if(e.key==='h'||e.key==='H') return; // don't re-trigger
     return; // consume the keypress that restored UI
   }
-  if(e.key==='f'||e.key==='F') document.getElementById('fps').classList.toggle('show');
+  if(e.key==='f'||e.key==='F') toggleFps();
   if(e.key==='a'||e.key==='A') axesGroup.visible=!axesGroup.visible;
   if(e.key==='l'||e.key==='L') document.querySelector('.panel-r').classList.toggle('collapsed');
   if(e.key==='h'||e.key==='H'){ document.getElementById('shortcutsOverlay').classList.remove('visible'); document.body.classList.add('zen'); }
