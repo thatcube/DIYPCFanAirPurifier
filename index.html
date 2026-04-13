@@ -531,7 +531,7 @@ scene.fog = new THREE.FogExp2(0xd4dce8, 0.0015);
 const camera = new THREE.PerspectiveCamera(42,1,0.1,500);
 // Daytime lighting — soft and even
 scene.add(new THREE.AmbientLight(0xffffff,0.22));
-const key=new THREE.DirectionalLight(0xfff8f0,0.55); key.position.set(-95,38,0); // from outside the window
+const key=new THREE.DirectionalLight(0xfff8f0,0.55); key.position.set(95,38,0); // from outside the window (flipped)
 key.castShadow=true; key.shadow.mapSize.set(_isMobile?1024:2048, _isMobile?1024:2048);
 key.shadow.bias=-0.0005; key.shadow.normalBias=0.04;
 key.shadow.radius=_isMobile?3:6; key.shadow.blurSamples=_isMobile?8:16;
@@ -2421,7 +2421,7 @@ function setPlacement(mode){
 function getPlacementOffset(mode){
   if(mode==='floor') return {x:0, y:0, z:0}; // default — floor
   if(mode==='table') return {x:0, y:24, z:0}; // raise up onto nightstand (tblH=24)
-  if(mode==='wall') return {x:12, y:34, z:35}; // wall-mounted: up high, near back wall
+  if(mode==='wall') return {x:0, y:30, z:55}; // wall-mounted on TV wall, ~30" up, near the wall
   return {x:0,y:0,z:0};
 }
 
@@ -2590,7 +2590,7 @@ function applyIsolate(on){
     if(_savedClear) renderer.setClearColor(_savedClear,1);
     scene.fog.density=_savedFog||0.0015;
     scene.children.forEach(c=>{ if(c.isAmbientLight) c.intensity=_savedLights.ambient; });
-    key.position.set(-95,38,0);
+    key.position.set(95,38,0);
     fill.position.set(-10,12,-12);
     rim.position.set(-6,15,-18);
     bounce.position.set(0,-10,8);
@@ -3256,6 +3256,15 @@ const axLblZ=makeTextSprite('Z','#6688ff'); axLblZ.position.set(0,0,11); axLblZ.
 axesGroup.visible=false;
 scene.add(axesGroup);
 
+// Mirror room 180° around Y axis so bed/TV/window are on the opposite side
+scene.traverse(obj=>{
+  if(obj._isRoom){
+    obj.position.x=-obj.position.x;
+    obj.position.z=-obj.position.z;
+    obj.rotation.y=obj.rotation.y+Math.PI;
+  }
+});
+
 // Freeze world matrices on all static objects (room + purifier structure)
 scene.traverse(obj=>{
   if(obj.isMesh && !obj.isPoints){
@@ -3426,21 +3435,21 @@ function animate(){
   if(!_prevCx || Math.abs(cx-_prevCx)>0.3 || Math.abs(cz-_prevCz)>0.3){
   _prevCx=cx; _prevCz=cz;
   const fadeMin=0.06;
-  // Back wall (Z=49) + recess: fade based on camera proximity
-  const backDist=49-cz;
+  // Back wall (was Z=49, now Z=-49): fade based on camera proximity
+  const backDist=cz+49;
   const backAlpha=backDist<25?Math.max(fadeMin,backDist/25):1;
   backWallParts.forEach(m=>{m.material.opacity=backAlpha;});
   doorPanel.material.opacity=backAlpha;
-  // Opposite wall: fade when camera approaches
-  const frontDist=cz-oppWallZ;
+  // Opposite/TV wall (was Z=-78, now Z=78): fade when camera approaches
+  const frontDist=78-cz;
   const frontAlpha=frontDist<25?Math.max(fadeMin,frontDist/25):1;
   oppWall.material.opacity=frontAlpha; oppBaseboard.material.opacity=frontAlpha;
-  // Side wall (X=60): fade when camera approaches
-  const rightDist=51-cx;
+  // Side wall (was X=51, now X=-51): fade when camera approaches
+  const rightDist=cx+51;
   const rightAlpha=rightDist<25?Math.max(fadeMin,rightDist/25):1;
   rightWall.material.opacity=rightAlpha; sideBaseboard.material.opacity=rightAlpha;
-  // Left wall (X=-90): fade when camera approaches
-  const leftDist=cx+81;
+  // Left wall (was X=-81, now X=81): fade when camera approaches
+  const leftDist=81-cx;
   const leftAlpha=leftDist<25?Math.max(fadeMin,leftDist/25):1;
   leftWallBelow.material.opacity=leftAlpha; leftWallAbove.material.opacity=leftAlpha;
   leftWallFront.material.opacity=leftAlpha; leftWallBack.material.opacity=leftAlpha;
