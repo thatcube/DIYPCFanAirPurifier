@@ -9,7 +9,7 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
     #viewer { width: 100%; height: 100%; position: relative; }
-    canvas { width: 100%; height: 100%; display: block; will-change: transform; }
+    canvas { width: 100%; height: 100%; display: block; will-change: transform; cursor: grab; }
     .hint { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 12px; color: rgba(255,255,255,0.5); pointer-events: none; }
     .panel { position: absolute; top: 12px; background: rgba(255,255,255,0.06); backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); border-radius: 22px; padding: 12px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 8px 40px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.08), inset 0 0 0 0.5px rgba(255,255,255,0.3), inset 0 0 18px 0 rgba(255,255,255,0.08), inset 0 1px 1px rgba(255,255,255,0.4), inset 0 -1px 1px rgba(255,255,255,0.1); }
     .panel::before { content: ''; position: absolute; inset: 0; border-radius: 22px; filter: url(#glass-refract); background: rgba(255,255,255,0.015); mix-blend-mode: overlay; opacity: 0.6; pointer-events: none; }
@@ -568,91 +568,129 @@ const FAN_BLACK={frame:0x1a1a1a,hub:0x111111,cap:0x181818,blade:0x1e1e1e};
 const FAN_WHITE={frame:0xe8e8e8,hub:0xdddddd,cap:0xd0d0d0,blade:0xf0f0f0};
 const BLADE_FROSTED={color:0xffffff,opacity:0.3,shininess:5};
 
-// ─── Procedural birch plywood texture (1024×1024) ───
-function makeBirchTexture(w,h,seed){
+// ─── Birch plywood texture (procedural, higher quality) ───
+function makeBirchTexture(size,seed){
   const cvs=document.createElement('canvas');
-  cvs.width=w||1024; cvs.height=h||1024;
+  cvs.width=cvs.height=size||512;
   const ctx=cvs.getContext('2d');
   const W=cvs.width, H=cvs.height;
   let s=seed||1;
   function rand(){s=(s*16807+0)%2147483647;return(s&0x7fffffff)/0x7fffffff;}
 
-  ctx.fillStyle='#f0e4cc';
+  // Warm base — varies by seed for panel diversity
+  const baseColors=['#e8d5b0','#e5d0a8','#ecdcb8','#e0c89e'];
+  ctx.fillStyle=baseColors[Math.floor(rand()*baseColors.length)];
   ctx.fillRect(0,0,W,H);
 
-  // Broad soft color bands
-  for(let i=0;i<8;i++){
-    const y=rand()*H, bH=30+rand()*80;
-    ctx.fillStyle=rand()>0.5
-      ?`rgba(245,235,210,${0.3+rand()*0.3})`
-      :`rgba(210,185,145,${0.15+rand()*0.2})`;
-    ctx.fillRect(0,y,W,bH);
+  // Large soft color bands — vary count and prominence
+  const bandCount=15+Math.floor(rand()*15);
+  for(let i=0;i<bandCount;i++){
+    const y=rand()*H;
+    const h=20+rand()*80;
+    const lightness=rand()>0.5?'rgba(235,218,185,':'rgba(200,175,135,';
+    ctx.fillStyle=lightness+(0.15+rand()*0.25)+')';
+    ctx.fillRect(0,y,W,h);
   }
 
-  // Heavy grain lines
-  for(let i=0;i<350;i++){
-    const y=rand()*H;
-    ctx.strokeStyle=rand()>0.4
-      ?`rgba(160,120,60,${0.25+rand()*0.35})`
-      :`rgba(190,155,100,${0.2+rand()*0.25})`;
-    ctx.lineWidth=0.3+rand()*2.5;
-    ctx.beginPath(); ctx.moveTo(0,y);
-    let cx=0;
-    while(cx<W){cx+=8+rand()*30;ctx.lineTo(cx,y+(rand()-0.5)*4);}
+  // Curved grain lines — the key to looking natural
+  for(let i=0;i<400;i++){
+    const baseY=rand()*H;
+    const amplitude=2+rand()*8;
+    const frequency=0.005+rand()*0.015;
+    const phase=rand()*Math.PI*2;
+    const isDark=rand()>0.4;
+    ctx.strokeStyle=isDark
+      ?`rgba(150,115,60,${0.15+rand()*0.25})`
+      :`rgba(180,150,100,${0.1+rand()*0.15})`;
+    ctx.lineWidth=0.5+rand()*2;
+    ctx.beginPath();
+    ctx.moveTo(0,baseY+Math.sin(phase)*amplitude);
+    for(let x=0;x<W;x+=3){
+      ctx.lineTo(x, baseY+Math.sin(x*frequency+phase)*amplitude+(rand()-0.5)*1.5);
+    }
     ctx.stroke();
   }
 
-  // Dense grain bundles
-  for(let b=0;b<12;b++){
-    const baseY=rand()*H;
-    for(let i=0;i<5+Math.floor(rand()*10);i++){
-      const y=baseY+i*1.5+(rand()-0.5)*2;
-      ctx.strokeStyle=`rgba(140,100,40,${0.15+rand()*0.2})`;
-      ctx.lineWidth=0.3+rand()*0.8;
-      ctx.beginPath(); ctx.moveTo(0,y);
-      let cx=0;
-      while(cx<W){cx+=5+rand()*20;ctx.lineTo(cx,y+(rand()-0.5)*1.5);}
+  // Tight grain clusters (groups of fine lines close together)
+  for(let g=0;g<10;g++){
+    const cy=rand()*H;
+    const count=4+Math.floor(rand()*12);
+    for(let i=0;i<count;i++){
+      const y=cy+i*(1+rand()*1.5);
+      const freq=0.008+rand()*0.01;
+      const ph=rand()*6;
+      ctx.strokeStyle=`rgba(140,105,50,${0.08+rand()*0.12})`;
+      ctx.lineWidth=0.3+rand()*0.5;
+      ctx.beginPath();
+      ctx.moveTo(0,y);
+      for(let x=0;x<W;x+=4){
+        ctx.lineTo(x, y+Math.sin(x*freq+ph)*3+(rand()-0.5)*0.8);
+      }
       ctx.stroke();
     }
   }
 
-  // Dark mineral streaks
-  for(let k=0;k<4+Math.floor(rand()*4);k++){
+  // Occasional darker streaks
+  for(let i=0;i<3+Math.floor(rand()*3);i++){
     const y=rand()*H;
-    ctx.strokeStyle=`rgba(100,70,25,${0.3+rand()*0.3})`;
-    ctx.lineWidth=1+rand()*2;
-    ctx.beginPath(); ctx.moveTo(0,y);
-    let cx=0;
-    while(cx<W){cx+=15+rand()*50;ctx.lineTo(cx,y+(rand()-0.5)*6);}
+    ctx.strokeStyle=`rgba(120,85,35,${0.2+rand()*0.15})`;
+    ctx.lineWidth=1+rand()*2.5;
+    const freq=0.003+rand()*0.008;
+    const ph=rand()*6;
+    ctx.beginPath();
+    ctx.moveTo(0,y);
+    for(let x=0;x<W;x+=4){
+      ctx.lineTo(x, y+Math.sin(x*freq+ph)*6+(rand()-0.5)*2);
+    }
     ctx.stroke();
   }
 
-  // Knots
-  for(let k=0;k<1+Math.floor(rand()*3);k++){
-    const kx=rand()*W, ky=rand()*H, kr=12+rand()*25;
-    const grad=ctx.createRadialGradient(kx,ky,0,kx,ky,kr);
-    grad.addColorStop(0,'rgba(120,80,30,0.5)');
-    grad.addColorStop(0.3,'rgba(140,100,50,0.35)');
-    grad.addColorStop(0.7,'rgba(170,140,90,0.15)');
-    grad.addColorStop(1,'rgba(0,0,0,0)');
+  // Knot with growth rings — only 30% chance, but dramatic when present
+  if(rand()<0.3){
+    const kx=W*(0.2+rand()*0.6), ky=H*(0.2+rand()*0.6);
+    const kr=20+rand()*50; // highly variable size
+    const angle=rand()*0.5-0.25;
+    // Dark center
+    const grad=ctx.createRadialGradient(kx,ky,0,kx,ky,kr*0.35);
+    grad.addColorStop(0,'rgba(80,50,15,0.5)');
+    grad.addColorStop(1,'rgba(110,75,30,0.3)');
     ctx.fillStyle=grad;
-    ctx.beginPath(); ctx.ellipse(kx,ky,kr,kr*0.6,0,0,Math.PI*2); ctx.fill();
-    for(let r=0;r<4;r++){
-      const rr=kr*(0.3+r*0.2);
-      ctx.strokeStyle=`rgba(110,75,25,${0.15+rand()*0.15})`;
-      ctx.lineWidth=0.5+rand();
-      ctx.beginPath(); ctx.ellipse(kx,ky,rr,rr*0.6,0,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(kx,ky,kr*0.35,kr*0.2,angle,0,Math.PI*2); ctx.fill();
+    // Growth rings — concentric ellipses getting lighter outward
+    for(let r=0;r<8;r++){
+      const rr=kr*(0.2+r*0.1);
+      const alpha=0.25-r*0.025;
+      ctx.strokeStyle=`rgba(120,85,35,${Math.max(0.04,alpha)})`;
+      ctx.lineWidth=0.8+rand()*1.2;
+      ctx.beginPath();
+      ctx.ellipse(kx,ky,rr,rr*0.55,angle+(rand()-0.5)*0.1,0,Math.PI*2);
+      ctx.stroke();
+    }
+    // Grain lines curve around the knot
+    for(let i=0;i<15;i++){
+      const offset=(rand()-0.5)*kr*1.5;
+      const y=ky+offset;
+      ctx.strokeStyle=`rgba(155,120,65,${0.08+rand()*0.1})`;
+      ctx.lineWidth=0.3+rand()*0.8;
+      ctx.beginPath();
+      for(let x=0;x<W;x+=3){
+        const dx=x-kx, dy=y-ky;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        const deflect=dist<kr*1.2 ? Math.sign(offset)*kr*0.4*Math.exp(-dist*dist/(kr*kr*0.8)) : 0;
+        ctx.lineTo(x, y+deflect+(rand()-0.5)*0.5);
+      }
+      ctx.stroke();
     }
   }
 
-  // Pale highlights
-  for(let i=0;i<25;i++){
+  // Subtle highlights
+  for(let i=0;i<30;i++){
     const y=rand()*H;
-    ctx.strokeStyle=`rgba(250,245,230,${0.12+rand()*0.15})`;
-    ctx.lineWidth=2+rand()*5;
-    ctx.beginPath(); ctx.moveTo(0,y);
-    let cx=0;
-    while(cx<W){cx+=20+rand()*50;ctx.lineTo(cx,y+(rand()-0.5)*2);}
+    ctx.strokeStyle=`rgba(245,235,215,${0.06+rand()*0.1})`;
+    ctx.lineWidth=2+rand()*6;
+    ctx.beginPath();
+    ctx.moveTo(0,y);
+    for(let x=0;x<W;x+=8) ctx.lineTo(x, y+(rand()-0.5)*2);
     ctx.stroke();
   }
 
@@ -660,14 +698,33 @@ function makeBirchTexture(w,h,seed){
   tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
   return tex;
 }
-const birchTex=makeBirchTexture(512,512,42);
-const birchTexB=makeBirchTexture(512,512,137);
+const birchTexPool=[];
+for(let i=0;i<6;i++) birchTexPool.push(makeBirchTexture(1024, 42+i*73));
+let _birchTexIdx=0;
+
+// Normalize UVs on an ExtrudeGeometry so texture maps 0-1 across the face
+function normalizeUVs(geo){
+  const uv=geo.attributes.uv;
+  if(!uv) return;
+  let minU=Infinity,maxU=-Infinity,minV=Infinity,maxV=-Infinity;
+  for(let i=0;i<uv.count;i++){
+    const u=uv.getX(i), v=uv.getY(i);
+    if(u<minU) minU=u; if(u>maxU) maxU=u;
+    if(v<minV) minV=v; if(v>maxV) maxV=v;
+  }
+  const du=maxU-minU||1, dv=maxV-minV||1;
+  for(let i=0;i<uv.count;i++){
+    uv.setXY(i, (uv.getX(i)-minU)/du, (uv.getY(i)-minV)/dv);
+  }
+  uv.needsUpdate=true;
+}
 
 const allBirchMats=[];
-function birchMat(repeatX,repeatY,useB){
-  const t=(useB?birchTexB:birchTex).clone();
+function birchMat(){
+  const t=birchTexPool[_birchTexIdx%birchTexPool.length].clone();
+  _birchTexIdx++;
   t.needsUpdate=true;
-  t.repeat.set(repeatX||1,repeatY||1);
+  t.repeat.set(1,1);
   const m=new THREE.MeshPhongMaterial({map:t,color:0xd2b48c,shininess:18,side:THREE.DoubleSide});
   allBirchMats.push(m);
   return m;
@@ -697,7 +754,8 @@ function makeCapPanel(w,h,d,isTop){
   // Rotate so extrude axis (Z) becomes Y
   capGeo.rotateX(Math.PI/2);
   if(!isTop) capGeo.rotateX(Math.PI);
-  const capMesh=new THREE.Mesh(capGeo,birchMat(w/12,d/12));
+  normalizeUVs(capGeo);
+  const capMesh=new THREE.Mesh(capGeo,birchMat());
   g.add(capMesh);
 
   return g;
@@ -736,7 +794,8 @@ function makeFanPanel(flip, nFans){
   }
   const panelGeo=new THREE.ExtrudeGeometry(shape,{depth:ply-2*bvT,bevelEnabled:true,bevelSize:bv,bevelThickness:bvT,bevelSegments:bvSeg,curveSegments:48});
   panelGeo.translate(0,0,-(ply-2*bvT)/2);
-  const panel=new THREE.Mesh(panelGeo,birchMat(panelW/24,H/24));
+  normalizeUVs(panelGeo);
+  const panel=new THREE.Mesh(panelGeo,birchMat());
   g.add(panel);
 
   // Fans mounted inside the box, flush against plywood inner face
@@ -927,7 +986,8 @@ const altBackGroup=(function(){
   shape.lineTo(-(panelW/2-bv),-(H/2-bv));
   const geo=new THREE.ExtrudeGeometry(shape,{depth:ply-2*bvT,bevelEnabled:true,bevelSize:bv,bevelThickness:bvT,bevelSegments:bvSeg,curveSegments:32});
   geo.translate(0,0,-(ply-2*bvT)/2);
-  g.add(new THREE.Mesh(geo,birchMat(panelW/24,H/24)));
+  normalizeUVs(geo);
+  g.add(new THREE.Mesh(geo,birchMat()));
   return g;
 })();
 altBackGroup.position.set(0,0,D/2+ply/2);
@@ -964,7 +1024,8 @@ function makeAltTopPanel(nFans){
   panelGeo.translate(0,0,-(ply-2*bvT)/2);
   // Rotate so the panel lies flat: shape XY → XZ, extrude Z → Y
   panelGeo.rotateX(-Math.PI/2);
-  g.add(new THREE.Mesh(panelGeo,birchMat(topW/24,topD/24)));
+  normalizeUVs(panelGeo);
+  g.add(new THREE.Mesh(panelGeo,birchMat()));
 
   // Fans mounted on top, pointing upward
   for(let i=0;i<nFans;i++){
@@ -1396,13 +1457,13 @@ const ledgeBotGroup=new THREE.Group();
 for(let sx of[-1,1]){
   const lt=new THREE.Mesh(
     new THREE.BoxGeometry(ledgeW,ledgeT,ledgeDepth),
-    birchMat(ledgeW/6,ledgeDepth/12,true)
+    birchMat()
   );
   lt.position.set(sx*ledgeX, H/2-ledgeT/2, 0);
   ledgeTopGroup.add(lt);
   const lb=new THREE.Mesh(
     new THREE.BoxGeometry(ledgeW,ledgeT,ledgeDepth),
-    birchMat(ledgeW/6,ledgeDepth/12,true)
+    birchMat()
   );
   lb.position.set(sx*ledgeX, -(H/2-ledgeT/2), 0);
   ledgeBotGroup.add(lb);
@@ -1420,7 +1481,7 @@ const legInset=0.4; // inset from panel edges
 const legY=-(H/2+ply+legH/2);
 const legGroup=new THREE.Group();
 const allLegMeshes=[];
-const woodLegMat=birchMat(0.5,0.5);
+const woodLegMat=birchMat();
 const rubberMat=new THREE.MeshPhongMaterial({color:0x2a2a2a,shininess:5});
 
 // Peg leg geometry (tapered cylinder)
@@ -1673,23 +1734,212 @@ function toggleFilter(){
 
 // ─── Camera controls ───
 let drag=false,px=0,py=0,polar=1.05,azimuth=-0.5+Math.PI,radius=65;
-canvas.addEventListener('mousedown',e=>{drag=true;px=e.clientX;py=e.clientY;});
-canvas.addEventListener('touchstart',e=>{drag=true;px=e.touches[0].clientX;py=e.touches[0].clientY;},{passive:true});
-window.addEventListener('mouseup',()=>drag=false);
-window.addEventListener('touchend',()=>drag=false);
+let _clickStartX=0,_clickStartY=0;
+const _raycaster=new THREE.Raycaster();
+const _mouse=new THREE.Vector2();
+
+canvas.addEventListener('mousedown',e=>{
+  _clickStartX=e.clientX;_clickStartY=e.clientY;
+  _dragFilter=null;
+  // Try to start filter drag — but don't commit until mousemove confirms it's a drag
+  _pendingFilterDrag=handleDragStart(e.clientX,e.clientY);
+  drag=true; canvas.style.cursor='grabbing';
+  px=e.clientX;py=e.clientY;
+});
+canvas.addEventListener('touchstart',e=>{
+  px=e.touches[0].clientX;py=e.touches[0].clientY;
+  _clickStartX=px;_clickStartY=py;
+  _dragFilter=null;
+  _pendingFilterDrag=handleDragStart(px,py);
+  drag=true;
+},{passive:true});
+window.addEventListener('mouseup',e=>{
+  drag=false;
+  canvas.style.cursor='grab';
+  const wasDragging=_dragFilter && !_pendingFilterDrag;
+  if(wasDragging){
+    handleDragEnd();
+  } else {
+    _dragFilter=null;
+    if(Math.abs(e.clientX-_clickStartX)<4 && Math.abs(e.clientY-_clickStartY)<4){
+      handleClick(e.clientX,e.clientY);
+    }
+  }
+  _pendingFilterDrag=false;
+});
+window.addEventListener('touchend',e=>{
+  drag=false;
+  const wasDragging=_dragFilter && !_pendingFilterDrag;
+  if(wasDragging){
+    handleDragEnd();
+  } else {
+    _dragFilter=null;
+    if(e.changedTouches.length>0){
+      const t=e.changedTouches[0];
+      if(Math.abs(t.clientX-_clickStartX)<10 && Math.abs(t.clientY-_clickStartY)<10) handleClick(t.clientX,t.clientY);
+    }
+  }
+  _pendingFilterDrag=false;
+});
+let _pendingFilterDrag=false;
 canvas.addEventListener('mousemove',e=>{
-  if(!drag)return;
+  if(_pendingFilterDrag && _dragFilter && Math.abs(e.clientX-_clickStartX)>6){
+    // Confirmed drag — stop orbit, start filter drag
+    drag=false;
+    _pendingFilterDrag=false;
+    canvas.style.cursor='ew-resize';
+  }
+  if(_dragFilter && !_pendingFilterDrag){
+    handleDragMove(e.clientX);
+    return;
+  }
+  if(!drag){
+    // Hover cursor: check if over interactive object
+    const rect=canvas.getBoundingClientRect();
+    _mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
+    _mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
+    _raycaster.setFromCamera(_mouse,camera);
+    const hits=_raycaster.intersectObjects(scene.children,true);
+    canvas.style.cursor=(hits.length>0 && (hits[0].object._isFan||hits[0].object._isFilterL||hits[0].object._isFilterR))?'pointer':'grab';
+    return;
+  }
   azimuth-=(e.clientX-px)*0.013;
   polar=Math.max(0.1,Math.min(Math.PI-0.1,polar-(e.clientY-py)*0.013));
   px=e.clientX;py=e.clientY;
 });
 canvas.addEventListener('touchmove',e=>{
+  if(_pendingFilterDrag && _dragFilter && Math.abs(e.touches[0].clientX-_clickStartX)>10){
+    drag=false;
+    _pendingFilterDrag=false;
+  }
+  if(_dragFilter && !_pendingFilterDrag){
+    handleDragMove(e.touches[0].clientX);
+    return;
+  }
   if(!drag)return;
   azimuth-=(e.touches[0].clientX-px)*0.013;
   polar=Math.max(0.1,Math.min(Math.PI-0.1,polar-(e.touches[0].clientY-py)*0.013));
   px=e.touches[0].clientX;py=e.touches[0].clientY;
 },{passive:true});
 canvas.addEventListener('wheel',e=>{e.preventDefault();radius=Math.max(20,Math.min(130,radius+e.deltaY*0.55));},{passive:false});
+
+// ─── Interactive click: tap fans to toggle spin, tap filters to slide in/out ───
+// Tag interactive groups
+[front3,front4,back3,back4,altTop4].forEach(g=>g.traverse(o=>{o._isFan=true;}));
+// Tag each rotor's children with a reference to that rotor for per-fan click
+for(const rotor of allRotors){
+  rotor.userData.spinning=true;
+  rotor.userData.spinSpeed=0;
+  rotor.traverse(o=>{o._rotor=rotor;});
+}
+// Also tag frame/brace meshes — find the nearest rotor in the same group
+[front3,front4,back3,back4,altTop4].forEach(g=>{
+  const rotorsInGroup=[];
+  g.traverse(o=>{if(o.isGroup && o.userData.axis) rotorsInGroup.push(o);});
+  g.traverse(o=>{
+    if(o.isMesh && o._isFan && !o._rotor && rotorsInGroup.length>0){
+      // Find closest rotor by Y position
+      let best=rotorsInGroup[0], bestD=Infinity;
+      for(const r of rotorsInGroup){
+        const d=Math.abs(o.position.y-r.position.y)+Math.abs(o.position.z-r.position.z);
+        if(d<bestD){bestD=d;best=r;}
+      }
+      o._rotor=best;
+    }
+  });
+});
+filterL.traverse(o=>{o._isFilterL=true;});
+filterR.traverse(o=>{o._isFilterR=true;});
+
+let filterLOut=false, filterROut=false;
+const filterLOrigin=filterL.position.clone();
+const filterROrigin=filterR.position.clone();
+const filterSlideMax=12; // slide up to 12" out from installed position
+let _dragFilter=null; // {obj, side, origin, startMouse}
+
+function handleClick(clientX,clientY){
+  const rect=canvas.getBoundingClientRect();
+  _mouse.x=((clientX-rect.left)/rect.width)*2-1;
+  _mouse.y=-((clientY-rect.top)/rect.height)*2+1;
+  _raycaster.setFromCamera(_mouse,camera);
+  const hits=_raycaster.intersectObjects(scene.children,true);
+  if(hits.length===0) return;
+  const obj=hits[0].object;
+  // Clicked a fan → toggle that individual fan
+  if(obj._isFan && obj._rotor){
+    obj._rotor.userData.spinning=!obj._rotor.userData.spinning;
+    return;
+  }
+  if(obj._isFan){
+    toggleSpin();
+    return;
+  }
+  // Clicked filter → toggle slide (fallback if not dragged)
+  if(obj._isFilterL){
+    filterLOut=!filterLOut;
+    const target=filterLOut?filterLOrigin.clone().sub(new THREE.Vector3(filterSlideMax,0,0)):filterLOrigin.clone();
+    _filterLerps.push({obj:filterL,target:target});
+    return;
+  }
+  if(obj._isFilterR){
+    filterROut=!filterROut;
+    const target=filterROut?filterROrigin.clone().add(new THREE.Vector3(filterSlideMax,0,0)):filterROrigin.clone();
+    _filterLerps.push({obj:filterR,target:target});
+    return;
+  }
+}
+
+function handleDragStart(clientX,clientY){
+  const rect=canvas.getBoundingClientRect();
+  _mouse.x=((clientX-rect.left)/rect.width)*2-1;
+  _mouse.y=-((clientY-rect.top)/rect.height)*2+1;
+  _raycaster.setFromCamera(_mouse,camera);
+  const hits=_raycaster.intersectObjects(scene.children,true);
+  if(hits.length===0) return false;
+  const obj=hits[0].object;
+  if(obj._isFilterL){
+    _dragFilter={obj:filterL, side:-1, origin:filterLOrigin, startX:clientX, startPos:filterL.position.x};
+    return true;
+  }
+  if(obj._isFilterR){
+    _dragFilter={obj:filterR, side:1, origin:filterROrigin, startX:clientX, startPos:filterR.position.x};
+    return true;
+  }
+  return false;
+}
+
+function handleDragMove(clientX){
+  if(!_dragFilter) return;
+  const dx=(clientX-_dragFilter.startX)*0.15;
+  const side=_dragFilter.side;
+  const originX=_dragFilter.origin.x;
+  // Get camera's right vector X component — tells us which screen direction maps to +X in world
+  const camRight=new THREE.Vector3();
+  camera.getWorldDirection(camRight);
+  camRight.cross(camera.up).normalize();
+  const move=dx*camRight.x; // project screen drag onto world X
+  const newX=_dragFilter.startPos+move;
+  if(side===-1){
+    _dragFilter.obj.position.x=Math.max(originX-filterSlideMax, Math.min(originX, newX));
+  } else {
+    _dragFilter.obj.position.x=Math.min(originX+filterSlideMax, Math.max(originX, newX));
+  }
+}
+
+function handleDragEnd(){
+  if(!_dragFilter) return;
+  const side=_dragFilter.side;
+  const originX=_dragFilter.origin.x;
+  const currentX=_dragFilter.obj.position.x;
+  const pulled=Math.abs(currentX-originX);
+  // Update out state based on where it ended up
+  if(side===-1) filterLOut=pulled>0.1;
+  else filterROut=pulled>0.1;
+  _dragFilter=null;
+}
+
+const _filterLerps=[];
+
 // macOS trackpad pinch-to-zoom → model zoom (Safari gesture events)
 let gestureStartRadius;
 canvas.addEventListener('gesturestart',e=>{e.preventDefault();gestureStartRadius=radius;});
@@ -1850,6 +2100,8 @@ function toggleSpin(){
     document.getElementById('fanSpeedVal').textContent='900 rpm';
   }
   spinTarget=spinning?SPIN_MAX*(fanSpeedPct/100):0;
+  // Master toggle resets all individual fan states
+  for(const rotor of allRotors) rotor.userData.spinning=spinning;
   document.getElementById('togSpin').classList.toggle('on',spinning);
   // Auto-collapse so internals are visible inside the assembled box
   if(spinning) collapseView();
@@ -2128,7 +2380,7 @@ function applyTimeOfDay(minuteOfDay){
   fill.intensity=mix(0.03, 0.18, sun);
   rim.intensity=mix(0.06, 0.2, sun);
   bounce.intensity=mix(0.02, 0.08, sun);
-  ceilSpot.intensity=mix(0.3, 0.4, sun<0.5 ? 1-sun : sun); // ceiling light brighter at night
+  ceilSpot.intensity=mix(0.5, 0.35, sun); // brighter at night to softly illuminate the room
   domeMat.emissiveIntensity=mix(0.4, 0.15, sun);
 
   // Outdoor backdrop brightness (sun through window)
@@ -2979,13 +3231,25 @@ function animate(){
     if(done) explodeLerping=false;
   }
 
-  // Fan spin
-  spinSpeed+=(spinTarget-spinSpeed)*0.03;
-  if(spinSpeed>0.001){
-    for(const rotor of allRotors){
+  // Filter slide animation
+  for(let i=_filterLerps.length-1;i>=0;i--){
+    const fl=_filterLerps[i];
+    fl.obj.position.lerp(fl.target,0.12);
+    if(fl.obj.position.distanceToSquared(fl.target)<0.001){
+      fl.obj.position.copy(fl.target);
+      _filterLerps.splice(i,1);
+    }
+  }
+
+  // Fan spin — per-rotor with individual toggle
+  const globalTarget=spinning?SPIN_MAX*(fanSpeedPct/100):0;
+  for(const rotor of allRotors){
+    const target=rotor.userData.spinning?globalTarget:0;
+    rotor.userData.spinSpeed+=(target-rotor.userData.spinSpeed)*0.03;
+    if(rotor.userData.spinSpeed>0.001){
       const ax=rotor.userData.axis;
-      if(ax.z!==0) rotor.rotation.z+=spinSpeed*(ax.z>0?1:-1);
-      else if(ax.y!==0) rotor.rotation.z+=spinSpeed*(ax.y>0?1:-1); // top-mounted fans
+      if(ax.z!==0) rotor.rotation.z+=rotor.userData.spinSpeed*(ax.z>0?1:-1);
+      else if(ax.y!==0) rotor.rotation.z+=rotor.userData.spinSpeed*(ax.y>0?1:-1);
     }
   }
 
