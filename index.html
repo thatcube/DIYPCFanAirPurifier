@@ -509,11 +509,12 @@ if(window.innerWidth<=520){
 }
 
 const canvas = document.getElementById('c');
-const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false, powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+const _isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+const renderer = new THREE.WebGLRenderer({canvas, antialias:!_isMobile, alpha:false, powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, _isMobile?2:2));
 renderer.setClearColor(0xd4dce8, 1);
 renderer.shadowMap.enabled=true;
-renderer.shadowMap.type=THREE.VSMShadowMap;
+renderer.shadowMap.type=_isMobile?THREE.PCFSoftShadowMap:THREE.VSMShadowMap;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.15;
 const scene = new THREE.Scene();
@@ -522,9 +523,9 @@ const camera = new THREE.PerspectiveCamera(42,1,0.1,500);
 // Daytime lighting — soft and even
 scene.add(new THREE.AmbientLight(0xffffff,0.22));
 const key=new THREE.DirectionalLight(0xfff8f0,0.55); key.position.set(-95,38,0); // from outside the window
-key.castShadow=true; key.shadow.mapSize.set(2048,2048);
+key.castShadow=true; key.shadow.mapSize.set(_isMobile?1024:2048, _isMobile?1024:2048);
 key.shadow.bias=-0.0005; key.shadow.normalBias=0.04;
-key.shadow.radius=6; key.shadow.blurSamples=16;
+key.shadow.radius=_isMobile?3:6; key.shadow.blurSamples=_isMobile?8:16;
 key.shadow.camera.near=1; key.shadow.camera.far=160;
 key.shadow.camera.left=-50; key.shadow.camera.right=50;
 key.shadow.camera.top=40; key.shadow.camera.bottom=-40;
@@ -3109,7 +3110,7 @@ function checkPerformance(fps){
   if(elapsed<QUALITY_WINDOW) return;
   const avg=qualitySum/qualitySamples;
   qualitySum=0; qualitySamples=0; qualityWindowStart=performance.now();
-  if(avg>=55){ qualitySettled=true; return; } // good enough, stop checking
+  if(avg>=(_isMobile?50:55)){ qualitySettled=true; return; } // good enough, stop checking
   if(qualityTier<3){ downgrade(qualityTier+1); }
   else { qualitySettled=true; } // can't go lower
 }
