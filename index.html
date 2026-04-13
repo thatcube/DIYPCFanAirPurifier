@@ -3017,7 +3017,7 @@ scene.add(screen);
 // ─── Mini split indoor unit (on TV wall, near closet wall, 1ft from ceiling) ───
 {
   const msW=32, msH=11, msD=8; // typical wall-mount unit dimensions
-  const msX=sideWallX-12; // 1 foot from closet door wall (before flip)
+  const msX=51-12; // 1 foot from closet door wall (sideWallX=51, before flip)
   const msY=floorY+80-12-msH/2; // 1 foot from ceiling
   const msZ=oppWallZ+0.5+msD/2; // flush against TV wall
   const msMat=new THREE.MeshStandardMaterial({color:0xf0f0f0,roughness:0.3,metalness:0.05});
