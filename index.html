@@ -3256,12 +3256,11 @@ const axLblZ=makeTextSprite('Z','#6688ff'); axLblZ.position.set(0,0,11); axLblZ.
 axesGroup.visible=false;
 scene.add(axesGroup);
 
-// Mirror room 180° around Y axis so bed/TV/window are on the opposite side
+// Mirror room on X axis so bed/TV/window are on the opposite side
 scene.traverse(obj=>{
   if(obj._isRoom){
     obj.position.x=-obj.position.x;
-    obj.position.z=-obj.position.z;
-    obj.rotation.y=obj.rotation.y+Math.PI;
+    obj.rotation.y=-obj.rotation.y;
   }
 });
 
@@ -3435,13 +3434,13 @@ function animate(){
   if(!_prevCx || Math.abs(cx-_prevCx)>0.3 || Math.abs(cz-_prevCz)>0.3){
   _prevCx=cx; _prevCz=cz;
   const fadeMin=0.06;
-  // Back wall (was Z=49, now Z=-49): fade based on camera proximity
-  const backDist=cz+49;
+  // Back wall (Z=49, unchanged): fade based on camera proximity
+  const backDist=49-cz;
   const backAlpha=backDist<25?Math.max(fadeMin,backDist/25):1;
   backWallParts.forEach(m=>{m.material.opacity=backAlpha;});
   doorPanel.material.opacity=backAlpha;
-  // Opposite/TV wall (was Z=-78, now Z=78): fade when camera approaches
-  const frontDist=78-cz;
+  // TV wall (Z=-78, unchanged): fade when camera approaches
+  const frontDist=cz+78;
   const frontAlpha=frontDist<25?Math.max(fadeMin,frontDist/25):1;
   oppWall.material.opacity=frontAlpha; oppBaseboard.material.opacity=frontAlpha;
   // Side wall (was X=51, now X=-51): fade when camera approaches
