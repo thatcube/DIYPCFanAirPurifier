@@ -2883,21 +2883,24 @@ mug.position.set(tblX-3, floorY+tblH+1.75, tblZ+2);
 mug.castShadow=false; mug._isRoom=true;
 scene.add(mug);
 
-// Wall section behind — split into left portion and recessed alcove with door (flush to right wall)
-const recessDepth=18; // 1.5 feet inward
-const recessZ=49-recessDepth; // recessed wall
-const recessLeft=24, recessRight=51; // recess flush with right wall
+// Wall section behind — back wall with door extrusion bumping INTO the room
+const recessDepth=18; // 1.5 feet into room
+const recessZ=49+recessDepth; // extrusion wall (into room, toward -Z before flip but +Z in code)
+const recessLeft=24, recessRight=51; // extrusion flush with right wall
 const recessW=recessRight-recessLeft;
 
-// Left portion of back wall (X=-60 to recessLeft)
+// Left portion of back wall (continuous, full width)
 const backWallLeftW=recessLeft-(-81);
 const wallMeshL=roomBox(backWallLeftW, 80, 0.5, 0xd8d4ce, -81+backWallLeftW/2, floorY+40, 49, 0,0,0);
 
-// Left return wall (connecting back wall to recessed wall)
-const returnWallL=roomBox(0.5, 80, recessDepth, 0xd8d4ce, recessLeft, floorY+40, 49-recessDepth/2, 0,0,0);
+// Right portion of back wall (behind extrusion — from recessLeft to recessRight)
+// This piece is hidden behind the extrusion, skip it
 
-// Recessed wall (with door opening)
-const doorW=32, doorH=80; // standard interior door
+// Return wall (connects back wall to extrusion wall, goes INTO room)
+const returnWallL=roomBox(0.5, 80, recessDepth, 0xd8d4ce, recessLeft, floorY+40, 49+recessDepth/2, 0,0,0);
+
+// Extrusion wall (the wall that faces the room, has the door opening)
+const doorW=32, doorH=80;
 const doorCenterX=recessLeft+recessW/2;
 const doorLeft=doorCenterX-doorW/2;
 const doorRight=doorCenterX+doorW/2;
@@ -2908,22 +2911,25 @@ if(recessWallLeftW>0.5) var recessWallL=roomBox(recessWallLeftW, 80, 0.5, 0xd8d4
 // Wall right of door
 const recessWallRightW=recessRight-doorRight;
 if(recessWallRightW>0.5) var recessWallR=roomBox(recessWallRightW, 80, 0.5, 0xd8d4ce, doorRight+recessWallRightW/2, floorY+40, recessZ, 0,0,0);
-// Wall above door (transom)
-// (doorH=80 = wallHeight, so no transom needed)
 
-// Baseboards (follow the recess shape)
+// Right return wall (closing off the extrusion on the right side — flush with sideWallX)
+roomBox(0.5, 80, recessDepth, 0xd8d4ce, recessRight, floorY+40, 49+recessDepth/2, 0,0,0);
+// Top of extrusion (ceiling piece)
+roomBox(recessW, 0.5, recessDepth, 0xd8d4ce, recessLeft+recessW/2, floorY+80, 49+recessDepth/2, 0,0,0);
+
+// Baseboards
 const baseboardMeshL=roomBox(backWallLeftW, 3, 0.6, 0xc0bbb4, -81+backWallLeftW/2, floorY+1.5, 48.5, 0,0,0);
-const baseboardRetL=roomBox(0.6, 3, recessDepth, 0xc0bbb4, recessLeft+0.5, floorY+1.5, 49-recessDepth/2, 0,0,0);
-const baseboardRecessL=recessWallLeftW>0.5?roomBox(recessWallLeftW, 3, 0.6, 0xc0bbb4, recessLeft+recessWallLeftW/2, floorY+1.5, recessZ+0.5, 0,0,0):null;
-const baseboardRecessR=recessWallRightW>0.5?roomBox(recessWallRightW, 3, 0.6, 0xc0bbb4, doorRight+recessWallRightW/2, floorY+1.5, recessZ+0.5, 0,0,0):null;
+const baseboardRetL=roomBox(0.6, 3, recessDepth, 0xc0bbb4, recessLeft+0.5, floorY+1.5, 49+recessDepth/2, 0,0,0);
+const baseboardRecessL=recessWallLeftW>0.5?roomBox(recessWallLeftW, 3, 0.6, 0xc0bbb4, recessLeft+recessWallLeftW/2, floorY+1.5, recessZ-0.5, 0,0,0):null;
+const baseboardRecessR=recessWallRightW>0.5?roomBox(recessWallRightW, 3, 0.6, 0xc0bbb4, doorRight+recessWallRightW/2, floorY+1.5, recessZ-0.5, 0,0,0):null;
 
 // ─── Door ───
 const doorThick=1.5, doorFrameW=2.5, doorFrameD=recessDepth>4?4:recessDepth;
 const doorColor=0xf0ebe4; // warm off-white painted door
 const doorFrameColor=0xf5f5f0;
 
-// Door panel — sits inside the recess opening, flush with room-facing edge of recessed wall
-const doorPanelZ=recessZ-doorThick/2;
+// Door panel — sits in the extrusion wall opening, room-facing side
+const doorPanelZ=recessZ+doorThick/2;
 const doorPanel=roomBox(doorW-1, doorH-0.5, doorThick, doorColor,
   doorCenterX, floorY+doorH/2, doorPanelZ, 0,0,0);
 doorPanel.material.roughness=0.5;
@@ -2945,7 +2951,7 @@ const dpMat=new THREE.MeshStandardMaterial({color:0xe8e3dc,roughness:0.45,metaln
 
 // Door frame (trim around opening — spans from recessed wall into room)
 const dfMat=new THREE.MeshStandardMaterial({color:doorFrameColor,roughness:0.35,metalness:0.05});
-const frameZ=recessZ-doorFrameD/2;
+const frameZ=recessZ+doorFrameD/2;
 // Left jamb
 const dfl=new THREE.Mesh(new THREE.BoxGeometry(doorFrameW, doorH, doorFrameD), dfMat);
 dfl.position.set(doorLeft-doorFrameW/2+0.5, floorY+doorH/2, frameZ);
@@ -2963,14 +2969,14 @@ dfh.castShadow=false; dfh._isRoom=true; scene.add(dfh);
 const knobMat=new THREE.MeshStandardMaterial({color:0xaaaaaa,roughness:0.25,metalness:0.8});
 const knobGeo=new THREE.SphereGeometry(1.2, 16, 12);
 const knob=new THREE.Mesh(knobGeo, knobMat);
-knob.position.set(doorCenterX+doorW*0.35, floorY+36, doorPanelZ-doorThick/2-1.2);
+knob.position.set(doorCenterX+doorW*0.35, floorY+36, doorPanelZ+doorThick/2+1.2);
 knob.castShadow=false; knob._isRoom=true; scene.add(knob);
 // Knob base plate
 const plateMat=new THREE.MeshStandardMaterial({color:0xbbbbbb,roughness:0.3,metalness:0.7});
 const plateGeo=new THREE.CylinderGeometry(1.8, 1.8, 0.3, 16);
 plateGeo.rotateX(Math.PI/2);
 const plate=new THREE.Mesh(plateGeo, plateMat);
-plate.position.set(doorCenterX+doorW*0.35, floorY+36, doorPanelZ-doorThick/2-0.2);
+plate.position.set(doorCenterX+doorW*0.35, floorY+36, doorPanelZ+doorThick/2+0.2);
 plate.castShadow=false; plate._isRoom=true; scene.add(plate);
 
 // Collect all back wall + recess meshes for fading
