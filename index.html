@@ -1744,7 +1744,7 @@ function toggleFilter(){
 }
 
 // ─── Camera controls ───
-let drag=false,px=0,py=0,polar=1.05,azimuth=-0.5+Math.PI,radius=65;
+let drag=false,px=0,py=0,polar=1.1,azimuth=0.5+Math.PI,radius=50;
 let _clickStartX=0,_clickStartY=0;
 const _raycaster=new THREE.Raycaster();
 const _mouse=new THREE.Vector2();
@@ -1756,7 +1756,7 @@ canvas.addEventListener('mousedown',e=>{
   if(_dragFilter) handleDragEnd();
   _dragFilter=null;
   _pendingFilterDrag=false;
-  _pendingFilterDrag=handleDragStart(e.clientX,e.clientY);
+  _pendingFilterDrag=e.metaKey?handleDragStart(e.clientX,e.clientY):false;
   drag=!_pendingFilterDrag;
   if(!_pendingFilterDrag && !_hoverInteractive) canvas.style.cursor='grabbing';
   px=e.clientX;py=e.clientY;
@@ -3248,11 +3248,6 @@ rod.position.set(leftWallX+1.5, winTop+4, winCenterZ);
 rod.castShadow=false; rod._isRoom=true; scene.add(rod);
 
 // Mark only wall meshes that actually fade as transparent (keeps other room objects in fast opaque pass)
-const fadingWalls=[...backWallParts, doorPanel, oppWall, oppBaseboard,
-  rightWall, sideBaseboard,
-  leftWallBelow, leftWallAbove, leftWallFront, leftWallBack, leftBaseboard, cL, cR];
-fadingWalls.forEach(m=>{ m.material.transparent=true; });
-
 // Upholstered headboard (full height, at back of bed)
 const hbThick=3, hbH=bedH-bedClearance, hbW=bedW;
 const headboard=roomRoundBox(hbW, hbH, hbThick, 2, 0x4a4a55,
@@ -3346,6 +3341,15 @@ scene.traverse(obj=>{
   if(obj._isRoom){
     obj.position.x=-obj.position.x;
     obj.rotation.y=-obj.rotation.y;
+  }
+});
+
+// Collect all room meshes for proximity fading
+const fadingWalls=[];
+scene.traverse(obj=>{
+  if(obj._isRoom && obj.isMesh && obj.material){
+    obj.material.transparent=true;
+    fadingWalls.push(obj);
   }
 });
 
@@ -3512,32 +3516,29 @@ function animate(){
   camera.position.z=radius*Math.sin(polar)*Math.cos(azimuth);
   camera.lookAt(0,0,0);
 
-  // Auto-fade walls based on camera proximity to each wall plane.
-  // Walls are fully opaque when camera is >25 units away, fade to near-invisible
-  // when camera is right at the wall surface. Each wall fades independently.
-  const cx=camera.position.x, cz=camera.position.z;
+  // Auto-fade room objects that are between the camera and the purifier.
+  // Objects close to the camera fade out; distant ones stay opaque.
+  const cx=camera.position.x, cy=camera.position.y, cz=camera.position.z;
   if(!_prevCx || Math.abs(cx-_prevCx)>0.3 || Math.abs(cz-_prevCz)>0.3){
   _prevCx=cx; _prevCz=cz;
-  const fadeMin=0.06;
-  // Back wall (Z=49, unchanged): fade based on camera proximity
-  const backDist=49-cz;
-  const backAlpha=backDist<25?Math.max(fadeMin,backDist/25):1;
-  backWallParts.forEach(m=>{m.material.opacity=backAlpha;});
-  doorPanel.material.opacity=backAlpha;
-  // TV wall (Z=-78, unchanged): fade when camera approaches
-  const frontDist=cz+78;
-  const frontAlpha=frontDist<25?Math.max(fadeMin,frontDist/25):1;
-  oppWall.material.opacity=frontAlpha; oppBaseboard.material.opacity=frontAlpha;
-  // Side wall (was X=51, now X=-51): fade when camera approaches
-  const rightDist=cx+51;
-  const rightAlpha=rightDist<25?Math.max(fadeMin,rightDist/25):1;
-  rightWall.material.opacity=rightAlpha; sideBaseboard.material.opacity=rightAlpha;
-  // Left wall (was X=-81, now X=81): fade when camera approaches
-  const leftDist=81-cx;
-  const leftAlpha=leftDist<25?Math.max(fadeMin,leftDist/25):1;
-  leftWallBelow.material.opacity=leftAlpha; leftWallAbove.material.opacity=leftAlpha;
-  leftWallFront.material.opacity=leftAlpha; leftWallBack.material.opacity=leftAlpha;
-  leftBaseboard.material.opacity=leftAlpha; cL.material.opacity=leftAlpha; cR.material.opacity=leftAlpha;
+  const camDist=Math.sqrt(cx*cx+cy*cy+cz*cz);
+  const fadeRange=25; // start fading when camera is within 25" of an object
+  for(const m of fadingWalls){
+    // Distance from camera to this object's position
+    const ox=m.position.x, oy=m.position.y, oz=m.position.z;
+    const dx=cx-ox, dy=cy-oy, dz=cz-oz;
+    const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
+    // Check if object is roughly between camera and origin (dot product test)
+    const toOriginX=-cx, toOriginZ=-cz;
+    const toObjX=ox-cx, toObjZ=oz-cz;
+    const dot=toObjX*toOriginX+toObjZ*toOriginZ;
+    const between=dot>0; // object is in the direction of origin from camera
+    if(between && dist<fadeRange){
+      m.material.opacity=Math.max(0.04, dist/fadeRange);
+    } else {
+      m.material.opacity=1;
+    }
+  }
   }
 
   renderer.render(scene,camera);
