@@ -2924,7 +2924,7 @@ const doorFrameColor=0xf5f5f0;
 
 // Door panel (on room-facing side of recessed wall)
 const doorPanel=roomRoundBox(doorW-1, doorH-0.5, doorThick, 0.3, doorColor,
-  doorCenterX, floorY+doorH/2, recessZ-doorThick/2-0.3, 0,0,0);
+  doorCenterX, floorY+doorH/2, recessZ-doorThick/2-2, 0,0,0);
 doorPanel.material.roughness=0.5;
 doorPanel.castShadow=true;
 
@@ -2937,7 +2937,7 @@ const dpMat=new THREE.MeshStandardMaterial({color:0xe8e3dc,roughness:0.45,metaln
   dpHArr.forEach((ph,ri)=>{
     const pg=new THREE.BoxGeometry(dpW, ph, dpInset);
     const pm=new THREE.Mesh(pg, dpMat);
-    pm.position.set(doorCenterX+side*(doorW*0.2), dpY[ri], recessZ-doorThick-0.3-dpInset/2-0.01);
+    pm.position.set(doorCenterX+side*(doorW*0.2), dpY[ri], recessZ-doorThick-2-dpInset/2-0.01);
     pm.castShadow=false; pm._isRoom=true; scene.add(pm);
   });
 });
@@ -2961,14 +2961,14 @@ dfh.castShadow=false; dfh._isRoom=true; scene.add(dfh);
 const knobMat=new THREE.MeshStandardMaterial({color:0xaaaaaa,roughness:0.25,metalness:0.8});
 const knobGeo=new THREE.SphereGeometry(1.2, 16, 12);
 const knob=new THREE.Mesh(knobGeo, knobMat);
-knob.position.set(doorCenterX+doorW*0.35, floorY+36, recessZ-doorThick-0.3-1.2);
+knob.position.set(doorCenterX+doorW*0.35, floorY+36, recessZ-doorThick-2-1.2);
 knob.castShadow=false; knob._isRoom=true; scene.add(knob);
 // Knob base plate
 const plateMat=new THREE.MeshStandardMaterial({color:0xbbbbbb,roughness:0.3,metalness:0.7});
 const plateGeo=new THREE.CylinderGeometry(1.8, 1.8, 0.3, 16);
 plateGeo.rotateX(Math.PI/2);
 const plate=new THREE.Mesh(plateGeo, plateMat);
-plate.position.set(doorCenterX+doorW*0.35, floorY+36, recessZ-doorThick-0.3-0.2);
+plate.position.set(doorCenterX+doorW*0.35, floorY+36, recessZ-doorThick-2-0.2);
 plate.castShadow=false; plate._isRoom=true; scene.add(plate);
 
 // Collect all back wall + recess meshes for fading
