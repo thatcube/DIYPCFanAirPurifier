@@ -2816,6 +2816,7 @@ floor.rotation.x = -Math.PI/2;
 floor.position.y = floorY;
 floor.receiveShadow = true;
 floor._isRoom = true;
+floor._isFloor = true;
 scene.add(floor);
 
 // Helper: simple box with shadow
@@ -3601,6 +3602,11 @@ function animate(){
   const outsideLeft=cx>77;
 
   for(const m of fadingWalls){
+    // Floor never fades (unless camera is below it)
+    if(m._isFloor){
+      m.material.opacity=cy<m.position.y?0.08:1;
+      continue;
+    }
     const ox=m.position.x, oz=m.position.z;
     const dx=cx-ox, dz=cz-oz;
     const dist=Math.sqrt(dx*dx+dz*dz);
