@@ -1744,7 +1744,10 @@ function toggleFilter(){
 }
 
 // ─── Camera controls ───
-let drag=false,px=0,py=0,polar=1.1,azimuth=0.5+Math.PI,radius=50;
+// Restore camera from sessionStorage if available (survives live reload)
+const _savedCam=sessionStorage.getItem('cam');
+const _camDefaults=_savedCam?JSON.parse(_savedCam):{p:1.1,a:0.5+Math.PI,r:50};
+let drag=false,px=0,py=0,polar=_camDefaults.p,azimuth=_camDefaults.a,radius=_camDefaults.r;
 let _clickStartX=0,_clickStartY=0;
 const _raycaster=new THREE.Raycaster();
 const _mouse=new THREE.Vector2();
@@ -2963,7 +2966,7 @@ scene.add(mug);
 // Lamp on nightstand — near the corner closest to the door extrusion
 let lampLight, lampShade, lampOn=true;
 {
-  const lampX=tblX+tblW/2-4; // 4" from the extrusion-side edge
+  const lampX=tblX+tblW/2-6; // 6" from the extrusion-side edge
   const lampZ=tblZ+tblD/2-6; // 6" from the back edge (avoid wall clip)
   const lampBaseY=floorY+tblH;
   // Base — dark metal disc (larger)
@@ -3105,9 +3108,9 @@ if(recessWallR) backWallParts.push(recessWallR);
 if(baseboardRecessL) backWallParts.push(baseboardRecessL);
 if(baseboardRecessR) backWallParts.push(baseboardRecessR);
 
-// Book stack on table (for fun)
-roomBox(5, 1.2, 7, 0x8b4513, tblX+4, floorY+tblH+0.6, tblZ-1, 0, 0.1, 0);
-roomBox(4.5, 0.8, 6.5, 0x2d5a27, tblX+4, floorY+tblH+1.6, tblZ-1, 0, -0.05, 0);
+// Book stack on table — opposite side from lamp
+roomBox(5, 1.2, 7, 0x8b4513, tblX-6, floorY+tblH+0.6, tblZ-1, 0, 0.1, 0);
+roomBox(4.5, 0.8, 6.5, 0x2d5a27, tblX-6, floorY+tblH+1.6, tblZ-1, 0, -0.05, 0);
 
 // ─── Opposite wall + 65" OLED TV ───
 const oppWallZ=-78;
@@ -3685,6 +3688,8 @@ function animate(){
   }
 
   renderer.render(scene,camera);
+  // Persist camera for live reload
+  if(fpsFrames%60===0) sessionStorage.setItem('cam',JSON.stringify({p:polar,a:azimuth,r:radius}));
   fpsFrames++;
   const fpsNow=performance.now();
   if(fpsNow-fpsLast>=1000){
