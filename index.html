@@ -2950,6 +2950,38 @@ mug.position.set(tblX-3, floorY+tblH+1.75, tblZ+2);
 mug.castShadow=false; mug._isRoom=true;
 scene.add(mug);
 
+// Lamp on nightstand — near the corner closest to the door extrusion
+{
+  const lampX=tblX+tblW/2-3; // 3" from the extrusion-side edge
+  const lampZ=tblZ+tblD/2-3; // 3" from the back edge
+  const lampBaseY=floorY+tblH;
+  // Base — dark metal disc
+  const baseMat=new THREE.MeshStandardMaterial({color:0x222222,roughness:0.4,metalness:0.6});
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.8, 0.6, 16), baseMat);
+  base.position.set(lampX, lampBaseY+0.3, lampZ);
+  base._isRoom=true; scene.add(base);
+  // Stem — thin metal rod
+  const stemH=12;
+  const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, stemH, 8), baseMat);
+  stem.position.set(lampX, lampBaseY+0.6+stemH/2, lampZ);
+  stem._isRoom=true; scene.add(stem);
+  // Shade — fabric cylinder, slightly tapered
+  const shadeR1=3.5, shadeR2=4.5, shadeH=7;
+  const shadeMat=new THREE.MeshStandardMaterial({color:0xd8d0c0,roughness:0.9,metalness:0,side:THREE.DoubleSide});
+  const shade=new THREE.Mesh(new THREE.CylinderGeometry(shadeR1, shadeR2, shadeH, 20, 1, true), shadeMat);
+  shade.position.set(lampX, lampBaseY+0.6+stemH+shadeH/2-1, lampZ);
+  shade._isRoom=true; scene.add(shade);
+  // Top cap
+  const topCap=new THREE.Mesh(new THREE.CircleGeometry(shadeR1, 20), shadeMat);
+  topCap.rotation.x=-Math.PI/2;
+  topCap.position.set(lampX, lampBaseY+0.6+stemH+shadeH-1, lampZ);
+  topCap._isRoom=true; scene.add(topCap);
+  // Warm glow bulb inside shade
+  const bulbGlow=new THREE.PointLight(0xffeedd, 0.15, 30);
+  bulbGlow.position.set(lampX, lampBaseY+0.6+stemH+shadeH/2-1, lampZ);
+  bulbGlow._isRoom=true; scene.add(bulbGlow);
+}
+
 // Wall section — back wall with door extrusion bumping INTO the room (-Z direction)
 const recessDepth=30; // 2.5 feet into room
 const extrusionW=40; // door (32") + 4" each side
@@ -3064,7 +3096,7 @@ const oppBaseboard=roomBox(132, 3, 0.6, 0xc0bbb4, -15, floorY+1.5, oppWallZ+0.5,
 // 65" OLED: diagonal=65", 16:9 → ~56.7"W × 31.9"H, bezel ~0.3", depth ~1"
 const tvW=56.7, tvH=31.9, tvD=1.0, bezel=0.3;
 const tvCenterX=bedX; // centered on the bed
-const tvCenterY=floorY+42; // center of screen ~42" from floor (eye level from bed)
+const tvCenterY=floorY+54; // center of screen ~54" from floor (raised up)
 const tvZ=oppWallZ+0.5+tvD/2+0.1;
 
 // Thin black bezel frame
