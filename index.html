@@ -2874,30 +2874,56 @@ const tblX=bedX+bedW/2+tblW/2+3, tblZ=48.5-tblD/2-2;
 const tblBlack=0x1a1a1a;
 const tblOak=0x5a3f2a;
 {
-  // Main body — black box
-  const bodyH=tblH-1; // leave room for top
-  roomBox(tblW, bodyH, tblD, tblBlack, tblX, floorY+bodyH/2, tblZ, 0,0,0);
+  const bodyH=tblH-1;
+  const curveBulge=1.5; // how far the front curves outward
+  const segs=12; // curve smoothness
 
-  // Dark oak top with 1" overhang on sides and front, flush at back
+  // Helper: create a curved-front box (top-down profile extruded along Y)
+  function curvedFrontBox(w, h, d, bulge){
+    const shape=new THREE.Shape();
+    // Start at back-left, go clockwise
+    shape.moveTo(-w/2, d/2); // back-left
+    shape.lineTo(w/2, d/2);  // back-right
+    shape.lineTo(w/2, -d/2+bulge); // front-right (pulled in for curve start)
+    // Curved front: quadratic bezier bulging outward
+    shape.quadraticCurveTo(0, -d/2-bulge, -w/2, -d/2+bulge); // curve through center
+    shape.lineTo(-w/2, d/2); // back to start
+    const geo=new THREE.ExtrudeGeometry(shape, {depth:h, bevelEnabled:false});
+    geo.translate(0,0,-h/2);
+    geo.rotateX(-Math.PI/2); // extrude along Y
+    return geo;
+  }
+
+  // Main body — black curved front
+  const bodyGeo=curvedFrontBox(tblW, bodyH, tblD, curveBulge);
+  const bodyMat=new THREE.MeshStandardMaterial({color:tblBlack,roughness:0.4,metalness:0.05});
+  const body=new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.set(tblX, floorY+bodyH/2, tblZ);
+  body.castShadow=false; body.receiveShadow=true; body._isRoom=true;
+  scene.add(body);
+
+  // Dark oak top — also curved front, with overhang
   const topOverhang=1;
   const topW=tblW+topOverhang*2;
-  const topD=tblD+topOverhang; // overhang front only, flush back
+  const topD=tblD+topOverhang;
   const topThick=1;
+  const topGeo=curvedFrontBox(topW, topThick, topD, curveBulge+0.5);
   const topMat=new THREE.MeshStandardMaterial({color:tblOak,roughness:0.6,metalness:0.05});
-  const topMesh=new THREE.Mesh(new THREE.BoxGeometry(topW, topThick, topD), topMat);
+  const topMesh=new THREE.Mesh(topGeo, topMat);
   topMesh.position.set(tblX, floorY+tblH-topThick/2, tblZ-topOverhang/2);
   topMesh.castShadow=true; topMesh._isRoom=true; scene.add(topMesh);
 
-  // 3 drawers — evenly spaced on the front face
+  // 3 drawers — curved front faces
   const drawerGap=0.8;
   const drawerH=(bodyH-drawerGap*4)/3;
   const drawerW=tblW-1.5;
-  const drawerFrontZ=tblZ-tblD/2-0.1;
+  const drawerFrontZ=tblZ-tblD/2-curveBulge*0.3;
   const drawerMat=new THREE.MeshStandardMaterial({color:0x222222,roughness:0.5});
   for(let d=0;d<3;d++){
     const dy=floorY+drawerGap*(d+1)+drawerH*(d+0.5);
-    // Drawer face — slightly curved outward using a wider box (subtle)
-    const drawer=new THREE.Mesh(new THREE.BoxGeometry(drawerW, drawerH-0.5, 0.6), drawerMat);
+    // Curved drawer face
+    const dGeo=curvedFrontBox(drawerW, drawerH-0.5, 0.8, curveBulge*0.8);
+    const drawer=new THREE.Mesh(dGeo, drawerMat);
     drawer.position.set(tblX, dy, drawerFrontZ);
     drawer._isRoom=true; scene.add(drawer);
 
@@ -2905,12 +2931,11 @@ const tblOak=0x5a3f2a;
     const handleMat=new THREE.MeshStandardMaterial({color:0x888888,roughness:0.3,metalness:0.6});
     for(let h of[-1,1]){
       const handle=new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), handleMat);
-      handle.position.set(tblX+h*4, dy, drawerFrontZ-0.6);
+      handle.position.set(tblX+h*4, dy, drawerFrontZ-0.8);
       handle._isRoom=true; scene.add(handle);
-      // Handle stem
       const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,0.5,6), handleMat);
       stem.rotation.x=Math.PI/2;
-      stem.position.set(tblX+h*4, dy, drawerFrontZ-0.3);
+      stem.position.set(tblX+h*4, dy, drawerFrontZ-0.5);
       stem._isRoom=true; scene.add(stem);
     }
   }
