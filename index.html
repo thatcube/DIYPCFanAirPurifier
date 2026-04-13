@@ -2886,9 +2886,9 @@ scene.add(mug);
 // Wall section — back wall with door extrusion bumping INTO the room (-Z direction)
 const recessDepth=30; // 2.5 feet into room
 const extrusionW=40; // door (32") + 4" each side
-const extCenterX=25; // center of extrusion along X
-const extLeft=extCenterX-extrusionW/2; // 17.5
-const extRight=extCenterX+extrusionW/2; // 57.5 — clamp to sideWallX
+const extRight=51; // flush with right/side wall
+const extLeft=extRight-extrusionW; // 11
+const extCenterX=extLeft+extrusionW/2; // 31
 const recessZ=49-recessDepth; // front face of extrusion at Z=19
 
 // Back wall — full width behind extrusion
