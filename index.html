@@ -283,7 +283,7 @@
   <div class="picker-label">Wood stain</div>
   <div class="seg"><button id="btnStainRaw" class="on" onclick="setStain('raw')">Raw Birch</button><button id="btnStainOil" onclick="setStain('oil')">Oil</button><button id="btnStainWalnut" onclick="setStain('walnut')">Walnut</button></div>
   <div class="picker-label">Feet style</div>
-  <div class="seg"><button id="btnFeetPeg" onclick="setFeetStyle('peg')">Peg Legs</button><button id="btnFeetBun" class="on" onclick="setFeetStyle('bun')">Round Feet</button><button id="btnFeetRubber" onclick="setFeetStyle('rubber')">Rubber Feet</button></div>
+  <div class="seg"><button id="btnFeetPeg" onclick="setFeetStyle('peg')">Peg Legs</button><button id="btnFeetBun" class="on" onclick="setFeetStyle('bun')">Round Feet</button><button id="btnFeetRubber" onclick="setFeetStyle('rubber')">Rubber Feet</button><button id="btnFeetNone" onclick="setFeetStyle('none')">None</button></div>
   <div class="picker-label">Placement</div>
   <div class="seg"><button id="btnPlaceFloor" class="on" onclick="setPlacement('floor')">Floor</button><button id="btnPlaceWall" onclick="setPlacement('wall')">Wall</button><button id="btnPlaceTv" onclick="setPlacement('tv')">Under TV</button></div>
   <div style="margin-top:6px;font-size:9px;color:rgba(255,255,255,0.4);text-align:center">Arrow keys nudge position (world space)</div>
@@ -2633,7 +2633,8 @@ function setFanCount(n){
 }
 
 // ─── Feet style (peg / round bun / rubber) ───
-const FEET_H={peg:0.75, bun:2.5, rubber:0.75};
+const FEET_H={peg:0.75, bun:2.5, rubber:0.75, none:0};
+let _prePlacementFeet='bun'; // remember feet style before wall mode overrides it
 function setFeetStyle(style){
   if(style===feetStyle) return;
   const oldH=currentFeetH, newH=FEET_H[style];
@@ -2641,10 +2642,14 @@ function setFeetStyle(style){
   feetStyle=style; currentFeetH=newH;
 
   // Update buttons
-  document.querySelectorAll('#btnFeetPeg,#btnFeetBun,#btnFeetRubber').forEach(b=>b.classList.remove('on'));
-  document.getElementById(style==='peg'?'btnFeetPeg':style==='bun'?'btnFeetBun':'btnFeetRubber').classList.add('on');
+  document.querySelectorAll('#btnFeetPeg,#btnFeetBun,#btnFeetRubber,#btnFeetNone').forEach(b=>b.classList.remove('on'));
+  document.getElementById(style==='peg'?'btnFeetPeg':style==='bun'?'btnFeetBun':style==='rubber'?'btnFeetRubber':'btnFeetNone').classList.add('on');
 
-  // Swap geometry + material + position
+  // Hide legs entirely for 'none'
+  legGroup.visible=(style!=='none');
+
+  // Swap geometry + material + position (skip for none)
+  if(style!=='none'){
   const geo=style==='bun'?bunGeo:pegGeo;
   const mat=style==='rubber'?rubberMat:woodLegMat;
   const ins=style==='bun'?bunInset:legInset;
@@ -2659,6 +2664,7 @@ function setFeetStyle(style){
     leg.matrixAutoUpdate=true;
     leg.updateMatrixWorld(true);
     leg.matrixAutoUpdate=false;
+  }
   }
 
   // Shift floor + all room objects to match new clearance
@@ -2678,6 +2684,7 @@ function setFeetStyle(style){
 let currentPlacement='floor';
 function setPlacement(mode){
   if(mode===currentPlacement) return;
+  const prevMode=currentPlacement;
   const prevOff=placementOffset;
   const newOff=getPlacementOffset(mode);
   const delta={x:newOff.x-prevOff.x, y:newOff.y-prevOff.y, z:newOff.z-prevOff.z};
@@ -2685,17 +2692,26 @@ function setPlacement(mode){
   placementOffset={...newOff};
   document.querySelectorAll('#btnPlaceFloor,#btnPlaceWall,#btnPlaceTv').forEach(b=>b.classList.remove('on'));
   document.getElementById(mode==='floor'?'btnPlaceFloor':mode==='tv'?'btnPlaceTv':'btnPlaceWall').classList.add('on');
-  // Rotate purifier for Under TV mode, show/hide console props
-  if(mode==='tv'){
+  // Rotate purifier for Under TV / Wall mode, show/hide console props
+  if(mode==='tv'||mode==='wall'){
     purifierGroup.rotation.y=90*Math.PI/180;
     document.getElementById('turntableSlider').value=90;
     document.getElementById('turntableLabel').textContent='90°';
-    showConsoleProps(true);
+    showConsoleProps(mode==='tv');
+    showWallBracket(mode==='wall');
   } else {
     purifierGroup.rotation.y=0;
     document.getElementById('turntableSlider').value=0;
     document.getElementById('turntableLabel').textContent='0°';
     showConsoleProps(false);
+    showWallBracket(false);
+  }
+  // Auto-toggle feet for wall mount
+  if(mode==='wall'){
+    if(feetStyle!=='none'){ _prePlacementFeet=feetStyle; }
+    setFeetStyle('none');
+  } else if(prevMode==='wall' && feetStyle==='none'){
+    setFeetStyle(_prePlacementFeet);
   }
   applyRoomDelta(delta);
   updateNudgeLabel();
@@ -2732,7 +2748,7 @@ function updateNudgeLabel(){
 function getPlacementOffset(mode){
   if(mode==='floor') return {x:0, y:0, z:0}; // default — floor
   if(mode==='table') return {x:3.7, y:27, z:39.5}; // on nightstand (mirrored X)
-  if(mode==='wall') return {x:49, y:30, z:-73}; // wall-mounted under TV (mirrored X)
+  if(mode==='wall') return {x:-17, y:28, z:-69.625}; // wall-mounted under mini split, 5" standoff for airflow
   if(mode==='tv') return {x:45, y:0, z:-68}; // on floor under wall-mounted TV, centered
   return {x:0,y:0,z:0};
 }
@@ -2791,6 +2807,62 @@ consoleProps.visible=false;
 // Add to purifierGroup so it moves/rotates with the purifier
 function showConsoleProps(show){
   consoleProps.visible=show;
+}
+
+// ─── Wall-mount bracket (shown in Wall placement mode) ───
+const wallBracketGroup=new THREE.Group();
+wallBracketGroup.visible=false;
+{
+  const bkMat=stdMat({color:0x303035, roughness:0.35, metalness:0.85});
+  const bkThick=0.25; // steel plate thickness
+  const bkWidth=2.0; // bracket strap width
+  const standoff=5; // 5" from purifier back to wall
+  const purifierSide=W/2+ply; // 3.22" from center to narrow side
+  const fullArmLen=purifierSide*2+standoff; // extends from far edge of purifier to wall
+  const armLen=fullArmLen;
+  const plateH=7; // vertical wall plate height
+  const bkSpacing=8; // distance from center for each bracket (along purifier length = Z)
+
+  for(const sz of [-1,1]){
+    const bz=sz*bkSpacing; // spaced along purifier length (local Z)
+    const bkBottom=-(H/2+ply); // bottom of purifier box
+
+    // Horizontal arm — extends in +X from far edge of purifier to wall
+    // (+X becomes -Z = toward wall when purifierGroup rotates 90° on Y)
+    const arm=new THREE.Mesh(
+      new THREE.BoxGeometry(armLen, bkThick, bkWidth),
+      bkMat
+    );
+    arm.position.set(-purifierSide+armLen/2, bkBottom-bkThick/2, bz);
+    arm.castShadow=true; arm.receiveShadow=true;
+    wallBracketGroup.add(arm);
+
+    // Vertical wall plate — at wall end (+X), extends upward
+    const wallEndX=purifierSide+standoff;
+    const plate=new THREE.Mesh(
+      new THREE.BoxGeometry(bkThick, plateH, bkWidth),
+      bkMat
+    );
+    plate.position.set(wallEndX-bkThick/2, bkBottom+plateH/2, bz);
+    plate.castShadow=true; plate.receiveShadow=true;
+    wallBracketGroup.add(plate);
+
+    // Diagonal brace — angled support from arm to plate
+    const braceLen=Math.sqrt(standoff*standoff + (plateH*0.6)*(plateH*0.6));
+    const braceAngle=Math.atan2(plateH*0.6, standoff);
+    const brace=new THREE.Mesh(
+      new THREE.BoxGeometry(braceLen, bkThick, bkWidth*0.6),
+      bkMat
+    );
+    brace.position.set(purifierSide+standoff/2, bkBottom+plateH*0.3, bz);
+    brace.rotation.z=braceAngle;
+    brace.castShadow=true;
+    wallBracketGroup.add(brace);
+  }
+}
+scene.add(wallBracketGroup);
+function showWallBracket(show){
+  wallBracketGroup.visible=show;
 }
 
 // ─── Continuous time-of-day lighting ───
