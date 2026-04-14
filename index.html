@@ -277,12 +277,17 @@
   <div class="seg"><button id="btnFan3" class="on" onclick="setFanCount(3)">3 Fans</button><button id="btnFan4" onclick="setFanCount(4)">4 Fans</button></div>
   <div class="toggle-row"><span class="toggle-label">Exploded view</span><div class="toggle-switch" id="togExplode" onclick="toggleExplode()"></div></div>
   <div class="toggle-row"><span class="toggle-label">Show filters</span><div class="toggle-switch on" id="togFilter" onclick="toggleFilter()"></div></div>
+  <div class="toggle-row"><span class="toggle-label">Fan grills</span><div class="toggle-switch" id="togGrill" onclick="toggleGrills()"></div></div>
+  <div id="grillColorSection" style="display:none"><div class="picker-label">Grill color</div>
+  <div class="seg"><button id="btnGrillBlack" class="on" onclick="setGrillColor('black')">Black</button><button id="btnGrillSilver" onclick="setGrillColor('silver')">Silver</button></div></div>
   <div class="picker-label">Wood stain</div>
   <div class="seg"><button id="btnStainRaw" class="on" onclick="setStain('raw')">Raw Birch</button><button id="btnStainOil" onclick="setStain('oil')">Oil</button><button id="btnStainWalnut" onclick="setStain('walnut')">Walnut</button></div>
   <div class="picker-label">Feet style</div>
   <div class="seg"><button id="btnFeetPeg" onclick="setFeetStyle('peg')">Peg Legs</button><button id="btnFeetBun" class="on" onclick="setFeetStyle('bun')">Round Feet</button><button id="btnFeetRubber" onclick="setFeetStyle('rubber')">Rubber Feet</button></div>
   <div class="picker-label">Placement</div>
-  <div class="seg"><button id="btnPlaceTable" onclick="setPlacement('table')">Nightstand</button><button id="btnPlaceFloor" class="on" onclick="setPlacement('floor')">Floor</button><button id="btnPlaceWall" onclick="setPlacement('wall')">Wall</button></div>
+  <div class="seg"><button id="btnPlaceFloor" class="on" onclick="setPlacement('floor')">Floor</button><button id="btnPlaceWall" onclick="setPlacement('wall')">Wall</button><button id="btnPlaceTv" onclick="setPlacement('tv')">Under TV</button></div>
+  <div style="margin-top:6px;font-size:9px;color:rgba(255,255,255,0.4);text-align:center">Arrow keys nudge position (world space)</div>
+  <div style="text-align:center;font-size:10px;color:rgba(255,255,255,0.55);font-family:monospace;margin-top:2px" id="nudgeLabel">X:0 Y:0 Z:0</div>
   </div></div>
   </div>
 
@@ -309,10 +314,15 @@
   <div class="picker-label">Time of day</div>
   <div class="slider-row" style="gap:6px"><span style="font-size:16px;color:rgba(255,255,255,0.5);display:flex;align-items:center"><i class="ph ph-sun"></i></span><input type="range" id="todSlider" min="0" max="1440" value="720" step="1" oninput="setTimeFromSlider(this.value)"><span style="font-size:16px;color:rgba(255,255,255,0.5);display:flex;align-items:center"><i class="ph ph-moon-stars"></i></span></div>
   <div style="text-align:center;font-size:10px;color:rgba(255,255,255,0.45);margin-top:-2px" id="todLabel">12:00 PM</div>
+  <div class="picker-label" style="margin-top:8px">Turntable</div>
+  <div class="slider-row" style="gap:6px"><span style="font-size:14px;color:rgba(255,255,255,0.5);display:flex;align-items:center">0°</span><input type="range" id="turntableSlider" min="0" max="360" value="0" step="1" oninput="setTurntable(this.value)"><span style="font-size:14px;color:rgba(255,255,255,0.5);display:flex;align-items:center">360°</span></div>
+  <div style="text-align:center;font-size:10px;color:rgba(255,255,255,0.45);margin-top:-2px" id="turntableLabel">0°</div>
+  <div class="toggle-row" style="margin-top:4px"><span class="toggle-label" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted" onclick="resetPurifierPos()">Reset position</span></div>
   <div class="toggle-row"><span class="toggle-label">Isolate purifier</span><div class="toggle-switch" id="togIsolate" onclick="toggleIsolate()"></div></div>
   <div class="toggle-row"><span class="toggle-label">Dimensions</span><div class="toggle-switch" id="togDims" onclick="toggleDimensions()"></div></div>
   <div class="toggle-row"><span class="toggle-label">X-ray mode</span><div class="toggle-switch" id="togXray" onclick="toggleXray()"></div></div>
   <div class="toggle-row"><span class="toggle-label">Show FPS</span><div class="toggle-switch" id="togFps" onclick="toggleFps()"></div></div>
+  <div class="toggle-row" style="margin-top:4px"><span class="toggle-label">Mini explorer <span style="font-size:9px;opacity:0.5">(G)</span></span><div class="toggle-switch" id="togFP" onclick="toggleFirstPerson()"></div></div>
   </div></div>
   </div>
 
@@ -474,6 +484,8 @@
       <tr><td><kbd>F</kbd></td><td>Show FPS counter</td></tr>
       <tr><td><kbd>L</kbd></td><td>Toggle legend</td></tr>
       <tr><td><kbd>H</kbd></td><td>Hide all UI (any key restores)</td></tr>
+      <tr><td><kbd>G</kbd></td><td>Mini explorer (first-person)</td></tr>
+      <tr><td><kbd>←↑→↓</kbd></td><td>Nudge placement</td></tr>
     </table>
     <div class="dismiss">Press <b>?</b> or click outside to close</div>
   </div>
@@ -525,25 +537,96 @@ const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false, p
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, _isMobile?1:2));
 renderer.setClearColor(0xd4dce8, 1);
 renderer.shadowMap.enabled=true;
-renderer.shadowMap.type=_isMobile?THREE.PCFSoftShadowMap:THREE.VSMShadowMap;
+renderer.shadowMap.type=THREE.VSMShadowMap; // smooth variance shadows — zero grain
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=1.15;
+renderer.toneMappingExposure=1.3;
+
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0xd4dce8, 0.0015);
 const camera = new THREE.PerspectiveCamera(42,1,0.1,500);
-// Daytime lighting — soft and even
-scene.add(new THREE.AmbientLight(0xffffff,0.22));
-const key=new THREE.DirectionalLight(0xfff8f0,0.55); key.position.set(95,38,0); // from outside the window (flipped)
+
+// ─── Procedural environment map (fake indoor HDRI — free reflections) ───
+(function generateEnvMap(){
+  const pmrem=new THREE.PMREMGenerator(renderer);
+  pmrem.compileCubemapShader();
+  const envScene=new THREE.Scene();
+  // Gradient hemisphere: warm floor bounce, cool sky
+  const hemiEnv=new THREE.HemisphereLight(0x8899bb, 0xffe0c0, 0.4);
+  envScene.add(hemiEnv);
+  // Simulate window light from one side (warm rectangle)
+  const winLight=new THREE.DirectionalLight(0xfff4e0, 0.8);
+  winLight.position.set(5, 3, 0);
+  envScene.add(winLight);
+  // Soft fill from opposite side
+  const fillEnv=new THREE.DirectionalLight(0xc0d0e8, 0.2);
+  fillEnv.position.set(-3, 1, -2);
+  envScene.add(fillEnv);
+  const envRT=pmrem.fromScene(envScene, 0.04);
+  window._roomEnvMap=envRT.texture; // stored for selective use on metallic/glossy materials
+  pmrem.dispose();
+})();
+
+// ─── Fan Glow Sprites (additive glow behind each fan — no post-processing needed) ───
+// Canvas-generated radial gradient texture for soft glow disc
+const _glowCanvas=document.createElement('canvas');
+_glowCanvas.width=128; _glowCanvas.height=128;
+const _glowCtx=_glowCanvas.getContext('2d');
+const grad=_glowCtx.createRadialGradient(64,64,0,64,64,64);
+grad.addColorStop(0,'rgba(255,255,255,0.7)');
+grad.addColorStop(0.3,'rgba(255,255,255,0.3)');
+grad.addColorStop(0.7,'rgba(255,255,255,0.08)');
+grad.addColorStop(1,'rgba(255,255,255,0)');
+_glowCtx.fillStyle=grad;
+_glowCtx.fillRect(0,0,128,128);
+const _glowTex=new THREE.CanvasTexture(_glowCanvas);
+
+function makeGlowSprite(size){
+  const mat=new THREE.SpriteMaterial({
+    map:_glowTex,
+    color:0x000000,
+    blending:THREE.AdditiveBlending,
+    transparent:true,
+    depthWrite:false
+  });
+  const sprite=new THREE.Sprite(mat);
+  sprite.scale.set(size,size,1);
+  sprite.visible=false; // off until RGB activates
+  return sprite;
+}
+const allGlowSprites=[]; // parallel to allFanGlows — one per panel glow light
+
+// ─── PBR helper: converts legacy shininess → roughness ───
+function stdMat(opts){
+  if('shininess' in opts){
+    if(!('roughness' in opts)) opts.roughness=Math.max(0.04, 1-opts.shininess/120);
+    delete opts.shininess;
+  }
+  if(!('metalness' in opts)) opts.metalness=0;
+  if(!('roughness' in opts)) opts.roughness=0.5;
+  // Only apply env map to metallic/glossy surfaces
+  if(opts.metalness>0.3 || opts.roughness<0.15){
+    opts.envMap=window._roomEnvMap;
+    if(opts.envMapIntensity===undefined) opts.envMapIntensity=0.6;
+  } else {
+    if(opts.envMapIntensity===undefined) opts.envMapIntensity=0;
+  }
+  return new THREE.MeshStandardMaterial(opts);
+}
+
+// Daytime lighting — soft and even (hemisphere replaces flat ambient)
+const hemiLight=new THREE.HemisphereLight(0x8899bb, 0xffeedd, 0.18); // sky blue top, warm ground bounce
+scene.add(hemiLight);
+const key=new THREE.DirectionalLight(0xffe0a0,1.4); key.position.set(95,38,0); // from outside the window (flipped)
 key.castShadow=true; key.shadow.mapSize.set(_isMobile?1024:2048, _isMobile?1024:2048);
 key.shadow.bias=-0.0005; key.shadow.normalBias=0.04;
-key.shadow.radius=_isMobile?3:6; key.shadow.blurSamples=_isMobile?8:16;
+key.shadow.radius=_isMobile?4:8; key.shadow.blurSamples=_isMobile?10:25;
 key.shadow.camera.near=1; key.shadow.camera.far=160;
 key.shadow.camera.left=-50; key.shadow.camera.right=50;
 key.shadow.camera.top=40; key.shadow.camera.bottom=-40;
 scene.add(key);
-const fill=new THREE.DirectionalLight(0xe8eeff,0.18); fill.position.set(-10,12,-12); scene.add(fill);
-const rim=new THREE.DirectionalLight(0xccddff,0.2); rim.position.set(-6,15,-18); scene.add(rim);
-const bounce=new THREE.DirectionalLight(0xffeedd,0.08); bounce.position.set(0,-10,8); scene.add(bounce);
+const fill=new THREE.DirectionalLight(0xe8eeff,0.08); fill.position.set(-10,12,-12); scene.add(fill);
+const rim=new THREE.DirectionalLight(0xccddff,0.1); rim.position.set(-6,15,-18); scene.add(rim);
+const bounce=new THREE.DirectionalLight(0xffeedd,0.05); bounce.position.set(0,-10,8); scene.add(bounce);
 
 // Filtrete 20x25x1 actual: 19.69×24.69×0.78
 const W=5.44, H=19.69, D=24.69, ply=0.5, ft=0.78;
@@ -736,13 +819,15 @@ function birchMat(){
   _birchTexIdx++;
   t.needsUpdate=true;
   t.repeat.set(1,1);
-  const m=new THREE.MeshPhongMaterial({map:t,color:0xd2b48c,shininess:18,side:THREE.DoubleSide});
+  t.center.set(0.5,0.5);
+  t.rotation=Math.PI/2; // rotate 90° so grain runs vertically
+  const m=stdMat({map:t,color:0xd2b48c,shininess:18,side:THREE.DoubleSide});
   allBirchMats.push(m);
   return m;
 }
 
 function mk(geo,color,opacity=1){
-  return new THREE.Mesh(geo,new THREE.MeshPhongMaterial({
+  return new THREE.Mesh(geo,stdMat({
     color,transparent:opacity<1,opacity,side:THREE.DoubleSide,depthWrite:opacity>0.45
   }));
 }
@@ -779,6 +864,94 @@ scene.add(topPanel); parts.top=topPanel; origins.top=topPanel.position.clone();
 const botPanel=makeCapPanel(panelW,ply,D+2*ply,false);
 botPanel.position.set(0,-(H/2+ply/2),0);
 scene.add(botPanel); parts.bot=botPanel; origins.bot=botPanel.position.clone();
+
+// ─── Fan grills ───
+const allGrillMeshes=[];
+let grillsVisible=false;
+let grillColor='black'; // 'black' or 'silver'
+const C_GRILL_BLACK=0x1a1a1a;
+const C_GRILL_SILVER=0x9a9a9a;
+function grillMat(){
+  const c=grillColor==='silver'?C_GRILL_SILVER:C_GRILL_BLACK;
+  return stdMat({color:c,shininess:grillColor==='silver'?60:20,side:THREE.DoubleSide,metalness:grillColor==='silver'?0.7:0.1});
+}
+function makeGrill(radius, wireR){
+  // Classic fan grill: concentric rings + 2 bent wires (4 spokes) + angled corner legs
+  wireR=wireR||0.045;
+  const standoff=0.25; // grill sits 0.25" proud of the wood surface
+  const g=new THREE.Group();
+  g.userData._isGrill=true;
+  const mat=grillMat();
+
+  // Ring+spoke sub-group — offset outward by standoff
+  const ringGroup=new THREE.Group();
+  ringGroup.position.z=standoff;
+  g.add(ringGroup);
+
+  // Concentric rings — 6 rings from center to edge
+  const ringRadii=[radius*0.09, radius*0.26, radius*0.43, radius*0.60, radius*0.77, radius*0.94];
+  for(const r of ringRadii){
+    const ringGeo=new THREE.TorusGeometry(r,wireR,6,48);
+    ringGroup.add(new THREE.Mesh(ringGeo,mat));
+  }
+
+  // 2 wires: straight toward center, ONE bend near hub, straight to bottom corner
+  const s=0.707*radius; // corner ON the outer ring (cos45 * radius)
+  const off=0.04*radius; // offset from center — wires get close but don't touch
+  const gp=0.30*radius;  // guide point — keeps wire straight until near center
+  // Wire 1: top-right → straight → bend near center (slightly right) → straight → bottom-right
+  // Wire 2: top-left → straight → bend near center (slightly left) → straight → bottom-left
+  [[ [s,s], [gp,gp], [off,0], [gp,-gp], [s,-s] ],
+   [ [-s,s], [-gp,gp], [-off,0], [-gp,-gp], [-s,-s] ]].forEach(w=>{
+    const pts=w.map(p=>new THREE.Vector3(p[0],p[1],0));
+    const curve=new THREE.CatmullRomCurve3(pts);
+    const tubeGeo=new THREE.TubeGeometry(curve,32,wireR,6,false);
+    ringGroup.add(new THREE.Mesh(tubeGeo,mat));
+  });
+
+  // 4 corner legs — angled from grill plane down to flush against wood
+  // Each leg goes from the outer ring edge (at z=standoff) to the corner (at z=0)
+  const cornerDist=radius*1.18; // where the hook meets the wood — well outside the hole
+  const rimDist=radius*0.92;    // where the leg starts on the grill rim
+  for(let ci=0;ci<4;ci++){
+    const ca=Math.PI/4+ci*Math.PI/2;
+    const rx=Math.cos(ca)*rimDist;
+    const ry=Math.sin(ca)*rimDist;
+    const cx=Math.cos(ca)*cornerDist;
+    const cy=Math.sin(ca)*cornerDist;
+    // Leg from (rx,ry,standoff) to (cx,cy,0) — angled strut
+    const dx=cx-rx, dy=cy-ry, dz=-standoff;
+    const legLen=Math.sqrt(dx*dx+dy*dy+dz*dz);
+    const legGeo=new THREE.CylinderGeometry(wireR*0.9,wireR*0.9,legLen,6);
+    legGeo.translate(0,legLen/2,0);
+    legGeo.rotateX(Math.PI/2);
+    const leg=new THREE.Mesh(legGeo,mat);
+    leg.position.set(rx,ry,standoff);
+    // Aim toward the corner mount point
+    leg.lookAt(new THREE.Vector3(cx,cy,0));
+    g.add(leg);
+    // Small flat tab at the corner touching the wood
+    const tabGeo=new THREE.CylinderGeometry(wireR*2.5,wireR*2.5,wireR*1.5,8);
+    tabGeo.rotateX(Math.PI/2);
+    const tab=new THREE.Mesh(tabGeo,mat);
+    tab.position.set(cx,cy,wireR*0.75);
+    g.add(tab);
+  }
+
+  return g;
+}
+function updateGrillColors(){
+  const c=grillColor==='silver'?C_GRILL_SILVER:C_GRILL_BLACK;
+  const s=grillColor==='silver'?60:20;
+  for(const m of allGrillMeshes){
+    m.traverse(o=>{
+      if(o.isMesh&&o.material){
+        o.material.color.setHex(c);
+        o.material.shininess=s;
+      }
+    });
+  }
+}
 
 // ─── Fan panels (front/back) ───
 function makeFanPanel(flip, nFans){
@@ -833,7 +1006,7 @@ function makeFanPanel(flip, nFans){
     fs.holes.push(fh);
     const frameGeo=new THREE.ExtrudeGeometry(fs,{depth:fanDepth,bevelEnabled:false});
     frameGeo.translate(0,0,-fanDepth/2);
-    const frameMat=new THREE.MeshPhongMaterial({color:C_FAN,shininess:30});
+    const frameMat=stdMat({color:C_FAN,shininess:30});
     allFanMats.push(frameMat);
     const frame=new THREE.Mesh(frameGeo,frameMat);
     frame.position.set(0,fy,fanZ);
@@ -845,7 +1018,7 @@ function makeFanPanel(flip, nFans){
     rotor.userData.axis=new THREE.Vector3(0,0,inDir);
 
     // Hub
-    const hubMat=new THREE.MeshPhongMaterial({color:0x111111,shininess:40});
+    const hubMat=stdMat({color:0x111111,shininess:40});
     allFanMats.push(hubMat);
     const hub=new THREE.Mesh(
       new THREE.CylinderGeometry(hubR,hubR,fanDepth*0.85,24),
@@ -855,7 +1028,7 @@ function makeFanPanel(flip, nFans){
     rotor.add(hub);
 
     // Hub cap
-    const capMat=new THREE.MeshPhongMaterial({color:0x181818,shininess:50});
+    const capMat=stdMat({color:0x181818,shininess:50});
     allFanMats.push(capMat);
     const cap=new THREE.Mesh(
       new THREE.CylinderGeometry(hubR*1.15,hubR*1.15,fanDepth*0.08,24),
@@ -870,7 +1043,7 @@ function makeFanPanel(flip, nFans){
     const fanBlades=[];
     allFanMats.push(null); // placeholder at [i+3], replaced below with blade[0]
     for(let b=0;b<bladeCount;b++){
-      const bladeMat=new THREE.MeshPhongMaterial({color:0xf0ece8,shininess:30,side:THREE.DoubleSide,transparent:true,opacity:0.65,depthWrite:false});
+      const bladeMat=stdMat({color:0xf0ece8,shininess:30,side:THREE.DoubleSide,transparent:true,opacity:0.65,depthWrite:false});
       fanBlades.push(bladeMat);
       const baseAngle=b/bladeCount*Math.PI*2;
       const bladeShape=new THREE.Shape();
@@ -908,6 +1081,16 @@ function makeFanPanel(flip, nFans){
     g.add(rotor);
     allRotors.push(rotor);
 
+    // Invisible click target for reliable fan clicking
+    const clickBox=new THREE.Mesh(
+      new THREE.BoxGeometry(fanFrame, fanFrame, fanDepth),
+      new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false})
+    );
+    clickBox.position.set(0, fy, fanZ);
+    clickBox._isFan=true;
+    clickBox._rotor=rotor;
+    g.add(clickBox);
+
     // Back support brace — 4 spokes, pinwheel offset (each arm misses center)
     const braceR=0.07, braceD=fanDepth*0.12;
     // Slightly in front of hub back face so brace blends into the fan back
@@ -927,7 +1110,7 @@ function makeFanPanel(flip, nFans){
       const len=Math.sqrt(dx*dx+dy*dy);
       const ang=Math.atan2(dy,dx);
       const spokeGeo=new THREE.BoxGeometry(len,braceR*2,braceD);
-      const spokeMat=new THREE.MeshPhongMaterial({color:C_FAN,shininess:30});
+      const spokeMat=stdMat({color:C_FAN,shininess:30});
       allBraceMats.push(spokeMat);
       const spoke=new THREE.Mesh(spokeGeo,spokeMat);
       spoke.position.set((cx+hx)/2, fy+(cy+hy)/2, braceZ);
@@ -937,7 +1120,7 @@ function makeFanPanel(flip, nFans){
 
     // Mounting posts
     const mh=mountSpacing/2;
-    const postMat=new THREE.MeshPhongMaterial({color:0x222222});
+    const postMat=stdMat({color:0x222222,roughness:0.5});
     for(let mx of[-1,1]){
       for(let my of[-1,1]){
         const post=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,fanDepth,8),postMat);
@@ -946,6 +1129,15 @@ function makeFanPanel(flip, nFans){
         g.add(post);
       }
     }
+
+    // Fan grill (outside face of plywood panel)
+    const grillZ=-inDir*(ply/2); // flush with panel outer face
+    const grill=makeGrill(fanFrame/2);
+    grill.position.set(0,fy,grillZ);
+    if(!flip) grill.rotation.y=Math.PI; // front panel: flip so standoff goes outward (-Z)
+    grill.visible=grillsVisible;
+    g.add(grill);
+    allGrillMeshes.push(grill);
 
     // (RGB glow handled by single panel-level light below)
   }
@@ -1062,7 +1254,7 @@ function makeAltTopPanel(nFans){
     frameGeo.translate(0,0,-fanDepth/2);
     // Rotate frame to point up: Z→Y
     frameGeo.rotateX(-Math.PI/2);
-    const frameMat=new THREE.MeshPhongMaterial({color:C_FAN,shininess:30});
+    const frameMat=stdMat({color:C_FAN,shininess:30});
     allFanMats.push(frameMat);
     const frame=new THREE.Mesh(frameGeo,frameMat);
     frame.position.set(0,fanYPos,fz);
@@ -1074,13 +1266,13 @@ function makeAltTopPanel(nFans){
     rotor.userData.axis=new THREE.Vector3(0,-1,0); // spin around Y (downward into box)
     rotor.rotation.x=Math.PI/2; // orient blades horizontally, facing down
 
-    const hubMat=new THREE.MeshPhongMaterial({color:0x111111,shininess:40});
+    const hubMat=stdMat({color:0x111111,shininess:40});
     allFanMats.push(hubMat);
     const hub=new THREE.Mesh(new THREE.CylinderGeometry(hubR,hubR,fanDepth*0.85,24),hubMat);
     hub.rotation.x=Math.PI/2;
     rotor.add(hub);
 
-    const capMat=new THREE.MeshPhongMaterial({color:0x181818,shininess:50});
+    const capMat=stdMat({color:0x181818,shininess:50});
     allFanMats.push(capMat);
     const cap=new THREE.Mesh(new THREE.CylinderGeometry(hubR*1.15,hubR*1.15,fanDepth*0.08,24),capMat);
     cap.rotation.x=Math.PI/2;
@@ -1090,7 +1282,7 @@ function makeAltTopPanel(nFans){
     const fanBlades2=[];
     allFanMats.push(null); // placeholder for blade[0]
     for(let b=0;b<bladeCount;b++){
-      const bladeMat=new THREE.MeshPhongMaterial({color:0xf0ece8,shininess:30,side:THREE.DoubleSide,transparent:true,opacity:0.65,depthWrite:false});
+      const bladeMat=stdMat({color:0xf0ece8,shininess:30,side:THREE.DoubleSide,transparent:true,opacity:0.65,depthWrite:false});
       fanBlades2.push(bladeMat);
       const baseAngle=b/bladeCount*Math.PI*2;
       const bladeShape=new THREE.Shape();
@@ -1124,6 +1316,16 @@ function makeAltTopPanel(nFans){
     g.add(rotor);
     allRotors.push(rotor);
 
+    // Invisible click target for top-mount fan
+    const clickBox2=new THREE.Mesh(
+      new THREE.BoxGeometry(fanFrame, fanDepth, fanFrame),
+      new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false})
+    );
+    clickBox2.position.set(0, fanYPos, fz);
+    clickBox2._isFan=true;
+    clickBox2._rotor=rotor;
+    g.add(clickBox2);
+
     // Back support brace — 4 spokes, pinwheel offset (top-mount: exhaust is UP/+Y)
     const braceR2=0.07, braceD2=fanDepth*0.12;
     // Slightly in front of hub back face
@@ -1143,7 +1345,7 @@ function makeAltTopPanel(nFans){
       const len2=Math.sqrt(dx2*dx2+dz2*dz2);
       const ang2=Math.atan2(dz2,dx2);
       const spokeGeo2=new THREE.BoxGeometry(len2,braceD2,braceR2*2);
-      const spokeMat2=new THREE.MeshPhongMaterial({color:C_FAN,shininess:30});
+      const spokeMat2=stdMat({color:C_FAN,shininess:30});
       allBraceMats.push(spokeMat2);
       const spoke2=new THREE.Mesh(spokeGeo2,spokeMat2);
       spoke2.position.set((cx2+hx2)/2, braceY, fz+(cz2+hz2)/2);
@@ -1153,7 +1355,7 @@ function makeAltTopPanel(nFans){
 
     // Mounting posts
     const mh=mountSpacing/2;
-    const postMat=new THREE.MeshPhongMaterial({color:0x222222});
+    const postMat=stdMat({color:0x222222,roughness:0.5});
     for(let mx of[-1,1]){
       for(let my of[-1,1]){
         const post=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,fanDepth,8),postMat);
@@ -1162,6 +1364,14 @@ function makeAltTopPanel(nFans){
         g.add(post);
       }
     }
+
+    // Fan grill (outside/top face of top panel)
+    const grillTop=makeGrill(fanFrame/2);
+    grillTop.rotation.x=-Math.PI/2; // rotate flat onto XZ plane, facing up
+    grillTop.position.set(0, ply/2, fz); // sit on top surface of panel
+    grillTop.visible=grillsVisible;
+    g.add(grillTop);
+    allGrillMeshes.push(grillTop);
 
     // (RGB glow handled by single panel-level light below)
   }
@@ -1247,7 +1457,7 @@ function makePleatedFilter(){
   filterTex.minFilter=THREE.LinearFilter;
   filterTex.magFilter=THREE.LinearFilter;
 
-  const filterMat=new THREE.MeshPhongMaterial({map:filterTex,color:0xffffff,side:THREE.DoubleSide,shininess:1,transparent:true,opacity:0.99});
+  const filterMat=stdMat({map:filterTex,color:0xffffff,side:THREE.DoubleSide,shininess:1,transparent:true,opacity:0.99});
   filterMatRef=filterMat; // cache for direct RGB lookup (avoids scene.traverse)
 
   // Zigzag pleated mesh — vertical folds (step along Y, fold lines run along Z)
@@ -1301,7 +1511,7 @@ function makePleatedFilter(){
     }
   }
   const wireGeo=new THREE.BufferGeometry().setFromPoints(wirePoints);
-  const wireMat=new THREE.MeshPhongMaterial({color:0x777777,shininess:40});
+  const wireMat=stdMat({color:0x777777,shininess:40,metalness:0.7});
   const wireRadius=0.01;
   const wireSeg=4; // segments around each cylinder
   // Merge all wire strands into a single geometry per face
@@ -1354,14 +1564,14 @@ function makePleatedFilter(){
 
   // 1″ white cardboard border on flat faces
   const border=1.0;
-  const borderMat=new THREE.MeshPhongMaterial({color:0xf5f5f5,shininess:3});
+  const borderMat=stdMat({color:0xf5f5f5,shininess:3});
   g.add(new THREE.Mesh(new THREE.BoxGeometry(ft,border,D),borderMat).translateY(H/2-border/2));
   g.add(new THREE.Mesh(new THREE.BoxGeometry(ft,border,D),borderMat).translateY(-H/2+border/2));
   g.add(new THREE.Mesh(new THREE.BoxGeometry(ft,H,border),borderMat).translateZ(D/2-border/2));
   g.add(new THREE.Mesh(new THREE.BoxGeometry(ft,H,border),borderMat).translateZ(-D/2+border/2));
 
   // Blue on thin perimeter edges (top/bottom/front/back of slab)
-  const blueMat=new THREE.MeshPhongMaterial({color:0x1a3d7c,shininess:8});
+  const blueMat=stdMat({color:0x1a3d7c,shininess:8});
   const blueT=0.025;
   // Top edge
   const eTop=new THREE.Mesh(new THREE.PlaneGeometry(ft,D),blueMat);
@@ -1387,7 +1597,7 @@ function makePleatedFilter(){
     ctx.font='bold 180px -apple-system,BlinkMacSystemFont,sans-serif';
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText('3M',128,128);
-    return new THREE.MeshPhongMaterial({map:new THREE.CanvasTexture(cvs),shininess:5,side:THREE.DoubleSide});
+    return stdMat({map:new THREE.CanvasTexture(cvs),shininess:5,side:THREE.DoubleSide});
   }
   function flipUGeo(w,h){
     const geo=new THREE.PlaneGeometry(w,h);
@@ -1493,7 +1703,7 @@ const legY=-(H/2+ply+legH/2);
 const legGroup=new THREE.Group();
 const allLegMeshes=[];
 const woodLegMat=birchMat();
-const rubberMat=new THREE.MeshPhongMaterial({color:0x2a2a2a,shininess:5});
+const rubberMat=stdMat({color:0x2a2a2a,shininess:5});
 
 // Peg leg geometry (tapered cylinder)
 const pegGeo=new THREE.CylinderGeometry(legR,legR*0.85,legH,16);
@@ -1538,41 +1748,41 @@ parts.legs=legGroup; origins.legs=legGroup.position.clone();
 // ─── ESP32 + power supply on bottom interior ───
 {
   // ESP32-C3 Super Mini
-  const espMat=new THREE.MeshPhongMaterial({color:0x1a5c1a,shininess:30});
+  const espMat=stdMat({color:0x1a5c1a,shininess:30});
   const esp=new THREE.Mesh(new THREE.BoxGeometry(0.87,0.2,0.71),espMat);
   esp.position.set(0.5,-(H/2-0.1),0);
   scene.add(esp);
   // USB-C stub
   const usb=new THREE.Mesh(new THREE.BoxGeometry(0.35,0.1,0.15),
-    new THREE.MeshPhongMaterial({color:0xaaaaaa,shininess:50}));
+    stdMat({color:0xaaaaaa,shininess:50,metalness:0.7}));
   usb.position.set(0.5,-(H/2-0.1),-0.71/2-0.075);
   scene.add(usb);
   // Chip
   const chip=new THREE.Mesh(new THREE.BoxGeometry(0.25,0.06,0.25),
-    new THREE.MeshPhongMaterial({color:0x111111}));
+    stdMat({color:0x111111,roughness:0.8}));
   chip.position.set(0.5,-(H/2-0.23),0);
   scene.add(chip);
 
   // 5V buck converter
   const psu=new THREE.Mesh(new THREE.BoxGeometry(1.5,0.47,0.71),
-    new THREE.MeshPhongMaterial({color:0x1a1a8a,shininess:20}));
+    stdMat({color:0x1a1a8a,shininess:20}));
   psu.position.set(-0.6,-(H/2-0.235),0);
   scene.add(psu);
   // Barrel jack
   const jack=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,0.25,12),
-    new THREE.MeshPhongMaterial({color:0x222222}));
+    stdMat({color:0x222222,roughness:0.7}));
   jack.rotation.x=Math.PI/2;
   jack.position.set(-0.6,-(H/2-0.235),0.71/2+0.125);
   scene.add(jack);
 
   // Power cord hole in back panel
   const holeMesh=new THREE.Mesh(new THREE.BoxGeometry(0.6,0.4,ply+0.02),
-    new THREE.MeshPhongMaterial({color:0x222222}));
+    stdMat({color:0x222222,roughness:0.7}));
   holeMesh.position.set(-0.6,-(H/2-0.235),D/2+ply/2);
   scene.add(holeMesh);
 
   // Power cord — single smooth tube from hole to dangling plug
-  const cordMat=new THREE.MeshPhongMaterial({color:0x111111,shininess:15});
+  const cordMat=stdMat({color:0x111111,shininess:15});
   const cordR=0.09;
   const cX=-0.6, cY=-(H/2-0.235), cZ_hole=D/2+ply;
   // Build one continuous path: exit hole → gentle curve down → hang
@@ -1591,13 +1801,13 @@ parts.legs=legGroup; origins.legs=legGroup.position.clone();
 
   // US NEMA 5-15P plug at the end
   const plugEnd=cordCurve.getPoint(1);
-  const plugMat=new THREE.MeshPhongMaterial({color:0x222222,shininess:25});
+  const plugMat=stdMat({color:0x222222,shininess:25});
   // Plug body
   const plugBody=new THREE.Mesh(new THREE.BoxGeometry(0.55,0.9,0.35),plugMat);
   plugBody.position.copy(plugEnd).add(new THREE.Vector3(0,-0.5,0));
   scene.add(plugBody);
   // Two flat prongs (parallel, vertical)
-  const prongMat=new THREE.MeshPhongMaterial({color:0xbbbbbb,shininess:70});
+  const prongMat=stdMat({color:0xbbbbbb,shininess:70,metalness:0.9});
   for(let px of[-0.12,0.12]){
     const prong=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.5,0.015),prongMat);
     prong.position.copy(plugEnd).add(new THREE.Vector3(px,-1.2,0));
@@ -1612,10 +1822,10 @@ parts.legs=legGroup; origins.legs=legGroup.position.clone();
 // ─── Fan wiring — daisy-chained with connectors ───
 {
   const wireR=0.045;
-  const wireMat=new THREE.MeshPhongMaterial({color:0x444444,shininess:15}); // dark gray, not black
-  const redMat=new THREE.MeshPhongMaterial({color:0xaa2222,shininess:10});
-  const connMat=new THREE.MeshPhongMaterial({color:0xeeeeee,shininess:40}); // white JST connector
-  const connBlack=new THREE.MeshPhongMaterial({color:0x333333,shininess:25});
+  const wireMat=stdMat({color:0x444444,shininess:15}); // dark gray, not black
+  const redMat=stdMat({color:0xaa2222,shininess:10});
+  const connMat=stdMat({color:0xeeeeee,shininess:40}); // white JST connector
+  const connBlack=stdMat({color:0x333333,shininess:25});
 
   function makeWire(pts, mat, segs){
     if(pts.length<2) return;
@@ -1742,12 +1952,26 @@ function toggleFilter(){
   parts.filterR.visible=filterOn;
   document.getElementById('togFilter').classList.toggle('on',filterOn);
 }
+function toggleGrills(){
+  grillsVisible=!grillsVisible;
+  document.getElementById('togGrill').classList.toggle('on',grillsVisible);
+  document.getElementById('grillColorSection').style.display=grillsVisible?'':'none';
+  for(const gm of allGrillMeshes) gm.visible=grillsVisible;
+}
+function setGrillColor(c){
+  grillColor=c;
+  document.querySelectorAll('#btnGrillBlack,#btnGrillSilver').forEach(b=>b.classList.remove('on'));
+  document.getElementById(c==='black'?'btnGrillBlack':'btnGrillSilver').classList.add('on');
+  updateGrillColors();
+}
 
 // ─── Camera controls ───
 // Restore camera from sessionStorage if available (survives live reload)
 const _savedCam=sessionStorage.getItem('cam');
 const _camDefaults=_savedCam?JSON.parse(_savedCam):{p:1.1,a:0.5+Math.PI,r:50};
 let drag=false,px=0,py=0,polar=_camDefaults.p,azimuth=_camDefaults.a,radius=_camDefaults.r;
+let panX=0, panY=0, panZ=0; // camera target offset (shift+drag)
+let _isPanning=false;
 let _clickStartX=0,_clickStartY=0;
 const _raycaster=new THREE.Raycaster();
 const _mouse=new THREE.Vector2();
@@ -1781,7 +2005,12 @@ window.addEventListener('mouseup',e=>{
   } else {
     _dragFilter=null;
     if(Math.abs(e.clientX-_clickStartX)<15 && Math.abs(e.clientY-_clickStartY)<15){
-      handleClick(e.clientX,e.clientY);
+      // In FP mode with pointer lock, use the pre-computed center-screen target
+      if(_fpMode && document.pointerLockElement){
+        if(window._fpLookTarget) handleClickObject(window._fpLookTarget);
+      } else {
+        handleClick(e.clientX,e.clientY);
+      }
     }
   }
   _pendingFilterDrag=false;
@@ -1824,6 +2053,7 @@ canvas.addEventListener('mousemove',e=>{
     _hoverInteractive=false;
     let hoveredPartId=null;
     for(const h of hits){
+      if(!isAncestorVisible(h.object)) continue;
       if(h.object._isLamp){ _hoverInteractive=true; break; }
       if(h.object._isRoom) continue;
       if(h.object._isFan||h.object._isFilterL||h.object._isFilterR){ _hoverInteractive=true; }
@@ -1841,8 +2071,22 @@ canvas.addEventListener('mousemove',e=>{
     }
   }
   if(!drag) return;
-  azimuth-=(e.clientX-px)*0.013;
-  polar=Math.max(0.1,Math.min(Math.PI-0.1,polar-(e.clientY-py)*0.013));
+  if(e.shiftKey){
+    // Shift+drag: pan the camera target on the floor plane
+    _isPanning=true;
+    const panSpeed=0.08*radius/50;
+    // Camera right vector projected onto XZ
+    const rx=Math.cos(azimuth), rz=-Math.sin(azimuth);
+    // Camera forward vector projected onto XZ
+    const fx=-Math.sin(azimuth), fz=-Math.cos(azimuth);
+    const dx=e.clientX-px, dy=e.clientY-py;
+    panX-=dx*rx*panSpeed + dy*fx*panSpeed;
+    panZ-=dx*rz*panSpeed + dy*fz*panSpeed;
+  } else {
+    _isPanning=false;
+    azimuth-=(e.clientX-px)*0.013;
+    polar=Math.max(0.1,Math.min(Math.PI-0.1,polar-(e.clientY-py)*0.013));
+  }
   px=e.clientX;py=e.clientY;
 });
 canvas.addEventListener('touchmove',e=>{
@@ -1855,8 +2099,18 @@ canvas.addEventListener('touchmove',e=>{
     return;
   }
   if(!drag)return;
-  azimuth-=(e.touches[0].clientX-px)*0.013;
-  polar=Math.max(0.1,Math.min(Math.PI-0.1,polar-(e.touches[0].clientY-py)*0.013));
+  // Two-finger touch: pan
+  if(e.touches.length===2){
+    const panSpeed=0.08*radius/50;
+    const rx=Math.cos(azimuth), rz=-Math.sin(azimuth);
+    const fx=-Math.sin(azimuth), fz=-Math.cos(azimuth);
+    const dx=e.touches[0].clientX-px, dy=e.touches[0].clientY-py;
+    panX-=dx*rx*panSpeed + dy*fx*panSpeed;
+    panZ-=dx*rz*panSpeed + dy*fz*panSpeed;
+  } else {
+    azimuth-=(e.touches[0].clientX-px)*0.013;
+    polar=Math.max(0.1,Math.min(Math.PI-0.1,polar-(e.touches[0].clientY-py)*0.013));
+  }
   px=e.touches[0].clientX;py=e.touches[0].clientY;
 },{passive:true});
 canvas.addEventListener('wheel',e=>{e.preventDefault();radius=Math.max(20,Math.min(130,radius+e.deltaY*0.55));},{passive:false});
@@ -1946,25 +2200,12 @@ const filterROrigin=filterR.position.clone();
 const filterSlideMax=12; // slide up to 12" out from installed position
 let _dragFilter=null; // {obj, side, origin, startMouse}
 
-function handleClick(clientX,clientY){
-  const rect=canvas.getBoundingClientRect();
-  _mouse.x=((clientX-rect.left)/rect.width)*2-1;
-  _mouse.y=-((clientY-rect.top)/rect.height)*2+1;
-  _raycaster.setFromCamera(_mouse,camera);
-  const hits=_raycaster.intersectObjects(scene.children,true);
-  // Find the first interactive hit
-  let obj=null;
-  for(const h of hits){
-    // Lamp is a room object but still interactive
-    if(h.object._isLamp){ obj=h.object; break; }
-    if(h.object._isRoom) continue;
-    if(h.object._isFan||h.object._isFilterL||h.object._isFilterR){ obj=h.object; break; }
-  }
+function handleClickObject(obj){
   if(!obj) return;
   // Clicked lamp → toggle light
   if(obj._isLamp){
     lampOn=!lampOn;
-    lampLight.intensity=lampOn?1.0:0;
+    lampLight.intensity=lampOn?1.2:0;
     lampShade.material.emissiveIntensity=lampOn?0.4:0;
     return;
   }
@@ -1975,7 +2216,7 @@ function handleClick(clientX,clientY){
     }
     return;
   }
-  // Clicked filter → toggle slide (fallback if not dragged)
+  // Clicked filter → toggle slide
   if(obj._isFilterL){
     filterLOut=!filterLOut;
     const target=filterLOut?filterLOrigin.clone().sub(new THREE.Vector3(filterSlideMax,0,0)):filterLOrigin.clone();
@@ -1988,6 +2229,29 @@ function handleClick(clientX,clientY){
     _filterLerps.push({obj:filterR,target:target});
     return;
   }
+}
+
+function handleClick(clientX,clientY){
+  const rect=canvas.getBoundingClientRect();
+  _mouse.x=((clientX-rect.left)/rect.width)*2-1;
+  _mouse.y=-((clientY-rect.top)/rect.height)*2+1;
+  _raycaster.setFromCamera(_mouse,camera);
+  const hits=_raycaster.intersectObjects(scene.children,true);
+  // Find the first interactive hit (skip objects inside invisible parent groups)
+  let obj=null;
+  for(const h of hits){
+    if(!isAncestorVisible(h.object)) continue;
+    if(h.object._isLamp){ obj=h.object; break; }
+    if(h.object._isRoom) continue;
+    if(h.object._isFan||h.object._isFilterL||h.object._isFilterR){ obj=h.object; break; }
+  }
+  handleClickObject(obj);
+}
+
+function isAncestorVisible(obj){
+  let p=obj;
+  while(p){ if(!p.visible) return false; p=p.parent; }
+  return true;
 }
 
 function handleDragStart(clientX,clientY){
@@ -2414,12 +2678,32 @@ function setFeetStyle(style){
 let currentPlacement='floor';
 function setPlacement(mode){
   if(mode===currentPlacement) return;
-  const prevOff=getPlacementOffset(currentPlacement);
+  const prevOff=placementOffset;
   const newOff=getPlacementOffset(mode);
   const delta={x:newOff.x-prevOff.x, y:newOff.y-prevOff.y, z:newOff.z-prevOff.z};
   currentPlacement=mode;
-  document.querySelectorAll('#btnPlaceTable,#btnPlaceFloor,#btnPlaceWall').forEach(b=>b.classList.remove('on'));
-  document.getElementById(mode==='table'?'btnPlaceTable':mode==='floor'?'btnPlaceFloor':'btnPlaceWall').classList.add('on');
+  placementOffset={...newOff};
+  document.querySelectorAll('#btnPlaceFloor,#btnPlaceWall,#btnPlaceTv').forEach(b=>b.classList.remove('on'));
+  document.getElementById(mode==='floor'?'btnPlaceFloor':mode==='tv'?'btnPlaceTv':'btnPlaceWall').classList.add('on');
+  // Rotate purifier for Under TV mode, show/hide console props
+  if(mode==='tv'){
+    purifierGroup.rotation.y=90*Math.PI/180;
+    document.getElementById('turntableSlider').value=90;
+    document.getElementById('turntableLabel').textContent='90°';
+    showConsoleProps(true);
+  } else {
+    purifierGroup.rotation.y=0;
+    document.getElementById('turntableSlider').value=0;
+    document.getElementById('turntableLabel').textContent='0°';
+    showConsoleProps(false);
+  }
+  applyRoomDelta(delta);
+  updateNudgeLabel();
+  if(exploded) collapseView();
+}
+// Live placement offset — arrow keys nudge this in world space
+let placementOffset={x:0,y:0,z:0};
+function applyRoomDelta(delta){
   scene.traverse(function(o){
     if(o._isRoom){
       o.position.x-=delta.x;
@@ -2431,13 +2715,82 @@ function setPlacement(mode){
     }
   });
   _prevCx=0; _prevCz=0;
-  if(exploded) collapseView();
+}
+function nudgePlacement(dx,dy,dz){
+  const step=2; // 2 inches per press
+  const delta={x:dx*step, y:dy*step, z:dz*step};
+  placementOffset.x+=delta.x;
+  placementOffset.y+=delta.y;
+  placementOffset.z+=delta.z;
+  applyRoomDelta(delta);
+  updateNudgeLabel();
+}
+function updateNudgeLabel(){
+  const el=document.getElementById('nudgeLabel');
+  if(el) el.textContent='X:'+placementOffset.x.toFixed(0)+' Y:'+placementOffset.y.toFixed(0)+' Z:'+placementOffset.z.toFixed(0);
 }
 function getPlacementOffset(mode){
   if(mode==='floor') return {x:0, y:0, z:0}; // default — floor
-  if(mode==='table') return {x:0, y:24, z:0}; // raise up onto nightstand (tblH=24)
-  if(mode==='wall') return {x:0, y:30, z:55}; // wall-mounted on TV wall, ~30" up, near the wall
+  if(mode==='table') return {x:3.7, y:27, z:39.5}; // on nightstand (mirrored X)
+  if(mode==='wall') return {x:49, y:30, z:-73}; // wall-mounted under TV (mirrored X)
+  if(mode==='tv') return {x:45, y:0, z:-68}; // on floor under wall-mounted TV, centered
   return {x:0,y:0,z:0};
+}
+
+// ─── Console props (shown in Under TV mode) ───
+const consoleProps=new THREE.Group();
+consoleProps.visible=false;
+{
+  const topY=H/2+ply; // top surface of purifier
+
+  // Xbox Series X — standing vertical: 5.94"×11.85"×5.94" (W×H×D)
+  const xbW=5.94, xbH=11.85, xbD=5.94;
+  const xbMat=stdMat({color:0x1a1a1a,roughness:0.5});
+  const xbox=new THREE.Mesh(new THREE.BoxGeometry(xbW,xbH,xbD),xbMat);
+  // Rotated 90° so when purifierGroup rotates, Xbox is oriented correctly
+  // Sits on top of purifier, toward the right end
+  xbox.position.set(0, topY+xbH/2, 8);
+  consoleProps.add(xbox);
+  // Green accent vent on top
+  const ventMat=stdMat({color:0x107c10,roughness:0.6});
+  const vent=new THREE.Mesh(new THREE.CylinderGeometry(2.2,2.2,0.15,32),ventMat);
+  vent.position.set(0, topY+xbH+0.08, 8);
+  consoleProps.add(vent);
+
+  // Nintendo Switch 2 Dock — roughly 6.5"W × 4"H × 2.5"D
+  const switchGroup=new THREE.Group();
+  switchGroup.rotation.y=-Math.PI/2; // face +Z direction
+  switchGroup.position.z=-6; // shift along purifier length
+  const dkW=6.5, dkH=4.0, dkD=2.5;
+  const dkMat=stdMat({color:0x222222,roughness:0.6});
+  const dock=new THREE.Mesh(new THREE.BoxGeometry(dkW,dkH,dkD),dkMat);
+  dock.position.set(0, topY+dkH/2, 0);
+  switchGroup.add(dock);
+
+  // Nintendo Switch 2 console in dock — ~10.5"W × 4.7"H visible × 0.5"D
+  const swW=10.5, swH=4.7, swD=0.5;
+  const swMat=stdMat({color:0x1a1a1a,roughness:0.5});
+  const sw2=new THREE.Mesh(new THREE.BoxGeometry(swW,swH,swD),swMat);
+  // Sticking up out of dock
+  sw2.position.set(0, topY+dkH+swH*0.35, 0);
+  switchGroup.add(sw2);
+  // Screen (blue-ish rectangle inset)
+  const scrMat=stdMat({color:0x1133aa, emissive:0x0a1a44, emissiveIntensity:0.3, roughness:0.3});
+  const scr=new THREE.Mesh(new THREE.PlaneGeometry(swW*0.88, swH*0.8),scrMat);
+  scr.position.set(0, topY+dkH+swH*0.35, swD/2+0.01);
+  switchGroup.add(scr);
+  // Joy-Con rails — light gray strips on sides
+  const jcMat=stdMat({color:0x888888,roughness:0.5,metalness:0.3});
+  for(const side of [-1,1]){
+    const jc=new THREE.Mesh(new THREE.BoxGeometry(0.35, swH*0.9, swD+0.05),jcMat);
+    jc.position.set(side*(swW/2-0.15), topY+dkH+swH*0.35, 0);
+    switchGroup.add(jc);
+  }
+  consoleProps.add(switchGroup);
+}
+// Add to purifierGroup so it moves/rotates with the purifier
+function showConsoleProps(show){
+  consoleProps.visible=show;
 }
 
 // ─── Continuous time-of-day lighting ───
@@ -2500,23 +2853,25 @@ function applyTimeOfDay(minuteOfDay){
   renderer.setClearColor(clearCol.clone(), 1);
   scene.fog.color.copy(clearCol);
   scene.fog.density=mix(0.003, 0.0015, sun);
-  renderer.toneMappingExposure=mix(1.0, 1.15, sun);
+  renderer.toneMappingExposure=mix(1.0, 1.3, sun);
 
   // Key light: direction is sun through window; warm during golden hour
-  const keyColor=warm>0.1 ? lerpHex(0xfff8f0, GOLDEN_KEY, warm) : lerpHex(0x6688cc, 0xfff8f0, sun);
+  const keyColor=warm>0.1 ? lerpHex(0xffe0a0, GOLDEN_KEY, warm) : lerpHex(0x6688cc, 0xffe0a0, sun);
   key.color.copy(keyColor);
-  key.intensity=mix(0.12, 0.55, sun)+warm*0.15;
+  key.intensity=mix(0.15, 1.4, sun)+warm*0.2;
 
   // Other lights
-  scene.children.forEach(c=>{ if(c.isAmbientLight) c.intensity=mix(0.06, 0.22, sun); });
-  fill.intensity=mix(0.03, 0.18, sun);
-  rim.intensity=mix(0.06, 0.2, sun);
-  bounce.intensity=mix(0.02, 0.08, sun);
-  ceilSpot.intensity=mix(0.5, 0.35, sun); // brighter at night to softly illuminate the room
-  domeMat.emissiveIntensity=mix(0.4, 0.15, sun);
+  hemiLight.intensity=mix(0.08, 0.18, sun);
+  hemiLight.color.copy(lerpHex(0x334466, 0x8899bb, sun)); // sky shifts blue→grey at night
+  hemiLight.groundColor.copy(lerpHex(0x221100, 0xffeedd, sun)); // warm ground bounce
+  fill.intensity=mix(0.04, 0.12, sun);
+  rim.intensity=mix(0.06, 0.14, sun);
+  bounce.intensity=mix(0.02, 0.07, sun);
+  ceilSpot.intensity=mix(0.6, 0.4, sun); // brighter at night to softly illuminate the room
+  domeMat.emissiveIntensity=mix(0.5, 0.15, sun);
 
   // Outdoor backdrop brightness (sun through window)
-  outdoor.material.color.setScalar(mix(0.05, 1.0, sun)+warm*0.15);
+  outdoor.material.color.setScalar(mix(0.08, 1.4, sun)+warm*0.25);
 
   // Room surfaces
   const wallCol=lerpHex(NIGHT_WALL, DAY_WALL, sun);
@@ -2535,7 +2890,7 @@ function applyTimeOfDay(minuteOfDay){
     _savedFog=scene.fog.density;
     _savedLights={ambient:0, key:key.intensity, fill:fill.intensity,
       rim:rim.intensity, bounce:bounce.intensity, ceil:ceilSpot.intensity};
-    scene.children.forEach(c=>{ if(c.isAmbientLight) _savedLights.ambient=c.intensity; });
+    _savedLights.ambient=hemiLight.intensity;
     applyIsolate(true);
   }
 }
@@ -2584,12 +2939,12 @@ function applyIsolate(on){
       ambient:0, key:key.intensity, fill:fill.intensity,
       rim:rim.intensity, bounce:bounce.intensity, ceil:ceilSpot.intensity
     };
-    scene.children.forEach(c=>{ if(c.isAmbientLight) _savedLights.ambient=c.intensity; });
+    _savedLights.ambient=hemiLight.intensity;
     // Soft dark background, no fog
     renderer.setClearColor(0x1a1a2e,1);
     scene.fog.density=0;
     // Spotlight lighting: soft ambient + strong key from above-front
-    scene.children.forEach(c=>{ if(c.isAmbientLight) c.intensity=0.3; });
+    hemiLight.intensity=0.3;
     key.intensity=0.7;
     key.position.set(-30,40,30);
     fill.intensity=0.3;
@@ -2604,7 +2959,7 @@ function applyIsolate(on){
     // Restore by re-applying the current slider time
     if(_savedClear) renderer.setClearColor(_savedClear,1);
     scene.fog.density=_savedFog||0.0015;
-    scene.children.forEach(c=>{ if(c.isAmbientLight) c.intensity=_savedLights.ambient; });
+    hemiLight.intensity=_savedLights.ambient;
     key.position.set(95,38,0);
     fill.position.set(-10,12,-12);
     rim.position.set(-6,15,-18);
@@ -2710,7 +3065,7 @@ function setRGB(color){
   }
   if(color==='rainbow'){
     const dist=RGB_BASE_DIST*(0.5+rgbBrightness*1.5);
-    for(const gl of allFanGlows){ gl.intensity=0.8*rgbBrightness+0.05; gl.distance=dist; }
+    for(const gl of allFanGlows){ gl.intensity=(0.9*rgbBrightness+0.05); gl.distance=dist; }
     return;
   }
   setRGBColor(color==='off'?0x000000:customRGBHex);
@@ -2718,7 +3073,7 @@ function setRGB(color){
 function setRGBColor(hex){
   const br=rgbBrightness;
   const isOff=(hex===0x000000);
-  const intensity=isOff?0:0.8;
+  const intensity=isOff?0:0.9;
   const dist=RGB_BASE_DIST*(0.5+br*1.5);
   for(const gl of allFanGlows){
     gl.color.setHex(hex);
@@ -2832,6 +3187,16 @@ floor._isRoom = true;
 floor._isFloor = true;
 scene.add(floor);
 
+// Ceiling — flat plane at top of walls
+const ceilingGeo = new THREE.PlaneGeometry(200, 200);
+const ceilingMat = new THREE.MeshStandardMaterial({color:0xe0ddd6, roughness:0.9, metalness:0.0, side:THREE.DoubleSide});
+const ceiling = new THREE.Mesh(ceilingGeo, ceilingMat);
+ceiling.rotation.x = Math.PI/2;
+ceiling.position.y = floorY+80;
+ceiling.receiveShadow = true;
+ceiling._isRoom = true;
+scene.add(ceiling);
+
 // Helper: simple box with shadow
 function roomBox(w,h,d,color,x,y,z,rx,ry,rz){
   const g=new THREE.BoxGeometry(w,h,d);
@@ -2879,7 +3244,7 @@ function roomRoundBox(w,h,d,radius,color,x,y,z,rx,ry,rz){
 
 // ─── Zinus Queen Piper Upholstered Platform Bed ───
 // 82.3"L × 60.3"W × 42"H, 6.5" ground clearance, slats at 14" from floor
-const bedL=82.3, bedW=60.3, bedH=42, bedClearance=6.5, bedSlatsFromFloor=14;
+const bedL=82.3, bedW=60.3, bedH=42, bedClearance=6.5, bedSlatsFromFloor=10;
 const bedX=-81+2+bedW/2, bedZ=48.5-bedL/2; // bed left edge 2" from left wall, headboard flush against back wall
 
 // Nightstand — 27"H × 24"W × 14"D, black body, dark oak top, 3 drawers, curved front
@@ -2913,7 +3278,7 @@ const tblOak=0x5a3f2a;
   const bodyMat=new THREE.MeshStandardMaterial({color:tblBlack,roughness:0.4,metalness:0.05});
   const body=new THREE.Mesh(bodyGeo, bodyMat);
   body.position.set(tblX, floorY+bodyH/2, tblZ);
-  body.castShadow=false; body.receiveShadow=true; body._isRoom=true;
+  body.castShadow=true; body.receiveShadow=true; body._isRoom=true;
   scene.add(body);
 
   // Dark oak top — also curved front, with overhang
@@ -3110,12 +3475,12 @@ let lampLight, lampShade, lampOn=true;
   topCap.position.set(lampX, lampBaseY+0.8+stemH+shadeH-1, lampZ);
   topCap._isRoom=true; topCap._isLamp=true; scene.add(topCap);
   // Warm glow light — strong enough to visibly illuminate surroundings
-  lampLight=new THREE.PointLight(0xffddaa, 1.0, 80);
+  lampLight=new THREE.PointLight(0xffddaa, 1.2, 80);
   lampLight.position.set(lampX, lampBaseY+0.8+stemH+shadeH/2-1, lampZ);
   lampLight.castShadow=false;
   lampLight._isRoom=true; scene.add(lampLight);
   // Bulb visible inside shade
-  const bulbMat=new THREE.MeshStandardMaterial({color:0xffffcc,emissive:0xffeedd,emissiveIntensity:1,roughness:0.3});
+  const bulbMat=new THREE.MeshStandardMaterial({color:0xffffcc,emissive:0xffeedd,emissiveIntensity:1.2,roughness:0.3});
   const bulb=new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), bulbMat);
   bulb.position.set(lampX, lampBaseY+0.8+stemH+3, lampZ);
   bulb._isRoom=true; bulb._isLamp=true; scene.add(bulb);
@@ -3246,18 +3611,18 @@ tvFrame.material.metalness=0.6;
 
 // Screen — dark glossy panel
 const screenGeo=new THREE.PlaneGeometry(tvW, tvH);
-const screenMat=new THREE.MeshPhongMaterial({color:0x0a0a0a, shininess:120, reflectivity:0.8});
+const screenMat=stdMat({color:0x0a0a0a,roughness:0.05,metalness:0.0,envMapIntensity:1.5});
 const screen=new THREE.Mesh(screenGeo, screenMat);
 screen.position.set(tvCenterX, tvCenterY, tvZ+tvD/2+0.02);
 screen._isRoom=true;
 scene.add(screen);
 
 // ─── Mini split indoor unit (on TV wall, near closet wall, 1ft from ceiling) ───
+const msW=32, msH=11, msD=8; // typical wall-mount unit dimensions
+const msX=51-18-msW/2; // 1.5 feet gap from closet wall to edge of unit (before flip)
+const msY=floorY+80-12-msH/2; // 1 foot from ceiling
+const msZ=oppWallZ+0.5+msD/2; // flush against TV wall
 {
-  const msW=32, msH=11, msD=8; // typical wall-mount unit dimensions
-  const msX=51-18-msW/2; // 1.5 feet gap from closet wall to edge of unit (before flip)
-  const msY=floorY+80-12-msH/2; // 1 foot from ceiling
-  const msZ=oppWallZ+0.5+msD/2; // flush against TV wall
   const msMat=new THREE.MeshStandardMaterial({color:0xf0f0f0,roughness:0.3,metalness:0.05});
   // Main body — rounded rectangle
   const msBody=roomRoundBox(msW, msH, msD, 2, 0xf0f0f0, msX, msY, msZ, 0,0,0);
@@ -3339,7 +3704,7 @@ const sideBaseboard=roomBox(0.6, 3, wallDepth, 0xc0bbb4, sideWallX-0.5, floorY+1
 // ─── Left side wall with window (near the bed) ───
 const leftWallX=-81;
 const winW=36, winH=50; // window opening size
-const winCenterY=floorY+38; // center of window
+const winCenterY=floorY+48; // center of window
 const winCenterZ=bedZ; // centered on the bed along Z
 const winBottom=winCenterY-winH/2;
 const winTop=winCenterY+winH/2;
@@ -3369,7 +3734,7 @@ const leftBaseboard=roomBox(0.6, 3, wallDepth, 0xc0bbb4, leftWallX+0.5, floorY+1
 roomBox(0.8, 0.5, winW+2, 0xc8c4be, leftWallX+0.4, winBottom-0.25, winCenterZ, 0,0,0);
 
 // Window frame (thin white trim)
-const frameMat=new THREE.MeshPhongMaterial({color:0xf5f5f0,shininess:10});
+const frameMat=stdMat({color:0xf5f5f0,shininess:10});
 const frameT=0.8, frameD=0.6;
 // Top
 const wft=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT, winW+frameT*2), frameMat);
@@ -3393,10 +3758,10 @@ outdoorCvs.width=512; outdoorCvs.height=512;
 const oCtx=outdoorCvs.getContext('2d');
 // Sky gradient
 const skyGrad=oCtx.createLinearGradient(0,0,0,300);
-skyGrad.addColorStop(0,'#5b8cc9');
-skyGrad.addColorStop(0.35,'#8cb8e0');
-skyGrad.addColorStop(0.55,'#c4ddf0');
-skyGrad.addColorStop(0.7,'#ddeaf5');
+skyGrad.addColorStop(0,'#6a99c4');
+skyGrad.addColorStop(0.35,'#a8c8da');
+skyGrad.addColorStop(0.55,'#ddd8c8');
+skyGrad.addColorStop(0.7,'#f0e8d8');
 oCtx.fillStyle=skyGrad; oCtx.fillRect(0,0,512,300);
 // Distant hazy hills
 oCtx.fillStyle='#8aab8a';
@@ -3429,7 +3794,8 @@ oCtx.globalAlpha=1.0;
 const outdoorTex=new THREE.CanvasTexture(outdoorCvs);
 outdoorTex.generateMipmaps=false;
 outdoorTex.minFilter=THREE.LinearFilter;
-const outdoorMat=new THREE.MeshBasicMaterial({map:outdoorTex}); // unlit — always bright
+const outdoorMat=new THREE.MeshBasicMaterial({map:outdoorTex, color:0xfff0d4}); // warm sunlight tint
+outdoorMat.toneMapped=false; // bypass ACES compression — let it be BRIGHT
 const outdoorGeo=new THREE.PlaneGeometry(winW*2.5, winH*2);
 const outdoor=new THREE.Mesh(outdoorGeo, outdoorMat);
 outdoor.rotation.y=Math.PI/2;
@@ -3447,13 +3813,13 @@ const fixBase=new THREE.Mesh(
 fixBase.position.set(ceilLightX,ceilY,ceilLightZ);
 fixBase._isRoom=true; scene.add(fixBase);
 // Frosted glass dome
-const domeMat=new THREE.MeshPhongMaterial({color:0xfff8ee,emissive:0xfff0d0,emissiveIntensity:0.3,transparent:true,opacity:0.85,shininess:60});
+const domeMat=stdMat({color:0xfff8ee,emissive:0xfff0d0,emissiveIntensity:0.3,transparent:true,opacity:0.85,shininess:60});
 const dome=new THREE.Mesh(new THREE.SphereGeometry(3.5,16,8,0,Math.PI*2,0,Math.PI/2),domeMat);
 dome.rotation.x=Math.PI; // flip dome to hang down
 dome.position.set(ceilLightX,ceilY-0.2,ceilLightZ);
 dome._isRoom=true; scene.add(dome);
 // SpotLight pointing down — wide angle, soft edge
-const ceilSpot=new THREE.SpotLight(0xfff0dd,0.4,0,Math.PI/3,0.7,1.5);
+const ceilSpot=new THREE.SpotLight(0xfff0dd,0.5,0,Math.PI/3,0.7,1.5);
 ceilSpot.position.set(ceilLightX,ceilY-1,ceilLightZ);
 ceilSpot.target.position.set(ceilLightX,floorY,ceilLightZ);
 scene.add(ceilSpot); scene.add(ceilSpot.target);
@@ -3540,21 +3906,121 @@ const mattress=roomRoundBox(mattW, mattH, mattL, 3, 0xd4cdc0,
 mattress.material.roughness=0.92;
 mattress.material.color.set(0xd4cdc0);
 
-// Pillow pair — rounded soft shapes near headboard
-const pillowW=20, pillowH=4, pillowD=12, pillowR=2;
-for(const px of [-12, 12]){
-  const pillow=roomRoundBox(pillowW, pillowH, pillowD, pillowR, 0xddd8cf,
-    bedX+px, mattY+mattH/2+pillowH/2, bedZ+bedL/2-hbThick-pillowD/2-2, 0,0,0);
-  pillow.material.roughness=0.9;
+// Pillow pair — puffy rectangular shapes via vertex-displaced box
+const pillowW=22, pillowH=4, pillowD=14;
+const pillowY=mattY+mattH/2-0.8; // sits snug on mattress surface
+const pillowBaseZ=bedZ+bedL/2-hbThick-pillowD/2-2;
+const pillows=[];
+for(const px of [-13, 13]){
+  const pGeo=new THREE.BoxGeometry(pillowW, pillowH, pillowD, 16, 8, 12);
+  const pp=pGeo.attributes.position;
+  for(let i=0;i<pp.count;i++){
+    let x=pp.getX(i), y=pp.getY(i), z=pp.getZ(i);
+    // Normalized coords (-1 to 1)
+    const nx=x/(pillowW/2), ny=y/(pillowH/2), nz=z/(pillowD/2);
+    // Round the edges: pull corners inward using a soft rounding
+    const edgeRound=2.5;
+    const ex=Math.max(0, Math.abs(x)-pillowW/2+edgeRound);
+    const ey=Math.max(0, Math.abs(y)-pillowH/2+edgeRound);
+    const ez=Math.max(0, Math.abs(z)-pillowD/2+edgeRound);
+    const dist=Math.sqrt(ex*ex+ey*ey+ez*ez);
+    if(dist>edgeRound){
+      const scale=edgeRound/dist;
+      if(ex>0) x=Math.sign(x)*(pillowW/2-edgeRound+ex*scale);
+      if(ey>0) y=Math.sign(y)*(pillowH/2-edgeRound+ey*scale);
+      if(ez>0) z=Math.sign(z)*(pillowD/2-edgeRound+ez*scale);
+    }
+    // Puffiness: inflate top center upward
+    const cx=nx*nx, cz=nz*nz;
+    const puff=(1-cx)*(1-cz);
+    if(y>0) y+=puff*1.5;
+    // Flatten bottom slightly
+    if(y<0) y*=0.6;
+    pp.setX(i,x); pp.setY(i,y); pp.setZ(i,z);
+  }
+  pGeo.computeVertexNormals();
+  const pMat=stdMat({color:0xeae6de, roughness:0.92});
+  const pillow=new THREE.Mesh(pGeo, pMat);
+  pillow.position.set(bedX+px, pillowY+pillowH/2, pillowBaseZ);
+  pillow.rotation.set(0, px>0?0.05:-0.05, px>0?-0.03:0.03);
+  pillow.castShadow=true; pillow.receiveShadow=true; pillow._isRoom=true;
+  scene.add(pillow);
+  pillows.push(pillow);
 }
 
-// Duvet / comforter — sits on mattress, covers from foot up to just below pillows
-const duvetH=3;
-const duvetL=mattL-pillowD-8; // leave room for pillows at headboard end
-const duvetZ=mattCenterZ-(mattL/2-duvetL/2); // flush with foot end, leave pillow gap at head
-const duvet=roomRoundBox(mattW+4, duvetH, duvetL, 2, 0xbfb8aa,
-  bedX, mattY+mattH/2+duvetH/2, duvetZ, 0,0,0);
-duvet.material.roughness=0.95;
+// Duvet / comforter — thin blanket that drapes over mattress edges
+const duvetH=1.5;
+const duvetL=mattL-pillowD-4;
+const duvetZ=mattCenterZ-(mattL/2-duvetL/2)-1.5; // shifted toward foot of bed
+// Generate a wrinkle normal map
+const duvetCanvas=document.createElement('canvas');
+duvetCanvas.width=256; duvetCanvas.height=256;
+const dctx=duvetCanvas.getContext('2d');
+dctx.fillStyle='#6b6b72';
+dctx.fillRect(0,0,256,256);
+// Dense velvet fiber texture — short fuzzy strokes for fabric feel
+for(let i=0;i<3000;i++){
+  const fx=Math.random()*256, fy=Math.random()*256;
+  const bright=90+Math.random()*40;
+  dctx.strokeStyle=`rgba(${bright},${bright-2},${bright+4},${0.15+Math.random()*0.2})`;
+  dctx.lineWidth=0.5+Math.random()*1.5;
+  dctx.beginPath();
+  dctx.moveTo(fx, fy);
+  dctx.lineTo(fx+Math.random()*4-2, fy+2+Math.random()*4);
+  dctx.stroke();
+}
+// Subtle wrinkle folds on top
+for(let i=0;i<25;i++){
+  const y=Math.random()*256;
+  dctx.strokeStyle=`rgba(${85+Math.random()*25},${83+Math.random()*22},${90+Math.random()*22},${0.08+Math.random()*0.12})`;
+  dctx.lineWidth=3+Math.random()*5;
+  dctx.beginPath();
+  dctx.moveTo(0, y+Math.random()*10);
+  for(let x=0;x<256;x+=20){
+    dctx.lineTo(x, y+Math.sin(x*0.05)*8+Math.random()*6);
+  }
+  dctx.stroke();
+}
+const duvetTex=new THREE.CanvasTexture(duvetCanvas);
+duvetTex.wrapS=duvetTex.wrapT=THREE.RepeatWrapping;
+duvetTex.repeat.set(3,4);
+// Generate a bump map for extra fabric relief
+const _bumpCanvas=document.createElement('canvas');
+_bumpCanvas.width=256; _bumpCanvas.height=256;
+const _bctx=_bumpCanvas.getContext('2d');
+_bctx.fillStyle='#808080';
+_bctx.fillRect(0,0,256,256);
+for(let i=0;i<4000;i++){
+  const bx=Math.random()*256, by=Math.random()*256;
+  const v=Math.random()>0.5?140+Math.random()*50:60+Math.random()*50;
+  _bctx.fillStyle=`rgba(${v},${v},${v},0.3)`;
+  _bctx.fillRect(bx, by, 1+Math.random()*2, 1+Math.random()*3);
+}
+const duvetBump=new THREE.CanvasTexture(_bumpCanvas);
+duvetBump.wrapS=duvetBump.wrapT=THREE.RepeatWrapping;
+duvetBump.repeat.set(4,6);
+// Continuous blanket — single mesh with vertex-displaced draped edges (no seams)
+const _bSideHang=2.5, _bFootHang=3, _bMaxDrape=10;
+const _bTotW=mattW+_bSideHang*2, _bTotL=duvetL+_bFootHang;
+const blanketGeo=new THREE.BoxGeometry(_bTotW, duvetH, _bTotL, 28, 1, 36);
+const _bp=blanketGeo.attributes.position;
+for(let i=0;i<_bp.count;i++){
+  let x=_bp.getX(i), y=_bp.getY(i), z=_bp.getZ(i);
+  z-=_bFootHang/2; // shift so extra length extends past foot (-Z)
+  let drop=0;
+  // Side drape: vertices past mattress edge drop nearly straight down
+  const sx=Math.max(0,Math.abs(x)-mattW/2);
+  if(sx>0){ const t=sx/_bSideHang; drop+=_bMaxDrape*t; x=Math.sign(x)*(mattW/2+sx*0.25); }
+  // Foot drape: vertices past foot edge drop nearly straight down
+  const fz=Math.max(0,-duvetL/2-z);
+  if(fz>0){ const t=fz/_bFootHang; drop+=_bMaxDrape*t; z=-duvetL/2-fz*0.25; }
+  _bp.setX(i,x); _bp.setY(i,y-drop); _bp.setZ(i,z);
+}
+blanketGeo.computeVertexNormals();
+const duvet=new THREE.Mesh(blanketGeo, stdMat({color:0x6e6e78, roughness:1.0, metalness:0.0, map:duvetTex, bumpMap:duvetBump, bumpScale:0.1}));
+duvet.position.set(bedX, mattY+mattH/2+duvetH/2, duvetZ);
+duvet.castShadow=true; duvet.receiveShadow=true; duvet._isRoom=true;
+scene.add(duvet);
 
 // Enable shadows on key furniture (not walls/baseboards/trim — those don't need it)
 [headboard, lRail, rRail, footboard, mattress, duvet].forEach(m=>{ m.castShadow=true; });
@@ -3563,13 +4029,52 @@ duvet.material.roughness=0.95;
 const axesGroup=new THREE.Group();
 const axesOrig=new THREE.Vector3(panelW/2+4, -H/2-ply, D/2+ply+4); // front-right of purifier, at foot level
 axesGroup.position.copy(axesOrig);
-const axesHelper=new THREE.AxesHelper(10);
-axesGroup.add(axesHelper);
-// Labels
-const axLblX=makeTextSprite('X','#ff6666'); axLblX.position.set(11,0,0); axLblX.scale.multiplyScalar(0.8); axesGroup.add(axLblX);
-const axLblY=makeTextSprite('Y','#66ff66'); axLblY.position.set(0,11,0); axLblY.scale.multiplyScalar(0.8); axesGroup.add(axLblY);
-const axLblZ=makeTextSprite('Z','#6688ff'); axLblZ.position.set(0,0,11); axLblZ.scale.multiplyScalar(0.8); axesGroup.add(axLblZ);
+// Build thick arrow axes that render on top of everything
+{
+  const axLen=22, shaftR=0.35, coneR=1.2, coneH=3.5;
+  const axes=[
+    {dir:[1,0,0], color:0xff4444, label:'X'},
+    {dir:[0,1,0], color:0x44ff44, label:'Y'},
+    {dir:[0,0,1], color:0x4488ff, label:'Z'},
+  ];
+  axes.forEach(a=>{
+    const mat=new THREE.MeshBasicMaterial({color:a.color, depthTest:false, depthWrite:false, transparent:true, opacity:0.9});
+    // Shaft (cylinder along Y, then rotated)
+    const shaft=new THREE.Mesh(new THREE.CylinderGeometry(shaftR,shaftR,axLen,8),mat);
+    shaft.renderOrder=999;
+    // Arrowhead cone
+    const cone=new THREE.Mesh(new THREE.ConeGeometry(coneR,coneH,12),mat);
+    cone.renderOrder=999;
+    // Position along the correct axis
+    const dx=a.dir[0], dy=a.dir[1], dz=a.dir[2];
+    if(dx){ // X axis
+      shaft.rotation.z=-Math.PI/2;
+      shaft.position.set(axLen/2,0,0);
+      cone.rotation.z=-Math.PI/2;
+      cone.position.set(axLen+coneH/2,0,0);
+    } else if(dy){ // Y axis
+      shaft.position.set(0,axLen/2,0);
+      cone.position.set(0,axLen+coneH/2,0);
+    } else { // Z axis
+      shaft.rotation.x=Math.PI/2;
+      shaft.position.set(0,0,axLen/2);
+      cone.rotation.x=Math.PI/2;
+      cone.position.set(0,0,axLen+coneH/2);
+    }
+    axesGroup.add(shaft);
+    axesGroup.add(cone);
+    // Label
+    const hexStr='#'+a.color.toString(16).padStart(6,'0');
+    const lbl=makeTextSprite(a.label,hexStr);
+    lbl.position.set(dx*(axLen+coneH+3), dy*(axLen+coneH+3), dz*(axLen+coneH+3));
+    lbl.scale.multiplyScalar(2.0);
+    lbl.renderOrder=999;
+    lbl.material.depthTest=false;
+    axesGroup.add(lbl);
+  });
+}
 axesGroup.visible=false;
+axesGroup._isRoom=true; // keep in scene, don't reparent into purifierGroup
 scene.add(axesGroup);
 
 // Mirror room on X axis so bed/TV/window are on the opposite side
@@ -3662,7 +4167,7 @@ function animate(){
       const midHue=(hueBase+midPanelFanIdx*fanStep)%1;
       hueColor.setHSL(midHue,1,0.5);
       allFanGlows[gi].color.copy(hueColor);
-      allFanGlows[gi].intensity=0.8*rb+0.05;
+      allFanGlows[gi].intensity=0.9*rb+0.05;
       fanIdx+=nf;
     }
 
@@ -3752,14 +4257,121 @@ function animate(){
     col.needsUpdate=true;
   }
 
-  camera.position.x=radius*Math.sin(polar)*Math.sin(azimuth);
-  camera.position.y=radius*Math.cos(polar);
-  camera.position.z=radius*Math.sin(polar)*Math.cos(azimuth);
-  camera.lookAt(0,0,0);
+  if(!_fpMode){
+  camera.position.x=panX+radius*Math.sin(polar)*Math.sin(azimuth);
+  camera.position.y=panY+radius*Math.cos(polar);
+  camera.position.z=panZ+radius*Math.sin(polar)*Math.cos(azimuth);
+  camera.lookAt(panX,panY,panZ);
+  }
 
-  // Auto-fade room objects.
-  // Outer walls: transparent when camera is outside them (looking in).
-  // Interior objects: fade when camera is close.
+  // First-person mode camera
+  if(_fpMode){
+    const spd=0.35;
+    const fwd=new THREE.Vector3(-Math.sin(_fpYaw),0,-Math.cos(_fpYaw));
+    const right=new THREE.Vector3(fwd.z,0,-fwd.x);
+    // Calculate desired movement
+    let moveX=0, moveZ=0;
+    if(_fpKeys.w){ moveX+=fwd.x*spd; moveZ+=fwd.z*spd; }
+    if(_fpKeys.s){ moveX-=fwd.x*spd; moveZ-=fwd.z*spd; }
+    if(_fpKeys.a){ moveX+=right.x*spd; moveZ+=right.z*spd; }
+    if(_fpKeys.d){ moveX-=right.x*spd; moveZ-=right.z*spd; }
+    // Jump — charged: hold space longer = jump higher
+    if(_fpKeys.space && Math.abs(_fpVy)<0.01){
+      _fpSpaceHeld++;
+    }
+    if(!_fpKeys.space && _fpSpaceHeld>0 && Math.abs(_fpVy)<0.01){
+      const charge=Math.min(_fpSpaceHeld, 60); // max ~1 second charge
+      const power=0.4+charge*0.025; // 0.4 base, up to ~1.9 for full charge
+      _fpVy=power;
+      _fpSpaceHeld=0;
+    }
+    if(!_fpKeys.space) _fpSpaceHeld=0;
+    // Update charge bar
+    const cbFill=document.getElementById('fpChargeFill');
+    if(cbFill){
+      if(_fpSpaceHeld>0){
+        cbFill.style.width=Math.min(_fpSpaceHeld/60*100,100)+'%';
+      } else {
+        cbFill.style.width='0%';
+      }
+    }
+    // Gravity
+    _fpVy-=0.018;
+    const newY=_fpPos.y+_fpVy;
+    // Try moving X, then Z separately (slide along walls)
+    let nx=_fpPos.x+moveX, nz=_fpPos.z+moveZ;
+    const r=_fpBodyR;
+    // Wall collision (dynamic — moves with room placement)
+    const _curBounds=_fpGetBounds();
+    nx=Math.max(_curBounds.xMin+r, Math.min(_curBounds.xMax-r, nx));
+    nz=Math.max(_curBounds.zMin+r, Math.min(_curBounds.zMax-r, nz));
+    // Furniture collision — AABB push-out + standing on top (dynamic)
+    const eyeH=4; // eye height
+    let groundY=_fpFloorY-placementOffset.y; // floor moves with room Y offset
+    const _curBoxes=_fpGetBoxes();
+    for(const box of _curBoxes){
+      const onTopPrev=_fpPos.y>=(box.yTop+eyeH-1);
+      // Check XZ overlap
+      const xOverlap=nx+r>box.xMin && nx-r<box.xMax;
+      const zOverlap=nz+r>box.zMin && nz-r<box.zMax;
+      if(xOverlap && zOverlap){
+        // If feet are above the box top, we can stand on it
+        if(newY-eyeH+1>=box.yTop-0.5){
+          groundY=Math.max(groundY, box.yTop+eyeH);
+        } else {
+          // Push out of box (pick smallest penetration axis)
+          const pushXL=box.xMax+r-nx;  // push +X
+          const pushXR=nx+r-box.xMin;  // push -X (use as magnitude)
+          const pushZF=box.zMax+r-nz;
+          const pushZB=nz+r-box.zMin;
+          const minPush=Math.min(pushXL,pushXR,pushZF,pushZB);
+          if(minPush===pushXL) nx=box.xMax+r;
+          else if(minPush===pushXR) nx=box.xMin-r;
+          else if(minPush===pushZF) nz=box.zMax+r;
+          else nz=box.zMin-r;
+        }
+      }
+    }
+    _fpPos.x=nx;
+    _fpPos.z=nz;
+    _fpPos.y=newY;
+    if(_fpPos.y<groundY){ _fpPos.y=groundY; _fpVy=0; }
+    // Ceiling collision — can't go above ceiling height
+    const ceilMax=(floorY+80-placementOffset.y)-0.5; // half inch below ceiling
+    if(_fpPos.y>ceilMax){ _fpPos.y=ceilMax; _fpVy=Math.min(_fpVy,0); }
+    camera.position.copy(_fpPos);
+    const lookTarget=new THREE.Vector3(
+      _fpPos.x-Math.sin(_fpYaw)*10,
+      _fpPos.y+Math.sin(_fpPitch)*10,
+      _fpPos.z-Math.cos(_fpYaw)*10
+    );
+    camera.lookAt(lookTarget);
+    // Crosshair interaction check — raycast from center of screen
+    const _fpRay=new THREE.Raycaster();
+    _fpRay.setFromCamera(new THREE.Vector2(0,0), camera);
+    const _fpHits=_fpRay.intersectObjects(scene.children,true);
+    let _fpTarget=null;
+    for(const h of _fpHits){
+      if(h.distance>30) break; // interaction range
+      if(!isAncestorVisible(h.object)) continue;
+      if(h.object._isRoom) continue;
+      if(h.object._isFan||h.object._isFilterL||h.object._isFilterR||h.object._isLamp){ _fpTarget=h.object; break; }
+    }
+    // Update crosshair style
+    const ch=document.getElementById('fpCrosshair');
+    if(ch){
+      ch.style.borderColor=_fpTarget?'#44ff44':'rgba(255,255,255,0.6)';
+      ch.style.transform=_fpTarget?'translate(-50%,-50%) scale(1.3)':'translate(-50%,-50%) scale(1)';
+    }
+    // Store for click handler
+    window._fpLookTarget=_fpTarget;
+    // Update HUD position readout
+    const hud=document.getElementById('fpHud');
+    if(hud) hud.querySelector('.fp-pos').textContent='X:'+_fpPos.x.toFixed(0)+' Y:'+_fpPos.y.toFixed(0)+' Z:'+_fpPos.z.toFixed(0);
+  }
+
+  // Auto-fade room objects (skip in first-person mode)
+  if(!_fpMode){
   const cx=camera.position.x, cy=camera.position.y, cz=camera.position.z;
   if(!_prevCx || Math.abs(cx-_prevCx)>0.3 || Math.abs(cz-_prevCz)>0.3){
   _prevCx=cx; _prevCz=cz;
@@ -3801,6 +4413,7 @@ function animate(){
     }
   }
   }
+  } // end fading skip
 
   renderer.render(scene,camera);
   // Persist camera for live reload
@@ -3816,6 +4429,150 @@ function animate(){
   }
 }
 let fpsFrames=0, fpsLast=performance.now(), _hueColor=null, _avgCol2=null;
+
+// ─── First-person mini explorer mode ───
+let _fpMode=false;
+const _fpFloorY=-(H/2+ply+bunFootH)+4; // 4" tall mini dude standing on floor (eye height ~4")
+let _fpPos=new THREE.Vector3(0,_fpFloorY,30); // starting position
+let _fpYaw=0, _fpPitch=0, _fpVy=0;
+const _fpKeys={w:false,a:false,s:false,d:false,space:false};
+let _fpSavedFov=42;
+let _fpSpaceHeld=0; // frames space is held for charged jump
+const _fpBodyR=1.5; // body radius for collision
+// Solid furniture AABBs derived from actual object variables
+// room=true means box moves with room (shifted by -placementOffset); false means stays at origin
+// X values are negated for room objects because the room gets X-mirrored after construction
+const _fpBoxesBase=[
+  // Bed — sleeping surface is top of duvet: mattY + mattH/2 + duvetH
+  {xMin:-(bedX+bedW/2), xMax:-(bedX-bedW/2), zMin:bedZ-bedL/2, zMax:bedZ+bedL/2, yTop:mattY+mattH/2+duvetH, room:true},
+  // Nightstand — uses tblX, tblW, tblD, tblZ, tblH (X-mirrored: negate X)
+  {xMin:-(tblX+tblW/2), xMax:-(tblX-tblW/2), zMin:tblZ-tblD/2, zMax:tblZ+tblD/2, yTop:floorY+tblH, room:true},
+  // Purifier — at origin, not mirrored
+  {xMin:-panelW/2-1, xMax:panelW/2+1, zMin:-(D/2+ply+1), zMax:D/2+ply+1, yTop:H/2+ply, room:false},
+  // Bottom plywood panel inside purifier
+  {xMin:-panelW/2, xMax:panelW/2, zMin:-(D/2+ply), zMax:D/2+ply, yTop:-(H/2), room:false},
+  // TV — uses tvCenterX, tvW, bezel, tvH, tvCenterY, tvZ, tvD (X-mirrored: negate X)
+  {xMin:-(tvCenterX+(tvW+bezel*2)/2), xMax:-(tvCenterX-(tvW+bezel*2)/2), zMin:oppWallZ, zMax:tvZ+tvD/2+1, yTop:tvCenterY+tvH/2+bezel, room:true},
+  // Mini split — uses msX, msW, msH, msY, msZ, msD (X-mirrored: negate X)
+  {xMin:-(msX+msW/2), xMax:-(msX-msW/2), zMin:oppWallZ, zMax:msZ+msD/2+1, yTop:msY+msH/2, room:true},
+  // Pillows (X-mirrored)
+  {xMin:-(bedX-13+pillowW/2), xMax:-(bedX-13-pillowW/2), zMin:pillowBaseZ-pillowD/2, zMax:pillowBaseZ+pillowD/2, yTop:pillowY+pillowH+1.5, room:true},
+  {xMin:-(bedX+13+pillowW/2), xMax:-(bedX+13-pillowW/2), zMin:pillowBaseZ-pillowD/2, zMax:pillowBaseZ+pillowD/2, yTop:pillowY+pillowH+1.5, room:true},
+  // Headboard (X-mirrored)
+  {xMin:-(bedX+hbW/2), xMax:-(bedX-hbW/2), zMin:bedZ+bedL/2-hbThick, zMax:bedZ+bedL/2, yTop:floorY+bedClearance+hbH, room:true},
+];
+// Wall bounds derived from actual wall variables (X-mirrored, with 2\" buffer)
+const _fpBoundsBase={xMin:-(sideWallX)+2, xMax:-(leftWallX)-2, zMin:oppWallZ+2, zMax:49-2};
+function _fpGetBoxes(){
+  const ox=placementOffset.x, oy=placementOffset.y, oz=placementOffset.z;
+  return _fpBoxesBase.map(b=>{
+    if(!b.room) return b;
+    return {xMin:b.xMin-ox, xMax:b.xMax-ox, zMin:b.zMin-oz, zMax:b.zMax-oz, yTop:b.yTop-oy};
+  });
+}
+function _fpGetBounds(){
+  const ox=placementOffset.x, oz=placementOffset.z;
+  return {xMin:_fpBoundsBase.xMin-ox, xMax:_fpBoundsBase.xMax-ox, zMin:_fpBoundsBase.zMin-oz, zMax:_fpBoundsBase.zMax-oz};
+}
+
+// Create HUD overlay
+const _fpHud=document.createElement('div');
+_fpHud.id='fpHud';
+_fpHud.innerHTML=`
+  <div style="position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);
+    color:white;padding:10px 20px;border-radius:10px;font-family:system-ui;font-size:12px;text-align:center;
+    pointer-events:none;z-index:9999;backdrop-filter:blur(8px);line-height:1.8">
+    <b style="font-size:14px">Mini Explorer</b><br>
+    <kbd style="background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:3px;margin:0 2px">W</kbd>
+    <kbd style="background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:3px;margin:0 2px">A</kbd>
+    <kbd style="background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:3px;margin:0 2px">S</kbd>
+    <kbd style="background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:3px;margin:0 2px">D</kbd> move &nbsp;
+    <kbd style="background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:3px">Mouse</kbd> look &nbsp;
+    <kbd style="background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:3px">Space</kbd> jump (hold to charge) &nbsp;
+    <kbd style="background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:3px">Esc</kbd> exit<br>
+    <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin:4px 0 2px">
+      <span style="font-size:10px;opacity:0.5">Jump</span>
+      <div style="width:120px;height:6px;background:rgba(255,255,255,0.12);border-radius:3px;overflow:hidden">
+        <div id="fpChargeFill" style="height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,#44aaff,#ff4444);transition:width 0.05s"></div>
+      </div>
+    </div>
+    <span style="opacity:0.4;font-size:10px">Click to interact with filters, fans, and lamp</span><br>
+    <span class="fp-pos" style="opacity:0.5;font-family:monospace;font-size:10px">X:0 Y:0 Z:0</span>
+  </div>`;
+_fpHud.style.display='none';
+document.body.appendChild(_fpHud);
+
+// Crosshair dot (center of screen)
+const _fpCrosshair=document.createElement('div');
+_fpCrosshair.id='fpCrosshair';
+_fpCrosshair.style.cssText='position:fixed;top:50%;left:50%;width:8px;height:8px;border:2px solid rgba(255,255,255,0.6);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:10000;transition:border-color 0.15s,transform 0.15s;box-sizing:border-box';
+_fpCrosshair.style.display='none';
+document.body.appendChild(_fpCrosshair);
+
+function toggleFirstPerson(){
+  _fpMode=!_fpMode;
+  const tog=document.getElementById('togFP');
+  if(tog) tog.classList.toggle('on',_fpMode);
+  _fpHud.style.display=_fpMode?'block':'none';
+  document.getElementById('fpCrosshair').style.display=_fpMode?'block':'none';
+
+  if(_fpMode){
+    _fpSavedFov=camera.fov;
+    camera.fov=75; // wider FOV for first person
+    camera.near=0.05;
+    camera.updateProjectionMatrix();
+    // Start near the purifier, on the floor — clamp to current room bounds
+    const spBounds=_fpGetBounds();
+    const spX=Math.max(spBounds.xMin+3, Math.min(spBounds.xMax-3, 0));
+    const spZ=Math.max(spBounds.zMin+3, Math.min(spBounds.zMax-3, 30));
+    _fpPos.set(spX, _fpFloorY-placementOffset.y, spZ);
+    _fpYaw=0; // face toward purifier (toward -Z)
+    _fpPitch=0; _fpVy=0; _fpSpaceHeld=0;
+    // Disable wall fading so you can see walls from inside
+    fadingWalls.forEach(m=>{ m._savedOpacity=m.material.opacity; m.material.opacity=1; });
+    // Request pointer lock for mouselook
+    canvas.requestPointerLock();
+  } else {
+    camera.fov=_fpSavedFov;
+    camera.near=0.1;
+    camera.updateProjectionMatrix();
+    // Restore wall fading
+    fadingWalls.forEach(m=>{ if(m._savedOpacity!==undefined) m.material.opacity=m._savedOpacity; });
+    document.exitPointerLock();
+  }
+}
+
+// Pointer lock mouselook
+document.addEventListener('mousemove',e=>{
+  if(!_fpMode||!document.pointerLockElement) return;
+  _fpYaw-=e.movementX*0.002;
+  _fpPitch=Math.max(-1.2,Math.min(1.2, _fpPitch-e.movementY*0.002));
+});
+// WASD keys for first-person (captured in keydown/keyup)
+document.addEventListener('keydown',e=>{
+  if(!_fpMode) return;
+  if(e.key==='w'||e.key==='W') _fpKeys.w=true;
+  if(e.key==='a'||e.key==='A'){ _fpKeys.a=true; e.stopImmediatePropagation(); }
+  if(e.key==='s'||e.key==='S') _fpKeys.s=true;
+  if(e.key==='d'||e.key==='D') _fpKeys.d=true;
+  if(e.code==='Space'){ _fpKeys.space=true; e.preventDefault(); }
+});
+document.addEventListener('keyup',e=>{
+  if(e.key==='w'||e.key==='W') _fpKeys.w=false;
+  if(e.key==='a'||e.key==='A') _fpKeys.a=false;
+  if(e.key==='s'||e.key==='S') _fpKeys.s=false;
+  if(e.key==='d'||e.key==='D') _fpKeys.d=false;
+  if(e.code==='Space') _fpKeys.space=false;
+});
+// Re-lock pointer on canvas click while in FP mode
+canvas.addEventListener('click',()=>{ if(_fpMode && !document.pointerLockElement) canvas.requestPointerLock(); });
+// Exit FP mode if pointer lock is released via browser (Esc press)
+document.addEventListener('pointerlockchange',()=>{
+  if(_fpMode && !document.pointerLockElement){
+    // Small delay to distinguish intentional exit from browser Esc
+    setTimeout(()=>{ if(_fpMode && !document.pointerLockElement) toggleFirstPerson(); }, 100);
+  }
+});
 
 // ─── Adaptive quality ───
 // Monitors FPS over several seconds and downgrades rendering if needed.
@@ -3865,11 +4622,46 @@ document.addEventListener('keydown',e=>{
   if(e.key==='l'||e.key==='L') document.querySelector('.panel-r').classList.toggle('collapsed');
   if(e.key==='h'||e.key==='H'){ document.getElementById('shortcutsOverlay').classList.remove('visible'); document.body.classList.add('zen'); }
   if(e.key==='?') document.getElementById('shortcutsOverlay').classList.toggle('visible');
+  if((e.key==='g'||e.key==='G') && !_fpMode) toggleFirstPerson();
+  if(e.key==='Escape' && _fpMode){ toggleFirstPerson(); return; }
+  // Arrow key nudging — always in world space
+  if(e.key==='ArrowRight'){ e.preventDefault(); nudgePlacement(1,0,0); }
+  if(e.key==='ArrowLeft'){ e.preventDefault(); nudgePlacement(-1,0,0); }
+  if(e.key==='ArrowUp'){ e.preventDefault(); nudgePlacement(0,0,e.shiftKey?0:1); }
+  if(e.key==='ArrowDown'){ e.preventDefault(); nudgePlacement(0,0,e.shiftKey?0:-1); }
+  if(e.shiftKey && e.key==='ArrowUp'){ nudgePlacement(0,1,0); }
+  if(e.shiftKey && e.key==='ArrowDown'){ nudgePlacement(0,-1,0); }
 });
 // Double-tap or double-click also exits zen mode
 document.addEventListener('dblclick',()=>document.body.classList.remove('zen'));
+// Wrap all purifier parts in a single group for turntable rotation
+const purifierGroup=new THREE.Group();
+{
+  const toMove=[];
+  scene.children.forEach(c=>{
+    if(c.isLight||c.isCamera||c._isRoom) return;
+    toMove.push(c);
+  });
+  toMove.forEach(c=>purifierGroup.add(c));
+  purifierGroup.add(consoleProps); // console props ride with the purifier
+  scene.add(purifierGroup);
+}
+function setTurntable(val){
+  const deg=parseInt(val);
+  document.getElementById('turntableLabel').textContent=deg+'°';
+  purifierGroup.rotation.y=deg*Math.PI/180;
+}
+function resetPurifierPos(){
+  panX=0; panY=0; panZ=0;
+  purifierGroup.rotation.y=0;
+  document.getElementById('turntableSlider').value=0;
+  document.getElementById('turntableLabel').textContent='0°';
+}
 updateFanLegend();
-autoTimeOfDay();
+// Default to mid-afternoon (2:30 PM = 870 min) instead of real time
+document.getElementById('todSlider').value=870;
+document.getElementById('todLabel').textContent=formatTime(870);
+applyTimeOfDay(870);
 animate();
 </script>
 </body>

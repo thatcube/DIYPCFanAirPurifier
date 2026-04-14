@@ -26,12 +26,12 @@ The box is an open-sided rectangle — **4 plywood panels** (top, bottom, front,
 | Status | Item | Notes |
 |---|---|---|
 | ✅ Have | ADS-25-12 power supply (12V 2.1A) | Main power source |
-| ✅ Have | 6× Arctic P12 Pro ARGB fans (of 10 owned) | 3 front + 3 back |
-| 🚚 Ordered | DC5521 to 4-pin PWM fan adapter cable | Delivers 12V + PWM signal to fans |
-| 🚚 Ordered | 5.5×2.1mm 1-to-2 DC power splitter cable | Splits PSU output — one feed for fans, one for step-down |
-| 🚚 Ordered | 12V→5V 3A step-down module (USB-C output) | Powers ESP32 via USB-C; also provides 5V for ARGB LEDs |
-| 🚚 Ordered | ESP32-C6-N16 dev board | Controls fan speed (PWM) + ARGB via HomeKit/ESPHome |
-| 🚚 Ordered | 5× Dupont F-F jumper wires 26AWG | For connecting ESP32 GPIO pins to fan PWM + ARGB data |
+| ✅ Have | 6× Arctic P12 Pro ARGB fans | 3 front + 3 back |
+| ✅ Have| DC5521 to 4-pin PWM fan adapter cable | Delivers 12V + PWM signal to fans |
+| ✅ Have | 5.5×2.1mm 1-to-2 DC power splitter cable | Splits PSU output — one feed for fans, one for step-down |
+| ✅ Have | 12V→5V 3A step-down module (USB-C output) | Powers ESP32 via USB-C; also provides 5V for ARGB LEDs |
+| ✅ Have | ESP32-C6-N16 dev board | Controls fan speed (PWM) + ARGB via HomeKit/ESPHome |
+| ✅ Have| 5× Dupont F-F jumper wires 26AWG | For connecting ESP32 GPIO pins to fan PWM + ARGB data |
 | ❌ Need | 5V 3-pin ARGB extension cable (~$3–5) | See ARGB wiring section below |
 | ❌ Need (maybe) | 74AHCT125 level shifter chip (~$1–2) | Only needed if ARGB LEDs flicker — try without first |
 
@@ -43,7 +43,7 @@ The box is an open-sided rectangle — **4 plywood panels** (top, bottom, front,
 | ✅ Have | ~½"×⅜" wood strip, ~8 ft | Cut into 4 ledge strips for filter retention (mounted on top/bottom panel inner edges) |
 | ❌ Need | Closed-cell EPDM foam tape — ½" wide × 3/32" thick | Seals between fan panels and top/bottom panels; runs as a continuous ring around all 4 inner faces |
 | ❌ Need (Do we ???) | Wood glue | Corner joints | (???)
-| ❌ Need | Screws (1¼" wood screws) + finish nails | Panel assembly |
+| ✅ Have | Screws (1¼" wood screws) + finish nails | Panel assembly |
 | ❌ Need | Feet — pick one: | See options below |
 
 **Feet options (all mount at the 4 corners of the bottom panel):**
