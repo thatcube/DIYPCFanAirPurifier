@@ -4,22 +4,43 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DIY Air Purifier – 3D Model</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
   <style>
+    :root {
+      --ui-bg: rgba(255,255,255,0.06);
+      --ui-bg-strong: rgba(255,255,255,0.12);
+      --ui-bg-soft: rgba(255,255,255,0.03);
+      --ui-stroke: rgba(255,255,255,0.18);
+      --ui-stroke-soft: rgba(255,255,255,0.08);
+      --ui-text: rgba(255,255,255,0.9);
+      --ui-muted: rgba(255,255,255,0.58);
+      --ui-accent: rgba(96,196,255,0.45);
+      --ui-accent-strong: rgba(96,196,255,0.75);
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Space Grotesk', 'Segoe UI', sans-serif; }
     #viewer { width: 100%; height: 100%; position: relative; }
     canvas { width: 100%; height: 100%; display: block; will-change: transform; cursor: grab; }
     .hint { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 12px; color: rgba(255,255,255,0.5); pointer-events: none; }
-    .panel { position: absolute; top: 12px; background: rgba(255,255,255,0.06); backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); border-radius: 22px; padding: 12px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 8px 40px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.08), inset 0 0 0 0.5px rgba(255,255,255,0.3), inset 0 0 18px 0 rgba(255,255,255,0.08), inset 0 1px 1px rgba(255,255,255,0.4), inset 0 -1px 1px rgba(255,255,255,0.1); }
+    .panel { position: absolute; top: 12px; background: var(--ui-bg); backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.05); border-radius: 22px; padding: 12px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 8px 40px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.08), inset 0 0 0 0.5px rgba(255,255,255,0.3), inset 0 0 18px 0 rgba(255,255,255,0.08), inset 0 1px 1px rgba(255,255,255,0.4), inset 0 -1px 1px rgba(255,255,255,0.1); }
     .panel::before { content: ''; position: absolute; inset: 0; border-radius: 22px; filter: url(#glass-refract); background: rgba(255,255,255,0.015); mix-blend-mode: overlay; opacity: 0.6; pointer-events: none; }
     .panel > * { position: relative; }
-    .panel-l { left: 12px; width: 240px; display: flex; flex-direction: column; gap: 0; padding: 0; max-height: calc(100vh - 90px); }
-    .panel-scroll { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; padding: 4px 6px 8px; flex: 1; min-height: 0; -webkit-mask-image: linear-gradient(to bottom, black 0%, black 100%); mask-image: linear-gradient(to bottom, black 0%, black 100%); transition: -webkit-mask-image 0.3s ease, mask-image 0.3s ease; }
+    .panel-l { left: 12px; width: 326px; display: flex; flex-direction: column; gap: 0; padding: 0; max-height: calc(100vh - 90px); }
+    .panel-scroll { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding: 4px 8px 8px; flex: 1; min-height: 0; -webkit-mask-image: linear-gradient(to bottom, black 0%, black 100%); mask-image: linear-gradient(to bottom, black 0%, black 100%); transition: -webkit-mask-image 0.3s ease, mask-image 0.3s ease; }
     .panel-scroll.scroll-fade { -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 32px), transparent); mask-image: linear-gradient(to bottom, black calc(100% - 32px), transparent); }
-    .panel-r { right: 12px; font-size: 11px; color: rgba(255,255,255,0.9); line-height: 2.4; padding: 14px 16px; }
-    .section-group { background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
-    .section { display: flex; align-items: center; gap: 6px; padding: 8px 10px; cursor: pointer; user-select: none; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(255,255,255,0.65); transition: background 0.15s ease; border-radius: 12px; }
+    .panel-r { right: 12px; width: 250px; font-size: 11px; color: rgba(255,255,255,0.9); line-height: 1.4; padding: 12px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 90px); overflow-y: auto; }
+    .panel-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; position: sticky; top: 0; z-index: 2; padding-bottom: 2px; }
+    .panel-tab { border: 1px solid var(--ui-stroke); border-radius: 10px; background: rgba(255,255,255,0.09); color: rgba(255,255,255,0.75); font-size: 10px; font-weight: 600; letter-spacing: 0.35px; padding: 7px 4px; cursor: pointer; transition: all 0.2s ease; font-family: inherit; }
+    .panel-tab:hover { background: rgba(255,255,255,0.18); color: #fff; }
+    .panel-tab.on { background: linear-gradient(135deg, rgba(96,196,255,0.26), rgba(255,170,102,0.2)); border-color: rgba(150,215,255,0.55); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22), 0 4px 12px rgba(18,41,70,0.25); }
+    .tab-pane { display: none; flex-direction: column; gap: 8px; animation: paneIn 0.2s ease; }
+    .tab-pane.active { display: flex; }
+    @keyframes paneIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .section-group { background: var(--ui-bg-soft); border: 1px solid var(--ui-stroke-soft); border-radius: 12px; }
+    .section { display: flex; align-items: center; gap: 6px; padding: 8px 10px; cursor: pointer; user-select: none; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.55px; color: rgba(255,255,255,0.68); transition: background 0.15s ease; border-radius: 12px; }
     .section:hover { background: rgba(255,255,255,0.04); }
     .section-icon { font-size: 14px; line-height: 1; opacity: 0.5; }
     .section-caret { margin-left: auto; font-size: 12px; color: rgba(255,255,255,0.25); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); }
@@ -27,6 +48,12 @@
     .section-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.35s cubic-bezier(0.34,1.56,0.64,1); }
     .section-group.collapsed .section-body { grid-template-rows: 0fr; }
     .section-body-inner { overflow: hidden; display: flex; flex-direction: column; gap: 2px; padding: 0 10px 10px; min-width: 0; }
+    .section-note { font-size: 10px; color: var(--ui-muted); line-height: 1.35; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 6px 8px; }
+    .legend-card-title { font-size: 10px; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; }
+    .legend-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px; }
+    .legend-line { display: flex; align-items: center; gap: 7px; color: rgba(255,255,255,0.85); font-size: 11px; line-height: 1.4; margin: 7px 0; }
+    .legend-shortcuts .legend-line { justify-content: space-between; font-size: 10px; color: rgba(255,255,255,0.68); }
+    .legend-kbd { font-family: 'IBM Plex Mono', monospace; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22); border-radius: 5px; padding: 1px 6px; color: rgba(255,255,255,0.92); }
     .seg { display: flex; gap: 4px; border-radius: 10px; overflow: hidden; border: none; background: none; }
     .seg button { flex: 1; font-size: 10px; padding: 7px 4px; border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85); transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
     .seg button:active { transform: scale(0.88); transition-duration: 0.08s; }
@@ -91,7 +118,9 @@
     .panel-close { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8); font-size: 14px; cursor: pointer; transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); flex-shrink: 0; margin-left: auto; }
     .panel-close:hover { background: rgba(255,255,255,0.25); color: #fff; transform: scale(1.1); }
     .panel-header { display: flex; align-items: center; padding: 12px 12px 6px; border-radius: 22px 22px 0 0; flex-shrink: 0; gap: 8px; }
-    .panel-title { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.85); letter-spacing: 0.3px; flex: 1; }
+    .panel-title-wrap { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+    .panel-title { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.92); letter-spacing: 0.2px; }
+    .panel-subtitle { font-size: 10px; color: rgba(255,255,255,0.5); letter-spacing: 0.2px; }
 
     /* Panel open/close transitions */
     .panel-l { transition: opacity 0.25s ease, transform 0.25s ease; }
@@ -100,8 +129,8 @@
     .panel-r.collapsed { opacity: 0; pointer-events: none; transform: translateY(-8px) scale(0.96); }
 
     /* Legend inside panel on small screens */
-    .panel-legend { display: none; border-top: 1px solid rgba(255,255,255,0.15); margin-top: 8px; padding: 12px 8px; }
-    .panel-legend .legend-item { font-size: 10px; color: rgba(255,255,255,0.75); line-height: 2.2; display: flex; align-items: center; }
+    .panel-legend { border-top: 1px solid rgba(255,255,255,0.15); margin-top: 0; padding: 0; }
+    .panel-legend .legend-item { font-size: 11px; color: rgba(255,255,255,0.8); line-height: 1.4; display: flex; align-items: center; gap: 7px; margin: 7px 0; }
 
     /* Responsive: small screens */
     @media (max-width: 520px) {
@@ -111,12 +140,15 @@
       .panel-scroll { padding: 6px 8px 8px; gap: 6px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
       .panel-l.mobile-init { opacity: 0; pointer-events: none; transform: translateY(-8px) scale(0.96); }
       .panel-r { display: none; }
-      .panel-legend { display: block; margin-top: 10px; padding-top: 12px; }
+      .panel-tabs { gap: 8px; }
+      .panel-tab { font-size: 13px; padding: 12px 6px; border-radius: 12px; }
+      .panel-legend { display: block; margin-top: 4px; padding-top: 2px; }
       .section-group { margin-bottom: 0; }
       .section { font-size: 13px; padding: 14px 14px; }
       .section-icon { font-size: 17px; }
       .section-caret { font-size: 14px; }
       .section-body-inner { padding: 0 14px 14px; gap: 8px; }
+      .section-note { font-size: 13px; border-radius: 10px; padding: 9px 10px; }
       .seg { gap: 8px; }
       .seg button { font-size: 15px; padding: 14px 8px; border-radius: 12px; }
       .picker-label { font-size: 13px; padding: 6px 2px 6px; }
@@ -131,9 +163,12 @@
       .slider-row input[type=range]::-webkit-slider-thumb { width: 24px; height: 24px; border-radius: 12px; }
       .slider-row .slider-val { font-size: 14px; }
       .panel-title { font-size: 15px; }
+      .panel-subtitle { font-size: 12px; }
       .panel-close { width: 36px; height: 36px; font-size: 17px; border-radius: 12px; }
-      .panel-legend .legend-item { font-size: 14px; line-height: 2.6; padding: 0 2px; }
+      .panel-legend .legend-item { font-size: 14px; line-height: 1.6; padding: 0 2px; }
       .panel-legend .swatch { width: 18px; height: 18px; border-radius: 4px; margin-right: 10px; }
+      .legend-card-title { font-size: 12px; }
+      .legend-kbd { font-size: 12px; padding: 2px 7px; }
       .rgb-seg button { font-size: 15px !important; padding: 12px 6px !important; }
       .fab { top: 12px; left: 12px; font-size: 16px; height: 48px; padding: 0 18px; border-radius: 14px; gap: 8px; }
       .fab i { font-size: 19px; }
@@ -141,7 +176,7 @@
       .hint { font-size: 13px; bottom: 14px; }
     }
     @media (min-width: 521px) and (max-width: 768px) {
-      .panel-l { width: 210px; }
+      .panel-l { width: 272px; }
       .seg button { font-size: 10px; }
     }
 
@@ -265,40 +300,62 @@
 <button class="fab hidden" id="fab" onclick="togglePanel()"><i class="ph ph-sliders-horizontal"></i><span class="fab-label">Controls</span></button>
 <button class="guide-fab" id="guideFab" onclick="toggleGuide()"><i class="ph ph-book-open-text"></i><span>Build Guide</span></button>
 <div class="panel panel-l" id="panelL">
-  <div class="panel-header"><span class="panel-title">Controls</span><button class="panel-close" onclick="togglePanel()" title="Hide controls"><i class="ph ph-x"></i></button></div>
+  <div class="panel-header"><div class="panel-title-wrap"><span class="panel-title">Control Center</span><span class="panel-subtitle">Build · Airflow · Scene · Legend</span></div><button class="panel-close" onclick="togglePanel()" title="Hide controls"><i class="ph ph-x"></i></button></div>
   <div class="panel-scroll">
+  <div class="panel-tabs" id="controlTabs">
+    <button class="panel-tab on" data-tab="tabBuild" onclick="setControlTab('tabBuild')">Build</button>
+    <button class="panel-tab" data-tab="tabAir" onclick="setControlTab('tabAir')">Air</button>
+    <button class="panel-tab" data-tab="tabScene" onclick="setControlTab('tabScene')">Scene</button>
+    <button class="panel-tab" data-tab="tabLegend" onclick="setControlTab('tabLegend')">Legend</button>
+  </div>
 
+  <div class="tab-pane active" id="tabBuild">
   <div class="section-group">
-  <div class="section" onclick="toggleSection(this)"><i class="ph ph-cube section-icon"></i><span>Purifier</span><i class="ph ph-caret-down section-caret"></i></div>
+  <div class="section" onclick="toggleSection(this)"><i class="ph ph-cube section-icon"></i><span>Structure</span><i class="ph ph-caret-down section-caret"></i></div>
   <div class="section-body"><div class="section-body-inner">
   <div class="picker-label">Fan layout</div>
   <div class="seg"><button id="btnLayoutFB" class="on" onclick="setLayout('fb')">Front + Back</button><button id="btnLayoutFT" onclick="setLayout('ft')">Front + Top</button></div>
   <div class="picker-label">Fans per panel</div>
   <div class="seg"><button id="btnFan3" class="on" onclick="setFanCount(3)">3 Fans</button><button id="btnFan4" onclick="setFanCount(4)">4 Fans</button></div>
-  <div class="toggle-row"><span class="toggle-label">Exploded view</span><div class="toggle-switch" id="togExplode" onclick="toggleExplode()"></div></div>
-  <div class="toggle-row"><span class="toggle-label">Show filters</span><div class="toggle-switch on" id="togFilter" onclick="toggleFilter()"></div></div>
-  <div class="toggle-row"><span class="toggle-label">Fan grills</span><div class="toggle-switch" id="togGrill" onclick="toggleGrills()"></div></div>
-  <div id="grillColorSection" style="display:none"><div class="picker-label">Grill color</div>
-  <div class="seg"><button id="btnGrillBlack" class="on" onclick="setGrillColor('black')">Black</button><button id="btnGrillSilver" onclick="setGrillColor('silver')">Silver</button></div></div>
   <div class="picker-label">Board thickness</div>
   <div class="seg"><button id="btnBoardHalf" onclick="setBoardThickness('half')">&frac12;" Plywood</button><button id="btnBoard34" onclick="setBoardThickness('34')">&#190;" (1&times;8)</button></div>
   <div class="picker-label">Edge profile</div>
   <div class="seg"><button id="btnEdgeFlat" onclick="setEdgeProfile('flat')">Flat</button><button id="btnEdgeCurved" class="on" onclick="setEdgeProfile('curved')">Curved</button></div>
   <div class="picker-label">Wood stain</div>
   <div class="seg"><button id="btnStainRaw" class="on" onclick="setStain('raw')">Raw Birch</button><button id="btnStainOil" onclick="setStain('oil')">Oil</button><button id="btnStainWalnut" onclick="setStain('walnut')">Walnut</button></div>
+  <div class="toggle-row"><span class="toggle-label">Exploded view</span><div class="toggle-switch" id="togExplode" onclick="toggleExplode()"></div></div>
+  </div></div>
+  </div>
+
+  <div class="section-group collapsed">
+  <div class="section" onclick="toggleSection(this)"><i class="ph ph-hand-coins section-icon"></i><span>Finish & Feet</span><i class="ph ph-caret-down section-caret"></i></div>
+  <div class="section-body"><div class="section-body-inner">
+  <div class="toggle-row"><span class="toggle-label">Show filters</span><div class="toggle-switch on" id="togFilter" onclick="toggleFilter()"></div></div>
+  <div class="toggle-row"><span class="toggle-label">Fan grills</span><div class="toggle-switch" id="togGrill" onclick="toggleGrills()"></div></div>
+  <div id="grillColorSection" style="display:none"><div class="picker-label">Grill color</div>
+  <div class="seg"><button id="btnGrillBlack" class="on" onclick="setGrillColor('black')">Black</button><button id="btnGrillSilver" onclick="setGrillColor('silver')">Silver</button></div></div>
   <div class="picker-label">Feet style</div>
   <div class="seg"><button id="btnFeetPeg" onclick="setFeetStyle('peg')">Peg Legs</button><button id="btnFeetBun" class="on" onclick="setFeetStyle('bun')">Round Feet</button><button id="btnFeetRubber" onclick="setFeetStyle('rubber')">Rubber Feet</button><button id="btnFeetNone" onclick="setFeetStyle('none')">None</button></div>
   <div class="picker-label">Foot diameter</div>
   <div class="seg"><button id="btnFootD1" onclick="setFootDiameter(1.1)">1.1"</button><button id="btnFootD2" class="on" onclick="setFootDiameter(1.0)">1"</button><button id="btnFootD3" onclick="setFootDiameter(1.5)">1.5"</button></div>
   <div class="picker-label">Foot height</div>
   <div class="seg"><button id="btnFootH25" class="on" onclick="setFootHeight(2.5)">2.5"</button><button id="btnFootH35" onclick="setFootHeight(3.5)">3.5"</button><button id="btnFootH45" onclick="setFootHeight(4.5)">4.5"</button></div>
-  <div class="picker-label">Placement</div>
-  <div class="seg"><button id="btnPlaceFloor" class="on" onclick="setPlacement('floor')">Floor</button><button id="btnPlaceWall" onclick="setPlacement('wall')">Wall</button><button id="btnPlaceTv" onclick="setPlacement('tv')">Under TV</button></div>
-  <div style="margin-top:6px;font-size:9px;color:rgba(255,255,255,0.4);text-align:center">Arrow keys nudge position (world space)</div>
-  <div style="text-align:center;font-size:10px;color:rgba(255,255,255,0.55);font-family:monospace;margin-top:2px" id="nudgeLabel">X:0 Y:0 Z:0</div>
   </div></div>
   </div>
 
+  <div class="section-group collapsed">
+  <div class="section" onclick="toggleSection(this)"><i class="ph ph-map-pin section-icon"></i><span>Placement</span><i class="ph ph-caret-down section-caret"></i></div>
+  <div class="section-body"><div class="section-body-inner">
+  <div class="picker-label">Placement</div>
+  <div class="seg"><button id="btnPlaceFloor" class="on" onclick="setPlacement('floor')">Floor</button><button id="btnPlaceWall" onclick="setPlacement('wall')">Wall</button><button id="btnPlaceTv" onclick="setPlacement('tv')">Under TV</button></div>
+  <div class="section-note">Arrow keys nudge in world space. Hold Shift + Arrow Up/Down to move vertically.</div>
+  <div style="text-align:center;font-size:11px;color:rgba(255,255,255,0.65);font-family:'IBM Plex Mono',monospace;margin-top:2px" id="nudgeLabel">X:0 Y:0 Z:0</div>
+  <div class="toggle-row" style="margin-top:4px"><span class="toggle-label" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted" onclick="resetPurifierPos()">Reset position</span></div>
+  </div></div>
+  </div>
+  </div>
+
+  <div class="tab-pane" id="tabAir">
   <div class="section-group">
   <div class="section" onclick="toggleSection(this)"><i class="ph ph-fan section-icon"></i><span>Fans</span><i class="ph ph-caret-down section-caret"></i></div>
   <div class="section-body"><div class="section-body-inner">
@@ -313,9 +370,12 @@
   <div id="rgbRow" class="seg rgb-seg"><button id="btnRgbAuto" class="on" onclick="setRGB('auto')" style="background:linear-gradient(135deg,rgba(255,238,221,0.35),rgba(255,106,26,0.35));color:rgba(255,255,255,0.9)">Auto</button><div class="rgb-color-wrap" id="rgbColorWrap"><span class="rgb-color-swatch" id="rgbSwatch" style="background:#ffeedd"></span>Custom<input type="color" id="rgbColorPicker" value="#ffeedd" oninput="setRGBFromPicker(this.value)"></div><button id="btnRgbRainbow" class="party" onclick="setRGB('rainbow')">Party</button><button id="btnRgbOff" class="ob" onclick="setRGB('off')">Off</button></div>
   <div class="slider-row"><label>Brightness</label><input type="range" id="rgbBright" min="0" max="100" value="50" oninput="setRGBBrightness(this.value)"><span class="slider-val" id="rgbBrightVal">50%</span></div>
   </div></div>
+  <div class="section-note">Use Auto for realistic warm-white glow, Custom for fixed tint, Party for animated RGB.</div>
   </div></div>
   </div>
+  </div>
 
+  <div class="tab-pane" id="tabScene">
   <div class="section-group">
   <div class="section" onclick="toggleSection(this)"><i class="ph ph-eye section-icon"></i><span>Scene</span><i class="ph ph-caret-down section-caret"></i></div>
   <div class="section-body"><div class="section-body-inner">
@@ -325,7 +385,6 @@
   <div class="picker-label" style="margin-top:8px">Turntable</div>
   <div class="slider-row" style="gap:6px"><span style="font-size:14px;color:rgba(255,255,255,0.5);display:flex;align-items:center">0°</span><input type="range" id="turntableSlider" min="0" max="360" value="0" step="1" oninput="setTurntable(this.value)"><span style="font-size:14px;color:rgba(255,255,255,0.5);display:flex;align-items:center">360°</span></div>
   <div style="text-align:center;font-size:10px;color:rgba(255,255,255,0.45);margin-top:-2px" id="turntableLabel">0°</div>
-  <div class="toggle-row" style="margin-top:4px"><span class="toggle-label" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted" onclick="resetPurifierPos()">Reset position</span></div>
   <div class="toggle-row"><span class="toggle-label">Isolate purifier</span><div class="toggle-switch" id="togIsolate" onclick="toggleIsolate()"></div></div>
   <div class="toggle-row"><span class="toggle-label">Dimensions</span><div class="toggle-switch" id="togDims" onclick="toggleDimensions()"></div></div>
   <div class="toggle-row"><span class="toggle-label">X-ray mode</span><div class="toggle-switch" id="togXray" onclick="toggleXray()"></div></div>
@@ -333,24 +392,47 @@
   <div class="toggle-row" style="margin-top:4px"><span class="toggle-label">Mini explorer <span style="font-size:9px;opacity:0.5">(G)</span></span><div class="toggle-switch" id="togFP" onclick="toggleFirstPerson()"></div></div>
   </div></div>
   </div>
+  </div>
 
-  <div class="panel-legend" id="panelLegend">
+  <div class="tab-pane" id="tabLegend">
+  <div class="legend-card">
+    <div class="legend-card-title">Material Legend</div>
+    <div class="panel-legend" id="panelLegend">
     <div class="legend-item"><span class="swatch" style="background:#ddc89e"></span>Plywood (½″ birch)</div>
     <div class="legend-item"><span class="swatch" style="background:#f0ede6;border:1px solid rgba(255,255,255,0.3)"></span>Filters (MERV 13)</div>
     <div class="legend-item"><span class="swatch" id="fanSwatchMobile" style="background:#1a1a1a"></span>Fans (P12 Pro 120×120×27mm)</div>
     <div class="legend-item"><span class="swatch" style="background:#c4a870"></span>Ledge strips</div>
     <div class="legend-item"><span class="swatch" style="background:#3a3a3a"></span>Foam tape seal</div>
     <div class="legend-item"><span class="swatch" style="background:#999;border:1px solid rgba(255,255,255,0.3)"></span>Butt joints + screws</div>
+    </div>
   </div>
+  <div class="legend-card legend-shortcuts">
+    <div class="legend-card-title">Keyboard Shortcuts</div>
+    <div class="legend-line"><span><span class="legend-kbd">G</span> Mini explorer</span><span><span class="legend-kbd">?</span> Shortcuts</span></div>
+    <div class="legend-line"><span><span class="legend-kbd">H</span> Zen mode</span><span><span class="legend-kbd">L</span> Toggle legend</span></div>
+    <div class="legend-line"><span><span class="legend-kbd">1-4</span> Tab switch</span><span><span class="legend-kbd">F</span> FPS</span></div>
+  </div>
+  </div>
+
   </div>
 </div>
 <div class="panel panel-r">
-  <div id="legendWood"><span class="swatch" style="background:#ddc89e"></span><span style="color:rgba(255,255,255,0.85)">Plywood (½″ birch)</span></div>
-  <div><span class="swatch" style="background:#f0ede6;border:1px solid rgba(255,255,255,0.3)"></span><span style="color:rgba(255,255,255,0.85)">Filters (MERV 13)</span></div>
-  <div><span class="swatch" id="fanSwatchDesktop" style="background:#1a1a1a"></span><span style="color:rgba(255,255,255,0.85)">Fans (P12 Pro 120×120×27mm)</span></div>
-  <div><span class="swatch" style="background:#c4a870"></span><span style="color:rgba(255,255,255,0.85)">Ledge strips</span></div>
-  <div><span class="swatch" style="background:#3a3a3a"></span><span style="color:rgba(255,255,255,0.85)">Foam tape seal</span></div>
-  <div><span class="swatch" style="background:#999;border:1px solid rgba(255,255,255,0.3)"></span><span style="color:rgba(255,255,255,0.85)">Butt joints + screws</span></div>
+  <div class="legend-card">
+    <div class="legend-card-title">Material Legend</div>
+    <div id="legendWood" class="legend-line"><span class="swatch" style="background:#ddc89e"></span><span>Plywood (½″ birch)</span></div>
+    <div class="legend-line"><span class="swatch" style="background:#f0ede6;border:1px solid rgba(255,255,255,0.3)"></span><span>Filters (MERV 13)</span></div>
+    <div class="legend-line"><span class="swatch" id="fanSwatchDesktop" style="background:#1a1a1a"></span><span>Fans (P12 Pro 120×120×27mm)</span></div>
+    <div class="legend-line"><span class="swatch" style="background:#c4a870"></span><span>Ledge strips</span></div>
+    <div class="legend-line"><span class="swatch" style="background:#3a3a3a"></span><span>Foam tape seal</span></div>
+    <div class="legend-line"><span class="swatch" style="background:#999;border:1px solid rgba(255,255,255,0.3)"></span><span>Butt joints + screws</span></div>
+  </div>
+  <div class="legend-card legend-shortcuts">
+    <div class="legend-card-title">Quick Keys</div>
+    <div class="legend-line"><span>Mini explorer</span><span class="legend-kbd">G</span></div>
+    <div class="legend-line"><span>Toggle FPS</span><span class="legend-kbd">F</span></div>
+    <div class="legend-line"><span>Toggle legend panel</span><span class="legend-kbd">L</span></div>
+    <div class="legend-line"><span>Switch tabs</span><span class="legend-kbd">1-4</span></div>
+  </div>
 </div>
 <div class="guide-overlay" id="guideOverlay">
 <div class="guide-scroll" onclick="toggleGuide()">
@@ -493,6 +575,7 @@
       <tr><td><kbd>L</kbd></td><td>Toggle legend</td></tr>
       <tr><td><kbd>H</kbd></td><td>Hide all UI (any key restores)</td></tr>
       <tr><td><kbd>G</kbd></td><td>Mini explorer (first-person)</td></tr>
+      <tr><td><kbd>1-4</kbd></td><td>Switch control tabs</td></tr>
       <tr><td><kbd>←↑→↓</kbd></td><td>Nudge placement</td></tr>
     </table>
     <div class="dismiss">Press <b>?</b> or click outside to close</div>
@@ -503,6 +586,12 @@
 <script>
 // Section collapse toggle
 function toggleSection(el){ el.closest('.section-group').classList.toggle('collapsed'); }
+function setControlTab(tabId){
+  document.querySelectorAll('.panel-tab').forEach(btn=>btn.classList.toggle('on', btn.dataset.tab===tabId));
+  document.querySelectorAll('.tab-pane').forEach(pane=>pane.classList.toggle('active', pane.id===tabId));
+  const panelScroll=document.querySelector('.panel-scroll');
+  if(panelScroll) panelScroll.scrollTop=0;
+}
 // Panel toggle
 function togglePanel() {
   const panel = document.getElementById('panelL');
@@ -5098,6 +5187,10 @@ document.addEventListener('keydown',e=>{
   if(e.key==='f'||e.key==='F') toggleFps();
   if(e.key==='a'||e.key==='A') axesGroup.visible=!axesGroup.visible;
   if(e.key==='l'||e.key==='L') document.querySelector('.panel-r').classList.toggle('collapsed');
+  if(e.key==='1') setControlTab('tabBuild');
+  if(e.key==='2') setControlTab('tabAir');
+  if(e.key==='3') setControlTab('tabScene');
+  if(e.key==='4') setControlTab('tabLegend');
   if(e.key==='h'||e.key==='H'){ document.getElementById('shortcutsOverlay').classList.remove('visible'); document.body.classList.add('zen'); }
   if(e.key==='?') document.getElementById('shortcutsOverlay').classList.toggle('visible');
   if((e.key==='g'||e.key==='G') && !_fpMode) toggleFirstPerson();
