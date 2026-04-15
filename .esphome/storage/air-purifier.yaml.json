@@ -1,0 +1,43 @@
+{
+  "storage_version": 1,
+  "name": "air-purifier",
+  "friendly_name": "Air Purifier",
+  "comment": null,
+  "esphome_version": "2026.3.3",
+  "src_version": 1,
+  "address": "192.168.68.238",
+  "web_port": 80,
+  "esp_platform": "ESP32C6",
+  "build_path": "/Users/brandon/Development/DIYPCFanAirPurifier/.esphome/build/air-purifier",
+  "firmware_bin_path": "/Users/brandon/Development/DIYPCFanAirPurifier/.esphome/build/air-purifier/.pioenvs/air-purifier/firmware.bin",
+  "loaded_integrations": [
+    "api",
+    "captive_portal",
+    "esp32",
+    "esp32_rmt_led_strip",
+    "esphome",
+    "json",
+    "light",
+    "logger",
+    "md5",
+    "mdns",
+    "network",
+    "ota",
+    "preferences",
+    "safe_mode",
+    "sha256",
+    "socket",
+    "web_server",
+    "web_server_base",
+    "web_server_idf",
+    "wifi"
+  ],
+  "loaded_platforms": [
+    "light/esp32_rmt_led_strip",
+    "ota/esphome",
+    "ota/web_server"
+  ],
+  "no_mdns": false,
+  "framework": "esp-idf",
+  "core_platform": "esp32"
+}
