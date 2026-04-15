@@ -360,7 +360,7 @@
   </div></div>
   </div>
 
-  <div class="section-group collapsed">
+  <div class="section-group">
   <div class="section" onclick="toggleSection(this)"><i class="ph ph-hand-coins section-icon"></i><span>Finish & Feet</span><i class="ph ph-caret-down section-caret"></i></div>
   <div class="section-body"><div class="section-body-inner">
   <div class="toggle-row"><span class="toggle-label">Show filters</span><div class="toggle-switch on" id="togFilter" onclick="toggleFilter()"></div></div>
@@ -376,7 +376,7 @@
   </div></div>
   </div>
 
-  <div class="section-group collapsed">
+  <div class="section-group">
   <div class="section" onclick="toggleSection(this)"><i class="ph ph-map-pin section-icon"></i><span>Placement</span><i class="ph ph-caret-down section-caret"></i></div>
   <div class="section-body"><div class="section-body-inner">
   <div class="picker-label">Placement</div>
@@ -659,11 +659,7 @@ function toggleGuide(){
   new MutationObserver(checkFade).observe(ps,{childList:true,subtree:true,attributes:true});
   checkFade();
 })();
-// On small screens, start with panel collapsed and FAB visible
-if(window.innerWidth<=520){
-  document.getElementById('panelL').classList.add('collapsed','mobile-init');
-  const fab=document.getElementById('fab'); fab.classList.remove('hidden'); fab.classList.add('mobile-init');
-}
+// Keep control panel expanded by default on all screen sizes.
 
 const canvas = document.getElementById('c');
 const _isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
