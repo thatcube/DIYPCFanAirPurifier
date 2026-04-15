@@ -668,7 +668,8 @@
     <h3>Keyboard shortcuts</h3>
     <table>
       <tr><td><kbd>?</kbd></td><td>Toggle this dialog</td></tr>
-      <tr><td><kbd>A</kbd></td><td>Show XYZ axes</td></tr>
+      <tr><td><kbd>WASD</kbd></td><td>Move camera (outside Play Mode)</td></tr>
+      <tr><td><kbd>X</kbd></td><td>Show XYZ axes</td></tr>
       <tr><td><kbd>F</kbd></td><td>Show FPS counter</td></tr>
       <tr><td><kbd>L</kbd></td><td>Toggle legend</td></tr>
       <tr><td><kbd>H</kbd></td><td>Hide all UI (any key restores)</td></tr>
@@ -2333,6 +2334,7 @@ const _savedCam=sessionStorage.getItem('cam');
 const _camDefaults=_savedCam?JSON.parse(_savedCam):{p:1.1,a:0.5+Math.PI,r:50};
 let drag=false,px=0,py=0,polar=_camDefaults.p,azimuth=_camDefaults.a,radius=_camDefaults.r;
 let panX=0, panY=0, panZ=0; // camera target offset (shift+drag)
+const _camKeys={w:false,a:false,s:false,d:false};
 let _isPanning=false;
 let _touchMode='none';
 let _pinchStartDist=0;
@@ -4775,7 +4777,7 @@ scene.add(duvet);
 // Enable shadows on key furniture (not walls/baseboards/trim — those don't need it)
 [headboard, lRail, rRail, footboard, mattress, duvet].forEach(m=>{ m.castShadow=true; });
 
-// XYZ axis helper — press 'A' to toggle (positioned beside purifier)
+// XYZ axis helper — press 'X' to toggle (positioned beside purifier)
 const axesGroup=new THREE.Group();
 const axesOrig=new THREE.Vector3(panelW/2+4, -H/2-ply, D/2+ply+4); // front-right of purifier, at foot level
 axesGroup.position.copy(axesOrig);
@@ -5066,6 +5068,15 @@ function animate(ts){
   }
 
   if(!_fpMode){
+  if(_camKeys.w||_camKeys.a||_camKeys.s||_camKeys.d){
+    const spd=Math.max(0.18,Math.min(0.9,radius*0.012));
+    const fwdX=-Math.sin(azimuth), fwdZ=-Math.cos(azimuth);
+    const rightX=Math.cos(azimuth), rightZ=-Math.sin(azimuth);
+    if(_camKeys.w){ panX+=fwdX*spd; panZ+=fwdZ*spd; }
+    if(_camKeys.s){ panX-=fwdX*spd; panZ-=fwdZ*spd; }
+    if(_camKeys.a){ panX+=rightX*spd; panZ+=rightZ*spd; }
+    if(_camKeys.d){ panX-=rightX*spd; panZ-=rightZ*spd; }
+  }
   camera.position.x=panX+radius*Math.sin(polar)*Math.sin(azimuth);
   camera.position.y=panY+radius*Math.cos(polar);
   camera.position.z=panZ+radius*Math.sin(polar)*Math.cos(azimuth);
@@ -5345,6 +5356,7 @@ function toggleFirstPerson(){
     _fpPos.set(spX, _fpFloorY-placementOffset.y, spZ);
     _fpYaw=0; // face toward purifier (toward -Z)
     _fpPitch=0; _fpVy=0; _fpSpaceHeld=0;
+    _camKeys.w=false; _camKeys.a=false; _camKeys.s=false; _camKeys.d=false;
     // Disable wall fading so you can see walls from inside.
     fadingWalls.forEach(m=>{
       m._savedOpacity=m.material.opacity;
@@ -5373,6 +5385,7 @@ function toggleFirstPerson(){
       if(m._savedDepthWrite!==undefined) m.material.depthWrite=m._savedDepthWrite;
     });
     _fpKeys.w=false; _fpKeys.a=false; _fpKeys.s=false; _fpKeys.d=false; _fpKeys.space=false;
+    _camKeys.w=false; _camKeys.a=false; _camKeys.s=false; _camKeys.d=false;
     if(document.exitPointerLock && document.pointerLockElement) document.exitPointerLock();
   }
 }
@@ -5398,6 +5411,21 @@ document.addEventListener('keyup',e=>{
   if(e.key==='s'||e.key==='S') _fpKeys.s=false;
   if(e.key==='d'||e.key==='D') _fpKeys.d=false;
   if(e.code==='Space') _fpKeys.space=false;
+});
+document.addEventListener('keydown',e=>{
+  if(_fpMode) return;
+  if(document.body.classList.contains('zen')) return;
+  const t=e.target;
+  if(t && (t.tagName==='INPUT' || t.tagName==='TEXTAREA' || t.tagName==='SELECT' || t.isContentEditable)) return;
+  const k=e.key.toLowerCase();
+  if(k==='w'||k==='a'||k==='s'||k==='d'){
+    _camKeys[k]=true;
+    e.preventDefault();
+  }
+});
+document.addEventListener('keyup',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='w'||k==='a'||k==='s'||k==='d') _camKeys[k]=false;
 });
 // Re-lock pointer on canvas click while in FP mode
 canvas.addEventListener('click',()=>{ if(_fpMode && !_isMobile && !document.pointerLockElement && canvas.requestPointerLock) canvas.requestPointerLock(); });
@@ -5444,7 +5472,7 @@ document.addEventListener('keydown',e=>{
     return; // consume the keypress that restored UI
   }
   if(e.key==='f'||e.key==='F') toggleFps();
-  if(e.key==='a'||e.key==='A') axesGroup.visible=!axesGroup.visible;
+  if(e.key==='x'||e.key==='X') axesGroup.visible=!axesGroup.visible;
   if(e.key==='l'||e.key==='L') document.querySelector('.panel-r').classList.toggle('collapsed');
   if(e.key==='h'||e.key==='H'){ document.getElementById('shortcutsOverlay').classList.remove('visible'); document.body.classList.add('zen'); }
   if(e.key==='?') toggleShortcuts();
