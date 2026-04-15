@@ -280,10 +280,18 @@
   <div class="toggle-row"><span class="toggle-label">Fan grills</span><div class="toggle-switch" id="togGrill" onclick="toggleGrills()"></div></div>
   <div id="grillColorSection" style="display:none"><div class="picker-label">Grill color</div>
   <div class="seg"><button id="btnGrillBlack" class="on" onclick="setGrillColor('black')">Black</button><button id="btnGrillSilver" onclick="setGrillColor('silver')">Silver</button></div></div>
+  <div class="picker-label">Board thickness</div>
+  <div class="seg"><button id="btnBoardHalf" onclick="setBoardThickness('half')">&frac12;" Plywood</button><button id="btnBoard34" onclick="setBoardThickness('34')">&#190;" (1&times;8)</button></div>
+  <div class="picker-label">Edge profile</div>
+  <div class="seg"><button id="btnEdgeFlat" onclick="setEdgeProfile('flat')">Flat</button><button id="btnEdgeCurved" class="on" onclick="setEdgeProfile('curved')">Curved</button></div>
   <div class="picker-label">Wood stain</div>
   <div class="seg"><button id="btnStainRaw" class="on" onclick="setStain('raw')">Raw Birch</button><button id="btnStainOil" onclick="setStain('oil')">Oil</button><button id="btnStainWalnut" onclick="setStain('walnut')">Walnut</button></div>
   <div class="picker-label">Feet style</div>
   <div class="seg"><button id="btnFeetPeg" onclick="setFeetStyle('peg')">Peg Legs</button><button id="btnFeetBun" class="on" onclick="setFeetStyle('bun')">Round Feet</button><button id="btnFeetRubber" onclick="setFeetStyle('rubber')">Rubber Feet</button><button id="btnFeetNone" onclick="setFeetStyle('none')">None</button></div>
+  <div class="picker-label">Foot diameter</div>
+  <div class="seg"><button id="btnFootD1" onclick="setFootDiameter(1.1)">1.1"</button><button id="btnFootD2" class="on" onclick="setFootDiameter(1.0)">1"</button><button id="btnFootD3" onclick="setFootDiameter(1.5)">1.5"</button></div>
+  <div class="picker-label">Foot height</div>
+  <div class="seg"><button id="btnFootH25" class="on" onclick="setFootHeight(2.5)">2.5"</button><button id="btnFootH35" onclick="setFootHeight(3.5)">3.5"</button><button id="btnFootH45" onclick="setFootHeight(4.5)">4.5"</button></div>
   <div class="picker-label">Placement</div>
   <div class="seg"><button id="btnPlaceFloor" class="on" onclick="setPlacement('floor')">Floor</button><button id="btnPlaceWall" onclick="setPlacement('wall')">Wall</button><button id="btnPlaceTv" onclick="setPlacement('tv')">Under TV</button></div>
   <div style="margin-top:6px;font-size:9px;color:rgba(255,255,255,0.4);text-align:center">Arrow keys nudge position (world space)</div>
@@ -534,10 +542,10 @@ if(window.innerWidth<=520){
 const canvas = document.getElementById('c');
 const _isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false, powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, _isMobile?1:2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, _isMobile?0.72:0.85));
 renderer.setClearColor(0xd4dce8, 1);
 renderer.shadowMap.enabled=true;
-renderer.shadowMap.type=THREE.VSMShadowMap; // smooth variance shadows — zero grain
+renderer.shadowMap.type=THREE.VSMShadowMap; // softer look preferred; keep corner fix via larger occluders
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.3;
 
@@ -619,17 +627,31 @@ scene.add(hemiLight);
 const key=new THREE.DirectionalLight(0xffe0a0,1.4); key.position.set(95,38,0); // from outside the window (flipped)
 key.castShadow=true; key.shadow.mapSize.set(_isMobile?1024:2048, _isMobile?1024:2048);
 key.shadow.bias=-0.0005; key.shadow.normalBias=0.04;
-key.shadow.radius=_isMobile?4:8; key.shadow.blurSamples=_isMobile?10:25;
-key.shadow.camera.near=1; key.shadow.camera.far=160;
-key.shadow.camera.left=-50; key.shadow.camera.right=50;
-key.shadow.camera.top=40; key.shadow.camera.bottom=-40;
+key.shadow.radius=_isMobile?6:12; key.shadow.blurSamples=_isMobile?16:36;
+key.shadow.camera.near=1; key.shadow.camera.far=240;
+key.shadow.camera.left=-90; key.shadow.camera.right=90;
+key.shadow.camera.top=70; key.shadow.camera.bottom=-70;
+key.shadow.camera.updateProjectionMatrix();
 scene.add(key);
+const windowSun=new THREE.SpotLight(0xffe0a0,0,260,Math.PI*0.60,0.72,1.0);
+windowSun.position.set(95,38,0);
+windowSun.castShadow=false;
+windowSun.shadow.mapSize.set(_isMobile?1024:2048, _isMobile?1024:2048);
+windowSun.shadow.bias=-0.0002;
+windowSun.shadow.normalBias=0.012;
+windowSun.shadow.radius=_isMobile?5:10;
+windowSun.shadow.camera.near=1;
+windowSun.shadow.camera.far=260;
+scene.add(windowSun);
+scene.add(windowSun.target);
+windowSun.visible=false;
 const fill=new THREE.DirectionalLight(0xe8eeff,0.08); fill.position.set(-10,12,-12); scene.add(fill);
 const rim=new THREE.DirectionalLight(0xccddff,0.1); rim.position.set(-6,15,-18); scene.add(rim);
 const bounce=new THREE.DirectionalLight(0xffeedd,0.05); bounce.position.set(0,-10,8); scene.add(bounce);
 
 // Filtrete 20x25x1 actual: 19.69×24.69×0.78
-const W=5.44, H=19.69, D=24.69, ply=0.5, ft=0.78;
+const _boardThickness=sessionStorage.getItem('boardThickness')||'half';
+const W=5.44, H=19.69, D=24.69, ply=_boardThickness==='34'?0.75:0.5, ft=0.78;
 const panelW = W+2*ft; // overall width = 7.0"
 
 // Arctic P12 Pro: 120×120×27mm (FIXED — do not change)
@@ -813,6 +835,38 @@ function normalizeUVs(geo){
   uv.needsUpdate=true;
 }
 
+// Outer-edge-only roundover in XZ cross-section, applied uniformly through full Y.
+// Optional `outerSignZ` lets us round only one Z side: -1 (negative), +1 (positive), 0 (both).
+function applyOuterEdgeRoundXZ(geo,w,d,r,outerSignZ=0){
+  const R=Math.min(r, w/2-1e-3, d/2-1e-3);
+  if(!(R>0)) return;
+  const innerX=w/2-R;
+  const innerZ=d/2-R;
+  const EPS=1e-7;
+  const pp=geo.attributes.position;
+  for(let i=0;i<pp.count;i++){
+    let x=pp.getX(i), y=pp.getY(i), z=pp.getZ(i);
+    const ex=Math.max(0, Math.abs(x)-innerX);
+    const ez=(outerSignZ===1)
+      ? Math.max(0, z-innerZ)
+      : (outerSignZ===-1)
+        ? Math.max(0, -z-innerZ)
+        : Math.max(0, Math.abs(z)-innerZ);
+    if(ex>EPS && ez>EPS){
+      const dist=Math.sqrt(ex*ex+ez*ez);
+      if(dist>R+EPS){
+        const s=R/dist;
+        x=Math.sign(x)*(innerX+ex*s);
+        z=(outerSignZ===0)
+          ? Math.sign(z)*(innerZ+ez*s)
+          : outerSignZ*(innerZ+ez*s);
+      }
+    }
+    pp.setXYZ(i,x,y,z);
+  }
+  geo.computeVertexNormals();
+}
+
 const allBirchMats=[];
 function birchMat(){
   const t=birchTexPool[_birchTexIdx%birchTexPool.length].clone();
@@ -833,35 +887,35 @@ function mk(geo,color,opacity=1){
 }
 
 const parts={}, origins={}, targets={};
+let topEdgeProfile='curved'; // 'curved' or 'flat'
 
 // ─── Top/bottom cap panels (flat, birch textured, with screws) ───
-function makeCapPanel(w,h,d,isTop){
+// Old bevel approach (kept for reference):
+// function makeCapPanel_bevel(w,h,d,isTop){
+//   const bvS=0.12, bvT=0.12, bvSeg=3;
+//   const capShape=new THREE.Shape(); ...ExtrudeGeometry with uniform bevel...
+// }
+function makeCapPanel(w,h,d,isTop,edgeProfile='curved'){
   const g=new THREE.Group();
-  // Bevel-compensated cap: shrink shape by bevelSize, reduce depth by 2*bevelThickness
-  const bvS=0.12, bvT=0.12, bvSeg=3;
-  const capShape=new THREE.Shape();
-  capShape.moveTo(-(w/2-bvS),-(d/2-bvS));
-  capShape.lineTo( (w/2-bvS),-(d/2-bvS));
-  capShape.lineTo( (w/2-bvS), (d/2-bvS));
-  capShape.lineTo(-(w/2-bvS), (d/2-bvS));
-  capShape.lineTo(-(w/2-bvS),-(d/2-bvS));
-  const capGeo=new THREE.ExtrudeGeometry(capShape,{depth:h-2*bvT,bevelEnabled:true,bevelSize:bvS,bevelThickness:bvT,bevelSegments:bvSeg});
-  capGeo.translate(0,0,-(h-2*bvT)/2);
-  // Rotate so extrude axis (Z) becomes Y
-  capGeo.rotateX(Math.PI/2);
-  if(!isTop) capGeo.rotateX(Math.PI);
-  normalizeUVs(capGeo);
-  const capMesh=new THREE.Mesh(capGeo,birchMat());
-  g.add(capMesh);
-
+  const curved=(edgeProfile==='curved');
+  const baseR=0.25;
+  const R=Math.min(baseR, w/2-1e-3, d/2-1e-3);
+  const edgeStep=Math.max(0.07, R/3);
+  const segsW=curved?Math.min(160, Math.max(24, Math.ceil(w/edgeStep))):1;
+  const segsD=curved?Math.min(320, Math.max(48, Math.ceil(d/edgeStep))):1;
+  const segsH=curved?Math.min(24, Math.max(4, Math.ceil(h/Math.max(0.03, R/4)))):1;
+  const geo=new THREE.BoxGeometry(w, h, d, segsW, segsH, segsD);
+  if(curved) applyOuterEdgeRoundXZ(geo,w,d,R);
+  normalizeUVs(geo);
+  g.add(new THREE.Mesh(geo,birchMat()));
   return g;
 }
 
-const topPanel=makeCapPanel(panelW,ply,D+2*ply,true);
+const topPanel=makeCapPanel(panelW,ply,D+2*ply,true,topEdgeProfile);
 topPanel.position.set(0,H/2+ply/2,0);
 scene.add(topPanel); parts.top=topPanel; origins.top=topPanel.position.clone();
 
-const botPanel=makeCapPanel(panelW,ply,D+2*ply,false);
+const botPanel=makeCapPanel(panelW,ply,D+2*ply,false,topEdgeProfile);
 botPanel.position.set(0,-(H/2+ply/2),0);
 scene.add(botPanel); parts.bot=botPanel; origins.bot=botPanel.position.clone();
 
@@ -954,7 +1008,108 @@ function updateGrillColors(){
 }
 
 // ─── Fan panels (front/back) ───
-function makeFanPanel(flip, nFans){
+function buildFanPanelShellGeometry(nFans, edgeProfile='curved', outerSignZ=0){
+  nFans = nFans || numFans;
+  const buf = (nFans === 3) ? 1.5 : (H - nFans*fanFrame) / 2;
+  const usableH = H - 2*buf;
+  const slotH = usableH / nFans;
+  const shape=new THREE.Shape();
+  shape.moveTo(-panelW/2,-H/2);
+  shape.lineTo( panelW/2,-H/2);
+  shape.lineTo( panelW/2, H/2);
+  shape.lineTo(-panelW/2, H/2);
+  shape.lineTo(-panelW/2,-H/2);
+  for(let i=0;i<nFans;i++){
+    const fy=-H/2 + buf + slotH*(i+0.5);
+    const hole=new THREE.Path();
+    hole.absarc(0,fy,holeR,0,Math.PI*2,false,64);
+    shape.holes.push(hole);
+  }
+  const depthSteps=(edgeProfile==='curved')?16:1;
+  const geo=new THREE.ExtrudeGeometry(shape,{depth:ply,bevelEnabled:false,curveSegments:64,steps:depthSteps});
+  geo.translate(0,0,-ply/2);
+  if(edgeProfile==='curved'){
+    const sideR=Math.min(0.25, panelW/2-1e-3, ply/2-1e-3);
+    applyOuterEdgeRoundXZ(geo,panelW,ply,sideR,outerSignZ);
+  }
+  normalizeUVs(geo);
+  return geo;
+}
+
+function buildSolidBackShellGeometry(edgeProfile='curved', outerSignZ=0){
+  const shape=new THREE.Shape();
+  shape.moveTo(-panelW/2,-H/2);
+  shape.lineTo( panelW/2,-H/2);
+  shape.lineTo( panelW/2, H/2);
+  shape.lineTo(-panelW/2, H/2);
+  shape.lineTo(-panelW/2,-H/2);
+  const depthSteps=(edgeProfile==='curved')?16:1;
+  const geo=new THREE.ExtrudeGeometry(shape,{depth:ply,bevelEnabled:false,curveSegments:64,steps:depthSteps});
+  geo.translate(0,0,-ply/2);
+  if(edgeProfile==='curved'){
+    const sideR=Math.min(0.25, panelW/2-1e-3, ply/2-1e-3);
+    applyOuterEdgeRoundXZ(geo,panelW,ply,sideR,outerSignZ);
+  }
+  normalizeUVs(geo);
+  return geo;
+}
+
+function buildAltTopPanelShellGeometry(nFans, edgeProfile='curved'){
+  nFans = nFans || numFans;
+  const topW=panelW, topD=D+2*ply;
+  const topBuffer=1.0;
+  const topUsable=topD-2*topBuffer;
+  const topSlot=topUsable/nFans;
+  const shape=new THREE.Shape();
+  shape.moveTo(-topW/2,-topD/2);
+  shape.lineTo( topW/2,-topD/2);
+  shape.lineTo( topW/2, topD/2);
+  shape.lineTo(-topW/2, topD/2);
+  shape.lineTo(-topW/2,-topD/2);
+  for(let i=0;i<nFans;i++){
+    const fz=-topD/2+topBuffer+topSlot*(i+0.5);
+    const hole=new THREE.Path();
+    hole.absarc(0,fz,holeR,0,Math.PI*2,false,64);
+    shape.holes.push(hole);
+  }
+  const depthSteps=(edgeProfile==='curved')?16:1;
+  const geo=new THREE.ExtrudeGeometry(shape,{depth:ply,bevelEnabled:false,curveSegments:64,steps:depthSteps});
+  geo.translate(0,0,-ply/2);
+  geo.rotateX(-Math.PI/2);
+  if(edgeProfile==='curved'){
+    const sideR=Math.min(0.25, topW/2-1e-3, topD/2-1e-3);
+    applyOuterEdgeRoundXZ(geo,topW,topD,sideR);
+  }
+  normalizeUVs(geo);
+  return geo;
+}
+
+function findOuterPanelMesh(group){
+  let panelMesh=null;
+  group.traverse(o=>{ if(!panelMesh && o._isOuterPanel) panelMesh=o; });
+  return panelMesh;
+}
+
+function replaceOuterPanelGeometry(group,newGeo){
+  const panelMesh=findOuterPanelMesh(group);
+  if(!panelMesh){
+    if(newGeo&&newGeo.dispose) newGeo.dispose();
+    return;
+  }
+  if(panelMesh.geometry) panelMesh.geometry.dispose();
+  panelMesh.geometry=newGeo;
+}
+
+function refreshPanelEdgeProfiles(){
+  replaceOuterPanelGeometry(front4, buildFanPanelShellGeometry(4, topEdgeProfile, -1));
+  replaceOuterPanelGeometry(front3, buildFanPanelShellGeometry(3, topEdgeProfile, -1));
+  replaceOuterPanelGeometry(back4, buildFanPanelShellGeometry(4, topEdgeProfile, 1));
+  replaceOuterPanelGeometry(back3, buildFanPanelShellGeometry(3, topEdgeProfile, 1));
+  replaceOuterPanelGeometry(altBackGroup, buildSolidBackShellGeometry(topEdgeProfile, 1));
+  replaceOuterPanelGeometry(altTop4, buildAltTopPanelShellGeometry(4, topEdgeProfile));
+}
+
+function makeFanPanel(flip, nFans, edgeProfile=topEdgeProfile){
   nFans = nFans || numFans;
   const buf = (nFans === 3) ? 1.5 : (H - nFans*fanFrame) / 2;
   const usableH = H - 2*buf;
@@ -962,24 +1117,10 @@ function makeFanPanel(flip, nFans){
   function localFanY(i){ return -H/2 + buf + slotH*(i+0.5); }
   const g=new THREE.Group();
 
-  // Plywood panel with circular cutouts — bevel-compensated so final size is exact
-  const bv=0.12, bvT=0.12, bvSeg=3;
-  const shape=new THREE.Shape();
-  shape.moveTo(-(panelW/2-bv),-(H/2-bv));
-  shape.lineTo( (panelW/2-bv),-(H/2-bv));
-  shape.lineTo( (panelW/2-bv), (H/2-bv));
-  shape.lineTo(-(panelW/2-bv), (H/2-bv));
-  shape.lineTo(-(panelW/2-bv),-(H/2-bv));
-  for(let i=0;i<nFans;i++){
-    const fy=localFanY(i);
-    const hole=new THREE.Path();
-    hole.absarc(0,fy,holeR+bv,0,Math.PI*2,false,64);
-    shape.holes.push(hole);
-  }
-  const panelGeo=new THREE.ExtrudeGeometry(shape,{depth:ply-2*bvT,bevelEnabled:true,bevelSize:bv,bevelThickness:bvT,bevelSegments:bvSeg,curveSegments:48});
-  panelGeo.translate(0,0,-(ply-2*bvT)/2);
-  normalizeUVs(panelGeo);
+  // Plywood shell: flat top/bottom edges, optional curved left/right outer edges only.
+  const panelGeo=buildFanPanelShellGeometry(nFans, edgeProfile, flip?1:-1);
   const panel=new THREE.Mesh(panelGeo,birchMat());
+  panel._isOuterPanel=true;
   g.add(panel);
 
   // Fans mounted inside the box, flush against plywood inner face
@@ -1180,17 +1321,10 @@ parts.back=back3; origins.back=back3.position.clone();
 // Solid back panel (no holes) — hidden by default
 const altBackGroup=(function(){
   const g=new THREE.Group();
-  const bv=0.12, bvT=0.12, bvSeg=3;
-  const shape=new THREE.Shape();
-  shape.moveTo(-(panelW/2-bv),-(H/2-bv));
-  shape.lineTo( (panelW/2-bv),-(H/2-bv));
-  shape.lineTo( (panelW/2-bv), (H/2-bv));
-  shape.lineTo(-(panelW/2-bv), (H/2-bv));
-  shape.lineTo(-(panelW/2-bv),-(H/2-bv));
-  const geo=new THREE.ExtrudeGeometry(shape,{depth:ply-2*bvT,bevelEnabled:true,bevelSize:bv,bevelThickness:bvT,bevelSegments:bvSeg,curveSegments:32});
-  geo.translate(0,0,-(ply-2*bvT)/2);
-  normalizeUVs(geo);
-  g.add(new THREE.Mesh(geo,birchMat()));
+  const geo=buildSolidBackShellGeometry(topEdgeProfile, 1);
+  const panel=new THREE.Mesh(geo,birchMat());
+  panel._isOuterPanel=true;
+  g.add(panel);
   return g;
 })();
 altBackGroup.position.set(0,0,D/2+ply/2);
@@ -1203,32 +1337,16 @@ function makeAltTopPanel(nFans){
   nFans = nFans || numFans;
   const g=new THREE.Group();
   const topW=panelW, topD=D+2*ply;
-  const bv=0.12, bvT=0.12, bvSeg=3;
   // Fan positions along Z (local coords: shape is in XZ, extruded along Y)
   const topBuffer=1.0;
   const topUsable=topD-2*topBuffer;
   const topSlot=topUsable/nFans;
   function topFanZ(i){return -topD/2+topBuffer+topSlot*(i+0.5);}
 
-  // Shape in XZ plane with holes
-  const shape=new THREE.Shape();
-  shape.moveTo(-(topW/2-bv),-(topD/2-bv));
-  shape.lineTo( (topW/2-bv),-(topD/2-bv));
-  shape.lineTo( (topW/2-bv), (topD/2-bv));
-  shape.lineTo(-(topW/2-bv), (topD/2-bv));
-  shape.lineTo(-(topW/2-bv),-(topD/2-bv));
-  for(let i=0;i<nFans;i++){
-    const fz=topFanZ(i);
-    const hole=new THREE.Path();
-    hole.absarc(0,fz,holeR+bv,0,Math.PI*2,false,64);
-    shape.holes.push(hole);
-  }
-  const panelGeo=new THREE.ExtrudeGeometry(shape,{depth:ply-2*bvT,bevelEnabled:true,bevelSize:bv,bevelThickness:bvT,bevelSegments:bvSeg,curveSegments:48});
-  panelGeo.translate(0,0,-(ply-2*bvT)/2);
-  // Rotate so the panel lies flat: shape XY → XZ, extrude Z → Y
-  panelGeo.rotateX(-Math.PI/2);
-  normalizeUVs(panelGeo);
-  g.add(new THREE.Mesh(panelGeo,birchMat()));
+  const panelGeo=buildAltTopPanelShellGeometry(nFans, topEdgeProfile);
+  const panel=new THREE.Mesh(panelGeo,birchMat());
+  panel._isOuterPanel=true;
+  g.add(panel);
 
   // Fans mounted on top, pointing upward
   for(let i=0;i<nFans;i++){
@@ -1711,24 +1829,22 @@ const pegGeo=new THREE.CylinderGeometry(legR,legR*0.85,legH,16);
 // Round wooden foot — 2.5" tall, 0.55" radius, rounded cylinder
 const bunFootH=2.5, bunFootR=0.55;
 const bunInset=0.68; // inset from panel edges for round feet
-const bunGeo=(function(){
+function makeBunGeo(radius, height){
+  const h=height||bunFootH;
   const pts=[];
-  const hH=bunFootH/2;
-  // Bottom center pole
+  const hH=h/2;
   pts.push(new THREE.Vector2(0, -hH));
-  // Quarter-circle rounding at bottom (radius = bunFootR)
   const arcSegs=8;
   for(let i=1;i<=arcSegs;i++){
     const a=Math.PI/2*(i/arcSegs);
-    pts.push(new THREE.Vector2(Math.sin(a)*bunFootR, -hH+bunFootR-Math.cos(a)*bunFootR));
+    pts.push(new THREE.Vector2(Math.sin(a)*radius, -hH+radius-Math.cos(a)*radius));
   }
-  // Straight sides up to near top
-  pts.push(new THREE.Vector2(bunFootR, hH-0.08));
-  // Slight top bevel
-  pts.push(new THREE.Vector2(bunFootR-0.04, hH-0.02));
-  pts.push(new THREE.Vector2(bunFootR-0.12, hH));
+  pts.push(new THREE.Vector2(radius, hH-0.08));
+  pts.push(new THREE.Vector2(radius-0.04, hH-0.02));
+  pts.push(new THREE.Vector2(radius-0.12, hH));
   return new THREE.LatheGeometry(pts, 20);
-})();
+}
+let bunGeo=makeBunGeo(bunFootR);
 
 let currentFeetH=bunFootH;
 let feetStyle='bun';
@@ -2055,6 +2171,7 @@ canvas.addEventListener('mousemove',e=>{
     for(const h of hits){
       if(!isAncestorVisible(h.object)) continue;
       if(h.object._isLamp){ _hoverInteractive=true; break; }
+      if(h.object._isCeilLight){ _hoverInteractive=true; break; }
       if(h.object._isRoom) continue;
       if(h.object._isFan||h.object._isFilterL||h.object._isFilterR){ _hoverInteractive=true; }
       if(h.object._partId && !hoveredPartId){ hoveredPartId=h.object._partId; }
@@ -2209,21 +2326,30 @@ function handleClickObject(obj){
     lampShade.material.emissiveIntensity=lampOn?0.4:0;
     return;
   }
-  // Clicked a fan → toggle that individual fan's rotor
-  if(obj._isFan){
-    if(obj._rotor){
-      obj._rotor.userData.spinning=!obj._rotor.userData.spinning;
+  // Clicked ceiling light → toggle
+  if(obj._isCeilLight){
+    ceilLightOn=!ceilLightOn;
+    if(!ceilLightOn){
+      ceilSpot.intensity=0;
+      domeMat.emissiveIntensity=0;
     }
     return;
   }
-  // Clicked filter → toggle slide
+  // Clicked a fan → toggle that individual fan's rotor (only if mesh has a _rotor ref)
+  if(obj._isFan && obj._rotor){
+    obj._rotor.userData.spinning=!obj._rotor.userData.spinning;
+    return;
+  }
+  // Clicked filter → toggle slide (ignore if already animating)
   if(obj._isFilterL){
+    if(_filterLerps.some(fl=>fl.obj===filterL)) return; // already sliding
     filterLOut=!filterLOut;
     const target=filterLOut?filterLOrigin.clone().sub(new THREE.Vector3(filterSlideMax,0,0)):filterLOrigin.clone();
     _filterLerps.push({obj:filterL,target:target});
     return;
   }
   if(obj._isFilterR){
+    if(_filterLerps.some(fl=>fl.obj===filterR)) return; // already sliding
     filterROut=!filterROut;
     const target=filterROut?filterROrigin.clone().add(new THREE.Vector3(filterSlideMax,0,0)):filterROrigin.clone();
     _filterLerps.push({obj:filterR,target:target});
@@ -2242,6 +2368,7 @@ function handleClick(clientX,clientY){
   for(const h of hits){
     if(!isAncestorVisible(h.object)) continue;
     if(h.object._isLamp){ obj=h.object; break; }
+    if(h.object._isCeilLight){ obj=h.object; break; }
     if(h.object._isRoom) continue;
     if(h.object._isFan||h.object._isFilterL||h.object._isFilterR){ obj=h.object; break; }
   }
@@ -2338,6 +2465,8 @@ function setFanSpeed(val){
 }
 
 const PARTICLE_COUNT=400;
+const PARTICLE_TIER_COUNTS=[400,340,260,180];
+let activeParticleCount=PARTICLE_COUNT;
 const particleGeo=new THREE.BufferGeometry();
 const particlePositions=new Float32Array(PARTICLE_COUNT*3);
 const particleColors=new Float32Array(PARTICLE_COUNT*3);
@@ -2449,9 +2578,22 @@ function initStagnant(i){
   particlePositions[i*3+2]=stagnantBase[i*3+2];
   particleColors[i*3]=0.2; particleColors[i*3+1]=0.5; particleColors[i*3+2]=0.8;
 }
+
+function setActiveParticleCount(count){
+  const clamped=Math.max(64, Math.min(PARTICLE_COUNT, count|0));
+  if(clamped===activeParticleCount) return;
+  activeParticleCount=clamped;
+  particleGeo.setDrawRange(0,activeParticleCount);
+  if(airflowOn){
+    if(spinning){ for(let i=0;i<activeParticleCount;i++) initParticle(i,true); }
+    else { for(let i=0;i<activeParticleCount;i++) initStagnant(i); }
+  }
+}
+
 for(let i=0;i<PARTICLE_COUNT;i++) initStagnant(i);
 particleGeo.setAttribute('position',new THREE.BufferAttribute(particlePositions,3));
 particleGeo.setAttribute('color',new THREE.BufferAttribute(particleColors,3));
+particleGeo.setDrawRange(0,activeParticleCount);
 const particleMat=new THREE.PointsMaterial({size:0.32,transparent:true,opacity:0.85,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false});
 const particles=new THREE.Points(particleGeo,particleMat);
 particles.visible=false;
@@ -2473,8 +2615,8 @@ function toggleSpin(){
   if(spinning) collapseView();
   // Re-init particles when transitioning between stagnant ↔ directional
   if(particles.visible){
-    if(spinning){ for(let i=0;i<PARTICLE_COUNT;i++) initParticle(i,true); }
-    else { for(let i=0;i<PARTICLE_COUNT;i++) initStagnant(i); }
+    if(spinning){ for(let i=0;i<activeParticleCount;i++) initParticle(i,true); }
+    else { for(let i=0;i<activeParticleCount;i++) initStagnant(i); }
   }
 }
 
@@ -2486,8 +2628,8 @@ function toggleAirflow(){
   if(airflowOn) collapseView();
   // Init to correct mode on show
   if(airflowOn){
-    if(spinning){ for(let i=0;i<PARTICLE_COUNT;i++) initParticle(i,true); }
-    else { for(let i=0;i<PARTICLE_COUNT;i++) initStagnant(i); }
+    if(spinning){ for(let i=0;i<activeParticleCount;i++) initParticle(i,true); }
+    else { for(let i=0;i<activeParticleCount;i++) initStagnant(i); }
   }
 }
 
@@ -2585,13 +2727,96 @@ function setStain(mode){
   stainMode=mode;
   document.querySelectorAll('#btnStainRaw,#btnStainOil,#btnStainWalnut').forEach(b=>b.classList.remove('on'));
   document.getElementById(mode==='raw'?'btnStainRaw':mode==='oil'?'btnStainOil':'btnStainWalnut').classList.add('on');
-  const s=STAIN_COLORS[mode];
+  applyCurrentStain();
+}
+
+function applyCurrentStain(){
+  const s=STAIN_COLORS[stainMode];
   for(const m of allBirchMats){
     m.color.copy(s.col);
     m.shininess=s.shine;
     m.needsUpdate=true;
   }
   document.getElementById('legendWood').querySelector('.swatch').style.background=s.swatch;
+}
+
+function applyXrayToObject(root,on){
+  root.traverse(obj=>{
+    if(!obj.isMesh || obj._isRoom) return;
+    const mat=obj.material;
+    if(!mat) return;
+    if(on){
+      if(mat._origOpacity===undefined) mat._origOpacity=mat.opacity;
+      if(mat._origTransp===undefined) mat._origTransp=mat.transparent;
+      if(mat._origDepthW===undefined) mat._origDepthW=mat.depthWrite;
+      mat.transparent=true;
+      mat.opacity=0.35;
+      mat.depthWrite=false;
+      mat.needsUpdate=true;
+    } else if(mat._origOpacity!==undefined){
+      mat.opacity=mat._origOpacity;
+      mat.transparent=mat._origTransp;
+      mat.depthWrite=mat._origDepthW;
+      delete mat._origOpacity;
+      delete mat._origTransp;
+      delete mat._origDepthW;
+      mat.needsUpdate=true;
+    }
+  });
+}
+
+function rebuildTopPanel(){
+  const oldTop=parts.top;
+  const oldBot=parts.bot;
+  const basePos=new THREE.Vector3(0,H/2+ply/2,0);
+  const baseBotPos=new THREE.Vector3(0,-(H/2+ply/2),0);
+  const wasVisible=oldTop?oldTop.visible:true;
+  const wasBotVisible=oldBot?oldBot.visible:true;
+
+  if(oldTop) scene.remove(oldTop);
+  if(oldBot) scene.remove(oldBot);
+
+  const newTop=makeCapPanel(panelW,ply,D+2*ply,true,topEdgeProfile);
+  const targetPos=exploded ? basePos.clone().add(explodeV.top) : basePos.clone();
+  newTop.position.copy(targetPos);
+  newTop.visible=wasVisible;
+  scene.add(newTop);
+
+  const newBot=makeCapPanel(panelW,ply,D+2*ply,false,topEdgeProfile);
+  const targetBotPos=exploded ? baseBotPos.clone().add(explodeV.bot) : baseBotPos.clone();
+  newBot.position.copy(targetBotPos);
+  newBot.visible=wasBotVisible;
+  scene.add(newBot);
+
+  parts.top=newTop;
+  parts.bot=newBot;
+  origins.top=basePos.clone();
+  origins.bot=baseBotPos.clone();
+  targets.top=targetPos.clone();
+  targets.bot=targetBotPos.clone();
+
+  newTop.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+  newBot.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+  tagPart(parts.top, 'Top Panel', panelW.toFixed(1)+'″ × '+(D+2*ply).toFixed(1)+'″ × '+ply+'″ birch plywood');
+  tagPart(parts.bot, 'Bottom Panel', panelW.toFixed(1)+'″ × '+(D+2*ply).toFixed(1)+'″ × '+ply+'″ birch plywood');
+  applyCurrentStain();
+  applyXrayToObject(newTop, xrayOn);
+  applyXrayToObject(newBot, xrayOn);
+  applyVisibility();
+}
+
+function setEdgeProfile(mode){
+  if(mode===topEdgeProfile) return;
+  topEdgeProfile=mode;
+  document.querySelectorAll('#btnEdgeFlat,#btnEdgeCurved').forEach(b=>b.classList.remove('on'));
+  document.getElementById(mode==='flat'?'btnEdgeFlat':'btnEdgeCurved').classList.add('on');
+  rebuildTopPanel();
+  refreshPanelEdgeProfiles();
+}
+
+function setBoardThickness(mode){
+  sessionStorage.setItem('boardThickness', mode);
+  location.reload();
 }
 
 // ─── Layout toggle (Front+Back vs Front+Top) ───
@@ -2634,6 +2859,57 @@ function setFanCount(n){
 
 // ─── Feet style (peg / round bun / rubber) ───
 const FEET_H={peg:0.75, bun:2.5, rubber:0.75, none:0};
+let currentFootDiameter=1.1; // diameter in inches
+let currentBunH=2.5; // bun foot height in inches
+function setFootDiameter(d){
+  currentFootDiameter=d;
+  document.querySelectorAll('#btnFootD1,#btnFootD2,#btnFootD3').forEach(b=>b.classList.remove('on'));
+  if(d===1.1) document.getElementById('btnFootD1').classList.add('on');
+  else if(d===1.0) document.getElementById('btnFootD2').classList.add('on');
+  else document.getElementById('btnFootD3').classList.add('on');
+  bunGeo=makeBunGeo(d/2, currentBunH);
+  if(feetStyle==='bun'){
+    for(const leg of allLegMeshes){
+      leg.geometry=bunGeo;
+      leg.matrixAutoUpdate=true;
+      leg.updateMatrixWorld(true);
+      leg.matrixAutoUpdate=false;
+    }
+  }
+}
+function setFootHeight(h){
+  document.querySelectorAll('#btnFootH25,#btnFootH35,#btnFootH45').forEach(b=>b.classList.remove('on'));
+  if(h===2.5) document.getElementById('btnFootH25').classList.add('on');
+  else if(h===3.5) document.getElementById('btnFootH35').classList.add('on');
+  else document.getElementById('btnFootH45').classList.add('on');
+  const oldH=currentFeetH;
+  currentBunH=h;
+  FEET_H.bun=h;
+  if(feetStyle==='bun'){
+    const newH=h;
+    const delta=newH-oldH;
+    currentFeetH=newH;
+    bunGeo=makeBunGeo(currentFootDiameter/2, h);
+    const newLegY=-(H/2+ply+h/2);
+    for(const leg of allLegMeshes){
+      leg.geometry=bunGeo;
+      leg.position.y=newLegY;
+      leg.matrixAutoUpdate=true;
+      leg.updateMatrixWorld(true);
+      leg.matrixAutoUpdate=false;
+    }
+    if(Math.abs(delta)>0.001){
+      scene.traverse(function(o){
+        if(o._isRoom){
+          o.position.y-=delta;
+          o.matrixAutoUpdate=true;
+          o.updateMatrixWorld(true);
+          o.matrixAutoUpdate=false;
+        }
+      });
+    }
+  }
+}
 let _prePlacementFeet='bun'; // remember feet style before wall mode overrides it
 function setFeetStyle(style){
   if(style===feetStyle) return;
@@ -2893,6 +3169,15 @@ function warmthCurve(minuteOfDay){
   return 0;
 }
 
+// Direct sun beam through window: present daytime, off at sunset/night.
+function windowBeamCurve(minuteOfDay){
+  const h=minuteOfDay/60;
+  if(h<=5.5) return 0;           // night / pre-dawn
+  if(h<7.0) return (h-5.5)/1.5;  // gentle sunrise ramp-in
+  if(h<17.0) return 1;           // full daytime beam
+  return 0;                      // sunset + night (no direct beam)
+}
+
 const DAY_CLEAR=0xd4dce8, NIGHT_CLEAR=0x181820;
 const DAY_WALL=0xd8d4ce, NIGHT_WALL=0x2a2a35;
 const DAY_BASE=0xc0bbb4, NIGHT_BASE=0x1e1e28;
@@ -2903,6 +3188,9 @@ const GOLDEN_KEY=0xffddaa;
 function applyTimeOfDay(minuteOfDay){
   const sun=sunCurve(minuteOfDay);
   const warm=warmthCurve(minuteOfDay);
+  const beam=windowBeamCurve(minuteOfDay);
+  const h=minuteOfDay/60;
+  const dayTravel=Math.max(0, Math.min(1, (h-6.0)/(17.0-6.0))); // morning -> late afternoon
   isNightMode=sun<0.3;
   document.body.classList.toggle('night-mode', isNightMode);
 
@@ -2925,22 +3213,55 @@ function applyTimeOfDay(minuteOfDay){
   renderer.setClearColor(clearCol.clone(), 1);
   scene.fog.color.copy(clearCol);
   scene.fog.density=mix(0.003, 0.0015, sun);
-  renderer.toneMappingExposure=mix(1.0, 1.3, sun);
+  renderer.toneMappingExposure=mix(1.02, 1.34, sun);
 
-  // Key light: direction is sun through window; warm during golden hour
+  // Window sun beam + broad daylight fill
   const keyColor=warm>0.1 ? lerpHex(0xffe0a0, GOLDEN_KEY, warm) : lerpHex(0x6688cc, 0xffe0a0, sun);
   key.color.copy(keyColor);
-  key.intensity=mix(0.15, 1.4, sun)+warm*0.2;
+  windowSun.color.copy(keyColor);
+  const baseKeyIntensity=mix(0.14, 0.95, sun)+warm*0.1;
+  // key = fixed shadow-caster, always aimed straight through window center (no sweep)
+  key.intensity=beam>0 ? Math.max(0.18, baseKeyIntensity*0.5)*beam : 0;
+  // windowSun = sweeping non-shadow light for the moving sun effect
+  windowSun.visible=beam>0;
+  windowSun.castShadow=false;
+  windowSun.intensity=beam>0 ? Math.max(0.15, baseKeyIntensity*0.5)*beam : 0;
+
+  // Keep source constrained to aperture, but allow a wide in-room sweep direction.
+  const beamSrcY=Math.max(winBottom+4, Math.min(winTop-4, mix(winTop+11, winTop+1, dayTravel)));
+  const beamSrcZ=Math.max(winFront+2, Math.min(winBack-2, winCenterZ+mix(-winW*0.30, winW*0.30, dayTravel)));
+  const beamTgtY=mix(winCenterY+6, winCenterY-2, dayTravel);
+  const beamTgtZ=winCenterZ+mix(-28, 28, dayTravel);
+
+  // Sweeping light moves across the room (no shadows, so no bleed)
+  windowSun.position.set(
+    mirroredWindowX+13,
+    beamSrcY,
+    beamSrcZ
+  );
+  windowSun.target.position.set(
+    mix(-22, 14, dayTravel),
+    beamTgtY,
+    beamTgtZ
+  );
+  windowSun.target.updateMatrixWorld();
+
+  // Fixed shadow-casting key stays aimed at window center (known-good angle, no bleed)
+  key.position.set(mirroredWindowX+14, winCenterY+3, winCenterZ);
+  key.target.position.set(0, winCenterY+1, winCenterZ);
+  key.target.updateMatrixWorld();
+  key.updateMatrixWorld();
+  key.shadow.camera.updateProjectionMatrix();
 
   // Other lights
-  hemiLight.intensity=mix(0.08, 0.18, sun);
+  hemiLight.intensity=mix(0.05, 0.24, sun); // broader daylight fill so room reads naturally lit
   hemiLight.color.copy(lerpHex(0x334466, 0x8899bb, sun)); // sky shifts blue→grey at night
   hemiLight.groundColor.copy(lerpHex(0x221100, 0xffeedd, sun)); // warm ground bounce
-  fill.intensity=mix(0.04, 0.12, sun);
-  rim.intensity=mix(0.06, 0.14, sun);
-  bounce.intensity=mix(0.02, 0.07, sun);
-  ceilSpot.intensity=mix(0.6, 0.4, sun); // brighter at night to softly illuminate the room
-  domeMat.emissiveIntensity=mix(0.5, 0.15, sun);
+  fill.intensity=mix(0.01, 0.14, sun);   // gentle global fill to reduce hard spotlight look
+  rim.intensity=mix(0.01, 0.08, sun);    // subtle side lift for wall/door shading
+  bounce.intensity=mix(0.0, 0.06, sun);  // soft floor bounce in daytime
+  ceilSpot.intensity=ceilLightOn?mix(0.7, 0.05, sun):0; // almost off in daytime, brighter at night
+  domeMat.emissiveIntensity=ceilLightOn?mix(0.5, 0.15, sun):0;
 
   // Outdoor backdrop brightness (sun through window)
   outdoor.material.color.setScalar(mix(0.08, 1.4, sun)+warm*0.25);
@@ -3009,7 +3330,7 @@ function applyIsolate(on){
     _savedFog=scene.fog.density;
     _savedLights={
       ambient:0, key:key.intensity, fill:fill.intensity,
-      rim:rim.intensity, bounce:bounce.intensity, ceil:ceilSpot.intensity
+      rim:rim.intensity, bounce:bounce.intensity, ceil:ceilSpot.intensity, windowSun:windowSun.intensity
     };
     _savedLights.ambient=hemiLight.intensity;
     // Soft dark background, no fog
@@ -3018,6 +3339,7 @@ function applyIsolate(on){
     // Spotlight lighting: soft ambient + strong key from above-front
     hemiLight.intensity=0.3;
     key.intensity=0.7;
+    windowSun.intensity=0;
     key.position.set(-30,40,30);
     fill.intensity=0.3;
     fill.position.set(20,10,-15);
@@ -3265,6 +3587,7 @@ const ceilingMat = new THREE.MeshStandardMaterial({color:0xe0ddd6, roughness:0.9
 const ceiling = new THREE.Mesh(ceilingGeo, ceilingMat);
 ceiling.rotation.x = Math.PI/2;
 ceiling.position.y = floorY+80;
+ceiling.castShadow = true;
 ceiling.receiveShadow = true;
 ceiling._isRoom = true;
 scene.add(ceiling);
@@ -3278,7 +3601,7 @@ function roomBox(w,h,d,color,x,y,z,rx,ry,rz){
   if(rx) mesh.rotation.x=rx;
   if(ry) mesh.rotation.y=ry;
   if(rz) mesh.rotation.z=rz;
-  mesh.castShadow=false;
+  mesh.castShadow=true;
   mesh.receiveShadow=true;
   mesh._isRoom=true;
   scene.add(mesh);
@@ -3307,7 +3630,7 @@ function roomRoundBox(w,h,d,radius,color,x,y,z,rx,ry,rz){
   if(rx) mesh.rotation.x=rx;
   if(ry) mesh.rotation.y=ry;
   if(rz) mesh.rotation.z=rz;
-  mesh.castShadow=false;
+  mesh.castShadow=true;
   mesh.receiveShadow=true;
   mesh._isRoom=true;
   scene.add(mesh);
@@ -3517,6 +3840,7 @@ const tblOak=0x5a3f2a;
 
 // Lamp on nightstand — near the corner closest to the door extrusion
 let lampLight, lampShade, lampOn=true;
+let ceilLightOn=true; // ceiling fixture togglable by clicking
 {
   const lampX=tblX+tblW/2-6; // 6" from the extrusion-side edge
   const lampZ=tblZ+tblD/2-6; // 6" from the back edge (avoid wall clip)
@@ -3735,8 +4059,8 @@ const sideBaseboard=roomBox(0.6, 3, wallDepth, 0xc0bbb4, sideWallX-0.5, floorY+1
   const closetW=48, closetH=80; // 4-foot wide bifold opening
   const closetX=sideWallX-0.5; // flush against wall
   const closetZ=oppWallZ+closetW/2+4; // as far -Z as possible, 4" from TV wall
-  const bifoldColor=0xf0ebe4;
-  const bifoldMat=new THREE.MeshStandardMaterial({color:bifoldColor,roughness:0.5,metalness:0.02});
+  const bifoldColor=0xe0d8cc;
+  const bifoldMat=new THREE.MeshStandardMaterial({color:bifoldColor,roughness:0.72,metalness:0.0});
   const panelW2=closetW/4; // 4 panels (2 per side)
   const panelThick=1.2;
   // 4 bifold panels — slightly angled to show they're bifold
@@ -3744,33 +4068,34 @@ const sideBaseboard=roomBox(0.6, 3, wallDepth, 0xc0bbb4, sideWallX-0.5, floorY+1
     const pz=closetZ-closetW/2+panelW2*(i+0.5);
     const panel=roomRoundBox(panelThick, closetH-1, panelW2-0.5, 0.3, bifoldColor,
       closetX-panelThick/2, floorY+closetH/2, pz, 0,0,0);
-    panel.material.roughness=0.5;
+    panel.material.roughness=0.78;
+    panel.material.metalness=0.0;
     // Add raised panel detail (2 panels per door leaf)
     const rpH1=closetH*0.35, rpH2=closetH*0.45;
     const rpW=panelW2*0.7;
-    const rpMat=new THREE.MeshStandardMaterial({color:0xe8e3dc,roughness:0.45,metalness:0.02});
+    const rpMat=new THREE.MeshStandardMaterial({color:0xd6cec2,roughness:0.78,metalness:0.0});
     const rp1=new THREE.Mesh(new THREE.BoxGeometry(0.3, rpH1, rpW), rpMat);
     rp1.position.set(closetX-panelThick-0.16, floorY+closetH*0.24, pz);
-    rp1.castShadow=false; rp1._isRoom=true; scene.add(rp1);
+    rp1.castShadow=true; rp1.receiveShadow=true; rp1._isRoom=true; scene.add(rp1);
     const rp2=new THREE.Mesh(new THREE.BoxGeometry(0.3, rpH2, rpW), rpMat);
     rp2.position.set(closetX-panelThick-0.16, floorY+closetH*0.68, pz);
-    rp2.castShadow=false; rp2._isRoom=true; scene.add(rp2);
+    rp2.castShadow=true; rp2.receiveShadow=true; rp2._isRoom=true; scene.add(rp2);
   }
   // Moulding / trim around the opening
-  const trimMat=new THREE.MeshStandardMaterial({color:0xf5f5f0,roughness:0.35,metalness:0.05});
+  const trimMat=new THREE.MeshStandardMaterial({color:0xe4ddd1,roughness:0.7,metalness:0.0});
   const trimW=2.5, trimD=1;
   // Top header
   const trimTop=new THREE.Mesh(new THREE.BoxGeometry(trimD, trimW, closetW+trimW*2), trimMat);
   trimTop.position.set(closetX-trimD/2, floorY+closetH+trimW/2, closetZ);
-  trimTop.castShadow=false; trimTop._isRoom=true; scene.add(trimTop);
+  trimTop.castShadow=true; trimTop.receiveShadow=true; trimTop._isRoom=true; scene.add(trimTop);
   // Left jamb
   const trimL=new THREE.Mesh(new THREE.BoxGeometry(trimD, closetH, trimW), trimMat);
   trimL.position.set(closetX-trimD/2, floorY+closetH/2, closetZ-closetW/2-trimW/2);
-  trimL.castShadow=false; trimL._isRoom=true; scene.add(trimL);
+  trimL.castShadow=true; trimL.receiveShadow=true; trimL._isRoom=true; scene.add(trimL);
   // Right jamb
   const trimR=new THREE.Mesh(new THREE.BoxGeometry(trimD, closetH, trimW), trimMat);
   trimR.position.set(closetX-trimD/2, floorY+closetH/2, closetZ+closetW/2+trimW/2);
-  trimR.castShadow=false; trimR._isRoom=true; scene.add(trimR);
+  trimR.castShadow=true; trimR.receiveShadow=true; trimR._isRoom=true; scene.add(trimR);
 }
 
 // ─── Left side wall with window (near the bed) ───
@@ -3782,6 +4107,13 @@ const winBottom=winCenterY-winH/2;
 const winTop=winCenterY+winH/2;
 const winFront=winCenterZ-winW/2;
 const winBack=winCenterZ+winW/2;
+
+// Keep daylight aligned with the mirrored window opening to avoid overhead leakage.
+const mirroredWindowX=-leftWallX;
+key.position.set(mirroredWindowX+14, winCenterY+3, winCenterZ);
+scene.add(key.target);
+key.target.position.set(0, winCenterY+1, winCenterZ);
+key.target.updateMatrixWorld();
 
 // Wall sections around the window (4 pieces: below, above, front, back)
 // Below window
@@ -3883,13 +4215,13 @@ const fixBase=new THREE.Mesh(
   new THREE.MeshStandardMaterial({color:0xd8d4c8,roughness:0.4,metalness:0.1})
 );
 fixBase.position.set(ceilLightX,ceilY,ceilLightZ);
-fixBase._isRoom=true; scene.add(fixBase);
+fixBase._isRoom=true; fixBase._isCeilLight=true; scene.add(fixBase);
 // Frosted glass dome
 const domeMat=stdMat({color:0xfff8ee,emissive:0xfff0d0,emissiveIntensity:0.3,transparent:true,opacity:0.85,shininess:60});
 const dome=new THREE.Mesh(new THREE.SphereGeometry(3.5,16,8,0,Math.PI*2,0,Math.PI/2),domeMat);
 dome.rotation.x=Math.PI; // flip dome to hang down
 dome.position.set(ceilLightX,ceilY-0.2,ceilLightZ);
-dome._isRoom=true; scene.add(dome);
+dome._isRoom=true; dome._isCeilLight=true; scene.add(dome);
 // SpotLight pointing down — wide angle, soft edge
 const ceilSpot=new THREE.SpotLight(0xfff0dd,0.5,0,Math.PI/3,0.7,1.5);
 ceilSpot.position.set(ceilLightX,ceilY-1,ceilLightZ);
@@ -4161,15 +4493,56 @@ scene.traverse(obj=>{
 const fadingWalls=[];
 scene.traverse(obj=>{
   if(obj._isRoom && obj.isMesh && obj.material){
-    obj.material.transparent=true;
+    if(obj._noFade){
+      obj.material.transparent=false;
+      obj.material.opacity=1;
+      obj.material.depthWrite=true;
+      return;
+    }
+    // Preserve intentionally translucent materials (glass, domes, etc.) as-is.
+    if(obj.material.transparent || obj.material.opacity<0.999){
+      obj._fadeBaseOpacity=obj.material.opacity;
+      obj._fadeBaseTransparent=obj.material.transparent;
+      obj._fadeBaseDepthWrite=obj.material.depthWrite;
+    } else {
+      obj.material.transparent=false;
+      obj.material.opacity=1;
+      obj.material.depthWrite=true;
+    }
     fadingWalls.push(obj);
   }
 });
-// Tag exterior walls so they stay semi-transparent from outside
-[wallMeshL, oppWall, oppBaseboard, rightWall, sideBaseboard,
- leftWallBelow, leftWallAbove, leftWallFront, leftWallBack, leftBaseboard].forEach(m=>{
-  if(m) m._isWall=true;
+// Tag exterior walls by side so only the wall you are outside of fades.
+[
+  [wallMeshL, 'back'], [returnWallL, 'back'], [baseboardMeshL, 'back'], [baseboardRetL, 'back'],
+  [recessWallL, 'back'], [recessWallR, 'back'], [baseboardRecessL, 'back'], [baseboardRecessR, 'back'],
+  [oppWall, 'front'], [oppBaseboard, 'front'],
+  [rightWall, 'right'], [sideBaseboard, 'right'],
+  [leftWallBelow, 'left'], [leftWallAbove, 'left'], [leftWallFront, 'left'], [leftWallBack, 'left'], [leftBaseboard, 'left']
+].forEach(([m, side])=>{
+  if(m){
+    m._isWall=true;
+    m._wallSide=side;
+  }
 });
+
+function setFadeOpacity(mesh, alpha){
+  const mat=mesh.material;
+  // Keep authored transparent materials at/below their original alpha.
+  if(mesh._fadeBaseOpacity!==undefined){
+    mat.opacity=Math.min(mesh._fadeBaseOpacity, alpha);
+    mat.transparent=mesh._fadeBaseTransparent;
+    mat.depthWrite=mesh._fadeBaseDepthWrite;
+    return;
+  }
+  const faded=alpha<0.999;
+  if(mat.transparent!==faded){
+    mat.transparent=faded;
+    mat.needsUpdate=true;
+  }
+  mat.depthWrite=!faded;
+  mat.opacity=alpha;
+}
 
 // Freeze world matrices on all static objects (room + purifier structure)
 scene.traverse(obj=>{
@@ -4187,8 +4560,25 @@ if(particles) particles.matrixAutoUpdate=true;
 
 // ─── Animate ───
 let _prevCx=0,_prevCz=0;
-function animate(){
+function needsContinuousRender(){
+  if(_fpMode || drag || _dragFilter || _pendingFilterDrag || _isPanning) return true;
+  if(explodeLerping || _filterLerps.length>0) return true;
+  if(airflowOn || spinning || currentRGB==='rainbow') return true;
+  for(const rotor of allRotors){
+    if(Math.abs(rotor.userData.spinSpeed)>0.0008) return true;
+  }
+  return false;
+}
+
+let _lastRenderTs=0;
+const _idleFrameMs=1000/18; // low idle refresh to keep laptops cool
+
+function animate(ts){
   requestAnimationFrame(animate);
+
+  const continuous=needsContinuousRender();
+  if(!continuous && (ts-_lastRenderTs)<_idleFrameMs) return;
+  _lastRenderTs=ts;
 
   // Rainbow RGB cycling — smooth gradient flowing across all fans
   if(currentRGB==='rainbow'){
@@ -4292,7 +4682,7 @@ function animate(){
     if(spinning){
       // Directional flow through filter → fan → exhaust
       const speedMul=0.4+0.6*(spinSpeed/SPIN_MAX);
-      for(let i=0;i<PARTICLE_COUNT;i++){
+      for(let i=0;i<activeParticleCount;i++){
         particleT[i]+=particleTSpeed[i]*speedMul;
         if(particleT[i]>=1.0) initParticle(i,false);
         const t=particleT[i];
@@ -4315,7 +4705,7 @@ function animate(){
       }
     } else {
       // Stagnant ambient float — gentle Brownian drift, no directional movement
-      for(let i=0;i<PARTICLE_COUNT;i++){
+      for(let i=0;i<activeParticleCount;i++){
         particleWobble[i]+=0.006+0.003*Math.sin(i*0.37);
         const p=particleWobble[i];
         const bx=stagnantBase[i*3]  +Math.sin(p*0.71)*0.8+Math.sin(p*1.37)*0.3;
@@ -4339,8 +4729,8 @@ function animate(){
   // First-person mode camera
   if(_fpMode){
     const spd=0.35;
-    const fwd=new THREE.Vector3(-Math.sin(_fpYaw),0,-Math.cos(_fpYaw));
-    const right=new THREE.Vector3(fwd.z,0,-fwd.x);
+    const fwd=_fpFwd.set(-Math.sin(_fpYaw),0,-Math.cos(_fpYaw));
+    const right=_fpRight.set(fwd.z,0,-fwd.x);
     // Calculate desired movement
     let moveX=0, moveZ=0;
     if(_fpKeys.w){ moveX+=fwd.x*spd; moveZ+=fwd.z*spd; }
@@ -4412,22 +4802,21 @@ function animate(){
     const ceilMax=(floorY+80-placementOffset.y)-0.5; // half inch below ceiling
     if(_fpPos.y>ceilMax){ _fpPos.y=ceilMax; _fpVy=Math.min(_fpVy,0); }
     camera.position.copy(_fpPos);
-    const lookTarget=new THREE.Vector3(
+    const lookTarget=_fpLookTarget.set(
       _fpPos.x-Math.sin(_fpYaw)*10,
       _fpPos.y+Math.sin(_fpPitch)*10,
       _fpPos.z-Math.cos(_fpYaw)*10
     );
     camera.lookAt(lookTarget);
     // Crosshair interaction check — raycast from center of screen
-    const _fpRay=new THREE.Raycaster();
-    _fpRay.setFromCamera(new THREE.Vector2(0,0), camera);
+    _fpRay.setFromCamera(_fpRayCenter, camera);
     const _fpHits=_fpRay.intersectObjects(scene.children,true);
     let _fpTarget=null;
     for(const h of _fpHits){
       if(h.distance>30) break; // interaction range
       if(!isAncestorVisible(h.object)) continue;
       if(h.object._isRoom) continue;
-      if(h.object._isFan||h.object._isFilterL||h.object._isFilterR||h.object._isLamp){ _fpTarget=h.object; break; }
+      if(h.object._isFan||h.object._isFilterL||h.object._isFilterR||h.object._isLamp||h.object._isCeilLight){ _fpTarget=h.object; break; }
     }
     // Update crosshair style
     const ch=document.getElementById('fpCrosshair');
@@ -4449,17 +4838,21 @@ function animate(){
   _prevCx=cx; _prevCz=cz;
   const fadeNear=15, fadeFar=40;
 
-  // Outer wall transparency: check if camera is outside each wall
-  // After X flip: back wall Z=49→Z=49, TV wall Z=-78→Z=-78, right→X=-51, left→X=81
-  const outsideBack=cz>45;
-  const outsideFront=cz<-74;
-  const outsideRight=cx<-47;
-  const outsideLeft=cx>77;
+  // Outer wall transparency: dynamic bounds so this still works after room placement shifts.
+  const backWallZ=wallMeshL.position.z;
+  const frontWallZ=oppWall.position.z;
+  const rightWallX=rightWall.position.x;
+  const leftWallXNow=leftWallBelow.position.x;
+  const outsideMargin=4;
+  const outsideBack=cz>backWallZ-outsideMargin;
+  const outsideFront=cz<frontWallZ+outsideMargin;
+  const outsideRight=cx<rightWallX+outsideMargin;
+  const outsideLeft=cx>leftWallXNow-outsideMargin;
 
   for(const m of fadingWalls){
     // Floor never fades (unless camera is below it)
     if(m._isFloor){
-      m.material.opacity=cy<m.position.y?0.08:1;
+      setFadeOpacity(m, cy<m.position.y?0.08:1);
       continue;
     }
     const ox=m.position.x, oz=m.position.z;
@@ -4468,20 +4861,20 @@ function animate(){
 
     // Check if this is an outer wall and camera is outside it
     if(m._isWall){
-      let outside=false;
-      // Determine which wall this belongs to by position (after flip)
-      if(Math.abs(oz)>40) outside=oz>0?outsideBack:outsideFront; // back or front wall
-      if(Math.abs(ox)>40) outside=ox<0?outsideRight:outsideLeft; // side walls
-      m.material.opacity=outside?0.08:1;
+      const outside=(m._wallSide==='back'&&outsideBack)
+        || (m._wallSide==='front'&&outsideFront)
+        || (m._wallSide==='right'&&outsideRight)
+        || (m._wallSide==='left'&&outsideLeft);
+      setFadeOpacity(m, outside?0.08:1);
       continue;
     }
 
     // Interior objects: distance-based fade
     if(dist<fadeFar){
       const t=Math.max(0, (dist-fadeNear)/(fadeFar-fadeNear));
-      m.material.opacity=Math.max(0.03, t);
+      setFadeOpacity(m, Math.max(0.03, t));
     } else {
-      m.material.opacity=1;
+      setFadeOpacity(m, 1);
     }
   }
   }
@@ -4496,7 +4889,7 @@ function animate(){
     const ms=(fpsNow-fpsLast)/fpsFrames;
     const ri=renderer.info.render;
     document.getElementById('fps').textContent=fpsFrames+'fps '+ms.toFixed(1)+'ms | '+ri.calls+'dc '+ri.triangles+'tri Q'+qualityTier;
-    checkPerformance(fpsFrames);
+    checkPerformance(fpsFrames, continuous);
     fpsFrames=0; fpsLast=fpsNow;
   }
 }
@@ -4507,6 +4900,11 @@ let _fpMode=false;
 const _fpFloorY=-(H/2+ply+bunFootH)+4; // 4" tall mini dude standing on floor (eye height ~4")
 let _fpPos=new THREE.Vector3(0,_fpFloorY,30); // starting position
 let _fpYaw=0, _fpPitch=0, _fpVy=0;
+const _fpFwd=new THREE.Vector3();
+const _fpRight=new THREE.Vector3();
+const _fpLookTarget=new THREE.Vector3();
+const _fpRay=new THREE.Raycaster();
+const _fpRayCenter=new THREE.Vector2(0,0);
 const _fpKeys={w:false,a:false,s:false,d:false,space:false};
 let _fpSavedFov=42;
 let _fpSpaceHeld=0; // frames space is held for charged jump
@@ -4600,8 +4998,21 @@ function toggleFirstPerson(){
     _fpPos.set(spX, _fpFloorY-placementOffset.y, spZ);
     _fpYaw=0; // face toward purifier (toward -Z)
     _fpPitch=0; _fpVy=0; _fpSpaceHeld=0;
-    // Disable wall fading so you can see walls from inside
-    fadingWalls.forEach(m=>{ m._savedOpacity=m.material.opacity; m.material.opacity=1; });
+    // Disable wall fading so you can see walls from inside.
+    fadingWalls.forEach(m=>{
+      m._savedOpacity=m.material.opacity;
+      m._savedTransparent=m.material.transparent;
+      m._savedDepthWrite=m.material.depthWrite;
+      if(m._fadeBaseOpacity!==undefined){
+        m.material.opacity=m._fadeBaseOpacity;
+        m.material.transparent=m._fadeBaseTransparent;
+        m.material.depthWrite=m._fadeBaseDepthWrite;
+      } else {
+        m.material.opacity=1;
+        m.material.transparent=false;
+        m.material.depthWrite=true;
+      }
+    });
     // Request pointer lock for mouselook
     canvas.requestPointerLock();
   } else {
@@ -4609,7 +5020,11 @@ function toggleFirstPerson(){
     camera.near=0.1;
     camera.updateProjectionMatrix();
     // Restore wall fading
-    fadingWalls.forEach(m=>{ if(m._savedOpacity!==undefined) m.material.opacity=m._savedOpacity; });
+    fadingWalls.forEach(m=>{
+      if(m._savedOpacity!==undefined) m.material.opacity=m._savedOpacity;
+      if(m._savedTransparent!==undefined) m.material.transparent=m._savedTransparent;
+      if(m._savedDepthWrite!==undefined) m.material.depthWrite=m._savedDepthWrite;
+    });
     document.exitPointerLock();
   }
 }
@@ -4648,36 +5063,27 @@ document.addEventListener('pointerlockchange',()=>{
 
 // ─── Adaptive quality ───
 // Monitors FPS over several seconds and downgrades rendering if needed.
-// Tiers: 0 = full quality, 1 = reduced pixel ratio, 2 = also disable shadows, 3 = also reduce particles
+// Tiers: 0 = best, 3 = most conservative. Keep lighting/shadows intact; scale DPR and particles first.
 let qualityTier=0, qualitySamples=0, qualitySum=0, qualitySettled=false;
-const QUALITY_WINDOW=2000; // ms to average over before deciding
+const QUALITY_DPR_TIERS=_isMobile?[0.72,0.64,0.56,0.5]:[0.85,0.74,0.64,0.55];
+const QUALITY_WINDOW=1500; // ms to average over before deciding
 let qualityWindowStart=performance.now();
 function downgrade(tier){
-  qualityTier=tier;
-  if(tier>=1){
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio,1));
-    key.shadow.mapSize.set(512,512);
-    key.shadow.map?.dispose(); key.shadow.map=null; // force rebuild
-  }
-  if(tier>=2){
-    renderer.shadowMap.enabled=false;
-    rim.intensity=0; bounce.intensity=0;
-    ceilSpot.castShadow=false;
-  }
-  if(tier>=3){
-    // Hide particles on very weak hardware
-    particles.visible=false;
-  }
+  qualityTier=Math.max(0,Math.min(3,tier));
+  const dprCap=QUALITY_DPR_TIERS[qualityTier]??QUALITY_DPR_TIERS[QUALITY_DPR_TIERS.length-1];
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,dprCap));
+  setActiveParticleCount(PARTICLE_TIER_COUNTS[qualityTier]??PARTICLE_COUNT);
   resize();
 }
-function checkPerformance(fps){
+function checkPerformance(fps,isActive){
+  if(!isActive) return;
   if(qualitySettled) return;
   qualitySum+=fps; qualitySamples++;
   const elapsed=performance.now()-qualityWindowStart;
   if(elapsed<QUALITY_WINDOW) return;
   const avg=qualitySum/qualitySamples;
   qualitySum=0; qualitySamples=0; qualityWindowStart=performance.now();
-  if(avg>=(_isMobile?50:55)){ qualitySettled=true; return; } // good enough, stop checking
+  if(avg>=(_isMobile?55:60)){ qualitySettled=true; return; } // good enough, stop checking
   if(qualityTier<3){ downgrade(qualityTier+1); }
   else { qualitySettled=true; } // can't go lower
 }
@@ -4730,6 +5136,11 @@ function resetPurifierPos(){
   document.getElementById('turntableLabel').textContent='0°';
 }
 updateFanLegend();
+// Default to Under TV placement
+setPlacement('tv');
+// Highlight active board thickness button
+document.querySelectorAll('#btnBoardHalf,#btnBoard34').forEach(b=>b.classList.remove('on'));
+document.getElementById(_boardThickness==='34'?'btnBoard34':'btnBoardHalf').classList.add('on');
 // Default to mid-afternoon (2:30 PM = 870 min) instead of real time
 document.getElementById('todSlider').value=870;
 document.getElementById('todLabel').textContent=formatTime(870);
