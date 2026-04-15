@@ -5074,8 +5074,8 @@ function animate(ts){
     const rightX=Math.cos(azimuth), rightZ=-Math.sin(azimuth);
     if(_camKeys.w){ panX+=fwdX*spd; panZ+=fwdZ*spd; }
     if(_camKeys.s){ panX-=fwdX*spd; panZ-=fwdZ*spd; }
-    if(_camKeys.a){ panX+=rightX*spd; panZ+=rightZ*spd; }
-    if(_camKeys.d){ panX-=rightX*spd; panZ-=rightZ*spd; }
+    if(_camKeys.a){ panX-=rightX*spd; panZ-=rightZ*spd; }
+    if(_camKeys.d){ panX+=rightX*spd; panZ+=rightZ*spd; }
   }
   camera.position.x=panX+radius*Math.sin(polar)*Math.sin(azimuth);
   camera.position.y=panY+radius*Math.cos(polar);
@@ -5085,6 +5085,17 @@ function animate(ts){
 
   // First-person mode camera
   if(_fpMode){
+    // Apply queued pointer-lock look deltas in fixed-size chunks to prevent jumpy turns on slower browsers.
+    const maxLookStep=28;
+    const stepX=Math.max(-maxLookStep, Math.min(maxLookStep, _fpLookDX));
+    const stepY=Math.max(-maxLookStep, Math.min(maxLookStep, _fpLookDY));
+    _fpLookDX-=stepX;
+    _fpLookDY-=stepY;
+    if(Math.abs(_fpLookDX)>maxLookStep*4) _fpLookDX*=0.6;
+    if(Math.abs(_fpLookDY)>maxLookStep*4) _fpLookDY*=0.6;
+    _fpYaw-=stepX*0.002;
+    _fpPitch=Math.max(-1.2,Math.min(1.2, _fpPitch-stepY*0.002));
+
     const spd=0.35;
     const fwd=_fpFwd.set(-Math.sin(_fpYaw),0,-Math.cos(_fpYaw));
     const right=_fpRight.set(fwd.z,0,-fwd.x);
@@ -5165,16 +5176,20 @@ function animate(ts){
       _fpPos.z-Math.cos(_fpYaw)*10
     );
     camera.lookAt(lookTarget);
-    // Crosshair interaction check — raycast from center of screen
-    _fpRay.setFromCamera(_fpRayCenter, camera);
-    const _fpHits=_fpRay.intersectObjects(scene.children,true);
-    let _fpTarget=null;
-    for(const h of _fpHits){
-      if(h.distance>30) break; // interaction range
-      if(!isAncestorVisible(h.object)) continue;
-      if(h.object._isRoom) continue;
-      if(h.object._isFan||h.object._isFilterL||h.object._isFilterR||h.object._isLamp||h.object._isCeilLight){ _fpTarget=h.object; break; }
+    // Crosshair interaction check — raycast from center of screen (throttled for smoother play mode).
+    if(ts>=_fpNextRaycastTs){
+      _fpNextRaycastTs=ts+_fpRaycastIntervalMs;
+      _fpRay.setFromCamera(_fpRayCenter, camera);
+      const _fpHits=_fpRay.intersectObjects(scene.children,true);
+      _fpHoverTarget=null;
+      for(const h of _fpHits){
+        if(h.distance>30) break; // interaction range
+        if(!isAncestorVisible(h.object)) continue;
+        if(h.object._isRoom) continue;
+        if(h.object._isFan||h.object._isFilterL||h.object._isFilterR||h.object._isLamp||h.object._isCeilLight){ _fpHoverTarget=h.object; break; }
+      }
     }
+    const _fpTarget=_fpHoverTarget;
     // Update crosshair style
     const ch=document.getElementById('fpCrosshair');
     if(ch){
@@ -5263,6 +5278,10 @@ const _fpLookTarget=new THREE.Vector3();
 const _fpRay=new THREE.Raycaster();
 const _fpRayCenter=new THREE.Vector2(0,0);
 const _fpKeys={w:false,a:false,s:false,d:false,space:false};
+let _fpLookDX=0, _fpLookDY=0;
+let _fpHoverTarget=null;
+let _fpNextRaycastTs=0;
+const _fpRaycastIntervalMs=60;
 let _fpSavedFov=42;
 let _fpSpaceHeld=0; // frames space is held for charged jump
 const _fpBodyR=1.5; // body radius for collision
@@ -5356,6 +5375,9 @@ function toggleFirstPerson(){
     _fpPos.set(spX, _fpFloorY-placementOffset.y, spZ);
     _fpYaw=0; // face toward purifier (toward -Z)
     _fpPitch=0; _fpVy=0; _fpSpaceHeld=0;
+    _fpLookDX=0; _fpLookDY=0;
+    _fpHoverTarget=null;
+    _fpNextRaycastTs=0;
     _camKeys.w=false; _camKeys.a=false; _camKeys.s=false; _camKeys.d=false;
     // Disable wall fading so you can see walls from inside.
     fadingWalls.forEach(m=>{
@@ -5385,6 +5407,9 @@ function toggleFirstPerson(){
       if(m._savedDepthWrite!==undefined) m.material.depthWrite=m._savedDepthWrite;
     });
     _fpKeys.w=false; _fpKeys.a=false; _fpKeys.s=false; _fpKeys.d=false; _fpKeys.space=false;
+    _fpLookDX=0; _fpLookDY=0;
+    _fpHoverTarget=null;
+    _fpNextRaycastTs=0;
     _camKeys.w=false; _camKeys.a=false; _camKeys.s=false; _camKeys.d=false;
     if(document.exitPointerLock && document.pointerLockElement) document.exitPointerLock();
   }
@@ -5393,8 +5418,11 @@ function toggleFirstPerson(){
 // Pointer lock mouselook
 document.addEventListener('mousemove',e=>{
   if(!_fpMode||!document.pointerLockElement) return;
-  _fpYaw-=e.movementX*0.002;
-  _fpPitch=Math.max(-1.2,Math.min(1.2, _fpPitch-e.movementY*0.002));
+  const rawX=e.movementX||e.mozMovementX||0;
+  const rawY=e.movementY||e.mozMovementY||0;
+  const maxEventDelta=120;
+  _fpLookDX+=Math.max(-maxEventDelta,Math.min(maxEventDelta,rawX));
+  _fpLookDY+=Math.max(-maxEventDelta,Math.min(maxEventDelta,rawY));
 });
 // WASD keys for first-person (captured in keydown/keyup)
 document.addEventListener('keydown',e=>{
