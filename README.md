@@ -20,6 +20,23 @@ The leaderboard now has a shared backend API. Run the app through the Node serve
 
 Opening `index.html` directly still renders the scene, but leaderboard sharing requires the API server.
 
+## Deploy So Friends Can Post Scores
+
+The easiest path is Render using the included blueprint:
+
+1. Push latest `main` to GitHub.
+2. In Render: `New` -> `Blueprint` -> select this repo.
+3. Render will detect `render.yaml` and create one web service with a persistent disk.
+4. Wait for deploy, then open the Render URL.
+5. Share that URL with friends.
+
+Important:
+
+- Use the Render URL (same origin) so client + API stay together.
+- Persistent leaderboard storage is mounted at `/var/data` via `DATA_DIR`.
+- Do not use static file hosting only (GitHub Pages/Netlify static-only) for shared scores.
+- Keep instance count at 1 unless you move leaderboard storage to a real shared database.
+
 ## Shared Leaderboard Anti-Exploit Notes
 
 Server-side protections in `server.js` include:
