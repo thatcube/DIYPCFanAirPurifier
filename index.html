@@ -6464,7 +6464,7 @@ _fpHud.innerHTML=`
   <div id="fpLeaderboard" style="position:fixed;top:16px;right:16px;min-width:290px;max-width:340px;
     background:linear-gradient(180deg,rgba(12,18,27,0.92),rgba(7,10,15,0.9));color:#e8eef7;
     padding:10px 11px;border-radius:14px;font-family:system-ui;font-size:12px;
-    pointer-events:none;z-index:9999;backdrop-filter:blur(10px);line-height:1.45;
+    pointer-events:auto;z-index:9999;backdrop-filter:blur(10px);line-height:1.45;
     border:1px solid rgba(116,171,218,0.36);box-shadow:0 10px 24px rgba(0,0,0,0.4)">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
       <span style="font-size:11px;font-weight:700;letter-spacing:0.7px;color:#9fe3ff">LEADERBOARD</span>
@@ -6476,6 +6476,9 @@ _fpHud.innerHTML=`
     </div>
     <ol id="fpLeaderboardList" style="list-style:none;margin:0;padding:0;display:grid;row-gap:4px"></ol>
     <div id="fpLeaderboardMeta" style="margin-top:7px;font-size:10px;opacity:0.58"></div>
+    <div id="fpShareRow" style="display:none;margin-top:8px">
+      <button id="fpShareBtn" type="button" style="appearance:none;border:1px solid rgba(159,227,255,0.45);background:rgba(19,60,80,0.44);color:#d9f5ff;border-radius:9px;padding:6px 9px;font-size:11px;font-weight:700;letter-spacing:0.35px;cursor:pointer">Copy result</button>
+    </div>
   </div>
   <div id="fpHudCore" style="position:fixed;left:16px;bottom:16px;min-width:280px;background:linear-gradient(180deg,rgba(12,18,27,0.86),rgba(7,10,15,0.82));
     color:#e8eef7;padding:11px 12px;border-radius:14px;font-family:system-ui;font-size:12px;
@@ -6593,6 +6596,7 @@ let _leaderboard=[];
 let _lbSharedOnline=false;
 let _lbSharedRunId='';
 let _lbStatusNote=_LB_SHARED_ENABLED?'Connecting':'';
+let _lastRunShareData=null;
 const _lbClaimedCoinIds=new Set();
 
 function _escapeHtml(v){
@@ -6614,6 +6618,65 @@ function _fmtRun(ms){
   const s=Math.floor((total%60000)/1000);
   const z=total%1000;
   return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(z).padStart(3,'0')}`;
+}
+function _makeEntryId(name,timeMs,at){
+  const base=`${_sanitizePlayerName(name)||'Player'}|${Math.floor(Number(timeMs)||0)}|${Math.floor(Number(at)||Date.now())}`;
+  let h=2166136261;
+  for(let i=0;i<base.length;i++){
+    h^=base.charCodeAt(i);
+    h=(h*16777619)>>>0;
+  }
+  const rnd=Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0');
+  return `${h.toString(16).padStart(8,'0')}${rnd}`;
+}
+function _makeShareUrl(entryId){
+  const clean=String(entryId||'').trim();
+  const base=`${location.origin}/leaderboard`;
+  return clean?`${base}?entry=${encodeURIComponent(clean)}`:base;
+}
+function _buildShareText(data){
+  const row=data||{};
+  const rankTxt=row.rank&&row.rank>0?`#${row.rank}`:'Unranked';
+  const who=_sanitizePlayerName(row.name)||(_lbPlayerName||'Player');
+  const coins=Number.isFinite(Number(row.coins))?Math.floor(Number(row.coins)):_coinTotal;
+  const total=Number.isFinite(Number(row.coinTotal))?Math.floor(Number(row.coinTotal)):_coinTotal;
+  const url=_makeShareUrl(row.entryId||'');
+  return [
+    `${who} finished DIY Air Purifier Run`,
+    `Time ${_fmtRun(row.timeMs||0)} | Rank ${rankTxt} | Coins ${coins}/${total}`,
+    url
+  ].join('\n');
+}
+async function _copyTextToClipboard(text){
+  const value=String(text||'');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const ta=document.createElement('textarea');
+  ta.value=value;
+  ta.style.position='fixed';
+  ta.style.left='-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  ta.remove();
+}
+function _setShareButtonLabel(text){
+  const btn=document.getElementById('fpShareBtn');
+  if(btn) btn.textContent=String(text||'Copy result');
+}
+function _hideShareButton(){
+  const row=document.getElementById('fpShareRow');
+  if(row) row.style.display='none';
+  _setShareButtonLabel('Copy result');
+  _lastRunShareData=null;
+}
+function _showShareButton(data){
+  _lastRunShareData=data||null;
+  const row=document.getElementById('fpShareRow');
+  if(row) row.style.display=_lastRunShareData?'block':'none';
+  _setShareButtonLabel('Copy result');
 }
 function _readPlayerName(){
   try{
@@ -6801,6 +6864,19 @@ document.getElementById('nameDialogInput').addEventListener('input',e=>{
     e.target.value='';
   }
 });
+document.getElementById('fpShareBtn').addEventListener('click',async(e)=>{
+  e.preventDefault();
+  e.stopPropagation();
+  if(!_lastRunShareData) return;
+  try{
+    await _copyTextToClipboard(_buildShareText(_lastRunShareData));
+    _setShareButtonLabel('Copied!');
+    setTimeout(()=>_setShareButtonLabel('Copy result'),1300);
+  }catch(err){
+    _setShareButtonLabel('Copy failed');
+    setTimeout(()=>_setShareButtonLabel('Copy result'),1500);
+  }
+});
 _nameDialog.addEventListener('keydown',e=>{ e.stopPropagation(); });
 _nameDialog.addEventListener('click',e=>{ if(e.target===_nameDialog) _closeNameDialog(); });
 function _normalizeLeaderboard(rows){
@@ -6812,7 +6888,9 @@ function _normalizeLeaderboard(rows){
     const at=Math.floor(Number(r.at));
     if(!name) continue;
     if(!Number.isFinite(timeMs) || timeMs<=0) continue;
-    clean.push({name,timeMs,at:Number.isFinite(at)&&at>0?at:Date.now()});
+    const safeAt=Number.isFinite(at)&&at>0?at:Date.now();
+    const id=String(r.id||'').trim()||_makeEntryId(name,timeMs,safeAt);
+    clean.push({id,name,timeMs,at:safeAt});
   }
   clean.sort((a,b)=>a.timeMs-b.timeMs || a.at-b.at);
   const perNameCount=new Map();
@@ -6875,6 +6953,7 @@ function _startRunTimer(){
   _runTimerEndMs=_runTimerStartMs;
   _runTimerActive=true;
   _runTimerFinished=false;
+  _hideShareButton();
   _updateTimerHud(_runTimerStartMs);
 }
 function _stopRunTimer(){
@@ -6891,15 +6970,24 @@ function _tickRunTimer(ts){
 function _recordRun(timeMs){
   const commitRunLocal=()=>{
     const name=_lbPlayerName||'Player';
-    const entry={name,timeMs:Math.floor(timeMs),at:Date.now()};
+    const now=Date.now();
+    const entry={id:_makeEntryId(name,timeMs,now),name,timeMs:Math.floor(timeMs),at:now};
     _leaderboard=_normalizeLeaderboard(_leaderboard.concat(entry));
     _saveLeaderboard();
     _renderLeaderboard();
     let rank=0;
     for(let i=0;i<_leaderboard.length;i++){
       const r=_leaderboard[i];
-      if(r.name===entry.name && r.timeMs===entry.timeMs && r.at===entry.at){ rank=i+1; break; }
+      if(r.id===entry.id){ rank=i+1; break; }
     }
+    _showShareButton({
+      entryId:entry.id,
+      rank,
+      name:entry.name,
+      timeMs:entry.timeMs,
+      coins:_coinTotal,
+      coinTotal:_coinTotal
+    });
     const st=document.getElementById('runTimerState');
     if(st){
       st.textContent=rank>0?`FINISHED #${rank}`:'FINISHED';
@@ -6917,6 +7005,15 @@ function _recordRun(timeMs){
       _lbSharedOnline=true;
       _lbStatusNote='';
       _leaderboard=_normalizeLeaderboard(Array.isArray(data.leaderboard)?data.leaderboard:[]);
+      const serverEntry=(data&&data.entry)?data.entry:{};
+      _showShareButton({
+        entryId:String(serverEntry.id||''),
+        rank:Math.floor(Number(data&&data.rank)||0),
+        name:_sanitizePlayerName(serverEntry.name||_lbPlayerName||'Player'),
+        timeMs:Math.floor(Number(serverEntry.timeMs)||Math.floor(timeMs)),
+        coins:_coinTotal,
+        coinTotal:_coinTotal
+      });
       _renderLeaderboard();
       const st=document.getElementById('runTimerState');
       if(st){

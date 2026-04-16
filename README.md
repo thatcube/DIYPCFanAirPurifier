@@ -75,6 +75,7 @@ Notes:
 - The API contract matches the existing frontend routes (`/api/leaderboard`, `/api/run/*`, `/api/admin/*`).
 - Existing Node server (`server.js`) is still available for local development.
 - If you ever exceed free Cloudflare quotas, API requests will fail until limits reset.
+- Share links can point to `/leaderboard?entry=<entryId>` to highlight a specific score.
 
 ## Deploy On Render (Paid Alternative)
 
@@ -142,6 +143,7 @@ Security notes:
 - **Airflow particles** — 600-particle system showing intake → filter → exhaust flow (stagnant drift when fans off)
 - **Day/night mode** — full lighting theme switch
 - **Room context** — bedroom scene with bed, nightstand, TV wall, window with curtains, and door alcove for scale
+- **Shareable results** — finish-time copy button plus a `/leaderboard` page with deep-link highlight support
 
 ## Room Layout
 
