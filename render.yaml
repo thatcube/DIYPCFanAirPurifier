@@ -12,6 +12,8 @@ services:
         value: 20
       - key: TRUST_PROXY
         value: "true"
+      - key: ADMIN_TOKEN
+        generateValue: true
       - key: DATA_DIR
         value: /var/data
       - key: LB_MAX

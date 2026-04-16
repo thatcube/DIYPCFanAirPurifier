@@ -48,6 +48,31 @@ Server-side protections in `server.js` include:
 - Run min/max duration checks
 - Basic per-IP rate limiting
 
+## Optional Admin API (Now Included)
+
+Admin endpoints are token-protected and disabled unless `ADMIN_TOKEN` is set.
+
+- Header options:
+	- `Authorization: Bearer <ADMIN_TOKEN>`
+	- `x-admin-token: <ADMIN_TOKEN>`
+
+Endpoints:
+
+1. `GET /api/admin/leaderboard`
+2. `POST /api/admin/delete` with JSON body `{ "id": "<entryId>" }`
+3. `POST /api/admin/reset` with JSON body `{ "confirm": "RESET_LEADERBOARD" }`
+
+Example:
+
+```bash
+curl -H "Authorization: Bearer $ADMIN_TOKEN" https://your-app.onrender.com/api/admin/leaderboard
+```
+
+Security notes:
+
+- Keep `ADMIN_TOKEN` secret and rotate it if leaked.
+- Do not expose admin requests from the browser client; use terminal/curl.
+
 ## Features
 
 - **Interactive 3D viewer** — orbit, zoom, and inspect from any angle

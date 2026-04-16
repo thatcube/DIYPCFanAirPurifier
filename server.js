@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const app = express();
 const PORT = Number(process.env.PORT || 8787);
 const TRUST_PROXY = /^(1|true|yes)$/i.test(String(process.env.TRUST_PROXY || 'false'));
+const ADMIN_TOKEN = String(process.env.ADMIN_TOKEN || '');
 
 const MAX_NAME_LEN = 24;
 const LB_MAX = Number(process.env.LB_MAX || 25);
@@ -37,6 +38,14 @@ function sanitizeName(name) {
   return String(name || '').trim().replace(/\s+/g, ' ').slice(0, MAX_NAME_LEN);
 }
 
+function makeEntryId(name, timeMs, at) {
+  return crypto
+    .createHash('sha1')
+    .update(`${name}|${timeMs}|${at}`)
+    .digest('hex')
+    .slice(0, 16);
+}
+
 function normalizeLeaderboard(rows) {
   const clean = [];
   for (const row of rows || []) {
@@ -46,7 +55,11 @@ function normalizeLeaderboard(rows) {
     const at = Math.floor(Number(row.at));
     if (!name) continue;
     if (!Number.isFinite(timeMs) || timeMs <= 0) continue;
-    clean.push({ name, timeMs, at: Number.isFinite(at) && at > 0 ? at : Date.now() });
+    const safeAt = Number.isFinite(at) && at > 0 ? at : Date.now();
+    const id = (typeof row.id === 'string' && row.id.trim())
+      ? row.id.trim().slice(0, 64)
+      : makeEntryId(name, timeMs, safeAt);
+    clean.push({ id, name, timeMs, at: safeAt });
   }
   clean.sort((a, b) => a.timeMs - b.timeMs || a.at - b.at);
 
@@ -106,6 +119,39 @@ function getClientIp(req) {
 
 function apiError(res, status, code, message) {
   res.status(status).json({ ok: false, code, message });
+}
+
+function extractAdminToken(req) {
+  const hdr = req.headers.authorization;
+  if (typeof hdr === 'string' && hdr.toLowerCase().startsWith('bearer ')) {
+    return hdr.slice(7).trim();
+  }
+  const x = req.headers['x-admin-token'];
+  if (typeof x === 'string') return x.trim();
+  return '';
+}
+
+function secureTokenMatch(provided) {
+  if (!provided || !ADMIN_TOKEN) return false;
+  const a = Buffer.from(provided, 'utf8');
+  const b = Buffer.from(ADMIN_TOKEN, 'utf8');
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+function requireAdmin(req, res, next) {
+  const ip = getClientIp(req);
+  if (!rateLimit(ip, 'admin', 120, 5 * 60 * 1000)) {
+    return apiError(res, 429, 'rate_limited', 'Too many admin requests');
+  }
+  if (!ADMIN_TOKEN) {
+    return apiError(res, 503, 'admin_disabled', 'Admin API is disabled on this server');
+  }
+  const token = extractAdminToken(req);
+  if (!secureTokenMatch(token)) {
+    return apiError(res, 401, 'unauthorized', 'Invalid admin token');
+  }
+  return next();
 }
 
 app.disable('x-powered-by');
@@ -233,6 +279,7 @@ app.post('/api/run/finish', (req, res) => {
   }
 
   const entry = {
+    id: makeEntryId(name || 'Player', Math.floor(elapsed), now),
     name: name || 'Player',
     timeMs: Math.floor(elapsed),
     at: now,
@@ -261,6 +308,40 @@ app.post('/api/run/finish', (req, res) => {
     maxEntries: LB_MAX,
     perPlayer: LB_PER_PLAYER,
   });
+});
+
+app.get('/api/admin/leaderboard', requireAdmin, (_req, res) => {
+  return res.json({
+    ok: true,
+    leaderboard,
+    maxEntries: LB_MAX,
+    perPlayer: LB_PER_PLAYER,
+    requiredCoinCount: COIN_IDS.length,
+  });
+});
+
+app.post('/api/admin/delete', requireAdmin, (req, res) => {
+  const id = String(req.body?.id || '').trim();
+  if (!id) return apiError(res, 400, 'bad_request', 'id is required');
+  const before = leaderboard.length;
+  leaderboard = leaderboard.filter((row) => row.id !== id);
+  if (leaderboard.length === before) {
+    return apiError(res, 404, 'not_found', 'Entry not found');
+  }
+  leaderboard = normalizeLeaderboard(leaderboard);
+  saveLeaderboard(leaderboard);
+  return res.json({ ok: true, deletedId: id, leaderboardSize: leaderboard.length });
+});
+
+app.post('/api/admin/reset', requireAdmin, (req, res) => {
+  const confirm = String(req.body?.confirm || '');
+  if (confirm !== 'RESET_LEADERBOARD') {
+    return apiError(res, 400, 'bad_request', 'confirm must be RESET_LEADERBOARD');
+  }
+  leaderboard = [];
+  saveLeaderboard(leaderboard);
+  activeRuns.clear();
+  return res.json({ ok: true, leaderboardSize: 0 });
 });
 
 // Cleanup stale runs periodically.
