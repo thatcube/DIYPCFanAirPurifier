@@ -924,6 +924,19 @@ const _catBaseLocalQuat=new THREE.Quaternion();
         o.receiveShadow=true;
         // Ensure materials render correctly under tone mapping.
         if(o.material && o.material.map){ o.material.map.encoding=THREE.sRGBEncoding; }
+        // Make the cat look less glossy and more fur-like.
+        const mats=Array.isArray(o.material)?o.material:[o.material];
+        for(const m of mats){
+          if(!m) continue;
+          if(m.isMeshStandardMaterial || m.isMeshPhysicalMaterial){
+            m.metalness=0;
+            m.roughness=Math.max(0.9, Number(m.roughness)||0);
+            m.envMapIntensity=Math.min(0.08, Number(m.envMapIntensity)||0.08);
+            if(m.clearcoat!==undefined) m.clearcoat=0;
+            if(m.sheen!==undefined) m.sheen=0;
+            m.needsUpdate=true;
+          }
+        }
       }
     });
     catGroup.add(catModel);
@@ -3568,6 +3581,7 @@ function applyRoomDelta(delta){
       o.position.x-=delta.x;
       o.position.y-=delta.y;
       o.position.z-=delta.z;
+      if(o._isDrawer && Number.isFinite(o._drawerBaseZ)) o._drawerBaseZ-=delta.z;
       o.matrixAutoUpdate=true;
       o.updateMatrixWorld(true);
       o.matrixAutoUpdate=false;
@@ -4582,6 +4596,7 @@ const drawers=[]; // populated in nightstand block below; used by click/collisio
     const dy=floorY+drawerGap*(d+1)+drawerH*(d+0.5);
     const grp=new THREE.Group();
     grp.position.set(tblX, dy, drawerFrontZ);
+    grp._drawerBaseZ=drawerFrontZ;
     grp._isRoom=true;
     grp._isDrawer=true;
     grp._drawerIdx=d;
@@ -6438,6 +6453,30 @@ _fpHud.innerHTML=`
     <span style="font-size:10px;opacity:0.8;letter-spacing:0.8px;margin-right:6px">COINS</span>
     <span id="coinCount">0 / 0</span>
   </div>
+  <div id="runTimerHud" style="position:fixed;top:68px;left:16px;background:rgba(10,13,18,0.78);
+    color:#b3ecff;padding:7px 12px;border-radius:12px;font-family:system-ui;font-size:14px;font-weight:700;
+    pointer-events:none;z-index:9999;backdrop-filter:blur(8px);letter-spacing:0.4px;
+    border:1px solid rgba(120,214,255,0.35);box-shadow:0 8px 18px rgba(0,0,0,0.35)">
+    <span style="font-size:10px;opacity:0.8;letter-spacing:0.8px;margin-right:6px">TIME</span>
+    <span id="runTimerText">00:00.000</span>
+    <span id="runTimerState" style="margin-left:8px;font-size:10px;opacity:0.66">READY</span>
+  </div>
+  <div id="fpLeaderboard" style="position:fixed;top:16px;right:16px;min-width:290px;max-width:340px;
+    background:linear-gradient(180deg,rgba(12,18,27,0.92),rgba(7,10,15,0.9));color:#e8eef7;
+    padding:10px 11px;border-radius:14px;font-family:system-ui;font-size:12px;
+    pointer-events:none;z-index:9999;backdrop-filter:blur(10px);line-height:1.45;
+    border:1px solid rgba(116,171,218,0.36);box-shadow:0 10px 24px rgba(0,0,0,0.4)">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="font-size:11px;font-weight:700;letter-spacing:0.7px;color:#9fe3ff">LEADERBOARD</span>
+      <span style="margin-left:auto;font-size:10px;opacity:0.62">TOP 25</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px;font-size:11px;opacity:0.9">
+      <span style="opacity:0.65">Player</span>
+      <span id="fpPlayerName" style="font-weight:700;color:#ffd873">Player</span>
+    </div>
+    <ol id="fpLeaderboardList" style="list-style:none;margin:0;padding:0;display:grid;row-gap:4px"></ol>
+    <div id="fpLeaderboardMeta" style="margin-top:7px;font-size:10px;opacity:0.58"></div>
+  </div>
   <div id="fpHudCore" style="position:fixed;left:16px;bottom:16px;min-width:280px;background:linear-gradient(180deg,rgba(12,18,27,0.86),rgba(7,10,15,0.82));
     color:#e8eef7;padding:11px 12px;border-radius:14px;font-family:system-ui;font-size:12px;
     pointer-events:none;z-index:9999;backdrop-filter:blur(10px);line-height:1.5;
@@ -6454,7 +6493,7 @@ _fpHud.innerHTML=`
       </div>
       <span style="font-size:10px;opacity:0.62;background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:999px">Space</span>
     </div>
-    <div style="margin-top:7px;font-size:10px;opacity:0.52"><kbd style="background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.16)">H</kbd> help · <kbd style="background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.16)">Esc</kbd> exit</div>
+    <div style="margin-top:7px;font-size:10px;opacity:0.52"><kbd style="background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.16)">R</kbd> reset · <kbd style="background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.16)">H</kbd> help · <kbd style="background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.16)">Esc</kbd> exit</div>
   </div>
   <div id="fpControlsPanel" style="position:fixed;right:16px;bottom:16px;background:linear-gradient(180deg,rgba(12,18,27,0.92),rgba(7,10,15,0.9));color:#e8eef7;
     padding:11px 12px;border-radius:14px;font-family:system-ui;font-size:12px;display:none;
@@ -6466,6 +6505,8 @@ _fpHud.innerHTML=`
       <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">Space</span> jump (hold)</div>
       <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">Shift</span> sprint</div>
       <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">V</span> switch view</div>
+      <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">R</span> reset run</div>
+      <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">N</span> rename</div>
       <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">H</span> toggle help</div>
       <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">Esc</span> exit play mode</div>
     </div>
@@ -6473,6 +6514,41 @@ _fpHud.innerHTML=`
   </div>`;
 _fpHud.style.display='none';
 document.body.appendChild(_fpHud);
+
+const _nameDialogStyle=document.createElement('style');
+_nameDialogStyle.textContent=`
+  #nameDialogOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:12000;background:rgba(3,7,12,0.58);backdrop-filter:blur(6px)}
+  #nameDialogCard{width:min(92vw,380px);background:linear-gradient(180deg,rgba(16,23,34,0.98),rgba(9,13,20,0.98));border:1px solid rgba(128,190,232,0.35);border-radius:14px;box-shadow:0 16px 44px rgba(0,0,0,0.5);padding:14px 14px 12px;color:#e8eef7;font-family:system-ui}
+  #nameDialogTitle{font-size:13px;font-weight:800;letter-spacing:0.7px;color:#9fe3ff}
+  #nameDialogBody{font-size:12px;opacity:0.85;margin-top:6px}
+  #nameDialogInput{width:100%;margin-top:10px;box-sizing:border-box;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:10px;color:#fff;padding:8px 10px;font-size:14px;outline:none}
+  #nameDialogInput:focus{border-color:rgba(159,227,255,0.8);box-shadow:0 0 0 2px rgba(159,227,255,0.2)}
+  #nameDialogHint{font-size:10px;opacity:0.6;margin-top:6px}
+  #nameDialogActions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+  .nameDlgBtn{border:none;border-radius:10px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer}
+  .nameDlgBtn.cancel{background:rgba(255,255,255,0.1);color:#d8e2f2}
+  .nameDlgBtn.save{background:linear-gradient(90deg,#5cd8ff,#ffd873);color:#081019}
+`;
+document.head.appendChild(_nameDialogStyle);
+
+const _nameDialog=document.createElement('div');
+_nameDialog.id='nameDialogOverlay';
+_nameDialog.innerHTML=`
+  <div id="nameDialogCard" role="dialog" aria-modal="true" aria-labelledby="nameDialogTitle">
+    <div id="nameDialogTitle">CAT NAME</div>
+    <div id="nameDialogBody">What should we call this cat on the leaderboard?</div>
+    <form id="nameDialogForm" autocomplete="off" data-bwignore="true">
+      <input type="text" name="ghost_user" autocomplete="username" data-bwignore="true" tabindex="-1" aria-hidden="true" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;opacity:0;pointer-events:none" />
+      <input type="password" name="ghost_pass" autocomplete="new-password" data-bwignore="true" tabindex="-1" aria-hidden="true" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;opacity:0;pointer-events:none" />
+      <input id="nameDialogInput" type="text" name="run_tag_manual_entry" maxlength="24" inputmode="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" data-bwignore="true" data-lpignore="true" data-1p-ignore="true" data-form-type="other" placeholder="Type cat name" />
+      <div id="nameDialogHint">Press Enter to save, or Esc to cancel.</div>
+      <div id="nameDialogActions">
+        <button type="button" class="nameDlgBtn cancel" id="nameDialogCancel">Cancel</button>
+        <button type="submit" class="nameDlgBtn save" id="nameDialogSave">Save</button>
+      </div>
+    </form>
+  </div>`;
+document.body.appendChild(_nameDialog);
 
 // Camera mode inside Play Mode: 'cat' (third person) or 'first'.
 let _fpCamMode='cat';
@@ -6491,6 +6567,278 @@ function _setFpCamMode(mode){
     if(catGroup.visible && catGroup.parent!==scene) scene.add(catGroup);
   }
 }
+
+// Run timer + local leaderboard (fastest time first).
+const _LB_STORE_KEY='diy_air_purifier_leaderboard_v1';
+const _LB_PLAYER_KEY='diy_air_purifier_player_name_v1';
+const _LB_MAX=25;
+const _LB_PER_PLAYER=3;
+// Temporary testing toggle: clear saved player identity so completion asks again.
+const _LB_CLEAR_SAVED_NAME_ON_LOAD=true;
+if(_LB_CLEAR_SAVED_NAME_ON_LOAD){
+  try{ localStorage.removeItem(_LB_PLAYER_KEY); }catch(e){}
+}
+let _runTimerStartMs=0;
+let _runTimerEndMs=0;
+let _runTimerActive=false;
+let _runTimerFinished=false;
+let _fpIgnorePointerUnlock=false;
+let _nameDialogOpen=false;
+let _nameDialogAfterClose=null;
+let _nameDialogManualTyped=false;
+let _lbPlayerName='';
+let _leaderboard=[];
+
+function _escapeHtml(v){
+  return String(v||'').replace(/[&<>"']/g,ch=>({
+    '&':'&amp;',
+    '<':'&lt;',
+    '>':'&gt;',
+    '"':'&quot;',
+    "'":'&#39;'
+  }[ch]));
+}
+function _sanitizePlayerName(name){
+  const t=String(name||'').trim().replace(/\s+/g,' ');
+  return t.slice(0,24);
+}
+function _fmtRun(ms){
+  const total=Math.max(0,Math.floor(Number(ms)||0));
+  const m=Math.floor(total/60000);
+  const s=Math.floor((total%60000)/1000);
+  const z=total%1000;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(z).padStart(3,'0')}`;
+}
+function _readPlayerName(){
+  try{
+    return _sanitizePlayerName(localStorage.getItem(_LB_PLAYER_KEY)||'');
+  }catch(e){
+    return '';
+  }
+}
+function _setPlayerName(name,persist=true){
+  _lbPlayerName=_sanitizePlayerName(name)||'Player';
+  if(persist){
+    try{ localStorage.setItem(_LB_PLAYER_KEY,_lbPlayerName); }catch(e){}
+  }
+  const el=document.getElementById('fpPlayerName');
+  if(el) el.textContent=_lbPlayerName;
+}
+
+function _hasCustomPlayerName(){
+  try{
+    const raw=_sanitizePlayerName(localStorage.getItem(_LB_PLAYER_KEY)||'');
+    return !!raw && raw!=='Player';
+  }catch(e){
+    return !!(_lbPlayerName && _lbPlayerName!=='Player');
+  }
+}
+function _clearPlayInputState(){
+  _fpKeys.w=false; _fpKeys.a=false; _fpKeys.s=false; _fpKeys.d=false;
+  _fpKeys.space=false; _fpKeys.shift=false;
+  _camKeys.w=false; _camKeys.a=false; _camKeys.s=false; _camKeys.d=false;
+  _fpLookDX=0; _fpLookDY=0;
+}
+function _closeNameDialog(){
+  if(!_nameDialogOpen) return;
+  _nameDialogOpen=false;
+  _nameDialog.style.display='none';
+  const input=document.getElementById('nameDialogInput');
+  if(input){ input.value=''; input.blur(); }
+  const afterClose=_nameDialogAfterClose;
+  _nameDialogAfterClose=null;
+  _clearPlayInputState();
+  if(_fpMode && !_isMobile && canvas.requestPointerLock){
+    canvas.requestPointerLock();
+    setTimeout(()=>{ _fpIgnorePointerUnlock=false; }, 180);
+  } else {
+    _fpIgnorePointerUnlock=false;
+  }
+  if(afterClose) afterClose();
+}
+function _openNameDialog(force,onAfterClose){
+  if(!force && _hasCustomPlayerName()){
+    if(onAfterClose) onAfterClose();
+    return;
+  }
+  _nameDialogAfterClose=typeof onAfterClose==='function'?onAfterClose:null;
+  _nameDialogOpen=true;
+  _nameDialogManualTyped=false;
+  _clearPlayInputState();
+  _fpIgnorePointerUnlock=true;
+  if(document.exitPointerLock && document.pointerLockElement) document.exitPointerLock();
+  const input=document.getElementById('nameDialogInput');
+  const hint=document.getElementById('nameDialogHint');
+  _nameDialog.style.display='flex';
+  if(hint) hint.textContent='Press Enter to save, or Esc to cancel.';
+  if(input){
+    input.name=`run_tag_manual_${Math.random().toString(36).slice(2,10)}`;
+    input.value='';
+    input.setAttribute('readonly','readonly');
+    setTimeout(()=>{
+      input.removeAttribute('readonly');
+      input.focus();
+      if(!_nameDialogManualTyped) input.value='';
+    }, 30);
+  }
+}
+
+document.getElementById('nameDialogCancel').addEventListener('click',()=>_closeNameDialog());
+document.getElementById('nameDialogForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const input=document.getElementById('nameDialogInput');
+  const hint=document.getElementById('nameDialogHint');
+  if(!_nameDialogManualTyped){
+    if(input){ input.value=''; input.focus(); }
+    if(hint) hint.textContent='Manual typing required. Autofill is blocked for this field.';
+    return;
+  }
+  const name=_sanitizePlayerName(input?input.value:'');
+  if(name) _setPlayerName(name,true);
+  _renderLeaderboard();
+  _closeNameDialog();
+});
+document.getElementById('nameDialogInput').addEventListener('keydown',e=>{
+  if((e.key && e.key.length===1) || e.key==='Backspace' || e.key==='Delete'){
+    _nameDialogManualTyped=true;
+  }
+  if(e.key==='Escape'){
+    e.preventDefault();
+    _closeNameDialog();
+  }
+  e.stopPropagation();
+});
+document.getElementById('nameDialogInput').addEventListener('beforeinput',e=>{
+  if(!e.isTrusted) return;
+  if(e.inputType==='insertText' || e.inputType==='deleteContentBackward' || e.inputType==='deleteContentForward'){
+    _nameDialogManualTyped=true;
+  }
+});
+document.getElementById('nameDialogInput').addEventListener('input',e=>{
+  if(!_nameDialogManualTyped){
+    e.target.value='';
+  }
+});
+_nameDialog.addEventListener('keydown',e=>{ e.stopPropagation(); });
+_nameDialog.addEventListener('click',e=>{ if(e.target===_nameDialog) _closeNameDialog(); });
+function _normalizeLeaderboard(rows){
+  const clean=[];
+  for(const r of rows||[]){
+    if(!r) continue;
+    const name=_sanitizePlayerName(r.name);
+    const timeMs=Math.floor(Number(r.timeMs));
+    const at=Math.floor(Number(r.at));
+    if(!name) continue;
+    if(!Number.isFinite(timeMs) || timeMs<=0) continue;
+    clean.push({name,timeMs,at:Number.isFinite(at)&&at>0?at:Date.now()});
+  }
+  clean.sort((a,b)=>a.timeMs-b.timeMs || a.at-b.at);
+  const perNameCount=new Map();
+  const kept=[];
+  for(const r of clean){
+    const n=perNameCount.get(r.name)||0;
+    if(n>=_LB_PER_PLAYER) continue;
+    perNameCount.set(r.name,n+1);
+    kept.push(r);
+    if(kept.length>=_LB_MAX) break;
+  }
+  return kept;
+}
+function _loadLeaderboard(){
+  try{
+    const raw=localStorage.getItem(_LB_STORE_KEY);
+    const parsed=raw?JSON.parse(raw):[];
+    _leaderboard=_normalizeLeaderboard(Array.isArray(parsed)?parsed:[]);
+  }catch(e){
+    _leaderboard=[];
+  }
+}
+function _saveLeaderboard(){
+  try{ localStorage.setItem(_LB_STORE_KEY,JSON.stringify(_leaderboard)); }catch(e){}
+}
+function _renderLeaderboard(){
+  const list=document.getElementById('fpLeaderboardList');
+  const meta=document.getElementById('fpLeaderboardMeta');
+  const nameEl=document.getElementById('fpPlayerName');
+  if(nameEl) nameEl.textContent=_lbPlayerName||'Player';
+  if(!list || !meta) return;
+  if(!_leaderboard.length){
+    list.innerHTML='<li style="opacity:0.62;padding:4px 2px">No runs yet. Grab every coin to post a time.</li>';
+  } else {
+    list.innerHTML=_leaderboard.map((r,i)=>{
+      const own=r.name===_lbPlayerName;
+      return `<li style="display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:center;padding:3px 6px;border-radius:8px;${own?'background:rgba(255,216,115,0.14);border:1px solid rgba(255,216,115,0.3);':'background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);'}">
+        <span style="opacity:0.68">#${i+1}</span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_escapeHtml(r.name)}</span>
+        <span style="font-variant-numeric:tabular-nums;font-weight:700;color:${own?'#ffd873':'#9fe3ff'}">${_fmtRun(r.timeMs)}</span>
+      </li>`;
+    }).join('');
+  }
+  meta.textContent=`Fastest first | Top ${_LB_MAX} | Max ${_LB_PER_PLAYER} per player`;
+}
+function _updateTimerHud(nowMs){
+  const txt=document.getElementById('runTimerText');
+  const st=document.getElementById('runTimerState');
+  if(txt){
+    const ms=_runTimerActive?Math.max(0,nowMs-_runTimerStartMs):Math.max(0,_runTimerEndMs-_runTimerStartMs);
+    txt.textContent=_fmtRun(ms);
+  }
+  if(st){
+    if(_runTimerActive) st.textContent='RUNNING';
+    else if(_runTimerFinished) st.textContent='FINISHED';
+    else st.textContent='READY';
+  }
+}
+function _startRunTimer(){
+  _runTimerStartMs=performance.now();
+  _runTimerEndMs=_runTimerStartMs;
+  _runTimerActive=true;
+  _runTimerFinished=false;
+  _updateTimerHud(_runTimerStartMs);
+}
+function _stopRunTimer(){
+  if(!_runTimerActive) return Math.max(0,_runTimerEndMs-_runTimerStartMs);
+  _runTimerEndMs=performance.now();
+  _runTimerActive=false;
+  _runTimerFinished=true;
+  _updateTimerHud(_runTimerEndMs);
+  return Math.max(0,_runTimerEndMs-_runTimerStartMs);
+}
+function _tickRunTimer(ts){
+  if(_fpMode && _runTimerActive) _updateTimerHud(ts);
+}
+function _recordRun(timeMs){
+  const commitRun=()=>{
+    const name=_lbPlayerName||'Player';
+    const entry={name,timeMs:Math.floor(timeMs),at:Date.now()};
+    _leaderboard=_normalizeLeaderboard(_leaderboard.concat(entry));
+    _saveLeaderboard();
+    _renderLeaderboard();
+    let rank=0;
+    for(let i=0;i<_leaderboard.length;i++){
+      const r=_leaderboard[i];
+      if(r.name===entry.name && r.timeMs===entry.timeMs && r.at===entry.at){ rank=i+1; break; }
+    }
+    const st=document.getElementById('runTimerState');
+    if(st){
+      st.textContent=rank>0?`FINISHED #${rank}`:'FINISHED';
+    }
+  };
+  if(_hasCustomPlayerName()){
+    commitRun();
+  } else {
+    _openNameDialog(true,commitRun);
+  }
+}
+
+{
+  const _storedName=_readPlayerName();
+  _setPlayerName(_storedName||'Player', !!_storedName);
+}
+_loadLeaderboard();
+_renderLeaderboard();
+_updateTimerHud(performance.now());
+
 // Coin pickup pop animation
 {
   const _coinStyle=document.createElement('style');
@@ -6504,6 +6852,110 @@ _fpCrosshair.id='fpCrosshair';
 _fpCrosshair.style.cssText='position:fixed;top:50%;left:50%;width:10px;height:10px;border:2px solid rgba(226,239,255,0.8);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:10000;transition:border-color 0.15s,transform 0.15s,box-shadow 0.15s;box-sizing:border-box;box-shadow:0 0 0 2px rgba(9,14,20,0.6),0 0 10px rgba(0,0,0,0.35)';
 _fpCrosshair.style.display='none';
 document.body.appendChild(_fpCrosshair);
+
+const _fpResetToast=document.createElement('div');
+_fpResetToast.id='fpResetToast';
+_fpResetToast.style.cssText='position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-8px);opacity:0;pointer-events:none;z-index:10001;background:rgba(8,12,18,0.86);color:#d9f3ff;border:1px solid rgba(145,222,255,0.48);border-radius:12px;padding:7px 12px;font-family:system-ui;font-size:12px;font-weight:700;letter-spacing:0.6px;backdrop-filter:blur(10px);box-shadow:0 8px 20px rgba(0,0,0,0.35);transition:opacity 0.2s,transform 0.2s';
+_fpResetToast.textContent='RUN RESET';
+document.body.appendChild(_fpResetToast);
+let _fpResetToastTimer=null;
+function _showFpResetIndicator(text){
+  _fpResetToast.textContent=text||'RUN RESET';
+  _fpResetToast.style.opacity='1';
+  _fpResetToast.style.transform='translateX(-50%) translateY(0)';
+  if(_fpResetToastTimer) clearTimeout(_fpResetToastTimer);
+  _fpResetToastTimer=setTimeout(()=>{
+    _fpResetToast.style.opacity='0';
+    _fpResetToast.style.transform='translateX(-50%) translateY(-8px)';
+  }, 900);
+}
+
+function _resetDrawersClosed(){
+  const activeLerps=_drawerLerps.slice();
+  for(const dg of drawers){
+    if(!dg || !dg._isDrawer) continue;
+    const liveLerp=activeLerps.find(dl=>dl.obj===dg);
+    let closedZ;
+    if(liveLerp){
+      // If a drawer is mid-animation, use its target and open-state to infer
+      // the true closed Z without relying on stale cached base values.
+      closedZ=dg._drawerOpen ? (liveLerp.targetZ + (dg._drawerSlideMax||0)) : liveLerp.targetZ;
+    } else {
+      // Idle relation: position.z = closedZ - slide.
+      const slide=Number(dg._drawerSlide)||0;
+      closedZ=dg.position.z + slide;
+    }
+    dg.position.z=closedZ;
+    dg._drawerBaseZ=closedZ;
+    dg._drawerSlide=0;
+    dg._drawerOpen=false;
+    dg.matrixAutoUpdate=true;
+    dg.updateMatrixWorld(true);
+  }
+  _drawerLerps.length=0;
+}
+
+function _resetFiltersInstalled(){
+  _filterLerps.length=0;
+  _dragFilter=null;
+  _pendingFilterDrag=false;
+  filterLOut=false;
+  filterROut=false;
+  filterL.position.copy(filterLOrigin);
+  filterR.position.copy(filterROrigin);
+  filterL.matrixAutoUpdate=true;
+  filterR.matrixAutoUpdate=true;
+  filterL.updateMatrixWorld(true);
+  filterR.updateMatrixWorld(true);
+}
+
+function _resetClosetDoorsClosed(){
+  _bifoldLerps.length=0;
+  scene.traverse(o=>{
+    if(!(o && o._isBifoldLeaf && o.isGroup && o._innerGroup)) return;
+    o._leafOpen=false;
+    o._leafTarget=0;
+    o._leafAngle=0;
+    o.rotation.y=0;
+    o._innerGroup.rotation.y=0;
+    o.matrixAutoUpdate=true;
+    o.updateMatrixWorld(true);
+  });
+}
+
+function _respawnFpAtStart(){
+  const spBounds=_fpGetBounds();
+  const spX=Math.max(spBounds.xMin+3, Math.min(spBounds.xMax-3, 4));
+  const spZ=Math.max(spBounds.zMin+3, Math.min(spBounds.zMax-3, 22));
+  _fpPos.set(spX, _fpFloorY-placementOffset.y, spZ);
+  _fpYaw=0;
+  _fpPitch=0;
+  _fpVy=0;
+  _fpSpaceHeld=0;
+  _fpVelX=0;
+  _fpVelZ=0;
+  _fpBobPhase=0;
+  _fpLookDX=0;
+  _fpLookDY=0;
+  _fpHoverTarget=null;
+  _fpNextRaycastTs=0;
+  _clearPlayInputState();
+  if(_isMobile) resetPlayMobileJoystick();
+  if(catGroup.parent!==scene) scene.add(catGroup);
+  catGroup.position.set(_fpPos.x, _fpPos.y - 4.0, _fpPos.z);
+  catGroup.rotation.set(0, _fpYaw+Math.PI, 0);
+}
+
+function _resetFpRun(){
+  if(!_fpMode) return;
+  _clearPlayInputState();
+  _resetDrawersClosed();
+  _resetFiltersInstalled();
+  _resetClosetDoorsClosed();
+  _respawnFpAtStart();
+  _resetCoins();
+  _showFpResetIndicator('RUN RESET');
+}
 
 function toggleFirstPerson(){
   _fpMode=!_fpMode;
@@ -6527,22 +6979,15 @@ function toggleFirstPerson(){
         _ensureBonkBuffer(ac);
       }
     }catch(e){}
-    // Start near the purifier, on the floor — clamp to current room bounds
-    const spBounds=_fpGetBounds();
-    const spX=Math.max(spBounds.xMin+3, Math.min(spBounds.xMax-3, 0));
-    const spZ=Math.max(spBounds.zMin+3, Math.min(spBounds.zMax-3, 30));
-    _fpPos.set(spX, _fpFloorY-placementOffset.y, spZ);
+    // Start near the purifier, on the floor.
+    _respawnFpAtStart();
     _fpYaw=0; // face toward purifier (toward -Z)
-    _fpPitch=0; _fpVy=0; _fpSpaceHeld=0; _fpVelX=0; _fpVelZ=0; _fpBobPhase=0;
     _setFpCamMode('cat'); // default to cat/third-person each time Play Mode starts
     _setFpControlsOpen(false);
     // World-space cat rig: place the cat ahead of spawn heading.
     if(catGroup.parent!==scene) scene.add(catGroup);
     catGroup.position.set(_fpPos.x, _fpPos.y - 4.0, _fpPos.z);
     catGroup.rotation.set(0, _fpYaw+Math.PI, 0);
-    _fpLookDX=0; _fpLookDY=0;
-    _fpHoverTarget=null;
-    _fpNextRaycastTs=0;
     _camKeys.w=false; _camKeys.a=false; _camKeys.s=false; _camKeys.d=false;
     // Disable wall fading so you can see walls from inside.
     fadingWalls.forEach(m=>{
@@ -6597,6 +7042,7 @@ document.addEventListener('mousemove',e=>{
 // WASD keys for first-person (captured in keydown/keyup)
 document.addEventListener('keydown',e=>{
   if(!_fpMode) return;
+  if(_nameDialogOpen) return;
   if(e.key==='h'||e.key==='H'){
     _setFpControlsOpen(!_fpControlsOpen);
     e.preventDefault();
@@ -6609,6 +7055,18 @@ document.addEventListener('keydown',e=>{
     e.stopImmediatePropagation();
     return;
   }
+  if(e.key==='r'||e.key==='R'){
+    _resetFpRun();
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
+  if(e.key==='n'||e.key==='N'){
+    _openNameDialog(true,()=>_renderLeaderboard());
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
   if(e.key==='w'||e.key==='W') _fpKeys.w=true;
   if(e.key==='a'||e.key==='A'){ _fpKeys.a=true; e.stopImmediatePropagation(); }
   if(e.key==='s'||e.key==='S') _fpKeys.s=true;
@@ -6617,6 +7075,10 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Shift') _fpKeys.shift=true;
 });
 document.addEventListener('keyup',e=>{
+  if(_nameDialogOpen){
+    _clearPlayInputState();
+    return;
+  }
   if(e.key==='w'||e.key==='W') _fpKeys.w=false;
   if(e.key==='a'||e.key==='A') _fpKeys.a=false;
   if(e.key==='s'||e.key==='S') _fpKeys.s=false;
@@ -6625,6 +7087,7 @@ document.addEventListener('keyup',e=>{
   if(e.key==='Shift') _fpKeys.shift=false;
 });
 document.addEventListener('keydown',e=>{
+  if(_nameDialogOpen) return;
   if(_fpMode) return;
   if(document.body.classList.contains('zen')) return;
   const t=e.target;
@@ -6643,6 +7106,7 @@ document.addEventListener('keyup',e=>{
 canvas.addEventListener('click',()=>{ if(_fpMode && !_isMobile && !document.pointerLockElement && canvas.requestPointerLock) canvas.requestPointerLock(); });
 // Exit FP mode if pointer lock is released via browser (Esc press)
 document.addEventListener('pointerlockchange',()=>{
+  if(_fpIgnorePointerUnlock) return;
   if(_fpMode && !_isMobile && !document.pointerLockElement){
     // Small delay to distinguish intentional exit from browser Esc
     setTimeout(()=>{ if(_fpMode && !document.pointerLockElement) toggleFirstPerson(); }, 100);
@@ -6725,6 +7189,9 @@ _coinGroup.visible=false;
 scene.add(_coinGroup);
 const _coins=[];
 const _coinPickR=3.5;
+// Quick test mode: keep only the Switch game-stack coin so full runs are fast.
+// Set to false to restore all coin placements.
+const _coinQuickTestMode=false;
 let _coinScore=0;
 let _coinTotal=0;
 function _makeCoin(){
@@ -6770,38 +7237,43 @@ function _addCoin(parent, localPos, opts){
   _coinTotal++;
 }
 {
-  // Room coins (scene-relative; apply -placementOffset each frame via group)
-  _addCoin(_coinGroup, new THREE.Vector3(-bedX, floorY+bedClearance-1.8, bedZ+4)); // under the bed (mirrored X)
-  _addCoin(_coinGroup, new THREE.Vector3(-tblX, floorY+tblH+5, tblZ)); // above nightstand (jump to grab)
-  _addCoin(_coinGroup, new THREE.Vector3(0, floorY+5, 10)); // middle of room, easy floor pickup
-  _addCoin(_coinGroup, new THREE.Vector3(25, floorY+6, -40)); // near TV wall
-  _addCoin(_coinGroup, new THREE.Vector3(-20, floorY+28, -60)); // high near mini split (jump!)
-  _addCoin(_coinGroup, new THREE.Vector3(-bedX, mattY+mattH/2+duvetH+3, mattCenterZ)); // on top of bed
-  _addCoin(_coinGroup, new THREE.Vector3(35, floorY+3, 20)); // near closet
-  // On the closet shelf — inside the walk-in, sitting on top of the shelf.
-  // Shelf world pos after X-mirror: x=-(sideWallX+0.5+(_closetDepth-0.5)/2),
-  // y=floorY+_closetH-10, z=_closetZ. Coin sits ~2.5" above shelf top.
-  _addCoin(_coinGroup, new THREE.Vector3(-(sideWallX+0.5+(_closetDepth-0.5)/2), floorY+_closetH-10+0.4+2.5, _closetZ));
-  // On top of mini split — bring coin slightly forward (toward +Z) so it's above the visible top surface.
-  _addCoin(_coinGroup, new THREE.Vector3(-msX, msY+msH/2+2.2, msZ-msD/2+1.5));
-  // On top of TV — sit it just above the bezel, in front of the wall.
-  _addCoin(_coinGroup, new THREE.Vector3(-tvCenterX, tvCenterY+tvH/2+bezel+2.2, tvZ-tvD/2+1.2));
-  // Closet corner coin (inside walk-in, floor corner near the opening/door side).
-  _addCoin(_coinGroup, new THREE.Vector3(-(sideWallX+2.0), floorY+2.5, _closetZ+_closetInteriorW/2-1.2));
-  // Coin on top of Switch game stack beside purifier.
-  _addCoin(purifierGroup, new THREE.Vector3(0, getPurifierFloorLocalY()-0.03+_tvGameStackH+2.3, -(D/2+ply+_tvGameCaseD/2+8.0)), {insidePurifier:true, consoleProp:true});
-  // Coin on top of Nintendo Switch tablet docked on purifier.
-  _addCoin(purifierGroup, new THREE.Vector3(0, (H/2+ply)+10.0, -6), {insidePurifier:true, consoleProp:true});
-  // Coin inside lamp shade, above the bulb (reachable by dropping through top opening).
-  _addCoin(_coinGroup, new THREE.Vector3(-(tblX+tblW/2-6), floorY+tblH+22.4, tblZ+tblD/2-6));
-  // Coin INSIDE the air purifier — rides with purifierGroup, at origin.
-  _addCoin(purifierGroup, new THREE.Vector3(0, 0, 0), {insidePurifier:true});
-  // Coin HIDDEN in a random dresser drawer. Parented to a placeholder group
-  // that _resetCoins re-parents to one of the 3 drawers each play session.
-  // Position is local-to-drawer, inside the tray: raised off the tray floor
-  // and pushed toward the back of the tray so it's more hidden.
-  const dTrayD=drawers[0]?._drawerTrayD||10;
-  _addCoin(drawers[0], new THREE.Vector3(0, -drawers[0]._drawerH/2+3.2, 0.4+dTrayD-2.2), {inDrawer:true});
+  if(_coinQuickTestMode){
+    // Only the Switch game-stack coin for fast leaderboard testing.
+    _addCoin(purifierGroup, new THREE.Vector3(0, getPurifierFloorLocalY()-0.03+_tvGameStackH+2.3, -(D/2+ply+_tvGameCaseD/2+8.0)), {insidePurifier:true, consoleProp:true});
+  } else {
+    // Room coins (scene-relative; apply -placementOffset each frame via group)
+    _addCoin(_coinGroup, new THREE.Vector3(-bedX, floorY+bedClearance-1.8, bedZ+4)); // under the bed (mirrored X)
+    _addCoin(_coinGroup, new THREE.Vector3(-tblX, floorY+tblH+5, tblZ)); // above nightstand (jump to grab)
+    _addCoin(_coinGroup, new THREE.Vector3(0, floorY+5, 10)); // middle of room, easy floor pickup
+    _addCoin(_coinGroup, new THREE.Vector3(25, floorY+6, -40)); // near TV wall
+    _addCoin(_coinGroup, new THREE.Vector3(-20, floorY+28, -60)); // high near mini split (jump!)
+    _addCoin(_coinGroup, new THREE.Vector3(-bedX, mattY+mattH/2+duvetH+3, mattCenterZ)); // on top of bed
+    _addCoin(_coinGroup, new THREE.Vector3(35, floorY+3, 20)); // near closet
+    // On the closet shelf — inside the walk-in, sitting on top of the shelf.
+    // Shelf world pos after X-mirror: x=-(sideWallX+0.5+(_closetDepth-0.5)/2),
+    // y=floorY+_closetH-10, z=_closetZ. Coin sits ~2.5" above shelf top.
+    _addCoin(_coinGroup, new THREE.Vector3(-(sideWallX+0.5+(_closetDepth-0.5)/2), floorY+_closetH-10+0.4+2.5, _closetZ));
+    // On top of mini split — bring coin slightly forward (toward +Z) so it's above the visible top surface.
+    _addCoin(_coinGroup, new THREE.Vector3(-msX, msY+msH/2+2.2, msZ-msD/2+1.5));
+    // On top of TV — sit it just above the bezel, in front of the wall.
+    _addCoin(_coinGroup, new THREE.Vector3(-tvCenterX, tvCenterY+tvH/2+bezel+2.2, tvZ-tvD/2+1.2));
+    // Closet corner coin (inside walk-in, floor corner near the opening/door side).
+    _addCoin(_coinGroup, new THREE.Vector3(-(sideWallX+2.0), floorY+2.5, _closetZ+_closetInteriorW/2-1.2));
+    // Coin on top of Switch game stack beside purifier.
+    _addCoin(purifierGroup, new THREE.Vector3(0, getPurifierFloorLocalY()-0.03+_tvGameStackH+2.3, -(D/2+ply+_tvGameCaseD/2+8.0)), {insidePurifier:true, consoleProp:true});
+    // Coin on top of Nintendo Switch tablet docked on purifier.
+    _addCoin(purifierGroup, new THREE.Vector3(0, (H/2+ply)+10.0, -6), {insidePurifier:true, consoleProp:true});
+    // Coin inside lamp shade, above the bulb (reachable by dropping through top opening).
+    _addCoin(_coinGroup, new THREE.Vector3(-(tblX+tblW/2-6), floorY+tblH+22.4, tblZ+tblD/2-6));
+    // Coin INSIDE the air purifier — rides with purifierGroup, at origin.
+    _addCoin(purifierGroup, new THREE.Vector3(0, 0, 0), {insidePurifier:true});
+    // Coin HIDDEN in a random dresser drawer. Parented to a placeholder group
+    // that _resetCoins re-parents to one of the 3 drawers each play session.
+    // Position is local-to-drawer, inside the tray: raised off the tray floor
+    // and pushed toward the back of the tray so it's more hidden.
+    const dTrayD=drawers[0]?._drawerTrayD||10;
+    _addCoin(drawers[0], new THREE.Vector3(0, -drawers[0]._drawerH/2+3.2, 0.4+dTrayD-2.2), {inDrawer:true});
+  }
 }
 function _setCoinsVisible(show){
   _coinGroup.visible=show;
@@ -6823,6 +7295,7 @@ function _setCoinsVisible(show){
 }
 function _updateCoins(ts){
   if(!_fpMode) return;
+  _tickRunTimer(ts);
   // Keep _coinGroup aligned with the room (room objects are shifted by -placementOffset).
   _coinGroup.position.set(-placementOffset.x, -placementOffset.y, -placementOffset.z);
   const t=ts*0.001;
@@ -6885,6 +7358,11 @@ function _updateCoins(ts){
           o.stop(ac.currentTime+0.26);
         }
       }catch(e){}
+
+      if(_coinScore===_coinTotal && !_runTimerFinished){
+        const finalMs=_stopRunTimer();
+        _recordRun(finalMs);
+      }
     }
   }
 }
@@ -6934,6 +7412,7 @@ function _playBonk(intensity){
 }
 function _resetCoins(){
   _coinScore=0;
+  _startRunTimer();
   // Randomize which drawer hides the coin this session.
   const drawerCoin=_coins.find(c=>c.inDrawer);
   if(drawerCoin && drawers.length){
@@ -6959,6 +7438,7 @@ function _resetCoins(){
   }
   const el=document.getElementById('coinCount');
   if(el) el.textContent=_coinScore+' / '+_coinTotal;
+  _renderLeaderboard();
 }
 function setTurntable(val){
   const deg=parseInt(val);
