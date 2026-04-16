@@ -5985,6 +5985,7 @@ function animate(ts){
   }
 
   if(!_fpMode){
+  _fpLastPhysicsTs=0;
   if(_camKeys.w||_camKeys.a||_camKeys.s||_camKeys.d){
     const spd=Math.max(0.18,Math.min(0.9,radius*0.012));
     const fwdX=-Math.sin(azimuth), fwdZ=-Math.cos(azimuth);
@@ -6002,6 +6003,10 @@ function animate(ts){
 
   // First-person mode camera
   if(_fpMode){
+    const _fpDtMs=_fpLastPhysicsTs?Math.min(80,Math.max(1,ts-_fpLastPhysicsTs)):(1000/60);
+    _fpLastPhysicsTs=ts;
+    const _fpFrameScale=_fpDtMs/(1000/60);
+
     // Apply queued pointer-lock look deltas in fixed-size chunks to prevent jumpy turns on slower browsers.
     const maxLookStep=28;
     const stepX=Math.max(-maxLookStep, Math.min(maxLookStep, _fpLookDX));
@@ -6025,15 +6030,16 @@ function animate(ts){
     if(_fpKeys.a){ tgtX+=right.x*spd; tgtZ+=right.z*spd; }
     if(_fpKeys.d){ tgtX-=right.x*spd; tgtZ-=right.z*spd; }
     const inputActive=(_fpKeys.w||_fpKeys.a||_fpKeys.s||_fpKeys.d);
-    const accel=inputActive?0.18:0.22; // decel slightly faster than accel
+    const accelBase=inputActive?0.18:0.22; // decel slightly faster than accel
+    const accel=1-Math.pow(1-accelBase,_fpFrameScale);
     _fpVelX+=(tgtX-_fpVelX)*accel;
     _fpVelZ+=(tgtZ-_fpVelZ)*accel;
     // Kill residual drift below threshold to avoid infinite tiny motion.
     if(!inputActive && Math.hypot(_fpVelX,_fpVelZ)<0.005){ _fpVelX=0; _fpVelZ=0; }
-    const moveX=_fpVelX, moveZ=_fpVelZ;
+    const moveX=_fpVelX*_fpFrameScale, moveZ=_fpVelZ*_fpFrameScale;
     // Jump — charged: hold space longer = jump higher
     if(_fpKeys.space && Math.abs(_fpVy)<0.01){
-      _fpSpaceHeld++;
+      _fpSpaceHeld+=_fpFrameScale;
     }
     if(!_fpKeys.space && _fpSpaceHeld>0 && Math.abs(_fpVy)<0.01){
       const charge=Math.min(_fpSpaceHeld, 60); // max ~1 second charge
@@ -6052,8 +6058,8 @@ function animate(ts){
       }
     }
     // Gravity
-    _fpVy-=0.018;
-    let newY=_fpPos.y+_fpVy;
+    _fpVy-=0.018*_fpFrameScale;
+    let newY=_fpPos.y+_fpVy*_fpFrameScale;
     // Try moving X, then Z separately (slide along walls)
     let nx=_fpPos.x+moveX, nz=_fpPos.z+moveZ;
     const r=_fpBodyR;
@@ -6125,7 +6131,7 @@ function animate(ts){
     const grounded=Math.abs(_fpPos.y-groundY)<0.05;
     const horizSpd=Math.hypot(_fpVelX,_fpVelZ);
     if(grounded && horizSpd>0.02){
-      _fpBobPhase+=horizSpd*0.55;
+      _fpBobPhase+=horizSpd*0.55*_fpFrameScale;
     }
     const bobY=grounded?Math.sin(_fpBobPhase)*Math.min(horizSpd,0.5)*0.07:0;
     // ─── Third-person camera + cat avatar ───
@@ -6294,6 +6300,7 @@ let _fpYaw=0, _fpPitch=0, _fpVy=0;
 // of instant start/stop). _fpBobPhase drives a subtle headbob while moving
 // on the ground.
 let _fpVelX=0, _fpVelZ=0, _fpBobPhase=0;
+let _fpLastPhysicsTs=0;
 const _fpPitchMin=-1.2;
 const _fpPitchMax=1.55;
 const _fpFwd=new THREE.Vector3();
