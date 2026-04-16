@@ -3,7 +3,9 @@ const SCHEMA_STATEMENTS = [
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     time_ms INTEGER NOT NULL,
-    at_ms INTEGER NOT NULL
+    at_ms INTEGER NOT NULL,
+    cat_color TEXT NOT NULL DEFAULT 'ginger',
+    cat_hair TEXT NOT NULL DEFAULT 'short'
   )`,
   `CREATE INDEX IF NOT EXISTS idx_lb_time ON leaderboard_entries(time_ms ASC, at_ms ASC)`,
   `CREATE INDEX IF NOT EXISTS idx_lb_name ON leaderboard_entries(name, time_ms ASC, at_ms ASC)`,
@@ -109,9 +111,25 @@ export default {
 
 async function ensureDbInitialized(env) {
   if (!dbInitPromise) {
-    dbInitPromise = env.LB_DB.batch(SCHEMA_STATEMENTS.map((sql) => env.LB_DB.prepare(sql).bind()));
+    dbInitPromise = (async () => {
+      await env.LB_DB.batch(SCHEMA_STATEMENTS.map((sql) => env.LB_DB.prepare(sql).bind()));
+      await ensureLeaderboardAppearanceColumns(env.LB_DB);
+    })();
   }
   await dbInitPromise;
+}
+
+async function ensureLeaderboardAppearanceColumns(db) {
+  const info = await db.prepare(`PRAGMA table_info('leaderboard_entries')`).all();
+  const existing = new Set((info.results || []).map((row) => String(row.name || '')));
+  const alters = [];
+  if (!existing.has('cat_color')) {
+    alters.push(db.prepare(`ALTER TABLE leaderboard_entries ADD COLUMN cat_color TEXT NOT NULL DEFAULT 'ginger'`).bind());
+  }
+  if (!existing.has('cat_hair')) {
+    alters.push(db.prepare(`ALTER TABLE leaderboard_entries ADD COLUMN cat_hair TEXT NOT NULL DEFAULT 'short'`).bind());
+  }
+  if (alters.length) await db.batch(alters);
 }
 
 function getConfig(env) {
@@ -245,6 +263,8 @@ async function handleRunFinish(request, env, cfg) {
   const body = await parseBody(request);
   const runId = String(body?.runId || '');
   const name = sanitizeName(body?.name || '', cfg.MAX_NAME_LEN);
+  const catColor = sanitizeCatColor(body?.catColor);
+  const catHair = sanitizeCatHair(body?.catHair);
   if (!runId) return apiError(400, 'bad_request', 'runId is required');
 
   const run = await env.LB_DB.prepare(
@@ -275,11 +295,15 @@ async function handleRunFinish(request, env, cfg) {
   const finalName = name || 'Player';
   const entryId = await makeEntryId(finalName, Math.floor(elapsed), now);
 
-  await env.LB_DB.prepare(`INSERT INTO leaderboard_entries (id, name, time_ms, at_ms) VALUES (?, ?, ?, ?)`).bind(
+  await env.LB_DB.prepare(
+    `INSERT INTO leaderboard_entries (id, name, time_ms, at_ms, cat_color, cat_hair) VALUES (?, ?, ?, ?, ?, ?)`
+  ).bind(
     entryId,
     finalName,
     Math.floor(elapsed),
-    now
+    now,
+    catColor,
+    catHair
   ).run();
 
   await deleteRun(env.LB_DB, runId);
@@ -293,6 +317,8 @@ async function handleRunFinish(request, env, cfg) {
     name: finalName,
     timeMs: Math.floor(elapsed),
     at: now,
+    catColor,
+    catHair,
   };
 
   return jsonResponse(200, {
@@ -392,7 +418,10 @@ async function getRunCoinCount(db, runId) {
 async function getNormalizedLeaderboard(db, cfg) {
   const scanLimit = Math.max(cfg.LB_MAX * cfg.LB_PER_PLAYER * 6, 200);
   const rows = await db
-    .prepare(`SELECT id, name, time_ms, at_ms FROM leaderboard_entries ORDER BY time_ms ASC, at_ms ASC LIMIT ?`)
+    .prepare(
+      `SELECT id, name, time_ms, at_ms, cat_color, cat_hair
+       FROM leaderboard_entries ORDER BY time_ms ASC, at_ms ASC LIMIT ?`
+    )
     .bind(scanLimit)
     .all();
 
@@ -432,7 +461,9 @@ function normalizeLeaderboard(rows, maxEntries, perPlayer) {
     if (!id || !name) continue;
     if (!Number.isFinite(timeMs) || timeMs <= 0) continue;
     const safeAt = Number.isFinite(at) && at > 0 ? at : Date.now();
-    clean.push({ id, name, timeMs, at: safeAt });
+    const catColor = sanitizeCatColor(row.cat_color ?? row.catColor);
+    const catHair = sanitizeCatHair(row.cat_hair ?? row.catHair);
+    clean.push({ id, name, timeMs, at: safeAt, catColor, catHair });
   }
 
   clean.sort((a, b) => a.timeMs - b.timeMs || a.at - b.at);
@@ -479,6 +510,16 @@ function sanitizeName(name, maxLen) {
     .trim()
     .replace(/\s+/g, ' ')
     .slice(0, maxLen);
+}
+
+function sanitizeCatColor(value) {
+  const key = String(value || '').trim().toLowerCase();
+  return key === 'ginger' || key === 'tuxedo' || key === 'cream' || key === 'midnight' ? key : 'ginger';
+}
+
+function sanitizeCatHair(value) {
+  const key = String(value || '').trim().toLowerCase();
+  return key === 'long' || key === 'short' ? key : 'short';
 }
 
 async function makeEntryId(name, timeMs, at) {

@@ -383,11 +383,16 @@
     .play-launcher-card { width: min(92vw, 430px); border-radius: 16px; border: 1px solid rgba(145,214,255,0.42); background: linear-gradient(180deg, rgba(11,22,32,0.95), rgba(6,12,18,0.95)); color: rgba(238,248,255,0.95); padding: 14px 14px 12px; box-shadow: 0 16px 40px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.08); }
     .play-launcher-title { font-size: 14px; font-weight: 800; letter-spacing: 0.7px; color: #9fe3ff; text-transform: uppercase; }
     .play-launcher-text { margin-top: 7px; font-size: 13px; color: rgba(219,239,255,0.86); }
+    .play-launcher-preview { margin-top: 6px; font-size: 11px; color: rgba(191,226,246,0.78); }
     .play-launcher-sub { margin-top: 10px; font-size: 11px; opacity: 0.72; text-transform: uppercase; letter-spacing: 0.5px; }
     .play-launcher-colors { margin-top: 7px; display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 7px; }
+    .play-launcher-hair { margin-top: 7px; display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 7px; }
     .play-launcher-color { border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; background: rgba(255,255,255,0.08); color: rgba(245,251,255,0.9); font-size: 11px; padding: 7px 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .play-launcher-hair-btn { border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; background: rgba(255,255,255,0.08); color: rgba(245,251,255,0.9); font-size: 11px; padding: 7px 6px; cursor: pointer; }
     .play-launcher-color:hover { background: rgba(255,255,255,0.18); }
+    .play-launcher-hair-btn:hover { background: rgba(255,255,255,0.18); }
     .play-launcher-color.on { border-color: rgba(159,227,255,0.8); box-shadow: 0 0 0 2px rgba(159,227,255,0.22) inset; }
+    .play-launcher-hair-btn.on { border-color: rgba(159,227,255,0.8); box-shadow: 0 0 0 2px rgba(159,227,255,0.22) inset; }
     .play-launcher-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.45); flex-shrink: 0; }
     .play-launcher-actions { margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px; }
     .play-launcher-btn { border: 1px solid rgba(255,255,255,0.24); border-radius: 10px; background: rgba(255,255,255,0.1); color: rgba(241,250,255,0.92); font-size: 12px; font-weight: 700; padding: 7px 10px; cursor: pointer; }
@@ -444,12 +449,18 @@
   <div class="play-launcher-card">
     <div class="play-launcher-title">Play Setup</div>
     <div class="play-launcher-text">Collect all the coins.</div>
+    <div class="play-launcher-preview">Live preview: the cat in the room updates as you choose.</div>
     <div class="play-launcher-sub">Choose cat color</div>
     <div class="play-launcher-colors">
-      <button class="play-launcher-color on" id="catColorBtnGinger" onclick="setCatColorPreset('ginger')"><span class="play-launcher-dot" style="background:#cd8a4f"></span><span>Ginger</span></button>
-      <button class="play-launcher-color" id="catColorBtnTuxedo" onclick="setCatColorPreset('tuxedo')"><span class="play-launcher-dot" style="background:#5e6775"></span><span>Tuxedo</span></button>
-      <button class="play-launcher-color" id="catColorBtnCream" onclick="setCatColorPreset('cream')"><span class="play-launcher-dot" style="background:#d7c9aa"></span><span>Cream</span></button>
-      <button class="play-launcher-color" id="catColorBtnMidnight" onclick="setCatColorPreset('midnight')"><span class="play-launcher-dot" style="background:#3f4659"></span><span>Midnight</span></button>
+      <button class="play-launcher-color on" id="catColorBtnGinger" onclick="setCatColorPreset('ginger')"><span class="play-launcher-dot" style="background:#c67f45"></span><span>Ginger</span></button>
+      <button class="play-launcher-color" id="catColorBtnTuxedo" onclick="setCatColorPreset('tuxedo')"><span class="play-launcher-dot" style="background:#5f6772"></span><span>Tuxedo</span></button>
+      <button class="play-launcher-color" id="catColorBtnCream" onclick="setCatColorPreset('cream')"><span class="play-launcher-dot" style="background:#d7ccb1"></span><span>Cream</span></button>
+      <button class="play-launcher-color" id="catColorBtnMidnight" onclick="setCatColorPreset('midnight')"><span class="play-launcher-dot" style="background:#41495a"></span><span>Midnight</span></button>
+    </div>
+    <div class="play-launcher-sub">Coat length</div>
+    <div class="play-launcher-hair">
+      <button class="play-launcher-hair-btn on" id="catHairBtnShort" onclick="setCatHairPreset('short')">Short Hair</button>
+      <button class="play-launcher-hair-btn" id="catHairBtnLong" onclick="setCatHairPreset('long')">Long Hair</button>
     </div>
     <div class="play-launcher-actions">
       <button class="play-launcher-btn" onclick="closePlayLauncher()">Cancel</button>
@@ -778,22 +789,56 @@ function syncPlayModeUI(){
 }
 const _PLAY_PATH_AUTO_OPEN = /^\/play\/?$/.test(location.pathname);
 const _catColorPresets={
-  ginger:0xcd8a4f,
-  tuxedo:0x5e6775,
-  cream:0xd7c9aa,
-  midnight:0x3f4659
+  ginger:{coat:0xc67f45,tint:0.76},
+  tuxedo:{coat:0x5f6772,tint:0.72},
+  cream:{coat:0xd7ccb1,tint:0.68},
+  midnight:{coat:0x41495a,tint:0.78}
+};
+const _catHairPresets={
+  short:{sx:1.0,sy:1.0,sz:1.0,rough:1.0},
+  long:{sx:1.08,sy:1.04,sz:1.08,rough:1.08}
 };
 let _playLauncherOpen=false;
+let _launcherCatPreview=false;
 let _catColorKey='ginger';
-let _catColorHex=_catColorPresets[_catColorKey];
+let _catHairKey='short';
+const _catBaseScale=new THREE.Vector3(1,1,1);
+const _catMatBaseColorMap=new WeakMap();
+const _catMatBaseRoughnessMap=new WeakMap();
+const _catTmpColorA=new THREE.Color();
+const _catTmpColorB=new THREE.Color();
+const _catTmpHSL={h:0,s:0,l:0};
+function _sanitizeCatColorKey(key){
+  const k=String(key||'').trim().toLowerCase();
+  return _catColorPresets[k]?k:'ginger';
+}
+function _sanitizeCatHairKey(key){
+  const k=String(key||'').trim().toLowerCase();
+  return _catHairPresets[k]?k:'short';
+}
 function _applyCatColorToModel(){
   if(!catModel) return;
+  const colorCfg=_catColorPresets[_sanitizeCatColorKey(_catColorKey)]||_catColorPresets.ginger;
+  const hairCfg=_catHairPresets[_sanitizeCatHairKey(_catHairKey)]||_catHairPresets.short;
+  catModel.scale.set(_catBaseScale.x*hairCfg.sx,_catBaseScale.y*hairCfg.sy,_catBaseScale.z*hairCfg.sz);
   catModel.traverse(o=>{
     if(!o.isMesh || !o.material) return;
     const mats=Array.isArray(o.material)?o.material:[o.material];
     for(const m of mats){
       if(!m || !(m.isMeshStandardMaterial||m.isMeshPhysicalMaterial) || !m.color) continue;
-      m.color.setHex(_catColorHex);
+      if(!_catMatBaseColorMap.has(m)) _catMatBaseColorMap.set(m,m.color.clone());
+      if(!_catMatBaseRoughnessMap.has(m)) _catMatBaseRoughnessMap.set(m,Number(m.roughness)||0.9);
+      const baseCol=_catMatBaseColorMap.get(m);
+      const baseRough=_catMatBaseRoughnessMap.get(m);
+      _catTmpColorA.copy(baseCol);
+      _catTmpColorA.getHSL(_catTmpHSL);
+      _catTmpColorB.setHex(colorCfg.coat);
+      let tint=colorCfg.tint;
+      if(_catTmpHSL.s<0.12) tint*=0.45;
+      if(_catTmpHSL.l<0.1 || _catTmpHSL.l>0.9) tint*=0.35;
+      tint=Math.max(0.08,Math.min(0.9,tint));
+      m.color.copy(_catTmpColorA.lerp(_catTmpColorB,tint));
+      m.roughness=Math.min(1,Math.max(0.55,baseRough*hairCfg.rough));
       m.needsUpdate=true;
     }
   });
@@ -805,12 +850,29 @@ function _setCatColorButtons(){
     if(btn) btn.classList.toggle('on',key===_catColorKey);
   }
 }
+function _setCatHairButtons(){
+  for(const key of Object.keys(_catHairPresets)){
+    const id='catHairBtn'+key.charAt(0).toUpperCase()+key.slice(1);
+    const btn=document.getElementById(id);
+    if(btn) btn.classList.toggle('on',key===_catHairKey);
+  }
+}
 function setCatColorPreset(key){
-  if(!_catColorPresets[key]) return;
-  _catColorKey=key;
-  _catColorHex=_catColorPresets[key];
+  _catColorKey=_sanitizeCatColorKey(key);
   _setCatColorButtons();
   _applyCatColorToModel();
+}
+function setCatHairPreset(key){
+  _catHairKey=_sanitizeCatHairKey(key);
+  _setCatHairButtons();
+  _applyCatColorToModel();
+}
+function _setLauncherCatPreview(show){
+  _launcherCatPreview=!!show;
+  if(!_launcherCatPreview && !_fpMode){
+    if(catGroup.parent===camera) scene.add(catGroup);
+    catGroup.visible=false;
+  }
 }
 function openPlayLauncher(){
   if(_fpMode) return;
@@ -818,17 +880,56 @@ function openPlayLauncher(){
   const el=document.getElementById('playLauncher');
   if(el) el.classList.add('show');
   _setCatColorButtons();
+  _setCatHairButtons();
   _applyCatColorToModel();
+  _setLauncherCatPreview(true);
 }
 function closePlayLauncher(){
   _playLauncherOpen=false;
   const el=document.getElementById('playLauncher');
   if(el) el.classList.remove('show');
+  _setLauncherCatPreview(false);
 }
 function startPlayModeFromLauncher(){
   if(_fpMode) return;
   closePlayLauncher();
   toggleFirstPerson();
+}
+function _stepCatMixer(ts,moveSpeed){
+  if(!catMixer) return;
+  const sp=Math.max(0,Number(moveSpeed)||0);
+  if(catWalkAction && catIdleAction){
+    const w=Math.min(1,sp/0.25);
+    catWalkAction.weight=w;
+    catIdleAction.weight=1-w;
+    if(catWalkAction.timeScale!==undefined) catWalkAction.timeScale=0.8+sp*2.0;
+  }
+  catMixer.update(Math.min(0.05,Math.max(0.001,(ts-(catMixer._lastTs||ts))/1000)));
+  catMixer._lastTs=ts;
+  if(catModel){
+    catModel.position.copy(_catBaseLocalPos);
+    catModel.quaternion.copy(_catBaseLocalQuat);
+  }
+}
+function _updateLauncherCatPreview(ts){
+  if(!_launcherCatPreview || _fpMode || !catModel) return;
+  if(catGroup.parent!==scene) scene.add(catGroup);
+  const groundY=_fpFloorY-placementOffset.y;
+  const previewDist=Math.max(5.2,Math.min(7.5,radius*0.12));
+  const fwdX=-Math.sin(azimuth), fwdZ=-Math.cos(azimuth);
+  const rightX=Math.cos(azimuth), rightZ=-Math.sin(azimuth);
+  const px=panX+fwdX*previewDist+rightX*1.3;
+  const pz=panZ+fwdZ*previewDist+rightZ*0.3;
+  catGroup.position.set(px,groundY,pz);
+  const targetYaw=Math.atan2(camera.position.x-px,camera.position.z-pz);
+  let dYaw=targetYaw-catGroup.rotation.y;
+  while(dYaw>Math.PI) dYaw-=Math.PI*2;
+  while(dYaw<-Math.PI) dYaw+=Math.PI*2;
+  catGroup.rotation.y+=dYaw*0.22;
+  catGroup.rotation.x=0;
+  catGroup.rotation.z=0;
+  catGroup.visible=true;
+  _stepCatMixer(ts,0);
 }
 function enterPlayMode(){ if(!_fpMode) openPlayLauncher(); }
 function exitPlayMode(){ if(_fpMode) toggleFirstPerson(); }
@@ -1002,6 +1103,7 @@ const _catBaseLocalQuat=new THREE.Quaternion();
     const h=size.y||1;
     const s=_catTargetHeight/h;
     catModel.scale.setScalar(s);
+    _catBaseScale.copy(catModel.scale);
     // Re-measure after scale. Center X/Z on the catGroup origin and rest the
     // feet on y=0 so catGroup.position maps directly to "where the cat is".
     const box2=new THREE.Box3().setFromObject(catModel);
@@ -1035,6 +1137,7 @@ const _catBaseLocalQuat=new THREE.Quaternion();
     });
     _applyCatColorToModel();
     catGroup.add(catModel);
+    if(_playLauncherOpen) _setLauncherCatPreview(true);
     // Animations — Quaternius cats ship w/ several clips. Pick walk + idle.
     if(gltf.animations && gltf.animations.length){
       catMixer=new THREE.AnimationMixer(catModel);
@@ -5984,6 +6087,8 @@ function animate(ts){
     col.needsUpdate=true;
   }
 
+  _updateLauncherCatPreview(ts);
+
   if(!_fpMode){
   _fpLastPhysicsTs=0;
   if(_camKeys.w||_camKeys.a||_camKeys.s||_camKeys.d){
@@ -6144,24 +6249,7 @@ function animate(ts){
       Math.sin(_fpPitch),
       -Math.cos(_fpYaw)*Math.cos(_fpPitch)
     );
-    if(catMixer){
-      if(catWalkAction && catIdleAction){
-        const w=Math.min(1, horizSpd/0.25);
-        catWalkAction.weight=w;
-        catIdleAction.weight=1-w;
-        if(catWalkAction.timeScale!==undefined){
-          catWalkAction.timeScale=0.8+horizSpd*2.0;
-        }
-      }
-      catMixer.update(Math.min(0.05, (ts-(catMixer._lastTs||ts))/1000));
-      catMixer._lastTs=ts;
-      if(catModel){
-        // Extra safety: keep the animated model anchored to its calibrated
-        // local transform in case a clip still contains root motion tracks.
-        catModel.position.copy(_catBaseLocalPos);
-        catModel.quaternion.copy(_catBaseLocalQuat);
-      }
-    }
+    _stepCatMixer(ts,horizSpd);
     if(_fpCamMode==='first'){
       // True first-person camera: eye at player head, no cat mesh.
       camera.position.set(_fpPos.x, _fpPos.y+bobY, _fpPos.z);
@@ -6744,10 +6832,12 @@ function _buildShareText(data){
   const who=_sanitizePlayerName(row.name)||(_lbPlayerName||'Player');
   const coins=Number.isFinite(Number(row.coins))?Math.floor(Number(row.coins)):_coinTotal;
   const total=Number.isFinite(Number(row.coinTotal))?Math.floor(Number(row.coinTotal)):_coinTotal;
+  const catColor=_sanitizeCatColorKey(row.catColor||_catColorKey);
+  const catHair=_sanitizeCatHairKey(row.catHair||_catHairKey);
   const url=_makeShareUrl(row.entryId||'');
   return [
     `${who} finished DIY Air Purifier Run`,
-    `Time ${_fmtRun(row.timeMs||0)} | Rank ${rankTxt} | Coins ${coins}/${total}`,
+    `Time ${_fmtRun(row.timeMs||0)} | Rank ${rankTxt} | Coins ${coins}/${total} | Cat ${catColor}/${catHair}`,
     url
   ].join('\n');
 }
@@ -7026,7 +7116,9 @@ function _normalizeLeaderboard(rows){
     if(!Number.isFinite(timeMs) || timeMs<=0) continue;
     const safeAt=Number.isFinite(at)&&at>0?at:Date.now();
     const id=String(r.id||'').trim()||_makeEntryId(name,timeMs,safeAt);
-    clean.push({id,name,timeMs,at:safeAt});
+    const catColor=_sanitizeCatColorKey(r.catColor||'');
+    const catHair=_sanitizeCatHairKey(r.catHair||'');
+    clean.push({id,name,timeMs,at:safeAt,catColor,catHair});
   }
   clean.sort((a,b)=>a.timeMs-b.timeMs || a.at-b.at);
   const perNameCount=new Map();
@@ -7107,7 +7199,9 @@ function _recordRun(timeMs){
   const commitRunLocal=()=>{
     const name=_lbPlayerName||'Player';
     const now=Date.now();
-    const entry={id:_makeEntryId(name,timeMs,now),name,timeMs:Math.floor(timeMs),at:now};
+    const catColor=_sanitizeCatColorKey(_catColorKey);
+    const catHair=_sanitizeCatHairKey(_catHairKey);
+    const entry={id:_makeEntryId(name,timeMs,now),name,timeMs:Math.floor(timeMs),at:now,catColor,catHair};
     _leaderboard=_normalizeLeaderboard(_leaderboard.concat(entry));
     _saveLeaderboard();
     _renderLeaderboard();
@@ -7122,7 +7216,9 @@ function _recordRun(timeMs){
       name:entry.name,
       timeMs:entry.timeMs,
       coins:_coinTotal,
-      coinTotal:_coinTotal
+      coinTotal:_coinTotal,
+      catColor:entry.catColor,
+      catHair:entry.catHair
     });
     const st=document.getElementById('runTimerState');
     if(st){
@@ -7138,7 +7234,12 @@ function _recordRun(timeMs){
     await _flushSharedCoinReports();
     if(_lbFailedCoinIds.size) await _reconcileSharedCoinClaims(runId);
     try{
-      const data=await _lbApiRequest('/run/finish', { runId, name:_lbPlayerName||'Player' });
+      const data=await _lbApiRequest('/run/finish', {
+        runId,
+        name:_lbPlayerName||'Player',
+        catColor:_sanitizeCatColorKey(_catColorKey),
+        catHair:_sanitizeCatHairKey(_catHairKey)
+      });
       _lbSharedRunId='';
       _lbClaimedCoinIds.clear();
       _lbFailedCoinIds.clear();
@@ -7153,7 +7254,9 @@ function _recordRun(timeMs){
         name:_sanitizePlayerName(serverEntry.name||_lbPlayerName||'Player'),
         timeMs:Math.floor(Number(serverEntry.timeMs)||Math.floor(timeMs)),
         coins:_coinTotal,
-        coinTotal:_coinTotal
+        coinTotal:_coinTotal,
+        catColor:_sanitizeCatColorKey(serverEntry.catColor||_catColorKey),
+        catHair:_sanitizeCatHairKey(serverEntry.catHair||_catHairKey)
       });
       _renderLeaderboard();
       const st=document.getElementById('runTimerState');
@@ -7164,7 +7267,12 @@ function _recordRun(timeMs){
       if(e && e.apiCode==='incomplete_run'){
         try{
           await _reconcileSharedCoinClaims(runId);
-          const retryData=await _lbApiRequest('/run/finish', { runId, name:_lbPlayerName||'Player' });
+          const retryData=await _lbApiRequest('/run/finish', {
+            runId,
+            name:_lbPlayerName||'Player',
+            catColor:_sanitizeCatColorKey(_catColorKey),
+            catHair:_sanitizeCatHairKey(_catHairKey)
+          });
           _lbSharedRunId='';
           _lbClaimedCoinIds.clear();
           _lbFailedCoinIds.clear();
@@ -7179,7 +7287,9 @@ function _recordRun(timeMs){
             name:_sanitizePlayerName(retryEntry.name||_lbPlayerName||'Player'),
             timeMs:Math.floor(Number(retryEntry.timeMs)||Math.floor(timeMs)),
             coins:_coinTotal,
-            coinTotal:_coinTotal
+            coinTotal:_coinTotal,
+            catColor:_sanitizeCatColorKey(retryEntry.catColor||_catColorKey),
+            catHair:_sanitizeCatHairKey(retryEntry.catHair||_catHairKey)
           });
           _renderLeaderboard();
           const st=document.getElementById('runTimerState');
