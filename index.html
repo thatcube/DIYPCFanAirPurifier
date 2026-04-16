@@ -6693,6 +6693,8 @@ let _lbSharedRunId='';
 let _lbStatusNote=_LB_SHARED_ENABLED?'Connecting':'';
 let _lastRunShareData=null;
 const _lbClaimedCoinIds=new Set();
+const _lbPendingCoinReports=new Set();
+const _lbFailedCoinIds=new Set();
 
 function _escapeHtml(v){
   return String(v||'').replace(/[&<>"']/g,ch=>({
@@ -6844,6 +6846,8 @@ async function _refreshSharedLeaderboard(){
 async function _startSharedRun(){
   _lbSharedRunId='';
   _lbClaimedCoinIds.clear();
+  _lbFailedCoinIds.clear();
+  _lbPendingCoinReports.clear();
   if(!_LB_SHARED_ENABLED) return;
   try{
     const data=await _lbApiRequest('/run/start',{});
@@ -6857,12 +6861,42 @@ async function _startSharedRun(){
   _renderLeaderboard();
 }
 
+function _trackCoinReport(promise){
+  _lbPendingCoinReports.add(promise);
+  promise.finally(()=>_lbPendingCoinReports.delete(promise));
+}
+
+async function _flushSharedCoinReports(){
+  if(!_lbPendingCoinReports.size) return;
+  const pending=[..._lbPendingCoinReports];
+  await Promise.allSettled(pending);
+}
+
+async function _reconcileSharedCoinClaims(runId){
+  if(!runId || !_lbClaimedCoinIds.size) return;
+  const jobs=[];
+  for(const coinId of _lbClaimedCoinIds){
+    jobs.push(
+      _lbApiRequest('/run/coin',{runId, coinId})
+        .then(()=>{ _lbFailedCoinIds.delete(coinId); })
+        .catch(()=>{ _lbFailedCoinIds.add(coinId); })
+    );
+  }
+  await Promise.allSettled(jobs);
+}
+
 function _reportSharedCoin(coinId){
   if(!_lbSharedRunId || !_lbSharedOnline || !coinId) return;
   if(_lbClaimedCoinIds.has(coinId)) return;
+  const runId=_lbSharedRunId;
   _lbClaimedCoinIds.add(coinId);
-  _lbApiRequest('/run/coin',{runId:_lbSharedRunId, coinId})
-    .catch(()=>{ /* keep local run playable even if network blips */ });
+  const job=_lbApiRequest('/run/coin',{runId, coinId})
+    .then(()=>{ _lbFailedCoinIds.delete(coinId); })
+    .catch(()=>{
+      // Keep local run playable; we'll reconcile claims before finish.
+      _lbFailedCoinIds.add(coinId);
+    });
+  _trackCoinReport(job);
 }
 
 function _hasCustomPlayerName(){
@@ -7093,10 +7127,15 @@ function _recordRun(timeMs){
       commitRunLocal();
       return;
     }
+    const runId=_lbSharedRunId;
+    await _flushSharedCoinReports();
+    if(_lbFailedCoinIds.size) await _reconcileSharedCoinClaims(runId);
     try{
-      const data=await _lbApiRequest('/run/finish', { runId:_lbSharedRunId, name:_lbPlayerName||'Player' });
+      const data=await _lbApiRequest('/run/finish', { runId, name:_lbPlayerName||'Player' });
       _lbSharedRunId='';
       _lbClaimedCoinIds.clear();
+      _lbFailedCoinIds.clear();
+      _lbPendingCoinReports.clear();
       _lbSharedOnline=true;
       _lbStatusNote='';
       _leaderboard=_normalizeLeaderboard(Array.isArray(data.leaderboard)?data.leaderboard:[]);
@@ -7115,8 +7154,40 @@ function _recordRun(timeMs){
         st.textContent=data.rank?`FINISHED #${data.rank}`:'FINISHED';
       }
     }catch(e){
+      if(e && e.apiCode==='incomplete_run'){
+        try{
+          await _reconcileSharedCoinClaims(runId);
+          const retryData=await _lbApiRequest('/run/finish', { runId, name:_lbPlayerName||'Player' });
+          _lbSharedRunId='';
+          _lbClaimedCoinIds.clear();
+          _lbFailedCoinIds.clear();
+          _lbPendingCoinReports.clear();
+          _lbSharedOnline=true;
+          _lbStatusNote='';
+          _leaderboard=_normalizeLeaderboard(Array.isArray(retryData.leaderboard)?retryData.leaderboard:[]);
+          const retryEntry=(retryData&&retryData.entry)?retryData.entry:{};
+          _showShareButton({
+            entryId:String(retryEntry.id||''),
+            rank:Math.floor(Number(retryData&&retryData.rank)||0),
+            name:_sanitizePlayerName(retryEntry.name||_lbPlayerName||'Player'),
+            timeMs:Math.floor(Number(retryEntry.timeMs)||Math.floor(timeMs)),
+            coins:_coinTotal,
+            coinTotal:_coinTotal
+          });
+          _renderLeaderboard();
+          const st=document.getElementById('runTimerState');
+          if(st){
+            st.textContent=retryData.rank?`FINISHED #${retryData.rank}`:'FINISHED';
+          }
+          return;
+        }catch(_retryErr){
+          // Fall through to normal rejection handling below.
+        }
+      }
       _lbSharedRunId='';
       _lbClaimedCoinIds.clear();
+      _lbFailedCoinIds.clear();
+      _lbPendingCoinReports.clear();
       if(e && e.apiCode){
         _lbSharedOnline=true;
         _lbStatusNote=`Rejected (${e.apiCode})`;
