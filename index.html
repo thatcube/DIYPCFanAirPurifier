@@ -378,6 +378,21 @@
     .play-mobile-look label { font-size: 10px; color: rgba(255,255,255,0.72); letter-spacing: 0.3px; text-transform: uppercase; }
     .play-mobile-look input[type=range] { flex: 1; min-width: 0; accent-color: #7dd3ff; }
     .play-mobile-look .sens-val { min-width: 32px; text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: rgba(255,255,255,0.92); }
+    .play-launcher { position: absolute; inset: 0; z-index: 40; display: none; align-items: center; justify-content: center; background: rgba(2,6,10,0.58); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 16px; }
+    .play-launcher.show { display: flex; }
+    .play-launcher-card { width: min(92vw, 430px); border-radius: 16px; border: 1px solid rgba(145,214,255,0.42); background: linear-gradient(180deg, rgba(11,22,32,0.95), rgba(6,12,18,0.95)); color: rgba(238,248,255,0.95); padding: 14px 14px 12px; box-shadow: 0 16px 40px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.08); }
+    .play-launcher-title { font-size: 14px; font-weight: 800; letter-spacing: 0.7px; color: #9fe3ff; text-transform: uppercase; }
+    .play-launcher-text { margin-top: 7px; font-size: 13px; color: rgba(219,239,255,0.86); }
+    .play-launcher-sub { margin-top: 10px; font-size: 11px; opacity: 0.72; text-transform: uppercase; letter-spacing: 0.5px; }
+    .play-launcher-colors { margin-top: 7px; display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 7px; }
+    .play-launcher-color { border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; background: rgba(255,255,255,0.08); color: rgba(245,251,255,0.9); font-size: 11px; padding: 7px 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .play-launcher-color:hover { background: rgba(255,255,255,0.18); }
+    .play-launcher-color.on { border-color: rgba(159,227,255,0.8); box-shadow: 0 0 0 2px rgba(159,227,255,0.22) inset; }
+    .play-launcher-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.45); flex-shrink: 0; }
+    .play-launcher-actions { margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px; }
+    .play-launcher-btn { border: 1px solid rgba(255,255,255,0.24); border-radius: 10px; background: rgba(255,255,255,0.1); color: rgba(241,250,255,0.92); font-size: 12px; font-weight: 700; padding: 7px 10px; cursor: pointer; }
+    .play-launcher-btn.start { border-color: rgba(159,227,255,0.62); background: linear-gradient(90deg, rgba(76,210,255,0.56), rgba(255,216,115,0.45)); color: #081019; }
+    .play-launcher-btn:hover { filter: brightness(1.08); }
     @media (max-width: 520px) {
       .guide-overlay { padding: 20px 10px; }
       .guide-panel { padding: 24px 20px 32px; font-size: 14px; border-radius: 16px; }
@@ -389,6 +404,10 @@
       .guide-fab { bottom: 12px; left: 12px; right: auto; width: 48px; min-width: 48px; font-size: 16px; height: 48px; padding: 0; border-radius: 14px; gap: 0; justify-content: center; }
       .guide-fab i { font-size: 20px; }
       .guide-fab span { display: none; }
+      .play-launcher-card { width: min(94vw, 440px); padding: 13px 12px 11px; }
+      .play-launcher-title { font-size: 13px; }
+      .play-launcher-text { font-size: 12px; }
+      .play-launcher-colors { grid-template-columns: repeat(2, minmax(0,1fr)); }
     }
   </style>
 </head>
@@ -420,6 +439,23 @@
   <label for="playLookSensitivity">Look</label>
   <input type="range" id="playLookSensitivity" min="0.5" max="2.0" value="1" step="0.1" oninput="setPlayLookSensitivity(this.value)">
   <span class="sens-val" id="playLookSensitivityVal">1.0x</span>
+</div>
+<div class="play-launcher" id="playLauncher" onclick="if(event.target===this) closePlayLauncher()">
+  <div class="play-launcher-card">
+    <div class="play-launcher-title">Play Setup</div>
+    <div class="play-launcher-text">Collect all the coins.</div>
+    <div class="play-launcher-sub">Choose cat color</div>
+    <div class="play-launcher-colors">
+      <button class="play-launcher-color on" id="catColorBtnGinger" onclick="setCatColorPreset('ginger')"><span class="play-launcher-dot" style="background:#cd8a4f"></span><span>Ginger</span></button>
+      <button class="play-launcher-color" id="catColorBtnTuxedo" onclick="setCatColorPreset('tuxedo')"><span class="play-launcher-dot" style="background:#5e6775"></span><span>Tuxedo</span></button>
+      <button class="play-launcher-color" id="catColorBtnCream" onclick="setCatColorPreset('cream')"><span class="play-launcher-dot" style="background:#d7c9aa"></span><span>Cream</span></button>
+      <button class="play-launcher-color" id="catColorBtnMidnight" onclick="setCatColorPreset('midnight')"><span class="play-launcher-dot" style="background:#3f4659"></span><span>Midnight</span></button>
+    </div>
+    <div class="play-launcher-actions">
+      <button class="play-launcher-btn" onclick="closePlayLauncher()">Cancel</button>
+      <button class="play-launcher-btn start" onclick="startPlayModeFromLauncher()">Start Run</button>
+    </div>
+  </div>
 </div>
 <button class="play-dock-btn" id="playDockBtn" onclick="enterPlayMode()"><i class="ph ph-game-controller"></i><span>Play Mode</span><span class="pm-kbd">G</span></button>
 <button class="fab hidden" id="fab" onclick="togglePanel()"><i class="ph ph-sliders-horizontal"></i><span class="fab-label">Controls</span></button>
@@ -688,6 +724,7 @@
       <tr><td><kbd>L</kbd></td><td>Toggle legend</td></tr>
       <tr><td><kbd>H</kbd></td><td>Hide all UI (any key restores)</td></tr>
       <tr><td><kbd>G</kbd></td><td>Enter Play Mode</td></tr>
+      <tr><td><kbd>R</kbd></td><td>Restart run (in Play Mode)</td></tr>
       <tr><td><kbd>Esc</kbd></td><td>Exit Play Mode</td></tr>
       <tr><td><kbd>←↑→↓</kbd></td><td>Nudge placement</td></tr>
     </table>
@@ -726,7 +763,7 @@ function syncPlayModeUI(){
   if(guideFab) guideFab.classList.toggle('hide-mobile-play',_fpMode && _isMobile);
   const hint=document.getElementById('playHudHint');
   if(hint){
-    hint.textContent=_isMobile?'Play Mode active':'Play Mode active - press Esc to exit';
+    hint.textContent=_isMobile?'Play Mode active':'Play Mode active - Esc: exit, R: restart';
     hint.classList.toggle('show',_fpMode);
   }
   const mobileExit=document.getElementById('playMobileExitBtn');
@@ -739,7 +776,61 @@ function syncPlayModeUI(){
   if(mobileLook) mobileLook.classList.toggle('show',_fpMode && _isMobile);
   if(!_fpMode || !_isMobile) resetPlayMobileJoystick();
 }
-function enterPlayMode(){ if(!_fpMode) toggleFirstPerson(); }
+const _PLAY_PATH_AUTO_OPEN = /^\/play\/?$/.test(location.pathname);
+const _catColorPresets={
+  ginger:0xcd8a4f,
+  tuxedo:0x5e6775,
+  cream:0xd7c9aa,
+  midnight:0x3f4659
+};
+let _playLauncherOpen=false;
+let _catColorKey='ginger';
+let _catColorHex=_catColorPresets[_catColorKey];
+function _applyCatColorToModel(){
+  if(!catModel) return;
+  catModel.traverse(o=>{
+    if(!o.isMesh || !o.material) return;
+    const mats=Array.isArray(o.material)?o.material:[o.material];
+    for(const m of mats){
+      if(!m || !(m.isMeshStandardMaterial||m.isMeshPhysicalMaterial) || !m.color) continue;
+      m.color.setHex(_catColorHex);
+      m.needsUpdate=true;
+    }
+  });
+}
+function _setCatColorButtons(){
+  for(const key of Object.keys(_catColorPresets)){
+    const id='catColorBtn'+key.charAt(0).toUpperCase()+key.slice(1);
+    const btn=document.getElementById(id);
+    if(btn) btn.classList.toggle('on',key===_catColorKey);
+  }
+}
+function setCatColorPreset(key){
+  if(!_catColorPresets[key]) return;
+  _catColorKey=key;
+  _catColorHex=_catColorPresets[key];
+  _setCatColorButtons();
+  _applyCatColorToModel();
+}
+function openPlayLauncher(){
+  if(_fpMode) return;
+  _playLauncherOpen=true;
+  const el=document.getElementById('playLauncher');
+  if(el) el.classList.add('show');
+  _setCatColorButtons();
+  _applyCatColorToModel();
+}
+function closePlayLauncher(){
+  _playLauncherOpen=false;
+  const el=document.getElementById('playLauncher');
+  if(el) el.classList.remove('show');
+}
+function startPlayModeFromLauncher(){
+  if(_fpMode) return;
+  closePlayLauncher();
+  toggleFirstPerson();
+}
+function enterPlayMode(){ if(!_fpMode) openPlayLauncher(); }
 function exitPlayMode(){ if(_fpMode) toggleFirstPerson(); }
 function setPlayMove(key,isDown){
   if(!_fpMode) return;
@@ -827,6 +918,9 @@ function setPlayLookSensitivity(val){
 }
 setPlayLookSensitivity(1);
 initPlayMobileJoystick();
+if(_PLAY_PATH_AUTO_OPEN){
+  setTimeout(()=>{ if(!_fpMode) openPlayLauncher(); }, 120);
+}
 // Panel toggle
 function togglePanel() {
   const panel = document.getElementById('panelL');
@@ -939,6 +1033,7 @@ const _catBaseLocalQuat=new THREE.Quaternion();
         }
       }
     });
+    _applyCatColorToModel();
     catGroup.add(catModel);
     // Animations — Quaternius cats ship w/ several clips. Pick walk + idle.
     if(gltf.animations && gltf.animations.length){
@@ -7363,6 +7458,11 @@ function checkPerformance(fps,isActive){
 }
 
 document.addEventListener('keydown',e=>{
+  if(_playLauncherOpen){
+    if(e.key==='Escape'){ closePlayLauncher(); return; }
+    if(e.key==='Enter'){ startPlayModeFromLauncher(); return; }
+    if(e.key==='g'||e.key==='G') return;
+  }
   // Zen mode: any key (except H again) restores UI
   if(document.body.classList.contains('zen')){
     document.body.classList.remove('zen');
