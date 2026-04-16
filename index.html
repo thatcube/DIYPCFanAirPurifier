@@ -7222,6 +7222,8 @@ let _coinGeo=null, _coinMat=null;
 function _addCoin(parent, localPos, opts){
   const coin=_makeCoin();
   coin.position.copy(localPos);
+  // Coins should never appear outside Play Mode.
+  coin.visible=false;
   parent.add(coin);
   _coins.push({
     mesh:coin,
@@ -7287,7 +7289,7 @@ function _setCoinsVisible(show){
       c.mesh.visible=show && !c.collected && open;
     }
     else if(c.consoleProp) c.mesh.visible=show && !c.collected && consoleProps.visible;
-    else c.mesh.visible=!c.collected;
+    else c.mesh.visible=show && !c.collected;
   }
   // Update HUD counter.
   const el=document.getElementById('coinCount');
