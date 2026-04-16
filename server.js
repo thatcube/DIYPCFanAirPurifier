@@ -6,6 +6,7 @@ const crypto = require('crypto');
 
 const app = express();
 const PORT = Number(process.env.PORT || 8787);
+const TRUST_PROXY = /^(1|true|yes)$/i.test(String(process.env.TRUST_PROXY || 'false'));
 
 const MAX_NAME_LEN = 24;
 const LB_MAX = Number(process.env.LB_MAX || 25);
@@ -23,7 +24,9 @@ const coinIds = (process.env.COIN_IDS || '')
 const COIN_IDS = coinIds.length ? coinIds : Array.from({ length: defaultCoinCount }, (_, i) => `coin_${i + 1}`);
 const COIN_SET = new Set(COIN_IDS);
 
-const dataDir = path.join(__dirname, 'data');
+const dataDir = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.join(__dirname, 'data');
 const leaderboardFile = path.join(dataDir, 'leaderboard.json');
 
 function ensureDataDir() {
@@ -94,8 +97,10 @@ function rateLimit(ip, action, limit, windowMs) {
 }
 
 function getClientIp(req) {
-  const xfwd = req.headers['x-forwarded-for'];
-  if (typeof xfwd === 'string' && xfwd) return xfwd.split(',')[0].trim();
+  if (TRUST_PROXY) {
+    const xfwd = req.headers['x-forwarded-for'];
+    if (typeof xfwd === 'string' && xfwd) return xfwd.split(',')[0].trim();
+  }
   return req.ip || req.socket?.remoteAddress || 'unknown';
 }
 
@@ -104,6 +109,7 @@ function apiError(res, status, code, message) {
 }
 
 app.disable('x-powered-by');
+if (TRUST_PROXY) app.set('trust proxy', 1);
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
   contentSecurityPolicy: false,

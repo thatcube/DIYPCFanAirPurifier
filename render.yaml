@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: diy-air-purifier-leaderboard
+    env: node
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: TRUST_PROXY
+        value: "true"
+      - key: DATA_DIR
+        value: /var/data
+      - key: LB_MAX
+        value: "25"
+      - key: LB_PER_PLAYER
+        value: "3"
+      - key: COIN_COUNT
+        value: "16"
+      - key: MIN_RUN_MS
+        value: "12000"
+      - key: MAX_RUN_MS
+        value: "1200000"
+      - key: MIN_COIN_INTERVAL_MS
+        value: "120"
+    disk:
+      name: leaderboard-data
+      mountPath: /var/data
+      sizeGB: 1
