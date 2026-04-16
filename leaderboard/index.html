@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>DIY Air Purifier Leaderboard</title>
+  <style>
+    :root {
+      --bg0: #07121d;
+      --bg1: #122637;
+      --card: rgba(6, 14, 24, 0.82);
+      --edge: rgba(128, 197, 243, 0.35);
+      --text: #e6f3ff;
+      --muted: #a8c0d6;
+      --accent: #9fe3ff;
+      --gold: #ffd873;
+      --goldEdge: rgba(255, 216, 115, 0.45);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 700px at 18% -12%, #244868 0%, transparent 58%),
+                  radial-gradient(900px 560px at 110% 10%, #1f3e56 0%, transparent 65%),
+                  linear-gradient(180deg, var(--bg1), var(--bg0));
+      padding: 18px;
+    }
+    .wrap {
+      width: min(960px, 100%);
+      margin: 0 auto;
+      background: var(--card);
+      border: 1px solid var(--edge);
+      border-radius: 16px;
+      box-shadow: 0 20px 44px rgba(0, 0, 0, 0.42);
+      backdrop-filter: blur(12px);
+      overflow: hidden;
+    }
+    .head {
+      padding: 16px 16px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(20px, 2.4vw, 30px);
+      letter-spacing: 0.3px;
+      color: var(--accent);
+    }
+    .sub {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      border: 1px solid var(--edge);
+      background: rgba(13, 34, 48, 0.72);
+      color: #d9f5ff;
+      border-radius: 10px;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .meta {
+      padding: 11px 16px;
+      color: var(--muted);
+      font-size: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .list {
+      list-style: none;
+      margin: 0;
+      padding: 10px;
+      display: grid;
+      gap: 7px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 48px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 9px 11px;
+      scroll-margin-top: 22px;
+    }
+    .rank { color: var(--muted); }
+    .name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .time {
+      font-variant-numeric: tabular-nums;
+      color: var(--accent);
+      font-weight: 800;
+    }
+    .row.hit {
+      background: rgba(255, 216, 115, 0.14);
+      border-color: var(--goldEdge);
+      box-shadow: 0 0 0 2px rgba(255, 216, 115, 0.2) inset;
+    }
+    .row.hit .time,
+    .row.hit .name { color: var(--gold); }
+    .empty {
+      padding: 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    @media (max-width: 640px) {
+      body { padding: 12px; }
+      .head { padding: 13px 12px 9px; }
+      .meta { padding: 10px 12px; }
+      .list { padding: 8px; }
+      .row { grid-template-columns: 42px 1fr auto; padding: 8px 9px; }
+      .right { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="head">
+      <div>
+        <h1>Leaderboard</h1>
+        <p class="sub">DIY PC Fan Air Purifier</p>
+      </div>
+      <div class="right">
+        <button id="copyLinkBtn" class="btn" type="button">Copy link</button>
+        <a class="btn" href="/">Play</a>
+      </div>
+    </div>
+    <div id="meta" class="meta">Loading...</div>
+    <ol id="rows" class="list" aria-live="polite"></ol>
+    <div id="empty" class="empty" style="display:none">No runs yet. Be the first to post a time.</div>
+  </main>
+
+  <script>
+    const rowsEl = document.getElementById('rows');
+    const metaEl = document.getElementById('meta');
+    const emptyEl = document.getElementById('empty');
+    const copyBtn = document.getElementById('copyLinkBtn');
+    const hitId = new URLSearchParams(location.search).get('entry') || '';
+
+    function escapeHtml(v) {
+      return String(v || '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[ch]));
+    }
+
+    function fmtRun(ms) {
+      const total = Math.max(0, Math.floor(Number(ms) || 0));
+      const m = Math.floor(total / 60000);
+      const s = Math.floor((total % 60000) / 1000);
+      const z = total % 1000;
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(z).padStart(3, '0')}`;
+    }
+
+    async function copyText(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+
+    async function loadLeaderboard() {
+      try {
+        const res = await fetch('/api/leaderboard', { credentials: 'same-origin' });
+        const data = await res.json();
+        if (!res.ok || data.ok === false) throw new Error((data && data.message) || `API ${res.status}`);
+
+        const rows = Array.isArray(data.leaderboard) ? data.leaderboard : [];
+        if (!rows.length) {
+          rowsEl.innerHTML = '';
+          emptyEl.style.display = 'block';
+          metaEl.textContent = 'Shared leaderboard is live. No runs yet.';
+          return;
+        }
+
+        rowsEl.innerHTML = rows.map((r, i) => {
+          const rowId = String(r.id || '');
+          const hit = hitId && rowId === hitId;
+          return `<li class="row${hit ? ' hit' : ''}" data-entry-id="${escapeHtml(rowId)}">
+            <div class="rank">#${i + 1}</div>
+            <div class="name">${escapeHtml(r.name)}</div>
+            <div class="time">${fmtRun(r.timeMs)}</div>
+          </li>`;
+        }).join('');
+
+        emptyEl.style.display = 'none';
+        metaEl.textContent = `Fastest first | Top ${data.maxEntries || 25} | Max ${data.perPlayer || 3} per player`;
+
+        if (hitId) {
+          const allRows = rowsEl.querySelectorAll('[data-entry-id]');
+          let hitEl = null;
+          for (const rowEl of allRows) {
+            if (rowEl.getAttribute('data-entry-id') === hitId) {
+              hitEl = rowEl;
+              break;
+            }
+          }
+          if (hitEl) {
+            setTimeout(() => hitEl.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+          }
+        }
+      } catch (err) {
+        rowsEl.innerHTML = '';
+        emptyEl.style.display = 'block';
+        emptyEl.textContent = 'Could not load leaderboard right now.';
+        metaEl.textContent = 'Connection issue';
+      }
+    }
+
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await copyText(location.href);
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1200);
+      } catch (err) {
+        copyBtn.textContent = 'Copy failed';
+        setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1400);
+      }
+    });
+
+    loadLeaderboard();
+  </script>
+</body>
+</html>
