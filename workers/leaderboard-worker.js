@@ -1,45 +1,38 @@
-const SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS leaderboard_entries (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  time_ms INTEGER NOT NULL,
-  at_ms INTEGER NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_lb_time ON leaderboard_entries(time_ms ASC, at_ms ASC);
-CREATE INDEX IF NOT EXISTS idx_lb_name ON leaderboard_entries(name, time_ms ASC, at_ms ASC);
-
-CREATE TABLE IF NOT EXISTS run_sessions (
-  run_id TEXT PRIMARY KEY,
-  ip_hash TEXT NOT NULL,
-  started_at INTEGER NOT NULL,
-  expires_at INTEGER NOT NULL,
-  finished INTEGER NOT NULL DEFAULT 0,
-  last_coin_at INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE INDEX IF NOT EXISTS idx_runs_expiry ON run_sessions(expires_at);
-
-CREATE TABLE IF NOT EXISTS run_claims (
-  run_id TEXT NOT NULL,
-  coin_id TEXT NOT NULL,
-  claimed_at INTEGER NOT NULL,
-  PRIMARY KEY (run_id, coin_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_claims_run ON run_claims(run_id);
-
-CREATE TABLE IF NOT EXISTS rate_limits (
-  ip_hash TEXT NOT NULL,
-  action TEXT NOT NULL,
-  bucket_start INTEGER NOT NULL,
-  expires_at INTEGER NOT NULL,
-  count INTEGER NOT NULL DEFAULT 0,
-  PRIMARY KEY (ip_hash, action, bucket_start)
-);
-
-CREATE INDEX IF NOT EXISTS idx_rate_expiry ON rate_limits(expires_at);
-`;
+const SCHEMA_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS leaderboard_entries (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    time_ms INTEGER NOT NULL,
+    at_ms INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_lb_time ON leaderboard_entries(time_ms ASC, at_ms ASC)`,
+  `CREATE INDEX IF NOT EXISTS idx_lb_name ON leaderboard_entries(name, time_ms ASC, at_ms ASC)`,
+  `CREATE TABLE IF NOT EXISTS run_sessions (
+    run_id TEXT PRIMARY KEY,
+    ip_hash TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    finished INTEGER NOT NULL DEFAULT 0,
+    last_coin_at INTEGER NOT NULL DEFAULT 0
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_runs_expiry ON run_sessions(expires_at)`,
+  `CREATE TABLE IF NOT EXISTS run_claims (
+    run_id TEXT NOT NULL,
+    coin_id TEXT NOT NULL,
+    claimed_at INTEGER NOT NULL,
+    PRIMARY KEY (run_id, coin_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_claims_run ON run_claims(run_id)`,
+  `CREATE TABLE IF NOT EXISTS rate_limits (
+    ip_hash TEXT NOT NULL,
+    action TEXT NOT NULL,
+    bucket_start INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (ip_hash, action, bucket_start)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_rate_expiry ON rate_limits(expires_at)`,
+];
 
 const DEFAULTS = {
   MAX_NAME_LEN: 24,
@@ -116,7 +109,7 @@ export default {
 
 async function ensureDbInitialized(env) {
   if (!dbInitPromise) {
-    dbInitPromise = env.LB_DB.exec(SCHEMA_SQL);
+    dbInitPromise = env.LB_DB.batch(SCHEMA_STATEMENTS.map((sql) => env.LB_DB.prepare(sql).bind()));
   }
   await dbInitPromise;
 }
