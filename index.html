@@ -391,7 +391,7 @@
     .play-launcher-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.45); flex-shrink: 0; }
     .play-launcher-actions { margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px; }
     .play-launcher-btn { border: 1px solid rgba(255,255,255,0.24); border-radius: 10px; background: rgba(255,255,255,0.1); color: rgba(241,250,255,0.92); font-size: 12px; font-weight: 700; padding: 7px 10px; cursor: pointer; }
-    .play-launcher-btn.start { border-color: rgba(159,227,255,0.62); background: linear-gradient(90deg, rgba(76,210,255,0.56), rgba(255,216,115,0.45)); color: #081019; }
+    .play-launcher-btn.start { border-color: rgba(159,227,255,0.62); background: linear-gradient(90deg, rgba(76,210,255,0.56), rgba(255,216,115,0.45)); color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
     .play-launcher-btn:hover { filter: brightness(1.08); }
     @media (max-width: 520px) {
       .guide-overlay { padding: 20px 10px; }
@@ -6053,7 +6053,7 @@ function animate(ts){
     }
     // Gravity
     _fpVy-=0.018;
-    const newY=_fpPos.y+_fpVy;
+    let newY=_fpPos.y+_fpVy;
     // Try moving X, then Z separately (slide along walls)
     let nx=_fpPos.x+moveX, nz=_fpPos.z+moveZ;
     const r=_fpBodyR;
