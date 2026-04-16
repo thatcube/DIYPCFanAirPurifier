@@ -1,0 +1,18 @@
+name = "diy-air-purifier-leaderboard"
+main = "workers/leaderboard-worker.js"
+compatibility_date = "2026-04-16"
+workers_dev = true
+
+[vars]
+LB_MAX = "25"
+LB_PER_PLAYER = "3"
+COIN_COUNT = "16"
+MIN_RUN_MS = "12000"
+MAX_RUN_MS = "1200000"
+MIN_COIN_INTERVAL_MS = "120"
+RUN_TTL_MS = "900000"
+
+[[d1_databases]]
+binding = "LB_DB"
+database_name = "diy-air-purifier-leaderboard"
+database_id = "8a01550e-dacb-4008-a47b-88ce7619f692"

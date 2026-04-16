@@ -20,7 +20,63 @@ The leaderboard now has a shared backend API. Run the app through the Node serve
 
 Opening `index.html` directly still renders the scene, but leaderboard sharing requires the API server.
 
-## Deploy So Friends Can Post Scores
+## Deploy Free (Recommended): Cloudflare Worker + D1 + Netlify
+
+For a zero-monthly-cost setup, keep the frontend on Netlify and run the leaderboard API on Cloudflare.
+
+- Worker API code: `workers/leaderboard-worker.js`
+- Cloudflare config: `wrangler.toml`
+- Netlify API proxy: `netlify.toml`
+
+### 1) Create Cloudflare D1 database
+
+```bash
+npm run cf:d1:create
+```
+
+The current `database_id` is already set in `wrangler.toml`. If you create a new D1 database later, update that value.
+
+### 2) Set required secrets on Cloudflare
+
+```bash
+npx wrangler secret put ADMIN_TOKEN
+npx wrangler secret put IP_HASH_SALT
+```
+
+- `ADMIN_TOKEN`: used for admin moderation endpoints.
+- `IP_HASH_SALT`: random string used to hash client IPs before storage.
+
+### 3) Deploy Worker
+
+```bash
+npm run cf:deploy
+```
+
+Copy the deployed Worker URL (for example: `https://your-worker.your-subdomain.workers.dev`).
+
+### 4) Point Netlify `/api/*` to your Worker
+
+`netlify.toml` is configured to proxy API calls to:
+
+- `https://diy-air-purifier-leaderboard.essays-loges0y.workers.dev/api/:splat`
+
+If your Worker URL changes later, update this line and redeploy Netlify.
+
+Then push and redeploy Netlify.
+
+### 5) Verify end-to-end
+
+1. `https://airpurifier.brandonmoore.design/api/leaderboard` returns JSON.
+2. Start a run and submit a score from the live site.
+3. Confirm leaderboard no longer shows `Local fallback`.
+
+Notes:
+
+- The API contract matches the existing frontend routes (`/api/leaderboard`, `/api/run/*`, `/api/admin/*`).
+- Existing Node server (`server.js`) is still available for local development.
+- If you ever exceed free Cloudflare quotas, API requests will fail until limits reset.
+
+## Deploy On Render (Paid Alternative)
 
 The easiest path is Render using the included blueprint:
 
