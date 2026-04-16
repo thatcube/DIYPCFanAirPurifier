@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DIY Air Purifier – 3D Model</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%8C%AC%EF%B8%8F%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -217,12 +218,12 @@
       .fab { top: 12px; left: 12px; font-size: 16px; height: 48px; padding: 0 18px; border-radius: 14px; gap: 8px; }
       .fab i { font-size: 19px; }
       .fab.mobile-init { opacity: 1; pointer-events: auto; transform: scale(1); }
-      .play-dock-btn { bottom: 14px; height: 50px; font-size: 15px; border-radius: 14px; padding: 0 18px; }
+      .play-dock-btn { bottom: 12px; height: 50px; font-size: 15px; border-radius: 14px; padding: 0 18px; }
       .play-dock-btn i { font-size: 18px; }
       .play-hud-hint { top: 12px; font-size: 12px; padding: 10px 14px; border-radius: 10px; }
       .play-mobile-exit { top: 12px; right: 12px; height: 44px; font-size: 14px; border-radius: 12px; padding: 0 14px; }
-      .play-mobile-pad { right: 10px; bottom: 86px; width: 144px; height: 144px; }
-      .play-mobile-pad .pad-btn { font-size: 20px; border-radius: 14px; }
+      .play-mobile-pad { right: 8px; bottom: 90px; width: min(40vw,164px); height: min(40vw,164px); }
+      .play-mobile-pad .joy-stick { width: min(15.5vw,58px); height: min(15.5vw,58px); }
       .play-mobile-jump { left: 10px; bottom: 162px; height: 48px; font-size: 15px; border-radius: 12px; padding: 0 16px; }
       .play-mobile-look { left: 10px; bottom: 92px; width: 188px; padding: 8px 10px; border-radius: 10px; }
       .play-mobile-look label { font-size: 11px; }
@@ -284,6 +285,20 @@
     /* Zen mode — hide all UI */
     body.zen .panel, body.zen .fab, body.zen .guide-fab, body.zen .fps, body.zen .play-dock-btn, body.zen .play-hud-hint, body.zen .play-mobile-exit, body.zen .play-mobile-pad, body.zen .play-mobile-jump, body.zen .play-mobile-look { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.3s ease; }
 
+    /* Play mode UI lock — keep only play controls visible */
+    body.play-mode .panel,
+    body.play-mode .fab,
+    body.play-mode .guide-fab,
+    body.play-mode .fps,
+    body.play-mode .part-tooltip,
+    body.play-mode .shortcuts-overlay,
+    body.play-mode .guide-overlay,
+    body.play-mode .play-hud-hint {
+      opacity: 0 !important;
+      pointer-events: none !important;
+      transition: opacity 0.2s ease;
+    }
+
     /* Keyboard shortcuts dialog */
     .shortcuts-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
     .shortcuts-overlay.visible { opacity: 1; pointer-events: auto; }
@@ -340,6 +355,7 @@
     .guide-fab i { font-size: 16px; line-height: 1; }
     .guide-fab:hover { background: rgba(255,255,255,0.12); }
     .guide-fab:active { transform: scale(0.92); }
+    .guide-fab.hide-mobile-play { opacity: 0; pointer-events: none; transform: scale(0.9); }
     .play-dock-btn { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); height: 44px; border-radius: 16px; border: 1px solid rgba(140,220,255,0.55); background: linear-gradient(140deg, rgba(95,200,255,0.34), rgba(255,170,95,0.24)); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); color: #fff; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 16px; z-index: 20; box-shadow: 0 12px 30px rgba(18,34,56,0.32), inset 0 0 0 1px rgba(255,255,255,0.24); transition: all 0.2s ease; }
     .play-dock-btn i { font-size: 16px; }
     .play-dock-btn:hover { background: linear-gradient(140deg, rgba(95,200,255,0.42), rgba(255,170,95,0.32)); transform: translateX(-50%) translateY(-1px); }
@@ -348,10 +364,13 @@
     .play-hud-hint.show { opacity: 1; }
     .play-mobile-exit { position: absolute; top: 12px; right: 12px; height: 40px; border-radius: 12px; border: 1px solid rgba(255,180,180,0.55); background: rgba(255,90,70,0.28); color: #fff; font-size: 12px; font-weight: 700; font-family: inherit; cursor: pointer; display: none; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; z-index: 30; box-shadow: 0 8px 24px rgba(40,0,0,0.28); }
     .play-mobile-exit.show { display: inline-flex; }
-    .play-mobile-pad { position: absolute; right: 12px; bottom: 72px; width: 136px; height: 136px; display: none; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 6px; z-index: 30; }
-    .play-mobile-pad.show { display: grid; }
-    .play-mobile-pad .pad-btn { border: 1px solid rgba(255,255,255,0.26); border-radius: 12px; background: rgba(0,0,0,0.34); color: #fff; font-size: 18px; font-weight: 700; font-family: inherit; touch-action: none; }
-    .play-mobile-pad .pad-empty { border: none; background: transparent; pointer-events: none; }
+    .play-mobile-pad { position: absolute; right: 12px; bottom: 72px; width: 136px; height: 136px; display: none; align-items: center; justify-content: center; z-index: 30; touch-action: none; user-select: none; -webkit-user-select: none; }
+    .play-mobile-pad.show { display: flex; }
+    .play-mobile-pad .joy-base { position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(255,255,255,0.24); background: radial-gradient(circle at 35% 28%, rgba(255,255,255,0.22), rgba(255,255,255,0.08) 34%, rgba(0,0,0,0.36) 75%); box-shadow: inset 0 8px 20px rgba(0,0,0,0.3), 0 10px 24px rgba(0,0,0,0.28); }
+    .play-mobile-pad .joy-base::after { content: ''; position: absolute; left: 50%; top: 50%; width: 52%; height: 52%; transform: translate(-50%,-50%); border-radius: 50%; border: 1px dashed rgba(255,255,255,0.18); }
+    .play-mobile-pad .joy-stick { position: absolute; width: 52px; height: 52px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.34); background: radial-gradient(circle at 32% 28%, rgba(255,255,255,0.65), rgba(230,244,255,0.24) 38%, rgba(0,0,0,0.42)); box-shadow: 0 8px 16px rgba(0,0,0,0.35), inset 0 1px 2px rgba(255,255,255,0.5); transform: translate(0,0); transition: transform 0.06s linear; pointer-events: none; }
+    .play-mobile-pad.dragging .joy-stick { transition: none; }
+    .play-mobile-pad .joy-label { position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%); font-size: 10px; letter-spacing: 0.3px; text-transform: uppercase; color: rgba(255,255,255,0.68); }
     .play-mobile-jump { position: absolute; left: 12px; bottom: 138px; height: 44px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.34); background: rgba(0,0,0,0.36); color: #fff; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; display: none; align-items: center; justify-content: center; gap: 6px; padding: 0 14px; z-index: 30; touch-action: none; }
     .play-mobile-jump.show { display: inline-flex; }
     .play-mobile-look { position: absolute; left: 12px; bottom: 74px; width: 172px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.34); color: rgba(255,255,255,0.86); font-size: 10px; font-weight: 600; display: none; align-items: center; gap: 6px; padding: 6px 8px; z-index: 30; }
@@ -367,8 +386,9 @@
       .guide-panel .parts-table { font-size: 12px; }
       .guide-btn { font-size: 13px; padding: 10px 14px; border-radius: 10px; }
       .guide-btn i { font-size: 16px; }
-      .guide-fab { bottom: 12px; left: 12px; right: auto; font-size: 16px; height: 48px; padding: 0 18px; border-radius: 14px; gap: 8px; }
-      .guide-fab i { font-size: 19px; }
+      .guide-fab { bottom: 12px; left: 12px; right: auto; width: 48px; min-width: 48px; font-size: 16px; height: 48px; padding: 0; border-radius: 14px; gap: 0; justify-content: center; }
+      .guide-fab i { font-size: 20px; }
+      .guide-fab span { display: none; }
     }
   </style>
 </head>
@@ -390,16 +410,10 @@
 <div class="part-tooltip" id="partTooltip"><div class="tip-name" id="tipName"></div><div class="tip-dims" id="tipDims"></div></div>
 <div class="play-hud-hint" id="playHudHint">Press Esc to exit Play Mode</div>
 <button class="play-mobile-exit" id="playMobileExitBtn" onclick="exitPlayMode()"><i class="ph ph-x"></i><span>Exit</span></button>
-<div class="play-mobile-pad" id="playMobilePad">
-  <div class="pad-empty"></div>
-  <button class="pad-btn" onpointerdown="setPlayMove('w',true);event.preventDefault();" onpointerup="setPlayMove('w',false);event.preventDefault();" onpointercancel="setPlayMove('w',false);event.preventDefault();" onpointerleave="setPlayMove('w',false);event.preventDefault();">&#9650;</button>
-  <div class="pad-empty"></div>
-  <button class="pad-btn" onpointerdown="setPlayMove('a',true);event.preventDefault();" onpointerup="setPlayMove('a',false);event.preventDefault();" onpointercancel="setPlayMove('a',false);event.preventDefault();" onpointerleave="setPlayMove('a',false);event.preventDefault();">&#9664;</button>
-  <div class="pad-empty"></div>
-  <button class="pad-btn" onpointerdown="setPlayMove('d',true);event.preventDefault();" onpointerup="setPlayMove('d',false);event.preventDefault();" onpointercancel="setPlayMove('d',false);event.preventDefault();" onpointerleave="setPlayMove('d',false);event.preventDefault();">&#9654;</button>
-  <div class="pad-empty"></div>
-  <button class="pad-btn" onpointerdown="setPlayMove('s',true);event.preventDefault();" onpointerup="setPlayMove('s',false);event.preventDefault();" onpointercancel="setPlayMove('s',false);event.preventDefault();" onpointerleave="setPlayMove('s',false);event.preventDefault();">&#9660;</button>
-  <div class="pad-empty"></div>
+<div class="play-mobile-pad" id="playMobilePad" aria-label="Movement joystick">
+  <div class="joy-base" aria-hidden="true"></div>
+  <div class="joy-stick" id="playMobileStick" aria-hidden="true"></div>
+  <div class="joy-label" aria-hidden="true">Move</div>
 </div>
 <button class="play-mobile-jump" id="playMobileJumpBtn" onpointerdown="setPlayMove('space',true);event.preventDefault();" onpointerup="setPlayMove('space',false);event.preventDefault();" onpointercancel="setPlayMove('space',false);event.preventDefault();" onpointerleave="setPlayMove('space',false);event.preventDefault();"><i class="ph ph-arrow-up"></i><span>Jump</span></button>
 <div class="play-mobile-look" id="playMobileLook">
@@ -411,7 +425,7 @@
 <button class="fab hidden" id="fab" onclick="togglePanel()"><i class="ph ph-sliders-horizontal"></i><span class="fab-label">Controls</span></button>
 <button class="guide-fab" id="guideFab" onclick="toggleGuide()"><i class="ph ph-book-open-text"></i><span>Build Guide</span></button>
 <div class="panel panel-l" id="panelL">
-  <div class="panel-header"><div class="panel-title-wrap"><span class="panel-title">Control Center</span><span class="panel-subtitle">Grouped one-pane controls</span></div><div class="panel-header-actions"><button class="panel-help" onclick="toggleShortcuts()" title="Show shortcuts"><i class="ph ph-question"></i></button><button class="panel-close" onclick="togglePanel()" title="Hide controls"><i class="ph ph-x"></i></button></div></div>
+  <div class="panel-header"><div class="panel-title-wrap"><span class="panel-title">Control Center</span></div><div class="panel-header-actions"><button class="panel-help" onclick="toggleShortcuts()" title="Show shortcuts"><i class="ph ph-question"></i></button><button class="panel-close" onclick="togglePanel()" title="Hide controls"><i class="ph ph-x"></i></button></div></div>
   <div class="panel-scroll">
 
   <div class="tab-pane active" id="tabBuild">
@@ -682,6 +696,7 @@
 </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 // Section collapse toggle
 function toggleSection(el){ el.closest('.section-group').classList.toggle('collapsed'); }
@@ -694,9 +709,21 @@ function toggleShortcuts(){
   document.getElementById('shortcutsOverlay').classList.toggle('visible');
 }
 let _fpTouchLookSensitivity=1;
+let _playJoyPointerId=null;
+let _playJoyRadius=1;
 function syncPlayModeUI(){
+  document.body.classList.toggle('play-mode',_fpMode);
+  if(_fpMode){
+    const shortcuts=document.getElementById('shortcutsOverlay');
+    if(shortcuts) shortcuts.classList.remove('visible');
+    const guide=document.getElementById('guideOverlay');
+    if(guide) guide.classList.remove('visible');
+  }
+
   const dockBtn=document.getElementById('playDockBtn');
   if(dockBtn) dockBtn.classList.toggle('hide',_fpMode);
+  const guideFab=document.getElementById('guideFab');
+  if(guideFab) guideFab.classList.toggle('hide-mobile-play',_fpMode && _isMobile);
   const hint=document.getElementById('playHudHint');
   if(hint){
     hint.textContent=_isMobile?'Play Mode active':'Play Mode active - press Esc to exit';
@@ -710,6 +737,7 @@ function syncPlayModeUI(){
   if(mobileJump) mobileJump.classList.toggle('show',_fpMode && _isMobile);
   const mobileLook=document.getElementById('playMobileLook');
   if(mobileLook) mobileLook.classList.toggle('show',_fpMode && _isMobile);
+  if(!_fpMode || !_isMobile) resetPlayMobileJoystick();
 }
 function enterPlayMode(){ if(!_fpMode) toggleFirstPerson(); }
 function exitPlayMode(){ if(_fpMode) toggleFirstPerson(); }
@@ -718,6 +746,79 @@ function setPlayMove(key,isDown){
   if(!Object.prototype.hasOwnProperty.call(_fpKeys,key)) return;
   _fpKeys[key]=!!isDown;
 }
+function applyPlayMobileJoy(nx,ny){
+  if(!_fpMode) return;
+  const deadZone=0.18;
+  _fpKeys.w=ny<-deadZone;
+  _fpKeys.s=ny>deadZone;
+  _fpKeys.a=nx<-deadZone;
+  _fpKeys.d=nx>deadZone;
+}
+function resetPlayMobileJoystick(){
+  const pad=document.getElementById('playMobilePad');
+  const stick=document.getElementById('playMobileStick');
+  if(pad) pad.classList.remove('dragging');
+  if(stick) stick.style.transform='translate(0px,0px)';
+  _playJoyPointerId=null;
+  if(_fpMode){
+    _fpKeys.w=false;
+    _fpKeys.a=false;
+    _fpKeys.s=false;
+    _fpKeys.d=false;
+  }
+}
+function updatePlayMobileJoystick(clientX,clientY){
+  const pad=document.getElementById('playMobilePad');
+  const stick=document.getElementById('playMobileStick');
+  if(!pad || !stick) return;
+  const rect=pad.getBoundingClientRect();
+  const cx=rect.left+rect.width*0.5;
+  const cy=rect.top+rect.height*0.5;
+  let dx=clientX-cx;
+  let dy=clientY-cy;
+  const dist=Math.hypot(dx,dy);
+  const max=_playJoyRadius;
+  if(dist>max && dist>0.0001){
+    const s=max/dist;
+    dx*=s;
+    dy*=s;
+  }
+  stick.style.transform='translate('+dx.toFixed(1)+'px,'+dy.toFixed(1)+'px)';
+  applyPlayMobileJoy(max>0?dx/max:0,max>0?dy/max:0);
+}
+function initPlayMobileJoystick(){
+  const pad=document.getElementById('playMobilePad');
+  if(!pad) return;
+  const recalcRadius=()=>{
+    _playJoyRadius=Math.max(18,pad.clientWidth*0.4);
+  };
+  recalcRadius();
+  window.addEventListener('resize',recalcRadius,{passive:true});
+
+  pad.addEventListener('pointerdown',e=>{
+    if(!_fpMode || !_isMobile) return;
+    _playJoyPointerId=e.pointerId;
+    pad.classList.add('dragging');
+    if(pad.setPointerCapture) pad.setPointerCapture(e.pointerId);
+    updatePlayMobileJoystick(e.clientX,e.clientY);
+    e.preventDefault();
+  },{passive:false});
+
+  pad.addEventListener('pointermove',e=>{
+    if(e.pointerId!==_playJoyPointerId) return;
+    updatePlayMobileJoystick(e.clientX,e.clientY);
+    e.preventDefault();
+  },{passive:false});
+
+  const endJoy=e=>{
+    if(e.pointerId!==_playJoyPointerId) return;
+    resetPlayMobileJoystick();
+    e.preventDefault();
+  };
+  pad.addEventListener('pointerup',endJoy,{passive:false});
+  pad.addEventListener('pointercancel',endJoy,{passive:false});
+  pad.addEventListener('lostpointercapture',resetPlayMobileJoystick);
+}
 function setPlayLookSensitivity(val){
   const num=parseFloat(val);
   _fpTouchLookSensitivity=Math.max(0.5,Math.min(2.0,Number.isFinite(num)?num:1));
@@ -725,6 +826,7 @@ function setPlayLookSensitivity(val){
   if(out) out.textContent=_fpTouchLookSensitivity.toFixed(1)+'x';
 }
 setPlayLookSensitivity(1);
+initPlayMobileJoystick();
 // Panel toggle
 function togglePanel() {
   const panel = document.getElementById('panelL');
@@ -755,11 +857,22 @@ function toggleGuide(){
   new MutationObserver(checkFade).observe(ps,{childList:true,subtree:true,attributes:true});
   checkFade();
 })();
-// Keep control panel expanded by default on all screen sizes.
+// On mobile, the controls panel starts collapsed to maximize scene space.
 
 const canvas = document.getElementById('c');
 const _isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false, powerPreference:'high-performance'});
+function initMobilePanelDefault(){
+  if(!_isMobile) return;
+  const panel=document.getElementById('panelL');
+  const fab=document.getElementById('fab');
+  if(panel) panel.classList.add('collapsed');
+  if(fab){
+    fab.classList.remove('hidden');
+    fab.classList.add('mobile-init');
+  }
+}
+initMobilePanelDefault();
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false, powerPreference:'high-performance', stencil:false});
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, _isMobile?0.72:0.85));
 renderer.setClearColor(0xd4dce8, 1);
 renderer.shadowMap.enabled=true;
@@ -770,6 +883,75 @@ renderer.toneMappingExposure=1.3;
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0xd4dce8, 0.0015);
 const camera = new THREE.PerspectiveCamera(42,1,0.1,500);
+// Camera is part of the scene graph so camera-attached objects (cat rig)
+// are traversed and rendered.
+scene.add(camera);
+
+// ─── Third-person cat avatar (shown only in play mode) ───
+// Model: "Cat" by Quaternius (CC0) via poly.pizza/m/qKICY6xla2
+const catGroup=new THREE.Group();
+catGroup.visible=false;
+scene.add(catGroup);
+let catModel=null, catMixer=null, catWalkAction=null, catIdleAction=null;
+let _catTargetHeight=4.0; // desired visual height in inches — small enough to fit near walls
+const _catBoxTmp=new THREE.Box3();
+const _catBaseLocalPos=new THREE.Vector3();
+const _catBaseLocalQuat=new THREE.Quaternion();
+(function loadCat(){
+  if(!THREE.GLTFLoader){ console.warn('GLTFLoader not available'); return; }
+  const loader=new THREE.GLTFLoader();
+  loader.load('assets/cat.glb', (gltf)=>{
+    catModel=gltf.scene;
+    // Auto-scale so cat height matches _catTargetHeight.
+    const box=new THREE.Box3().setFromObject(catModel);
+    const size=box.getSize(new THREE.Vector3());
+    const h=size.y||1;
+    const s=_catTargetHeight/h;
+    catModel.scale.setScalar(s);
+    // Re-measure after scale. Center X/Z on the catGroup origin and rest the
+    // feet on y=0 so catGroup.position maps directly to "where the cat is".
+    const box2=new THREE.Box3().setFromObject(catModel);
+    const center2=box2.getCenter(new THREE.Vector3());
+    catModel.position.x-=center2.x;
+    catModel.position.z-=center2.z;
+    catModel.position.y-=box2.min.y;
+    _catBaseLocalPos.copy(catModel.position);
+    _catBaseLocalQuat.copy(catModel.quaternion);
+    // Shadows
+    catModel.traverse(o=>{
+      if(o.isMesh){
+        o.castShadow=true;
+        o.receiveShadow=true;
+        // Ensure materials render correctly under tone mapping.
+        if(o.material && o.material.map){ o.material.map.encoding=THREE.sRGBEncoding; }
+      }
+    });
+    catGroup.add(catModel);
+    // Animations — Quaternius cats ship w/ several clips. Pick walk + idle.
+    if(gltf.animations && gltf.animations.length){
+      catMixer=new THREE.AnimationMixer(catModel);
+      // Remove translation tracks so clips stay in-place relative to catGroup.
+      // This prevents root-motion drift where the cat walks away from camera.
+      const makeInPlace=(clip)=>{
+        const tracks=clip.tracks.filter(t=>!t.name.endsWith('.position'));
+        if(tracks.length===clip.tracks.length) return clip;
+        return new THREE.AnimationClip(clip.name+'_inPlace', clip.duration, tracks);
+      };
+      const byName=(names)=>{
+        for(const n of names){
+          const c=gltf.animations.find(a=>a.name.toLowerCase().includes(n));
+          if(c) return c;
+        }
+        return null;
+      };
+      const walkClip=makeInPlace(byName(['walk','run','gallop']) || gltf.animations[0]);
+      const idleClip=makeInPlace(byName(['idle','sit','rest']) || gltf.animations[0]);
+      if(walkClip){ catWalkAction=catMixer.clipAction(walkClip); catWalkAction.play(); catWalkAction.weight=0; }
+      if(idleClip && idleClip!==walkClip){ catIdleAction=catMixer.clipAction(idleClip); catIdleAction.play(); catIdleAction.weight=1; }
+      else if(catWalkAction){ catWalkAction.weight=1; }
+    }
+  }, undefined, (err)=>{ console.warn('Cat load failed', err); });
+})();
 
 // ─── Procedural environment map (fake indoor HDRI — free reflections) ───
 (function generateEnvMap(){
@@ -2331,7 +2513,7 @@ function setGrillColor(c){
 // ─── Camera controls ───
 // Restore camera from sessionStorage if available (survives live reload)
 const _savedCam=sessionStorage.getItem('cam');
-const _camDefaults=_savedCam?JSON.parse(_savedCam):{p:1.1,a:0.5+Math.PI,r:50};
+const _camDefaults=_savedCam?JSON.parse(_savedCam):{p:1.03,a:0.34,r:42};
 let drag=false,px=0,py=0,polar=_camDefaults.p,azimuth=_camDefaults.a,radius=_camDefaults.r;
 let panX=0, panY=0, panZ=0; // camera target offset (shift+drag)
 const _camKeys={w:false,a:false,s:false,d:false};
@@ -2385,7 +2567,7 @@ canvas.addEventListener('touchstart',e=>{
   px=e.touches[0].clientX;py=e.touches[0].clientY;
   _clickStartX=px;_clickStartY=py;
   _dragFilter=null;
-  _pendingFilterDrag=handleDragStart(px,py);
+  _pendingFilterDrag=_isMobile?false:handleDragStart(px,py);
   drag=!_pendingFilterDrag;
 },{passive:false});
 window.addEventListener('mouseup',e=>{
@@ -2398,15 +2580,21 @@ window.addEventListener('mouseup',e=>{
   } else {
     _dragFilter=null;
     if(Math.abs(e.clientX-_clickStartX)<15 && Math.abs(e.clientY-_clickStartY)<15){
-      // In FP mode with pointer lock, use the pre-computed center-screen target
+      // In FP mode with pointer lock, click is handled on mousedown for better browser compatibility.
       if(_fpMode && document.pointerLockElement){
-        if(window._fpLookTarget) handleClickObject(window._fpLookTarget);
+        // no-op
       } else {
         handleClick(e.clientX,e.clientY);
       }
     }
   }
   _pendingFilterDrag=false;
+});
+window.addEventListener('mousedown',e=>{
+  if(e.button!==0) return;
+  if(_fpMode && document.pointerLockElement && window._fpLookTarget){
+    handleClickObject(window._fpLookTarget);
+  }
 });
 window.addEventListener('touchend',e=>{
   if(_fpMode){
@@ -2454,6 +2642,25 @@ window.addEventListener('touchend',e=>{
 let _pendingFilterDrag=false;
 let _hoverInteractive=false;
 let _hoverCheckTimer=0;
+
+function getInteractiveTarget(obj){
+  let p=obj;
+  while(p){
+    if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf) return p;
+    p=p.parent;
+  }
+  return null;
+}
+
+function getPartIdFromAncestors(obj){
+  let p=obj;
+  while(p){
+    if(p._partId) return p._partId;
+    p=p.parent;
+  }
+  return null;
+}
+
 canvas.addEventListener('mousemove',e=>{
   if(_pendingFilterDrag && _dragFilter && Math.abs(e.clientX-_clickStartX)>15){
     drag=false;
@@ -2476,11 +2683,9 @@ canvas.addEventListener('mousemove',e=>{
     let hoveredPartId=null;
     for(const h of hits){
       if(!isAncestorVisible(h.object)) continue;
-      if(h.object._isLamp){ _hoverInteractive=true; break; }
-      if(h.object._isCeilLight){ _hoverInteractive=true; break; }
-      if(h.object._isRoom) continue;
-      if(h.object._isFan||h.object._isFilterL||h.object._isFilterR){ _hoverInteractive=true; }
-      if(h.object._partId && !hoveredPartId){ hoveredPartId=h.object._partId; }
+      const target=getInteractiveTarget(h.object);
+      if(target) _hoverInteractive=true;
+      if(!hoveredPartId) hoveredPartId=getPartIdFromAncestors(h.object);
       if(_hoverInteractive || hoveredPartId) break;
     }
     canvas.style.cursor=_hoverInteractive?'pointer':'grab';
@@ -2520,7 +2725,7 @@ canvas.addEventListener('touchmove',e=>{
     const ty=e.touches[0].clientY;
     const lookScale=0.004*_fpTouchLookSensitivity;
     _fpYaw-=(tx-px)*lookScale;
-    _fpPitch=Math.max(-1.2,Math.min(1.2,_fpPitch-(ty-py)*lookScale));
+    _fpPitch=Math.max(_fpPitchMin,Math.min(_fpPitchMax,_fpPitch-(ty-py)*lookScale));
     px=tx;
     py=ty;
     return;
@@ -2650,15 +2855,15 @@ function handleClickObject(obj){
     lampOn=!lampOn;
     lampLight.intensity=lampOn?1.2:0;
     lampShade.material.emissiveIntensity=lampOn?0.4:0;
+    if(lampBulb) lampBulb.material.emissiveIntensity=lampOn?1.2:0;
     return;
   }
   // Clicked ceiling light → toggle
   if(obj._isCeilLight){
     ceilLightOn=!ceilLightOn;
-    if(!ceilLightOn){
-      ceilSpot.intensity=0;
-      domeMat.emissiveIntensity=0;
-    }
+    ceilSpot.intensity=ceilLightOn?0.95:0;
+    domeMat.emissiveIntensity=ceilLightOn?0.8:0;
+    if(ceilGlow) ceilGlow.intensity=ceilLightOn?0.5:0;
     return;
   }
   // Clicked a fan → toggle that individual fan's rotor (only if mesh has a _rotor ref)
@@ -2681,6 +2886,34 @@ function handleClickObject(obj){
     _filterLerps.push({obj:filterR,target:target});
     return;
   }
+  // Clicked a drawer → toggle slide (ignore if already animating)
+  if(obj._isDrawer){
+    const grp=drawers[obj._drawerIdx];
+    if(!grp) return;
+    if(_drawerLerps.some(dl=>dl.obj===grp)) return;
+    grp._drawerOpen=!grp._drawerOpen;
+    // slide=0 closed, slide=slideMax fully out (-Z direction).
+    const newSlide=grp._drawerOpen ? grp._drawerSlideMax : 0;
+    const deltaZ=-(newSlide - grp._drawerSlide); // change to apply to current Z
+    const targetZ=grp.position.z + deltaZ;
+    grp._drawerSlide=newSlide;
+    _drawerLerps.push({obj:grp, targetZ});
+    return;
+  }
+  // Clicked a bifold closet leaf → toggle fold
+  if(obj._isBifoldLeaf){
+    // Walk up to the leaf pivot group.
+    let leaf=obj;
+    while(leaf && !(leaf._isBifoldLeaf && leaf.isGroup && leaf._innerGroup)) leaf=leaf.parent;
+    if(!leaf) return;
+    if(_bifoldLerps.some(bl=>bl.leaf===leaf)) return;
+    leaf._leafOpen=!leaf._leafOpen;
+    // Fold angle: 80° gives a nicely open V without panels intersecting.
+    const openAng=80*Math.PI/180;
+    leaf._leafTarget=leaf._leafOpen ? openAng : 0;
+    _bifoldLerps.push({leaf});
+    return;
+  }
 }
 
 function handleClick(clientX,clientY){
@@ -2693,10 +2926,8 @@ function handleClick(clientX,clientY){
   let obj=null;
   for(const h of hits){
     if(!isAncestorVisible(h.object)) continue;
-    if(h.object._isLamp){ obj=h.object; break; }
-    if(h.object._isCeilLight){ obj=h.object; break; }
-    if(h.object._isRoom) continue;
-    if(h.object._isFan||h.object._isFilterL||h.object._isFilterR){ obj=h.object; break; }
+    obj=getInteractiveTarget(h.object);
+    if(obj) break;
   }
   handleClickObject(obj);
 }
@@ -2708,13 +2939,17 @@ function isAncestorVisible(obj){
 }
 
 function handleDragStart(clientX,clientY){
+  if(_isMobile) return false;
   const rect=canvas.getBoundingClientRect();
   _mouse.x=((clientX-rect.left)/rect.width)*2-1;
   _mouse.y=-((clientY-rect.top)/rect.height)*2+1;
   _raycaster.setFromCamera(_mouse,camera);
   const hits=_raycaster.intersectObjects(scene.children,true);
   let obj=null;
-  for(const h of hits){ if(!h.object._isRoom && (h.object._isFilterL||h.object._isFilterR)){ obj=h.object; break; } }
+  for(const h of hits){
+    const target=getInteractiveTarget(h.object);
+    if(target && (target._isFilterL||target._isFilterR)){ obj=target; break; }
+  }
   if(!obj) return false;
   if(obj._isFilterL){
     _dragFilter={obj:filterL, side:-1, origin:filterLOrigin, startX:clientX, startPos:filterL.position.x};
@@ -2758,6 +2993,8 @@ function handleDragEnd(){
 }
 
 const _filterLerps=[];
+const _drawerLerps=[];
+const _bifoldLerps=[];
 
 // macOS trackpad pinch-to-zoom → model zoom (Safari gesture events)
 let gestureStartRadius;
@@ -3228,6 +3465,7 @@ function setFootHeight(h){
     }
     if(Math.abs(delta)>0.001) applyRoomDelta({x:0,y:delta,z:0});
   }
+  updateTvGameStackPlacement();
 }
 let _prePlacementFeet='bun'; // remember feet style before wall mode overrides it
 function syncFootSizeRows(){
@@ -3275,6 +3513,7 @@ function setFeetStyle(style){
 
   // Shift floor + all room objects to match new clearance
   if(Math.abs(delta)>0.001) applyRoomDelta({x:0,y:delta,z:0});
+  updateTvGameStackPlacement();
 }
 syncFootSizeRows();
 
@@ -3360,6 +3599,10 @@ function getPlacementOffset(mode){
   return {x:0,y:0,z:0};
 }
 
+function getPurifierFloorLocalY(){
+  return -(H/2+ply+currentFeetH);
+}
+
 // ─── Console props (shown in Under TV mode) ───
 const consoleProps=new THREE.Group();
 consoleProps.visible=false;
@@ -3413,9 +3656,263 @@ origins.console=consoleProps.position.clone();
   }
   consoleProps.add(switchGroup);
 }
+
+// ─── Game stack props (shown in Under TV mode, next to purifier) ───
+const tvGameStackProps=new THREE.Group();
+tvGameStackProps.visible=false;
+const _tvGameCaseW=6.7;
+const _tvGameCaseT=0.43;
+const _tvGameCaseD=4.1;
+const _tvGameStackData=[
+  // Edit titles here to update every case spine in one place.
+  {title:'Pokemon Pokopia', platform:'switch2'},
+  {title:'Pokemon Legends: Z-Acan', platform:'switch2'},
+  {title:'Donkey Kong Bananza', platform:'switch2'},
+  {title:'The Legend of Zelda: Skyward Sword HD', platform:'switch1'},
+  {title:'Dead Cells', platform:'switch1'},
+  {title:'The Legend of Zelda: Breath of the Wild', platform:'switch1'},
+  {title:'The Legend of Zelda: Tears of the Kingdom', platform:'switch1'},
+  {title:'Xenoblade Chronicles 2', platform:'special-gray'},
+  {title:'Pokemon Violet', platform:'switch1'},
+  {title:'Yoshi\'s Crafted World', platform:'switch1'},
+  {title:'Moonlighter', platform:'switch1'},
+  {title:'Splatoon 3', platform:'switch1'},
+  {title:'Mario Party Superstars', platform:'switch1'},
+  {title:'Mario Kart 8 Deluxe', platform:'switch1'},
+  {title:'Pokemon Legends: Arceus', platform:'switch1'},
+  {title:'My Hero One\'s Justice', platform:'switch1'},
+  {title:'Astral Chain', platform:'switch1'},
+  {title:'Pokemon: Let\'s Go, Eevee!', platform:'switch1'},
+  {title:'Pokemon Brilliant Diamond', platform:'switch1'},
+  {title:'Bayonetta 3', platform:'switch1'},
+  {title:'Super Smash Bros. Ultimate', platform:'switch1'},
+  {title:'Super Mario 3D All-Stars', platform:'switch1'},
+  {title:'Crash Team Racing Nitro-Fueled', platform:'switch1'},
+  {title:'Pokemon Sword', platform:'switch1'},
+  {title:'Pokemon Shield', platform:'switch1'},
+  {title:'The Legend of Zelda: Link\'s Awakening', platform:'switch1'},
+  {title:'Super Mario Odyssey', platform:'switch1'},
+  {title:'Ys VIII: Lacrimosa of DANA', platform:'switch1'},
+  {title:'Hades', platform:'switch1'}
+];
+if(_tvGameStackData.length!==29) console.warn('Expected 29 games in _tvGameStackData, got', _tvGameStackData.length);
+const _tvGameStackH=_tvGameStackData.length*_tvGameCaseT;
+
+function _drawRoundRect(ctx,x,y,w,h,r){
+  const rr=Math.min(r, w/2, h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+rr,y);
+  ctx.arcTo(x+w,y,x+w,y+h,rr);
+  ctx.arcTo(x+w,y+h,x,y+h,rr);
+  ctx.arcTo(x,y+h,x,y,rr);
+  ctx.arcTo(x,y,x+w,y,rr);
+  ctx.closePath();
+}
+
+function makeGameSpineTexture(title,platform){
+  const cvs=document.createElement('canvas');
+  // Canvas aspect must match the spine decal plane (W:T ≈ 16.67:1) so the logo
+  // and text aren't stretched horizontally when the texture is mapped.
+  cvs.width=5334;
+  cvs.height=320;
+  const ctx=cvs.getContext('2d');
+  const spineFontStack='-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  const isSw2=platform==='switch2';
+  const isGray=platform==='special-gray';
+  const bg=isGray?'#bbbbbb':(isSw2?'#c4000f':'#c4000f');
+  const rail=isGray?'#a1a1a1':(isSw2?'#c4000f':'#c4000f');
+  const txt=isGray?'#262626':'#ffffff';
+  const badgeStroke=isGray?'#505050':'#f6d7d8';
+  const textStroke=isGray?'rgba(255,255,255,0.55)':'rgba(0,0,0,0.35)';
+
+  // Uniform red background — no separate rail stripe.
+  ctx.fillStyle=bg;
+  ctx.fillRect(0,0,cvs.width,cvs.height);
+
+  // Nintendo Switch logo — faithful port of icons8 SVG (48×48 viewBox).
+  // Sized to fill ~80% of canvas height so it reads clearly at the spine scale.
+  const ls=5.5; // 48 → 264px tall
+  const lx=40, ly=(320-48*ls)/2;
+  const logoCol=isGray?'#262626':'#ffffff';
+  ctx.save();
+  ctx.translate(lx,ly);
+  ctx.scale(ls,ls);
+
+  // Path 2: top half — filled with circular hole (evenodd).
+  ctx.fillStyle=logoCol;
+  ctx.beginPath();
+  ctx.moveTo(6,18);
+  ctx.lineTo(6,23);
+  ctx.lineTo(42,23);
+  ctx.lineTo(42,18);
+  ctx.bezierCurveTo(42,13, 38,8, 33,8);
+  ctx.lineTo(16,8);
+  ctx.bezierCurveTo(10,8, 6,12.342, 6,18);
+  ctx.closePath();
+  // inner circle cutout at (27.5, 15.5) r=3.5
+  ctx.moveTo(31,15.5);
+  ctx.bezierCurveTo(31,17.434, 29.434,19, 27.5,19);
+  ctx.bezierCurveTo(25.566,19, 24,17.434, 24,15.5);
+  ctx.bezierCurveTo(24,13.566, 25.566,12, 27.5,12);
+  ctx.bezierCurveTo(29.434,12, 31,13.566, 31,15.5);
+  ctx.closePath();
+  ctx.fill('evenodd');
+
+  // Path 1: bottom half — stroked outline only.
+  ctx.strokeStyle=logoCol;
+  ctx.lineWidth=2;
+  ctx.lineJoin='miter';
+  ctx.miterLimit=10;
+  ctx.beginPath();
+  ctx.moveTo(7,31);
+  ctx.lineTo(7,26);
+  ctx.lineTo(41,26);
+  ctx.lineTo(41,32);
+  ctx.bezierCurveTo(41,36.401, 37.67,40, 32.947,40);
+  ctx.lineTo(15.947,40);
+  ctx.bezierCurveTo(10.27,40, 7,36.281, 7,31);
+  ctx.closePath();
+  ctx.stroke();
+
+  // Path 3: small filled dot at (16.5, 32.5) r=3.5
+  ctx.fillStyle=logoCol;
+  ctx.beginPath();
+  ctx.arc(16.5,32.5,3.5,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+  const logoRight=lx+48*ls;
+  if(isSw2){
+    ctx.save();
+    ctx.fillStyle=logoCol;
+    ctx.font='700 200px '+spineFontStack;
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    // Switch 2 branding uses a tilted "2" — rotate ~90° counter-clockwise.
+    const cx=logoRight+80, cy=160;
+    ctx.translate(cx,cy);
+    ctx.rotate(-Math.PI/2);
+    ctx.fillText('2', 0, 0);
+    ctx.restore();
+  }
+
+  const displayTitle=title;
+  let font=125;
+  ctx.textAlign='left';
+  ctx.textBaseline='middle';
+  const textLeft=logoRight+(isSw2?130:60);
+  const textRight=4720;
+  do {
+    ctx.font='700 '+font+'px '+spineFontStack;
+    font-=4;
+  } while(ctx.measureText(displayTitle).width>(textRight-textLeft) && font>70);
+  ctx.lineWidth=Math.max(4, Math.floor(font*0.06));
+  ctx.strokeStyle=textStroke;
+  ctx.shadowColor='rgba(0,0,0,0.12)';
+  ctx.shadowBlur=3;
+  ctx.shadowOffsetX=0;
+  ctx.shadowOffsetY=1;
+  // Switch 2 titles are centered within the available text area; Switch 1 stays left-aligned.
+  if(isSw2){
+    ctx.textAlign='center';
+    const cx=(textLeft+textRight)/2;
+    ctx.strokeText(displayTitle, cx, 160);
+    ctx.fillStyle=txt;
+    ctx.fillText(displayTitle, cx, 160);
+  } else {
+    ctx.strokeText(displayTitle, textLeft, 160);
+    ctx.fillStyle=txt;
+    ctx.fillText(displayTitle, textLeft, 160);
+  }
+  ctx.shadowColor='transparent';
+
+  _drawRoundRect(ctx,4790,60,480,200,90);
+  ctx.lineWidth=8;
+  ctx.strokeStyle=badgeStroke;
+  ctx.stroke();
+  ctx.fillStyle=txt;
+  ctx.font='600 90px '+spineFontStack;
+  ctx.textAlign='center';
+  ctx.fillText('Nintendo', 5030, 160);
+
+  const tex=new THREE.CanvasTexture(cvs);
+  tex.generateMipmaps=true;
+  tex.minFilter=THREE.LinearMipmapLinearFilter;
+  tex.magFilter=THREE.LinearFilter;
+  tex.anisotropy=Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  tex.needsUpdate=true;
+  return tex;
+}
+
+{
+  for(let i=0;i<_tvGameStackData.length;i++){
+    const game=_tvGameStackData[i];
+    const isSw2=game.platform==='switch2';
+    const isGray=game.platform==='special-gray';
+    const sideCol=isGray?0xb7b7b7:0xc4000f;
+    const bodyMat=stdMat({color:sideCol, roughness:0.72, metalness:0.02});
+    const spineMap=makeGameSpineTexture(game.title, game.platform);
+    const spineMat=new THREE.MeshStandardMaterial({
+      map:spineMap,
+      emissiveMap:spineMap,
+      emissive:0xffffff,
+      emissiveIntensity:0.45,
+      roughness:0.7,
+      metalness:0.0
+    });
+    // Rounded case body — extrude a rounded rect (W × D silhouette) by thickness T.
+    const rr=Math.min(0.12, _tvGameCaseT*0.45);
+    const hw=_tvGameCaseW/2, hd=_tvGameCaseD/2;
+    const shape=new THREE.Shape();
+    shape.moveTo(-hw+rr,-hd);
+    shape.lineTo(hw-rr,-hd);
+    shape.quadraticCurveTo(hw,-hd,hw,-hd+rr);
+    shape.lineTo(hw,hd-rr);
+    shape.quadraticCurveTo(hw,hd,hw-rr,hd);
+    shape.lineTo(-hw+rr,hd);
+    shape.quadraticCurveTo(-hw,hd,-hw,hd-rr);
+    shape.lineTo(-hw,-hd+rr);
+    shape.quadraticCurveTo(-hw,-hd,-hw+rr,-hd);
+    const caseGeo=new THREE.ExtrudeGeometry(shape,{depth:_tvGameCaseT,bevelEnabled:false,curveSegments:10});
+    caseGeo.translate(0,0,-_tvGameCaseT/2);
+    caseGeo.rotateX(Math.PI/2);
+    const caseMesh=new THREE.Mesh(caseGeo,bodyMat);
+    // Spine decal — thin plane on +Z face with the printed label texture.
+    const decalGeo=new THREE.PlaneGeometry(_tvGameCaseW*0.985,_tvGameCaseT*0.92);
+    const decal=new THREE.Mesh(decalGeo,spineMat);
+    decal.position.set(0,0,hd+0.003);
+    caseMesh.add(decal);
+    const y=(_tvGameStackData.length-1-i)*_tvGameCaseT+_tvGameCaseT/2;
+    // Pseudo-random imperfect-stack jitter: small position and yaw offsets per case.
+    const seed=i*12.9898;
+    const jx=(Math.sin(seed)*0.5)*0.09;
+    const jz=(Math.sin(seed*1.7+0.3)*0.5)*0.12;
+    const jyaw=(Math.sin(seed*2.3+1.1)*0.5)*0.025; // up to ~1.4°
+    const jtilt=(Math.sin(seed*3.1+2.2)*0.5)*0.008;
+    caseMesh.position.set(jx, y, jz);
+    caseMesh.rotation.y=jyaw;
+    caseMesh.rotation.x=jtilt;
+    caseMesh.castShadow=true;
+    caseMesh.receiveShadow=true;
+    tvGameStackProps.add(caseMesh);
+  }
+}
+
+function updateTvGameStackPlacement(){
+  // Purifier group rotates +90° in Under TV mode; counter-rotate so spines face world +Z.
+  tvGameStackProps.rotation.y=-Math.PI/2;
+  tvGameStackProps.position.set(
+    0,
+    getPurifierFloorLocalY()-0.03,
+    -(D/2+ply+_tvGameCaseD/2+8.0)
+  );
+}
+updateTvGameStackPlacement();
+
 // Add to purifierGroup so it moves/rotates with the purifier
 function showConsoleProps(show){
   consoleProps.visible=show;
+  tvGameStackProps.visible=show;
+  updateTvGameStackPlacement();
 }
 
 // ─── Wall-mount bracket (shown in Wall placement mode) ───
@@ -3597,8 +4094,9 @@ function applyTimeOfDay(minuteOfDay){
   fill.intensity=mix(0.01, 0.14, sun);   // gentle global fill to reduce hard spotlight look
   rim.intensity=mix(0.01, 0.08, sun);    // subtle side lift for wall/door shading
   bounce.intensity=mix(0.0, 0.06, sun);  // soft floor bounce in daytime
-  ceilSpot.intensity=ceilLightOn?mix(0.7, 0.05, sun):0; // almost off in daytime, brighter at night
-  domeMat.emissiveIntensity=ceilLightOn?mix(0.5, 0.15, sun):0;
+  ceilSpot.intensity=ceilLightOn?mix(1.1, 0.4, sun):0; // keep visibly lit in daytime, warmer/stronger at night
+  domeMat.emissiveIntensity=ceilLightOn?mix(0.9, 0.45, sun):0;
+  if(ceilGlow) ceilGlow.intensity=ceilLightOn?mix(0.55, 0.2, sun):0;
 
   // Outdoor backdrop brightness (sun through window)
   outdoor.material.color.setScalar(mix(0.08, 1.4, sun)+warm*0.25);
@@ -3609,7 +4107,7 @@ function applyTimeOfDay(minuteOfDay){
   if(recessWallL) recessWallL.material.color.copy(wallCol);
   if(recessWallR) recessWallR.material.color.copy(wallCol);
   const baseCol=lerpHex(NIGHT_BASE, DAY_BASE, sun);
-  [baseboardMeshL,baseboardRetL,oppBaseboard,sideBaseboard,leftBaseboard].forEach(m=>m.material.color.copy(baseCol));
+  [baseboardMeshL,baseboardRetL,oppBaseboard,sideBaseboard1,sideBaseboard2,leftBaseboard].forEach(m=>m.material.color.copy(baseCol));
   if(baseboardRecessL) baseboardRecessL.material.color.copy(baseCol);
   if(baseboardRecessR) baseboardRecessR.material.color.copy(baseCol);
   floorMat.color.copy(lerpHex(NIGHT_CARPET, DAY_CARPET, sun));
@@ -3684,6 +4182,7 @@ function applyIsolate(on){
     rim.position.set(0,20,-30);
     bounce.intensity=0.1;
     ceilSpot.intensity=0;
+    if(ceilGlow) ceilGlow.intensity=0;
     // Expose purifier shadows onto nothing (disable shadow receiving on hidden floor)
     renderer.toneMappingExposure=1.3;
   } else {
@@ -3995,6 +4494,7 @@ const tblW=24, tblH=27, tblD=14;
 const tblX=bedX+bedW/2+tblW/2+3, tblZ=48.5-tblD/2-2;
 const tblBlack=0x1a1a1a;
 const tblOak=0x5a3f2a;
+const drawers=[]; // populated in nightstand block below; used by click/collision/coin systems
 {
   const bodyH=tblH-1;
   const curveBulge=1.5; // how far the front curves outward
@@ -4016,13 +4516,46 @@ const tblOak=0x5a3f2a;
     return geo;
   }
 
-  // Main body — black curved front
-  const bodyGeo=curvedFrontBox(tblW, bodyH, tblD, curveBulge);
+  // Main body — a solid rectangular block (tblW × bodyH × tblD) with three
+  // rectangular holes cut through it, front-to-back, where each drawer slots
+  // in. Built by extruding a front-facing silhouette-with-holes along Z.
+  // (The dark-oak top cap below keeps the curved silhouette on top.)
   const bodyMat=new THREE.MeshStandardMaterial({color:tblBlack,roughness:0.4,metalness:0.05});
-  const body=new THREE.Mesh(bodyGeo, bodyMat);
-  body.position.set(tblX, floorY+bodyH/2, tblZ);
-  body.castShadow=true; body.receiveShadow=true; body._isRoom=true;
-  scene.add(body);
+  const drawerGap=0.8;
+  const drawerH=(bodyH-drawerGap*4)/3;
+  const drawerW=tblW-1.5;
+  const drawerFrontZ=tblZ-tblD/2;   // drawer face sits flush with the body front
+  const trayD=tblD-0.5;              // tray runs nearly the full dresser depth
+  {
+    // Front silhouette: full body rectangle in XY.
+    const faceShape=new THREE.Shape();
+    faceShape.moveTo(-tblW/2, -bodyH/2);
+    faceShape.lineTo( tblW/2, -bodyH/2);
+    faceShape.lineTo( tblW/2,  bodyH/2);
+    faceShape.lineTo(-tblW/2,  bodyH/2);
+    faceShape.lineTo(-tblW/2, -bodyH/2);
+    // Three rectangular drawer-sized holes, one per drawer row.
+    const holeW=drawerW+0.3;           // slightly wider than drawer face for clearance
+    const holeH=drawerH-0.3;           // slightly shorter so face rests against rails
+    for(let d=0;d<3;d++){
+      const dyCenter=drawerGap*(d+1)+drawerH*(d+0.5)-bodyH/2; // body-local Y
+      const hole=new THREE.Path();
+      hole.moveTo(-holeW/2, dyCenter-holeH/2);
+      hole.lineTo( holeW/2, dyCenter-holeH/2);
+      hole.lineTo( holeW/2, dyCenter+holeH/2);
+      hole.lineTo(-holeW/2, dyCenter+holeH/2);
+      hole.lineTo(-holeW/2, dyCenter-holeH/2);
+      faceShape.holes.push(hole);
+    }
+    // Extrude along +Z through the full body depth. Final mesh origin at its
+    // geometric center (bodyH/2, tblD/2 in-shape).
+    const bodyGeo=new THREE.ExtrudeGeometry(faceShape, {depth:tblD, bevelEnabled:false});
+    bodyGeo.translate(0, 0, -tblD/2);   // center on Z
+    const body=new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.set(tblX, floorY+bodyH/2, tblZ);
+    body.castShadow=true; body.receiveShadow=true; body._isRoom=true;
+    scene.add(body);
+  }
 
   // Dark oak top — also curved front, with overhang
   const topOverhang=1;
@@ -4035,31 +4568,76 @@ const tblOak=0x5a3f2a;
   topMesh.position.set(tblX, floorY+tblH-topThick/2, tblZ-topOverhang/2);
   topMesh.castShadow=true; topMesh._isRoom=true; scene.add(topMesh);
 
-  // 3 drawers — curved front faces
-  const drawerGap=0.8;
-  const drawerH=(bodyH-drawerGap*4)/3;
-  const drawerW=tblW-1.5;
-  const drawerFrontZ=tblZ-tblD/2-curveBulge*0.3;
-  const drawerMat=new THREE.MeshStandardMaterial({color:0x222222,roughness:0.5});
+  // 3 drawers — curved front face + hollow tray (left/right/back walls + floor).
+  // Each drawer is a THREE.Group positioned at (tblX, dy, drawerFrontZ). The
+  // group slides along local Z (toward -Z = out) when opened. Marked _isRoom
+  // so it mirrors with the rest of the room; children are in local coords.
+  // (drawerGap, drawerH, drawerW, drawerFrontZ, trayD declared above for the
+  // body-cavity math and reused here.)
+  const drawerFaceMat=new THREE.MeshStandardMaterial({color:0x222222,roughness:0.5});
+  const drawerTrayMat=new THREE.MeshStandardMaterial({color:0x151515,roughness:0.85,metalness:0.02});
+  const trayWall=0.5;              // thickness of tray walls
+  const drawerSlideMax=8;          // how far the drawer pulls out
   for(let d=0;d<3;d++){
     const dy=floorY+drawerGap*(d+1)+drawerH*(d+0.5);
-    // Curved drawer face
-    const dGeo=curvedFrontBox(drawerW, drawerH-0.5, 0.8, curveBulge*0.8);
-    const drawer=new THREE.Mesh(dGeo, drawerMat);
-    drawer.position.set(tblX, dy, drawerFrontZ);
-    drawer._isRoom=true; scene.add(drawer);
-
-    // 2 round handles per drawer
+    const grp=new THREE.Group();
+    grp.position.set(tblX, dy, drawerFrontZ);
+    grp._isRoom=true;
+    grp._isDrawer=true;
+    grp._drawerIdx=d;
+    grp._drawerOpen=false;
+    grp._drawerSlide=0;              // current slide amount (0..slideMax)
+    grp._drawerSlideMax=drawerSlideMax;
+    grp._drawerW=drawerW;
+    grp._drawerH=drawerH;
+    grp._drawerTrayD=trayD;
+    grp._drawerTrayWall=trayWall;
+    // Curved front face — same as before, centered at group origin.
+    const faceGeo=curvedFrontBox(drawerW, drawerH-0.5, 0.8, curveBulge*0.8);
+    const face=new THREE.Mesh(faceGeo, drawerFaceMat);
+    face._isDrawer=true; face._drawerIdx=d;
+    grp.add(face);
+    // Tray: open-top box extending behind the face in +Z (into the body).
+    // Tray interior runs from z=0.4 (behind face) to z=trayD.
+    const trayBottom=new THREE.Mesh(
+      new THREE.BoxGeometry(drawerW-trayWall*2, trayWall, trayD),
+      drawerTrayMat
+    );
+    trayBottom.position.set(0, -drawerH/2+trayWall/2, trayD/2+0.4);
+    trayBottom._isDrawer=true; trayBottom._drawerIdx=d;
+    grp.add(trayBottom);
+    const trayLeft=new THREE.Mesh(
+      new THREE.BoxGeometry(trayWall, drawerH-0.5, trayD),
+      drawerTrayMat
+    );
+    trayLeft.position.set(-drawerW/2+trayWall/2, 0, trayD/2+0.4);
+    trayLeft._isDrawer=true; trayLeft._drawerIdx=d;
+    grp.add(trayLeft);
+    const trayRight=trayLeft.clone();
+    trayRight.position.x=drawerW/2-trayWall/2;
+    grp.add(trayRight);
+    const trayBack=new THREE.Mesh(
+      new THREE.BoxGeometry(drawerW-trayWall*2, drawerH-0.5, trayWall),
+      drawerTrayMat
+    );
+    trayBack.position.set(0, 0, trayD+0.4-trayWall/2);
+    trayBack._isDrawer=true; trayBack._drawerIdx=d;
+    grp.add(trayBack);
+    // 2 round handles per drawer — live on the face, so they travel with it.
     const handleMat=new THREE.MeshStandardMaterial({color:0x888888,roughness:0.3,metalness:0.6});
     for(let h of[-1,1]){
       const handle=new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), handleMat);
-      handle.position.set(tblX+h*4, dy, drawerFrontZ-0.8);
-      handle._isRoom=true; scene.add(handle);
+      handle.position.set(h*4, 0, -0.8);
+      handle._isDrawer=true; handle._drawerIdx=d;
+      grp.add(handle);
       const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,0.5,6), handleMat);
       stem.rotation.x=Math.PI/2;
-      stem.position.set(tblX+h*4, dy, drawerFrontZ-0.5);
-      stem._isRoom=true; scene.add(stem);
+      stem.position.set(h*4, 0, -0.5);
+      stem._isDrawer=true; stem._drawerIdx=d;
+      grp.add(stem);
     }
+    scene.add(grp);
+    drawers.push(grp);
   }
 }
 
@@ -4089,7 +4667,10 @@ const tblOak=0x5a3f2a;
   // Position and rotate the whole mug
   mugGroup.position.set(mugX, mugY, mugZ);
   mugGroup.rotation.y=60*Math.PI/180; // 60° rotation
-  mugGroup.traverse(o=>{o._isRoom=true;});
+  // Only mark the GROUP as room — not the children. Marking children caused
+  // applyRoomDelta to double-shift them (once for group, once per child) each
+  // time the room was nudged, which is why the mug drifted outside the room.
+  mugGroup._isRoom=true;
   scene.add(mugGroup);
 }
 
@@ -4188,7 +4769,9 @@ const tblOak=0x5a3f2a;
 
 // Lamp on nightstand — near the corner closest to the door extrusion
 let lampLight, lampShade, lampOn=true;
+let lampBulb=null;
 let ceilLightOn=true; // ceiling fixture togglable by clicking
+let ceilGlow=null;
 {
   const lampX=tblX+tblW/2-6; // 6" from the extrusion-side edge
   const lampZ=tblZ+tblD/2-6; // 6" from the back edge (avoid wall clip)
@@ -4213,8 +4796,8 @@ let ceilLightOn=true; // ceiling fixture togglable by clicking
   lampShade=new THREE.Mesh(new THREE.CylinderGeometry(shadeR1, shadeR2, shadeH, 24, 1, true), shadeMat);
   lampShade.position.set(lampX, lampBaseY+0.8+stemH+shadeH/2-1, lampZ);
   lampShade._isRoom=true; lampShade._isLamp=true; scene.add(lampShade);
-  // Top cap
-  const topCap=new THREE.Mesh(new THREE.CircleGeometry(shadeR1, 24), shadeMat);
+  // Top ring with a center opening so the player can drop into the shade.
+  const topCap=new THREE.Mesh(new THREE.RingGeometry(4.2, shadeR1, 24), shadeMat);
   topCap.rotation.x=-Math.PI/2;
   topCap.position.set(lampX, lampBaseY+0.8+stemH+shadeH-1, lampZ);
   topCap._isRoom=true; topCap._isLamp=true; scene.add(topCap);
@@ -4225,9 +4808,9 @@ let ceilLightOn=true; // ceiling fixture togglable by clicking
   lampLight._isRoom=true; scene.add(lampLight);
   // Bulb visible inside shade
   const bulbMat=new THREE.MeshStandardMaterial({color:0xffffcc,emissive:0xffeedd,emissiveIntensity:1.2,roughness:0.3});
-  const bulb=new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), bulbMat);
-  bulb.position.set(lampX, lampBaseY+0.8+stemH+3, lampZ);
-  bulb._isRoom=true; bulb._isLamp=true; scene.add(bulb);
+  lampBulb=new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), bulbMat);
+  lampBulb.position.set(lampX, lampBaseY+0.8+stemH+3, lampZ);
+  lampBulb._isRoom=true; lampBulb._isLamp=true; scene.add(lampBulb);
 }
 
 // Wall section — back wall with door extrusion bumping INTO the room (-Z direction)
@@ -4353,13 +4936,30 @@ const tvFrame=roomRoundBox(tvW+bezel*2, tvH+bezel*2, tvD, 0.4, 0x111111,
 tvFrame.material.roughness=0.3;
 tvFrame.material.metalness=0.6;
 
-// Screen — dark glossy panel
+// Screen — dark glossy panel, optionally displays an image (pokopia.jpg if present).
 const screenGeo=new THREE.PlaneGeometry(tvW, tvH);
 const screenMat=stdMat({color:0x0a0a0a,roughness:0.05,metalness:0.0,envMapIntensity:1.5});
 const screen=new THREE.Mesh(screenGeo, screenMat);
 screen.position.set(tvCenterX, tvCenterY, tvZ+tvD/2+0.02);
 screen._isRoom=true;
 scene.add(screen);
+// Load TV screen image — falls back silently to dark glass if file is missing.
+new THREE.TextureLoader().load(
+  'img/pokopia.jpg',
+  (tex)=>{
+    tex.colorSpace=THREE.SRGBColorSpace||tex.colorSpace;
+    tex.anisotropy=Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    screen.material.map=tex;
+    screen.material.emissiveMap=tex;
+    screen.material.emissive=new THREE.Color(0xffffff);
+    screen.material.emissiveIntensity=0.85;
+    screen.material.color=new THREE.Color(0x000000);
+    screen.material.roughness=0.4;
+    screen.material.needsUpdate=true;
+  },
+  undefined,
+  ()=>{ /* no-op if missing */ }
+);
 
 // ─── Mini split indoor unit (on TV wall, near closet wall, 1ft from ceiling) ───
 const msW=32, msH=11, msD=8; // typical wall-mount unit dimensions
@@ -4395,39 +4995,156 @@ const msZ=oppWallZ+0.5+msD/2; // flush against TV wall
   logoArea._isRoom=true; scene.add(logoArea);
 }
 
-// ─── Right side wall (solid) ───
+// ─── Right side wall (with a cut-out for the bifold closet) ───
 const sideWallX=51;
 const wallDepth=127; // Z span from oppWallZ to 49
 const wallHeight=80;
-const rightWall=roomBox(0.5, wallHeight, wallDepth, 0xd8d4ce, sideWallX, floorY+wallHeight/2, -15, 0,0,0);
-const sideBaseboard=roomBox(0.6, 3, wallDepth, 0xc0bbb4, sideWallX-0.5, floorY+1.5, -15, 0,0,0);
+// Closet opening geometry — must match the bifold block below exactly.
+// Opening width (closetW) is the doorway. Interior width is wider so the
+// walk-in feels like a real walk-in. Because the interior can extend past
+// the rightWall's Z span, we add extra wall panels on the main wall plane
+// (x=sideWallX) to close off the gap.
+const _closetW=48, _closetH=80, _closetDepth=36, _closetInteriorW=78;
+const _closetZ=oppWallZ+_closetW/2+4;
+const rightWall=(()=>{
+  // Build the wall as an extruded rectangle with a rectangular hole at the
+  // closet opening. Shape lives in Y-Z (the wall's face plane); extrudes along
+  // +X, then positioned so the inward face sits at sideWallX.
+  const wallMat=new THREE.MeshStandardMaterial({color:0xd8d4ce,roughness:0.7,metalness:0.05});
+  const zCenter=-15;
+  const wallShape=new THREE.Shape();
+  const zMin=zCenter-wallDepth/2, zMax=zCenter+wallDepth/2;
+  const yMin=0, yMax=wallHeight;
+  wallShape.moveTo(zMin, yMin);
+  wallShape.lineTo(zMax, yMin);
+  wallShape.lineTo(zMax, yMax);
+  wallShape.lineTo(zMin, yMax);
+  wallShape.lineTo(zMin, yMin);
+  // Rectangular hole for the closet opening. Bottom aligns with the wall
+  // bottom; the threshold z-fighting is addressed by lifting the wall mesh a
+  // hair above the floor and giving the wall material polygonOffset.
+  const hZMin=_closetZ-_closetW/2, hZMax=_closetZ+_closetW/2;
+  const hYMin=0, hYMax=_closetH;
+  const hole=new THREE.Path();
+  hole.moveTo(hZMin, hYMin);
+  hole.lineTo(hZMax, hYMin);
+  hole.lineTo(hZMax, hYMax);
+  hole.lineTo(hZMin, hYMax);
+  hole.lineTo(hZMin, hYMin);
+  wallShape.holes.push(hole);
+  const wallGeo=new THREE.ExtrudeGeometry(wallShape, {depth:0.5, bevelEnabled:false});
+  // After extrude: shape axes are (Z,Y) in the local XY plane. Rotate so
+  // shape's X-coord → world Z, shape's Y-coord → world Y, extrude → world +X.
+  // ExtrudeGeometry extrudes along +Z of its own frame; rotate the whole geo
+  // to map (localX→worldZ, localY→worldY, localZ→worldX).
+  wallGeo.rotateY(-Math.PI/2);
+  const rightWall=new THREE.Mesh(wallGeo, wallMat);
+  rightWall.position.set(sideWallX, floorY-0.5, 0);
+  rightWall.castShadow=true; rightWall.receiveShadow=true; rightWall._isRoom=true;
+  scene.add(rightWall);
+  // Extension panels on the main wall plane where the closet interior extends
+  // past rightWall's Z span. These cover the "gaps" flanking the opening so
+  // the closet doesn't look open to the void.
+  const rwZMin=-15-wallDepth/2, rwZMax=-15+wallDepth/2;
+  const intZMin=_closetZ-_closetInteriorW/2, intZMax=_closetZ+_closetInteriorW/2;
+  if(intZMin<rwZMin){
+    const w=rwZMin-intZMin;
+    const ext=roomBox(0.5, wallHeight, w, 0xd8d4ce, sideWallX, floorY+wallHeight/2, (intZMin+rwZMin)/2, 0,0,0);
+    ext._wallExtMinZ=true;
+  }
+  if(intZMax>rwZMax){
+    const w=intZMax-rwZMax;
+    const ext=roomBox(0.5, wallHeight, w, 0xd8d4ce, sideWallX, floorY+wallHeight/2, (rwZMax+intZMax)/2, 0,0,0);
+    ext._wallExtMaxZ=true;
+  }
+  return rightWall;
+})();
+// Baseboard — break into two pieces so it doesn't cross the closet opening.
+const sideBaseboard1=roomBox(0.6, 3, (_closetZ-_closetW/2) - (-15 - wallDepth/2), 0xc0bbb4,
+  sideWallX-0.5, floorY+1.5, (-15 - wallDepth/2 + (_closetZ-_closetW/2))/2, 0,0,0);
+const sideBaseboard2=roomBox(0.6, 3, (-15 + wallDepth/2) - (_closetZ+_closetW/2), 0xc0bbb4,
+  sideWallX-0.5, floorY+1.5, (_closetZ+_closetW/2 + (-15 + wallDepth/2))/2, 0,0,0);
 
 // ─── Bifold closet doors on right wall (becomes -X after flip) ───
 {
-  const closetW=48, closetH=80; // 4-foot wide bifold opening
+  const closetW=_closetW, closetH=_closetH; // share with the wall cut-out
   const closetX=sideWallX-0.5; // flush against wall
-  const closetZ=oppWallZ+closetW/2+4; // as far -Z as possible, 4" from TV wall
+  const closetZ=_closetZ; // match the wall opening exactly
   const bifoldColor=0xe0d8cc;
   const bifoldMat=new THREE.MeshStandardMaterial({color:bifoldColor,roughness:0.72,metalness:0.0});
   const panelW2=closetW/4; // 4 panels (2 per side)
   const panelThick=1.2;
-  // 4 bifold panels — slightly angled to show they're bifold
-  for(let i=0;i<4;i++){
-    const pz=closetZ-closetW/2+panelW2*(i+0.5);
-    const panel=roomRoundBox(panelThick, closetH-1, panelW2-0.5, 0.3, bifoldColor,
-      closetX-panelThick/2, floorY+closetH/2, pz, 0,0,0);
-    panel.material.roughness=0.78;
-    panel.material.metalness=0.0;
-    // Add raised panel detail (2 panels per door leaf)
-    const rpH1=closetH*0.35, rpH2=closetH*0.45;
-    const rpW=panelW2*0.7;
-    const rpMat=new THREE.MeshStandardMaterial({color:0xd6cec2,roughness:0.78,metalness:0.0});
-    const rp1=new THREE.Mesh(new THREE.BoxGeometry(0.3, rpH1, rpW), rpMat);
-    rp1.position.set(closetX-panelThick-0.16, floorY+closetH*0.24, pz);
-    rp1.castShadow=true; rp1.receiveShadow=true; rp1._isRoom=true; scene.add(rp1);
-    const rp2=new THREE.Mesh(new THREE.BoxGeometry(0.3, rpH2, rpW), rpMat);
-    rp2.position.set(closetX-panelThick-0.16, floorY+closetH*0.68, pz);
-    rp2.castShadow=true; rp2.receiveShadow=true; rp2._isRoom=true; scene.add(rp2);
+  // Two bifold leaves. Each leaf's pivot sits at its outer jamb (the hinge to
+  // the wall). Inside the leaf, an outer panel is fixed and an inner panel is
+  // attached via a second hinge group (the mid-leaf joint). Clicking a panel
+  // toggles the whole leaf open/closed — we animate leafPivot.rotation.y = θ
+  // and innerGroup.rotation.y = -2θ so the two panels fold into a V whose
+  // endpoint stays along the wall track.
+  const bifoldLeaves=[];
+  const handleMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.3,metalness:0.15});
+  for(let leafIdx=0; leafIdx<2; leafIdx++){
+    const leafSide=leafIdx===0?-1:1; // -1 → -Z jamb leaf, +1 → +Z jamb leaf
+    const leafPivot=new THREE.Group();
+    leafPivot.position.set(closetX-panelThick/2, floorY+closetH/2, closetZ+leafSide*closetW/2);
+    leafPivot._isRoom=true;
+    leafPivot._isBifoldLeaf=true;
+    leafPivot._leafOpen=false;
+    leafPivot._leafAngle=0;       // current θ (rad)
+    leafPivot._leafTarget=0;      // target θ (rad)
+    leafPivot._leafSide=leafSide;
+    scene.add(leafPivot);
+    bifoldLeaves.push(leafPivot);
+    // Outer panel — centered panelW2/2 along -leafSide*Z from pivot.
+    function addRaisedDetails(parent, zCenter){
+      const rpH1=closetH*0.35, rpH2=closetH*0.45;
+      const rpW=panelW2*0.7;
+      // Thin boxes proud of the door. Key fix: receiveShadow must match the
+      // door (both true) or the panels look brighter under any shadow.
+      const rp1=new THREE.Mesh(new THREE.BoxGeometry(0.3, rpH1, rpW), bifoldMat);
+      rp1.position.set(panelThick/2+0.16, -closetH*0.26, zCenter);
+      rp1.castShadow=true; rp1.receiveShadow=true;
+      rp1._isBifoldLeaf=true; parent.add(rp1);
+      const rp2=new THREE.Mesh(new THREE.BoxGeometry(0.3, rpH2, rpW), bifoldMat);
+      rp2.position.set(panelThick/2+0.16, closetH*0.18, zCenter);
+      rp2.castShadow=true; rp2.receiveShadow=true;
+      rp2._isBifoldLeaf=true; parent.add(rp2);
+    }
+    const outerPanel=new THREE.Mesh(
+      new THREE.BoxGeometry(panelThick, closetH-1, panelW2-0.3),
+      bifoldMat
+    );
+    outerPanel.position.set(0, 0, -leafSide*panelW2/2);
+    outerPanel.castShadow=true; outerPanel.receiveShadow=true;
+    outerPanel._isBifoldLeaf=true;
+    leafPivot.add(outerPanel);
+    addRaisedDetails(leafPivot, -leafSide*panelW2/2);
+    // Inner-panel hinge group — pivoted at the middle joint (panelW2 along
+    // -leafSide*Z from leaf pivot).
+    const innerGroup=new THREE.Group();
+    innerGroup.position.set(0, 0, -leafSide*panelW2);
+    leafPivot.add(innerGroup);
+    leafPivot._innerGroup=innerGroup;
+    const innerPanel=new THREE.Mesh(
+      new THREE.BoxGeometry(panelThick, closetH-1, panelW2-0.3),
+      bifoldMat
+    );
+    innerPanel.position.set(0, 0, -leafSide*panelW2/2);
+    innerPanel.castShadow=true; innerPanel.receiveShadow=true;
+    innerPanel._isBifoldLeaf=true;
+    innerGroup.add(innerPanel);
+    addRaisedDetails(innerGroup, -leafSide*panelW2/2);
+    // White round handle on the inner panel, near the mid-leaf joint side so
+    // it reads as the "pull" side of the bifold. Sits proud of the room-facing
+    // face by ~0.6".
+    const handle=new THREE.Mesh(new THREE.SphereGeometry(0.75, 14, 10), handleMat);
+    handle.position.set(panelThick/2+0.6, 0, -leafSide*(panelW2*0.22));
+    handle._isBifoldLeaf=true;
+    const handleStem=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,0.55,10), handleMat);
+    handleStem.rotation.z=Math.PI/2;
+    handleStem.position.set(panelThick/2+0.25, 0, -leafSide*(panelW2*0.22));
+    handleStem._isBifoldLeaf=true;
+    innerGroup.add(handle);
+    innerGroup.add(handleStem);
   }
   // Moulding / trim around the opening
   const trimMat=new THREE.MeshStandardMaterial({color:0xe4ddd1,roughness:0.7,metalness:0.0});
@@ -4444,6 +5161,45 @@ const sideBaseboard=roomBox(0.6, 3, wallDepth, 0xc0bbb4, sideWallX-0.5, floorY+1
   const trimR=new THREE.Mesh(new THREE.BoxGeometry(trimD, closetH, trimW), trimMat);
   trimR.position.set(closetX-trimD/2, floorY+closetH/2, closetZ+closetW/2+trimW/2);
   trimR.castShadow=true; trimR.receiveShadow=true; trimR._isRoom=true; scene.add(trimR);
+
+  // ─── Walk-in closet interior box (behind the wall opening) ───
+  // The wall sits at x=sideWallX with a hole cut out and thickness 0.5 (so
+  // its back face sits at sideWallX+0.5). Interior side walls and ceiling
+  // start at sideWallX+0.5 to butt cleanly against the wall's back face
+  // (avoiding z-fighting where they cross the solid part of the wall).
+  const closetDepth=_closetDepth;
+  const interiorW=_closetInteriorW;
+  const wallBack=0.5; // rightWall thickness
+  const innerDepth=closetDepth-wallBack;
+  const innerCx=sideWallX+wallBack+innerDepth/2;
+  const insideMat=new THREE.MeshStandardMaterial({color:0xe4dcce,roughness:0.85,metalness:0.0});
+  // Back wall
+  const closetBack=new THREE.Mesh(new THREE.BoxGeometry(0.5, closetH, interiorW), insideMat);
+  closetBack.position.set(sideWallX+closetDepth, floorY+closetH/2, closetZ);
+  closetBack.castShadow=false; closetBack.receiveShadow=true; closetBack._isRoom=true; scene.add(closetBack);
+  // +Z side wall
+  const closetSideP=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, closetH, 0.5), insideMat);
+  closetSideP.position.set(innerCx, floorY+closetH/2, closetZ+interiorW/2);
+  closetSideP.receiveShadow=true; closetSideP._isRoom=true; scene.add(closetSideP);
+  // -Z side wall
+  const closetSideN=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, closetH, 0.5), insideMat);
+  closetSideN.position.set(innerCx, floorY+closetH/2, closetZ-interiorW/2);
+  closetSideN.receiveShadow=true; closetSideN._isRoom=true; scene.add(closetSideN);
+  // Ceiling
+  const closetCeil=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, 0.5, interiorW), insideMat);
+  closetCeil.position.set(innerCx, floorY+closetH, closetZ);
+  closetCeil.receiveShadow=true; closetCeil._isRoom=true; scene.add(closetCeil);
+  // Clothes rod across the closet, ~14" below the ceiling
+  const rodMat=new THREE.MeshStandardMaterial({color:0xb8b8b8,roughness:0.35,metalness:0.6});
+  const rod=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,interiorW-2,14), rodMat);
+  rod.rotation.x=Math.PI/2;
+  rod.position.set(innerCx, floorY+closetH-14, closetZ);
+  rod.castShadow=true; rod._isRoom=true; scene.add(rod);
+  // Shelf above the rod
+  const shelfMat=new THREE.MeshStandardMaterial({color:0xdcd2c0,roughness:0.75,metalness:0.0});
+  const shelf=new THREE.Mesh(new THREE.BoxGeometry(innerDepth-2, 0.8, interiorW-1), shelfMat);
+  shelf.position.set(innerCx, floorY+closetH-10, closetZ);
+  shelf.castShadow=true; shelf.receiveShadow=true; shelf._isRoom=true; scene.add(shelf);
 }
 
 // ─── Left side wall with window (near the bed) ───
@@ -4581,6 +5337,11 @@ ceilSpot.shadow.bias=-0.0005;
 ceilSpot.shadow.radius=5; ceilSpot.shadow.blurSamples=12;
 ceilSpot.shadow.camera.near=10;
 ceilSpot.shadow.camera.far=95;
+// Extra local glow near the fixture so the dome visibly "emits" like the lamp.
+ceilGlow=new THREE.PointLight(0xfff3df,0.45,70,2);
+ceilGlow.position.set(ceilLightX,ceilY-1.2,ceilLightZ);
+ceilGlow.castShadow=false;
+scene.add(ceilGlow);
 
 // Curtains — simple draped fabric panels on each side of the window
 const curtainH=winH+12, curtainW=14, curtainD=1.5;
@@ -4865,7 +5626,7 @@ scene.traverse(obj=>{
   [wallMeshL, 'back'], [returnWallL, 'back'], [baseboardMeshL, 'back'], [baseboardRetL, 'back'],
   [recessWallL, 'back'], [recessWallR, 'back'], [baseboardRecessL, 'back'], [baseboardRecessR, 'back'],
   [oppWall, 'front'], [oppBaseboard, 'front'],
-  [rightWall, 'right'], [sideBaseboard, 'right'],
+  [rightWall, 'right'], [sideBaseboard1, 'right'], [sideBaseboard2, 'right'],
   [leftWallBelow, 'left'], [leftWallAbove, 'left'], [leftWallFront, 'left'], [leftWallBack, 'left'], [leftBaseboard, 'left']
 ].forEach(([m, side])=>{
   if(m){
@@ -4910,7 +5671,7 @@ if(particles) particles.matrixAutoUpdate=true;
 let _prevCx=0,_prevCz=0;
 function needsContinuousRender(){
   if(_fpMode || drag || _dragFilter || _pendingFilterDrag || _isPanning) return true;
-  if(explodeLerping || _filterLerps.length>0) return true;
+  if(explodeLerping || _filterLerps.length>0 || _drawerLerps.length>0 || _bifoldLerps.length>0) return true;
   if(airflowOn || spinning || currentRGB==='rainbow') return true;
   for(const rotor of allRotors){
     if(Math.abs(rotor.userData.spinSpeed)>0.0008) return true;
@@ -4927,6 +5688,9 @@ function animate(ts){
   const continuous=needsContinuousRender();
   if(!continuous && (ts-_lastRenderTs)<_idleFrameMs) return;
   _lastRenderTs=ts;
+
+  // Play Mode collectibles — spin, bob, and check for pickup.
+  _updateCoins(ts);
 
   // Rainbow RGB cycling — smooth gradient flowing across all fans
   if(currentRGB==='rainbow'){
@@ -5008,6 +5772,49 @@ function animate(ts){
     if(fl.obj.position.distanceToSquared(fl.target)<0.001){
       fl.obj.position.copy(fl.target);
       _filterLerps.splice(i,1);
+    }
+  }
+
+  // Drawer slide animation — slides along Z only. Force the group's matrix to
+  // update every frame of the animation (applyRoomDelta locks _isRoom matrices
+  // after its initial shift, so we must re-enable autoupdate to see motion).
+  for(let i=_drawerLerps.length-1;i>=0;i--){
+    const dl=_drawerLerps[i];
+    const cur=dl.obj.position.z;
+    const next=cur+(dl.targetZ-cur)*0.15;
+    dl.obj.position.z=next;
+    dl.obj.matrixAutoUpdate=true;
+    dl.obj.updateMatrixWorld(true);
+    if(Math.abs(next-dl.targetZ)<0.01){
+      dl.obj.position.z=dl.targetZ;
+      dl.obj.updateMatrixWorld(true);
+      _drawerLerps.splice(i,1);
+    }
+  }
+
+  // Bifold closet fold animation. leafPivot rotates by θ, innerGroup rotates
+  // by -2θ (relative), so the panel endpoint stays on the wall-track line.
+  for(let i=_bifoldLerps.length-1;i>=0;i--){
+    const bl=_bifoldLerps[i];
+    const leaf=bl.leaf;
+    const cur=leaf._leafAngle;
+    const next=cur+(leaf._leafTarget-cur)*0.15;
+    leaf._leafAngle=next;
+    // Sign: after the room's one-time X-mirror, the wall sits at -X and the
+    // room is at +X. The leafSide=-1 leaf's panels extend along local +Z from
+    // its pivot, so a positive Y rotation swings them into +X (into the room).
+    // The leafSide=+1 leaf's panels extend along -Z, needing a negative Y
+    // rotation to reach +X. So the fold sign is -leafSide.
+    const sign=-leaf._leafSide;
+    leaf.rotation.y=sign*next;
+    leaf._innerGroup.rotation.y=-2*sign*next;
+    leaf.matrixAutoUpdate=true; leaf.updateMatrixWorld(true);
+    if(Math.abs(next-leaf._leafTarget)<0.002){
+      leaf._leafAngle=leaf._leafTarget;
+      leaf.rotation.y=sign*leaf._leafTarget;
+      leaf._innerGroup.rotation.y=-2*sign*leaf._leafTarget;
+      leaf.updateMatrixWorld(true);
+      _bifoldLerps.splice(i,1);
     }
   }
 
@@ -5094,17 +5901,26 @@ function animate(ts){
     if(Math.abs(_fpLookDX)>maxLookStep*4) _fpLookDX*=0.6;
     if(Math.abs(_fpLookDY)>maxLookStep*4) _fpLookDY*=0.6;
     _fpYaw-=stepX*0.002;
-    _fpPitch=Math.max(-1.2,Math.min(1.2, _fpPitch-stepY*0.002));
+    _fpPitch=Math.max(_fpPitchMin,Math.min(_fpPitchMax, _fpPitch-stepY*0.002));
 
-    const spd=0.35;
+    const spd=_fpKeys.shift?0.45:0.22;
     const fwd=_fpFwd.set(-Math.sin(_fpYaw),0,-Math.cos(_fpYaw));
     const right=_fpRight.set(fwd.z,0,-fwd.x);
-    // Calculate desired movement
-    let moveX=0, moveZ=0;
-    if(_fpKeys.w){ moveX+=fwd.x*spd; moveZ+=fwd.z*spd; }
-    if(_fpKeys.s){ moveX-=fwd.x*spd; moveZ-=fwd.z*spd; }
-    if(_fpKeys.a){ moveX+=right.x*spd; moveZ+=right.z*spd; }
-    if(_fpKeys.d){ moveX-=right.x*spd; moveZ-=right.z*spd; }
+    // Target velocity from input (desired direction * speed). Smooth toward
+    // it with different accel/decel rates so starts feel weighty and stops
+    // decelerate naturally instead of snapping.
+    let tgtX=0, tgtZ=0;
+    if(_fpKeys.w){ tgtX+=fwd.x*spd; tgtZ+=fwd.z*spd; }
+    if(_fpKeys.s){ tgtX-=fwd.x*spd; tgtZ-=fwd.z*spd; }
+    if(_fpKeys.a){ tgtX+=right.x*spd; tgtZ+=right.z*spd; }
+    if(_fpKeys.d){ tgtX-=right.x*spd; tgtZ-=right.z*spd; }
+    const inputActive=(_fpKeys.w||_fpKeys.a||_fpKeys.s||_fpKeys.d);
+    const accel=inputActive?0.18:0.22; // decel slightly faster than accel
+    _fpVelX+=(tgtX-_fpVelX)*accel;
+    _fpVelZ+=(tgtZ-_fpVelZ)*accel;
+    // Kill residual drift below threshold to avoid infinite tiny motion.
+    if(!inputActive && Math.hypot(_fpVelX,_fpVelZ)<0.005){ _fpVelX=0; _fpVelZ=0; }
+    const moveX=_fpVelX, moveZ=_fpVelZ;
     // Jump — charged: hold space longer = jump higher
     if(_fpKeys.space && Math.abs(_fpVy)<0.01){
       _fpSpaceHeld++;
@@ -5133,32 +5949,52 @@ function animate(ts){
     const r=_fpBodyR;
     // Wall collision (dynamic — moves with room placement)
     const _curBounds=_fpGetBounds();
-    nx=Math.max(_curBounds.xMin+r, Math.min(_curBounds.xMax-r, nx));
-    nz=Math.max(_curBounds.zMin+r, Math.min(_curBounds.zMax-r, nz));
+    const bxMin=_curBounds.xMin+r, bxMax=_curBounds.xMax-r;
+    const bzMin=_curBounds.zMin+r, bzMax=_curBounds.zMax-r;
+    let _bonkedThisFrame=false;
+    let _bonkIntensity=0;
+    if(nx<bxMin){ nx=bxMin; _fpVelX=Math.max(_fpVelX,0); }
+    else if(nx>bxMax){ nx=bxMax; _fpVelX=Math.min(_fpVelX,0); }
+    if(nz<bzMin){ nz=bzMin; _fpVelZ=Math.max(_fpVelZ,0); }
+    else if(nz>bzMax){ nz=bzMax; _fpVelZ=Math.min(_fpVelZ,0); }
     // Furniture collision — AABB push-out + standing on top (dynamic)
     const eyeH=4; // eye height
     let groundY=_fpFloorY-placementOffset.y; // floor moves with room Y offset
     const _curBoxes=_fpGetBoxes();
     for(const box of _curBoxes){
-      const onTopPrev=_fpPos.y>=(box.yTop+eyeH-1);
       // Check XZ overlap
       const xOverlap=nx+r>box.xMin && nx-r<box.xMax;
       const zOverlap=nz+r>box.zMin && nz-r<box.zMax;
       if(xOverlap && zOverlap){
-        // If feet are above the box top, we can stand on it
-        if(newY-eyeH+1>=box.yTop-0.5){
+        // Feet heights for prev/new positions.
+        const prevFeet=_fpPos.y-eyeH;
+        const newFeet=newY-eyeH;
+        const newHead=newY; // camera at head/eye
+        // Standing on top: require the player was ALREADY at/above the box
+        // top and is descending (or touching). Prevents jumping from below
+        // and snapping on top, which was the shelf/mini-split pass-through.
+        const onTopPrev=prevFeet>=box.yTop-0.25;
+        if(onTopPrev && newFeet>=box.yTop-0.5){
           groundY=Math.max(groundY, box.yTop+eyeH);
+        } else if(box.yBottom!==undefined && newHead<=box.yBottom-0.2){
+          // Player fully beneath this box (walking under the bed/mini split).
+        } else if(box.yBottom!==undefined && _fpPos.y<=box.yBottom && newHead>box.yBottom-0.2 && _fpVy>0){
+          // Jumping up into the underside — clamp head just below it.
+          _bonkedThisFrame=true;
+          _bonkIntensity=Math.max(_bonkIntensity, _fpVy*1.2);
+          newY=box.yBottom-0.2;
+          _fpVy=0;
         } else {
-          // Push out of box (pick smallest penetration axis)
-          const pushXL=box.xMax+r-nx;  // push +X
-          const pushXR=nx+r-box.xMin;  // push -X (use as magnitude)
+          // Push out of box on smallest XZ penetration axis.
+          const pushXL=box.xMax+r-nx;
+          const pushXR=nx+r-box.xMin;
           const pushZF=box.zMax+r-nz;
           const pushZB=nz+r-box.zMin;
           const minPush=Math.min(pushXL,pushXR,pushZF,pushZB);
-          if(minPush===pushXL) nx=box.xMax+r;
-          else if(minPush===pushXR) nx=box.xMin-r;
-          else if(minPush===pushZF) nz=box.zMax+r;
-          else nz=box.zMin-r;
+          if(minPush===pushXL) { nx=box.xMax+r; _fpVelX=Math.max(_fpVelX,0); }
+          else if(minPush===pushXR) { nx=box.xMin-r; _fpVelX=Math.min(_fpVelX,0); }
+          else if(minPush===pushZF) { nz=box.zMax+r; _fpVelZ=Math.max(_fpVelZ,0); }
+          else { nz=box.zMin-r; _fpVelZ=Math.min(_fpVelZ,0); }
         }
       }
     }
@@ -5169,13 +6005,88 @@ function animate(ts){
     // Ceiling collision — can't go above ceiling height
     const ceilMax=(floorY+80-placementOffset.y)-0.5; // half inch below ceiling
     if(_fpPos.y>ceilMax){ _fpPos.y=ceilMax; _fpVy=Math.min(_fpVy,0); }
-    camera.position.copy(_fpPos);
-    const lookTarget=_fpLookTarget.set(
-      _fpPos.x-Math.sin(_fpYaw)*10,
-      _fpPos.y+Math.sin(_fpPitch)*10,
-      _fpPos.z-Math.cos(_fpYaw)*10
+    // Rising-edge bonk: only play on the frame we FIRST hit something. If
+    // the player holds a key into a wall, _wasBonking stays true and no
+    // repeat sound fires until they stop pushing and re-impact.
+    if(_bonkedThisFrame && !_wasBonking) _playBonk(_bonkIntensity);
+    _wasBonking=_bonkedThisFrame;
+    // Subtle headbob — only when grounded and actually moving. Amplitude
+    // scales with speed so sprinting bobs more than a slow stroll.
+    const grounded=Math.abs(_fpPos.y-groundY)<0.05;
+    const horizSpd=Math.hypot(_fpVelX,_fpVelZ);
+    if(grounded && horizSpd>0.02){
+      _fpBobPhase+=horizSpd*0.55;
+    }
+    const bobY=grounded?Math.sin(_fpBobPhase)*Math.min(horizSpd,0.5)*0.07:0;
+    // ─── Third-person camera + cat avatar ───
+    // Room is tiny (inches, not meters), so camera has to stay close.
+    // Strategy: camera sits slightly behind & above the player's head,
+    // looking at the cat below/in front. The cat is parented at _fpPos so
+    // it can't visually separate from where collision says you are.
+    const lookDir=_fpViewDir.set(
+      -Math.sin(_fpYaw)*Math.cos(_fpPitch),
+      Math.sin(_fpPitch),
+      -Math.cos(_fpYaw)*Math.cos(_fpPitch)
     );
-    camera.lookAt(lookTarget);
+    if(catMixer){
+      if(catWalkAction && catIdleAction){
+        const w=Math.min(1, horizSpd/0.25);
+        catWalkAction.weight=w;
+        catIdleAction.weight=1-w;
+        if(catWalkAction.timeScale!==undefined){
+          catWalkAction.timeScale=0.8+horizSpd*2.0;
+        }
+      }
+      catMixer.update(Math.min(0.05, (ts-(catMixer._lastTs||ts))/1000));
+      catMixer._lastTs=ts;
+      if(catModel){
+        // Extra safety: keep the animated model anchored to its calibrated
+        // local transform in case a clip still contains root motion tracks.
+        catModel.position.copy(_catBaseLocalPos);
+        catModel.quaternion.copy(_catBaseLocalQuat);
+      }
+    }
+    if(_fpCamMode==='first'){
+      // True first-person camera: eye at player head, no cat mesh.
+      camera.position.set(_fpPos.x, _fpPos.y+bobY, _fpPos.z);
+      const eyeTarget=_fpLookTarget.copy(camera.position).addScaledVector(lookDir,10);
+      camera.lookAt(eyeTarget);
+      catGroup.visible=false;
+    } else {
+      // Cat (third-person) camera.
+      const focal=_fpLookTarget.set(_fpPos.x+fwd.x*0.6, _fpPos.y+0.7, _fpPos.z+fwd.z*0.6);
+      const camDist=7.3;
+      const camLift=2.2;
+      const camShoulder=0.9;
+      let cxC=focal.x - lookDir.x*camDist + right.x*camShoulder;
+      let cyC=focal.y - lookDir.y*camDist + camLift;
+      let czC=focal.z - lookDir.z*camDist + right.z*camShoulder;
+      // Keep camera strictly inside the player's walking bounds with a 0.5"
+      // safety margin. This matches the same bounds collision uses.
+      const bnd=_fpGetBounds();
+      const m=0.5;
+      if(cxC<bnd.xMin+m) cxC=bnd.xMin+m;
+      else if(cxC>bnd.xMax-m) cxC=bnd.xMax-m;
+      if(czC<bnd.zMin+m) czC=bnd.zMin+m;
+      else if(czC>bnd.zMax-m) czC=bnd.zMax-m;
+      camera.position.set(cxC, cyC, czC);
+      camera.lookAt(focal.x, focal.y, focal.z);
+      if(catGroup.parent!==scene) scene.add(catGroup);
+      catGroup.visible=true;
+      // World-space yaw rig: keep cat parallel to floor and anchored to the
+      // collision center.
+      catGroup.position.set(_fpPos.x, _fpPos.y - 4.0, _fpPos.z);
+      // Face movement direction for natural locomotion (no moonwalk while
+      // turning/backing/strafe). If nearly stationary, keep facing heading.
+      const moveLenSq=_fpVelX*_fpVelX + _fpVelZ*_fpVelZ;
+      const targetYaw=moveLenSq>0.0009 ? Math.atan2(_fpVelX, _fpVelZ) : (_fpYaw+Math.PI);
+      let dYaw=targetYaw-catGroup.rotation.y;
+      while(dYaw>Math.PI) dYaw-=Math.PI*2;
+      while(dYaw<-Math.PI) dYaw+=Math.PI*2;
+      catGroup.rotation.y+=dYaw*0.28;
+      catGroup.rotation.x=0;
+      catGroup.rotation.z=0;
+    }
     // Crosshair interaction check — raycast from center of screen (throttled for smoother play mode).
     if(ts>=_fpNextRaycastTs){
       _fpNextRaycastTs=ts+_fpRaycastIntervalMs;
@@ -5183,10 +6094,10 @@ function animate(ts){
       const _fpHits=_fpRay.intersectObjects(scene.children,true);
       _fpHoverTarget=null;
       for(const h of _fpHits){
-        if(h.distance>30) break; // interaction range
+        if(h.distance>_fpInteractRange) break; // interaction range
         if(!isAncestorVisible(h.object)) continue;
-        if(h.object._isRoom) continue;
-        if(h.object._isFan||h.object._isFilterL||h.object._isFilterR||h.object._isLamp||h.object._isCeilLight){ _fpHoverTarget=h.object; break; }
+        const target=getInteractiveTarget(h.object);
+        if(target){ _fpHoverTarget=target; break; }
       }
     }
     const _fpTarget=_fpHoverTarget;
@@ -5198,9 +6109,6 @@ function animate(ts){
     }
     // Store for click handler
     window._fpLookTarget=_fpTarget;
-    // Update HUD position readout
-    const hud=document.getElementById('fpHud');
-    if(hud) hud.querySelector('.fp-pos').textContent='X:'+_fpPos.x.toFixed(0)+' Y:'+_fpPos.y.toFixed(0)+' Z:'+_fpPos.z.toFixed(0);
   }
 
   // Auto-fade room objects (skip in first-person mode)
@@ -5272,35 +6180,103 @@ let _fpMode=false;
 const _fpFloorY=-(H/2+ply+bunFootH)+4; // 4" tall mini dude standing on floor (eye height ~4")
 let _fpPos=new THREE.Vector3(0,_fpFloorY,30); // starting position
 let _fpYaw=0, _fpPitch=0, _fpVy=0;
+// Horizontal velocity smoothing for a natural walk feel (accel/decel instead
+// of instant start/stop). _fpBobPhase drives a subtle headbob while moving
+// on the ground.
+let _fpVelX=0, _fpVelZ=0, _fpBobPhase=0;
+const _fpPitchMin=-1.2;
+const _fpPitchMax=1.55;
 const _fpFwd=new THREE.Vector3();
 const _fpRight=new THREE.Vector3();
+const _fpViewDir=new THREE.Vector3();
 const _fpLookTarget=new THREE.Vector3();
 const _fpRay=new THREE.Raycaster();
 const _fpRayCenter=new THREE.Vector2(0,0);
-const _fpKeys={w:false,a:false,s:false,d:false,space:false};
+const _fpKeys={w:false,a:false,s:false,d:false,space:false,shift:false};
 let _fpLookDX=0, _fpLookDY=0;
 let _fpHoverTarget=null;
 let _fpNextRaycastTs=0;
-const _fpRaycastIntervalMs=60;
+const _fpRaycastIntervalMs=24;
+const _fpInteractRange=220;
 let _fpSavedFov=42;
 let _fpSpaceHeld=0; // frames space is held for charged jump
-const _fpBodyR=1.5; // body radius for collision
+const _fpBodyR=2.2; // body radius tuned to cat footprint (more realistic)
 // Solid furniture AABBs derived from actual object variables
 // room=true means box moves with room (shifted by -placementOffset); false means stays at origin
 // X values are negated for room objects because the room gets X-mirrored after construction
 const _fpBoxesBase=[
-  // Bed — sleeping surface is top of duvet: mattY + mattH/2 + duvetH
-  {xMin:-(bedX+bedW/2), xMax:-(bedX-bedW/2), zMin:bedZ-bedL/2, zMax:bedZ+bedL/2, yTop:mattY+mattH/2+duvetH, room:true},
-  // Nightstand — uses tblX, tblW, tblD, tblZ, tblH (X-mirrored: negate X)
-  {xMin:-(tblX+tblW/2), xMax:-(tblX-tblW/2), zMin:tblZ-tblD/2, zMax:tblZ+tblD/2, yTop:floorY+tblH, room:true},
-  // Purifier — at origin, not mirrored
-  {xMin:-panelW/2-1, xMax:panelW/2+1, zMin:-(D/2+ply+1), zMax:D/2+ply+1, yTop:H/2+ply, room:false},
-  // Bottom plywood panel inside purifier
-  {xMin:-panelW/2, xMax:panelW/2, zMin:-(D/2+ply), zMax:D/2+ply, yTop:-(H/2), room:false},
+  // Bed — sleeping surface is top of duvet. yBottom is the floor clearance so
+  // the player can walk underneath the bed frame.
+  {xMin:-(bedX+bedW/2), xMax:-(bedX-bedW/2), zMin:bedZ-bedL/2, zMax:bedZ+bedL/2, yTop:mattY+mattH/2+duvetH, yBottom:floorY+bedClearance, room:true},
+  // Walk-in closet interior — back and side walls. The front is the wall
+  // opening (walk-through). Solid sections of rightWall outside the opening
+  // are blocked by the two "right wall solid" AABBs below.
+  // Back wall
+  {xMin:-(sideWallX+_closetDepth+0.25), xMax:-(sideWallX+_closetDepth-0.25), zMin:_closetZ-_closetInteriorW/2, zMax:_closetZ+_closetInteriorW/2, yTop:floorY+_closetH, room:true},
+  // +Z side wall
+  {xMin:-(sideWallX+_closetDepth), xMax:-(sideWallX+0.5), zMin:_closetZ+_closetInteriorW/2-0.25, zMax:_closetZ+_closetInteriorW/2+0.25, yTop:floorY+_closetH, room:true},
+  // -Z side wall
+  {xMin:-(sideWallX+_closetDepth), xMax:-(sideWallX+0.5), zMin:_closetZ-_closetInteriorW/2-0.25, zMax:_closetZ-_closetInteriorW/2+0.25, yTop:floorY+_closetH, room:true},
+  // Right wall — solid portions flanking the closet opening. Blocks the
+  // player from walking through the main wall; the opening zMin.._closetZ-
+  // _closetW/2.._closetZ+_closetW/2..49 is deliberately left clear.
+  {xMin:-(sideWallX+0.5), xMax:-sideWallX, zMin:oppWallZ, zMax:_closetZ-_closetW/2, yTop:floorY+wallHeight, room:true},
+  {xMin:-(sideWallX+0.5), xMax:-sideWallX, zMin:_closetZ+_closetW/2, zMax:49, yTop:floorY+wallHeight, room:true},
+  // Wings between the wall opening edges and the closet's wider side walls —
+  // blocks squeezing sideways into the 15" pocket behind rightWall.
+  {xMin:-(sideWallX+0.5), xMax:-sideWallX, zMin:_closetZ+_closetW/2, zMax:_closetZ+_closetInteriorW/2, yTop:floorY+_closetH, room:true},
+  {xMin:-(sideWallX+0.5), xMax:-sideWallX, zMin:_closetZ-_closetInteriorW/2, zMax:_closetZ-_closetW/2, yTop:floorY+_closetH, room:true},
+  // Closet shelf — standable surface ~10" below the ceiling, spans inner
+  // depth and interior width (minus small margins). Top at floorY+_closetH-
+  // 10+0.4, bottom at floorY+_closetH-10-0.4. X range covers the shelf body.
+  {xMin:-(sideWallX+0.5+(_closetDepth-0.5)-1), xMax:-(sideWallX+0.5+1), zMin:_closetZ-_closetInteriorW/2+0.5, zMax:_closetZ+_closetInteriorW/2-0.5, yTop:floorY+_closetH-10+0.4, yBottom:floorY+_closetH-10-0.4, room:true},
+  // Opposite (front/TV) wall — explicit collision. Previously relied on the
+  // global bounds clamp, but we loosened that to allow walking into the
+  // closet interior (which extends past oppWallZ along Z, entirely at
+  // x<-sideWallX). oppWall's X span is world [-sideWallX, 81] which does NOT
+  // overlap the closet footprint, so a single AABB covers the wall.
+  {xMin:-sideWallX, xMax:15+132/2, zMin:oppWallZ-0.25, zMax:oppWallZ+0.25, yTop:floorY+wallHeight, room:true},
+  // Nightstand — drawer holes span nearly the full front of the cabinet, so
+  // instead of one solid AABB (which would block walking into an open drawer
+  // hole), we use:
+  //   • a top-surface slab (so the player can stand on the nightstand top),
+  //   • two thin side pillars at the cabinet's L/R edges.
+  // The drawer-face AABBs (added dynamically per drawer) block entry when the
+  // drawers are closed; when open, the hole interior is walk-through.
+  // All X values mirrored (negated) to match the room's X-flip.
+  // Top slab: from the top of the highest drawer hole up through the oak top.
+  {xMin:-(tblX+tblW/2), xMax:-(tblX-tblW/2), zMin:tblZ-tblD/2, zMax:tblZ+tblD/2, yTop:floorY+tblH, yBottom:floorY+25, room:true},
+  // Left & right side pillars — the slivers of body outside each hole.
+  {xMin:-(tblX+tblW/2), xMax:-(tblX+(tblW/2-0.6)), zMin:tblZ-tblD/2, zMax:tblZ+tblD/2, yTop:floorY+tblH, room:true},
+  {xMin:-(tblX-(tblW/2-0.6)), xMax:-(tblX-tblW/2), zMin:tblZ-tblD/2, zMax:tblZ+tblD/2, yTop:floorY+tblH, room:true},
+  // Objects sitting on top of the nightstand — standable / bump-into (X-mirrored).
+  // Coffee mug — cylinder r=1.4, h=3.5, center (tblX-3, tblZ-5).
+  {xMin:-(tblX-3+1.4), xMax:-(tblX-3-1.4), zMin:tblZ-5-1.4, zMax:tblZ-5+1.4, yTop:floorY+tblH+3.5, yBottom:floorY+tblH, room:true},
+  // Qingping air quality monitor — wedge w=3.5, h=4.0, d=2.8, center (tblX-8, tblZ+2).
+  {xMin:-(tblX-8+3.5/2), xMax:-(tblX-8-3.5/2), zMin:tblZ+2-2.8/2, zMax:tblZ+2+2.8/2, yTop:floorY+tblH+4.0, yBottom:floorY+tblH, room:true},
+  // Book stack (brown base 5×1.2×7 + green top 4.5×0.8×6.5) — combined AABB 5×2.0×7 at (tblX-1, tblZ+2).
+  {xMin:-(tblX-1+5/2), xMax:-(tblX-1-5/2), zMin:tblZ+2-7/2, zMax:tblZ+2+7/2, yTop:floorY+tblH+2.0, yBottom:floorY+tblH, room:true},
+  // Lamp base — cylinder r≈4, h=0.8, center (lampX, lampZ) where lampX=tblX+tblW/2-6, lampZ=tblZ+tblD/2-6.
+  {xMin:-(tblX+tblW/2-6+4), xMax:-(tblX+tblW/2-6-4), zMin:tblZ+tblD/2-6-4, zMax:tblZ+tblD/2-6+4, yTop:floorY+tblH+0.8, yBottom:floorY+tblH, room:true},
+  // Lamp shade walls — use four thin slabs so the interior stays open.
+  // This lets the player drop in through the top ring opening.
+  {xMin:-(tblX+tblW/2-6+6.5), xMax:-(tblX+tblW/2-6+6.5-1.1), zMin:tblZ+tblD/2-6-6.5, zMax:tblZ+tblD/2-6+6.5, yTop:floorY+tblH+26.8, yBottom:floorY+tblH+16.8, room:true},
+  {xMin:-(tblX+tblW/2-6-6.5+1.1), xMax:-(tblX+tblW/2-6-6.5), zMin:tblZ+tblD/2-6-6.5, zMax:tblZ+tblD/2-6+6.5, yTop:floorY+tblH+26.8, yBottom:floorY+tblH+16.8, room:true},
+  {xMin:-(tblX+tblW/2-6+6.5-1.1), xMax:-(tblX+tblW/2-6-6.5+1.1), zMin:tblZ+tblD/2-6-6.5, zMax:tblZ+tblD/2-6-6.5+1.1, yTop:floorY+tblH+26.8, yBottom:floorY+tblH+16.8, room:true},
+  {xMin:-(tblX+tblW/2-6+6.5-1.1), xMax:-(tblX+tblW/2-6-6.5+1.1), zMin:tblZ+tblD/2-6+6.5-1.1, zMax:tblZ+tblD/2-6+6.5, yTop:floorY+tblH+26.8, yBottom:floorY+tblH+16.8, room:true},
+  // Bulb collision pad inside shade so you can land and grab the coin.
+  {xMin:-(tblX+tblW/2-6+2.4), xMax:-(tblX+tblW/2-6-2.4), zMin:tblZ+tblD/2-6-2.4, zMax:tblZ+tblD/2-6+2.4, yTop:floorY+tblH+20.8, yBottom:floorY+tblH+18.6, room:true},
+  // Purifier is hollow — the interior is completely free. No bottom-panel
+  // collision box (the world floor already supports the player; adding one
+  // here caused the player's feet, which rest at room floor level below the
+  // bun feet, to get ejected sideways out of the cabinet footprint). The
+  // cabinet's filter side-walls and top panel are added dynamically in
+  // _fpGetBoxes() below.
   // TV — uses tvCenterX, tvW, bezel, tvH, tvCenterY, tvZ, tvD (X-mirrored: negate X)
   {xMin:-(tvCenterX+(tvW+bezel*2)/2), xMax:-(tvCenterX-(tvW+bezel*2)/2), zMin:oppWallZ, zMax:tvZ+tvD/2+1, yTop:tvCenterY+tvH/2+bezel, room:true},
-  // Mini split — uses msX, msW, msH, msY, msZ, msD (X-mirrored: negate X)
-  {xMin:-(msX+msW/2), xMax:-(msX-msW/2), zMin:oppWallZ, zMax:msZ+msD/2+1, yTop:msY+msH/2, room:true},
+  // Mini split — uses msX, msW, msH, msY, msZ, msD (X-mirrored: negate X).
+  // yBottom lets you walk underneath the wall-mounted unit.
+  {xMin:-(msX+msW/2), xMax:-(msX-msW/2), zMin:oppWallZ, zMax:msZ+msD/2+1, yTop:msY+msH/2, yBottom:msY-msH/2, room:true},
   // Pillows (X-mirrored)
   {xMin:-(bedX-13+pillowW/2), xMax:-(bedX-13-pillowW/2), zMin:pillowBaseZ-pillowD/2, zMax:pillowBaseZ+pillowD/2, yTop:pillowY+pillowH+1.5, room:true},
   {xMin:-(bedX+13+pillowW/2), xMax:-(bedX+13-pillowW/2), zMin:pillowBaseZ-pillowD/2, zMax:pillowBaseZ+pillowD/2, yTop:pillowY+pillowH+1.5, room:true},
@@ -5308,13 +6284,142 @@ const _fpBoxesBase=[
   {xMin:-(bedX+hbW/2), xMax:-(bedX-hbW/2), zMin:bedZ+bedL/2-hbThick, zMax:bedZ+bedL/2, yTop:floorY+bedClearance+hbH, room:true},
 ];
 // Wall bounds derived from actual wall variables (X-mirrored, with 2\" buffer)
-const _fpBoundsBase={xMin:-(sideWallX)+2, xMax:-(leftWallX)-2, zMin:oppWallZ+2, zMax:49-2};
+const _fpBoundsBase={xMin:-(sideWallX+_closetDepth)+2, xMax:-(leftWallX)-2, zMin:oppWallZ-_closetInteriorW/2, zMax:49-2};
+// Scratch vectors for drawer-AABB computation (avoid per-frame allocation).
+const _drawerWorldTmp=new THREE.Vector3();
+const _drawerDirTmp=new THREE.Vector3();
+const _drawerQuatTmp=new THREE.Quaternion();
+// Pool for per-frame AABBs — reused across calls to avoid GC pressure.
+const _boxPool=[];
+let _boxPoolIdx=0;
+function _acquireBox(){
+  if(_boxPoolIdx<_boxPool.length) return _boxPool[_boxPoolIdx++];
+  const b={xMin:0,xMax:0,zMin:0,zMax:0,yTop:0,yBottom:undefined,room:false};
+  _boxPool.push(b); _boxPoolIdx++;
+  return b;
+}
+const _fpBoxesOut=[];
 function _fpGetBoxes(){
+  _boxPoolIdx=0;
+  _fpBoxesOut.length=0;
   const ox=placementOffset.x, oy=placementOffset.y, oz=placementOffset.z;
-  return _fpBoxesBase.map(b=>{
-    if(!b.room) return b;
-    return {xMin:b.xMin-ox, xMax:b.xMax-ox, zMin:b.zMin-oz, zMax:b.zMax-oz, yTop:b.yTop-oy};
-  });
+  const purifierRot=purifierGroup.rotation.y||0;
+  // Purifier cabinet has 6 sides, all defined in purifier-local coords:
+  //   • ±Y (top, bottom)  — plywood, ALWAYS solid.
+  //   • ±Z (front, back)  — plywood, ALWAYS solid.
+  //   • ±X (left, right)  — FILTER side-walls. The filter meshes slide along
+  //                         local ±X. Their collision boxes follow the meshes,
+  //                         so when a filter is pushed out, its box leaves the
+  //                         cabinet footprint and the ±X opening is walk-through.
+  // Every local AABB is then rotated into world space by the purifier's
+  // actual Y rotation (handles 0°, +90°, 180°, -90°, or any angle) using the
+  // 4-corner bounding-box method, so off-center boxes end up on the correct
+  // world-space side.
+  const hwOuter=panelW/2;         // outer half-width (across filters)
+  const hdOuter=D/2+ply;          // outer half-depth (including front/back ply)
+  const yTopPanel=H/2+ply;        // top face of top plywood
+  const yTopInner=H/2;            // underside of top plywood (interior ceiling)
+  const yBotInner=-H/2;           // top face of bottom plywood (interior floor)
+  const yBotPanel=-H/2-ply;       // bottom face of bottom plywood
+  const fHalf=ft/2;               // filter half-thickness
+  const fLx=filterL.position.x;   // live local X of left filter
+  const fRx=filterR.position.x;   // live local X of right filter
+  const localBoxes=[
+    // Top plywood cap — stand on top; interior passes freely underneath (yBottom).
+    {xMin:-hwOuter, xMax:hwOuter, zMin:-hdOuter, zMax:hdOuter, yTop:yTopPanel, yBottom:yTopInner},
+    // Bottom plywood cap — stand on top (=interior floor). Acts as a 1.28" step-up
+    // when entering through a filter opening.
+    {xMin:-hwOuter, xMax:hwOuter, zMin:-hdOuter, zMax:hdOuter, yTop:yBotInner, yBottom:yBotPanel},
+    // Front plywood wall (-Z face) — ALWAYS solid, full cabinet height.
+    {xMin:-hwOuter, xMax:hwOuter, zMin:-hdOuter, zMax:-D/2, yTop:yTopPanel, yBottom:yBotPanel},
+    // Back plywood wall (+Z face) — ALWAYS solid, full cabinet height.
+    {xMin:-hwOuter, xMax:hwOuter, zMin:D/2, zMax:hdOuter, yTop:yTopPanel, yBottom:yBotPanel},
+    // Left filter — tracks filterL.position.x. When slid out, it moves outside
+    // the cabinet footprint and the -X opening becomes walk-through.
+    {xMin:fLx-fHalf, xMax:fLx+fHalf, zMin:-D/2, zMax:D/2, yTop:yTopInner, yBottom:yBotInner},
+    // Right filter — tracks filterR.position.x.
+    {xMin:fRx-fHalf, xMax:fRx+fHalf, zMin:-D/2, zMax:D/2, yTop:yTopInner, yBottom:yBotInner},
+    // Xbox Series X on top (only when consoles visible).
+    {xMin:-5.94/2, xMax:5.94/2, zMin:8-5.94/2, zMax:8+5.94/2, yTop:yTopPanel+11.85, yBottom:yTopPanel, _consoleProp:true},
+    // Nintendo Switch dock on top (only when consoles visible).
+    {xMin:-2.5/2, xMax:2.5/2, zMin:-6-6.5/2, zMax:-6+6.5/2, yTop:yTopPanel+4.0, yBottom:yTopPanel, _consoleProp:true},
+    // Nintendo Switch 2 tablet above dock (only when consoles visible).
+    {xMin:-0.6/2, xMax:0.6/2, zMin:-6-10.5/2, zMax:-6+10.5/2, yTop:yTopPanel+8.0, yBottom:yTopPanel+3.2, _consoleProp:true},
+    // Floor game-case stack next to purifier (only when consoles visible).
+    {xMin:-_tvGameCaseD/2, xMax:_tvGameCaseD/2,
+      zMin:-(D/2+ply+_tvGameCaseD/2+8.0)-_tvGameCaseW/2,
+      zMax:-(D/2+ply+_tvGameCaseD/2+8.0)+_tvGameCaseW/2,
+      yTop:getPurifierFloorLocalY()-0.03+_tvGameStackH,
+      yBottom:getPurifierFloorLocalY()-0.03,
+      _consoleProp:true},
+  ];
+  // Rotate each purifier-local AABB into a world-aligned AABB by taking the
+  // bounding box of the 4 rotated corners. For multiples of 90° this is exact.
+  const cosR=Math.cos(purifierRot), sinR=Math.sin(purifierRot);
+  for(const b of localBoxes){
+    if(b._consoleProp && !consoleProps.visible) continue;
+    let xMin=Infinity, xMax=-Infinity, zMin=Infinity, zMax=-Infinity;
+    // Inline 4-corner rotation.
+    for(let i=0;i<4;i++){
+      const x = (i&1)?b.xMax:b.xMin;
+      const z = (i&2)?b.zMax:b.zMin;
+      const wx= cosR*x + sinR*z;
+      const wz=-sinR*x + cosR*z;
+      if(wx<xMin) xMin=wx; if(wx>xMax) xMax=wx;
+      if(wz<zMin) zMin=wz; if(wz>zMax) zMax=wz;
+    }
+    const out=_acquireBox();
+    out.xMin=xMin; out.xMax=xMax; out.zMin=zMin; out.zMax=zMax;
+    out.yTop=b.yTop; out.yBottom=b.yBottom; out.room=false;
+    _fpBoxesOut.push(out);
+  }
+  // Drawer collision — tray walls that slide with the drawer mesh. Each drawer
+  // group is a top-level scene child; applyRoomDelta already shifts its
+  // position whenever the room is nudged, so dg.position IS the current world
+  // position. Flag room:false so _fpGetBoxes doesn't subtract the offset
+  // again. The front face also sits in front of the group origin (local -Z),
+  // but since the group itself is X-mirrored, the drawer pulls out in +world-Z
+  // (toward the foot of the bed). We read the current world Z directly.
+  for(const dg of drawers){
+    dg.updateMatrixWorld(false);
+    const wp=_drawerWorldTmp.setFromMatrixPosition(dg.matrixWorld);
+    const dx=wp.x, dy=wp.y, dz=wp.z;
+    const w=dg._drawerW, h=dg._drawerH, td=dg._drawerTrayD, tw=dg._drawerTrayWall;
+    const yT=dy+h/2-0.5, yB=dy-h/2;
+    const dir=_drawerDirTmp.set(0,0,1).applyQuaternion(dg.getWorldQuaternion(_drawerQuatTmp));
+    const sZ=dir.z>=0?1:-1;
+    const zInA=dz, zInB=dz+sZ*td;
+    const zMin=Math.min(zInA,zInB), zMax=Math.max(zInA,zInB);
+    const push=(xMin,xMax,zMn,zMx,yTp,yBt)=>{
+      const out=_acquireBox();
+      out.xMin=xMin; out.xMax=xMax; out.zMin=zMn; out.zMax=zMx;
+      out.yTop=yTp; out.yBottom=yBt; out.room=false;
+      _fpBoxesOut.push(out);
+    };
+    push(dx-w/2, dx+w/2, dz-0.4, dz+0.4, yT, yB);
+    push(dx-w/2+tw, dx+w/2-tw, zMin, zMax, yB+tw, yB);
+    push(dx-w/2, dx-w/2+tw, zMin, zMax, yT, yB+tw);
+    push(dx+w/2-tw, dx+w/2, zMin, zMax, yT, yB+tw);
+    const bMin=Math.min(zInB-sZ*tw, zInB), bMax=Math.max(zInB-sZ*tw, zInB);
+    push(dx-w/2+tw, dx+w/2-tw, bMin, bMax, yT, yB+tw);
+  }
+  // Append room-scoped base boxes with the placement offset applied.
+  for(const b of _fpBoxesBase){
+    const out=_acquireBox();
+    if(b.room){
+      out.xMin=b.xMin-ox; out.xMax=b.xMax-ox;
+      out.zMin=b.zMin-oz; out.zMax=b.zMax-oz;
+      out.yTop=b.yTop-oy;
+      out.yBottom=b.yBottom!==undefined?b.yBottom-oy:undefined;
+    } else {
+      out.xMin=b.xMin; out.xMax=b.xMax;
+      out.zMin=b.zMin; out.zMax=b.zMax;
+      out.yTop=b.yTop; out.yBottom=b.yBottom;
+    }
+    out.room=false;
+    _fpBoxesOut.push(out);
+  }
+  return _fpBoxesOut;
 }
 function _fpGetBounds(){
   const ox=placementOffset.x, oz=placementOffset.z;
@@ -5325,35 +6430,78 @@ function _fpGetBounds(){
 const _fpHud=document.createElement('div');
 _fpHud.id='fpHud';
 _fpHud.innerHTML=`
-  <div style="position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);
-    color:white;padding:10px 20px;border-radius:10px;font-family:system-ui;font-size:12px;text-align:center;
-    pointer-events:none;z-index:9999;backdrop-filter:blur(8px);line-height:1.8">
-    <b style="font-size:14px">Play Mode</b><br>
-    <kbd style="background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:3px;margin:0 2px">W</kbd>
-    <kbd style="background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:3px;margin:0 2px">A</kbd>
-    <kbd style="background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:3px;margin:0 2px">S</kbd>
-    <kbd style="background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:3px;margin:0 2px">D</kbd> move &nbsp;
-    ${_isMobile
-      ? '<kbd style="background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:3px">Touch</kbd> look &nbsp;<span style="opacity:0.7">Use on-screen pad to move</span> &nbsp;'
-      : '<kbd style="background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:3px">Mouse</kbd> look &nbsp;'}
-    <kbd style="background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:3px">Space</kbd> jump (hold to charge) &nbsp;
-    <kbd style="background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:3px">Esc</kbd> exit<br>
-    <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin:4px 0 2px">
-      <span style="font-size:10px;opacity:0.5">Jump</span>
-      <div style="width:120px;height:6px;background:rgba(255,255,255,0.12);border-radius:3px;overflow:hidden">
-        <div id="fpChargeFill" style="height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,#44aaff,#ff4444);transition:width 0.05s"></div>
-      </div>
+  <div id="coinHud" style="position:fixed;top:16px;left:16px;background:rgba(10,13,18,0.78);
+    color:#ffd873;padding:7px 12px;border-radius:12px;font-family:system-ui;font-size:15px;font-weight:700;
+    pointer-events:none;z-index:9999;backdrop-filter:blur(8px);letter-spacing:0.4px;
+    border:1px solid rgba(255,216,115,0.35);box-shadow:0 8px 18px rgba(0,0,0,0.35);transition:transform 0.2s">
+    <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#fff3a8,#ffb300);vertical-align:middle;margin-right:7px;box-shadow:0 0 8px rgba(255,193,67,0.8)"></span>
+    <span style="font-size:10px;opacity:0.8;letter-spacing:0.8px;margin-right:6px">COINS</span>
+    <span id="coinCount">0 / 0</span>
+  </div>
+  <div id="fpHudCore" style="position:fixed;left:16px;bottom:16px;min-width:280px;background:linear-gradient(180deg,rgba(12,18,27,0.86),rgba(7,10,15,0.82));
+    color:#e8eef7;padding:11px 12px;border-radius:14px;font-family:system-ui;font-size:12px;
+    pointer-events:none;z-index:9999;backdrop-filter:blur(10px);line-height:1.5;
+    border:1px solid rgba(116,171,218,0.32);box-shadow:0 10px 24px rgba(0,0,0,0.38)">
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px">
+      <span style="font-size:10px;font-weight:700;letter-spacing:0.8px;color:#9fe3ff;background:rgba(37,135,186,0.24);padding:3px 8px;border-radius:999px">LIVE</span>
+      <span style="opacity:0.92">View: <span class="fp-cammode">Third Person</span></span>
+      <span style="margin-left:auto;opacity:0.62"><kbd style="background:rgba(255,255,255,0.12);padding:2px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.16)">V</kbd> switch</span>
     </div>
-    <span style="opacity:0.4;font-size:10px">${_isMobile?'Tap':'Click'} to interact with filters, fans, and lamp</span><br>
-    <span class="fp-pos" style="opacity:0.5;font-family:monospace;font-size:10px">X:0 Y:0 Z:0</span>
+    <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);padding:7px 8px;border-radius:10px">
+      <span style="font-size:10px;opacity:0.75;min-width:44px;letter-spacing:0.6px">CHARGE</span>
+      <div style="flex:1;height:8px;background:rgba(255,255,255,0.12);border-radius:999px;overflow:hidden">
+        <div id="fpChargeFill" style="height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#4ce3ff,#ff5e66);transition:width 0.05s"></div>
+      </div>
+      <span style="font-size:10px;opacity:0.62;background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:999px">Space</span>
+    </div>
+    <div style="margin-top:7px;font-size:10px;opacity:0.52"><kbd style="background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.16)">H</kbd> help · <kbd style="background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.16)">Esc</kbd> exit</div>
+  </div>
+  <div id="fpControlsPanel" style="position:fixed;right:16px;bottom:16px;background:linear-gradient(180deg,rgba(12,18,27,0.92),rgba(7,10,15,0.9));color:#e8eef7;
+    padding:11px 12px;border-radius:14px;font-family:system-ui;font-size:12px;display:none;
+    pointer-events:none;z-index:9999;backdrop-filter:blur(10px);line-height:1.55;
+    border:1px solid rgba(116,171,218,0.36);box-shadow:0 10px 24px rgba(0,0,0,0.4)">
+    <div style="font-size:11px;font-weight:700;letter-spacing:0.7px;color:#9fe3ff;margin-bottom:7px">CONTROLS</div>
+    <div style="display:grid;row-gap:6px">
+      <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">WASD</span> move</div>
+      <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">Space</span> jump (hold)</div>
+      <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">Shift</span> sprint</div>
+      <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">V</span> switch view</div>
+      <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">H</span> toggle help</div>
+      <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">Esc</span> exit play mode</div>
+    </div>
+    ${_isMobile?'<div style="opacity:0.72;margin-top:5px">Touch drag to look</div>':''}
   </div>`;
 _fpHud.style.display='none';
 document.body.appendChild(_fpHud);
 
+// Camera mode inside Play Mode: 'cat' (third person) or 'first'.
+let _fpCamMode='cat';
+let _fpControlsOpen=false;
+function _setFpControlsOpen(open){
+  _fpControlsOpen=!!open;
+  const panel=_fpHud.querySelector('#fpControlsPanel');
+  if(panel) panel.style.display=_fpControlsOpen?'block':'none';
+}
+function _setFpCamMode(mode){
+  _fpCamMode=(mode==='first')?'first':'cat';
+  const el=_fpHud.querySelector('.fp-cammode');
+  if(el) el.textContent=_fpCamMode==='cat'?'Third Person':'First Person';
+  if(_fpMode){
+    catGroup.visible=_fpCamMode==='cat';
+    if(catGroup.visible && catGroup.parent!==scene) scene.add(catGroup);
+  }
+}
+// Coin pickup pop animation
+{
+  const _coinStyle=document.createElement('style');
+  _coinStyle.textContent='#coinCount{display:inline-block;transition:transform 0.2s,color 0.2s;transform-origin:center} #coinCount.pop{transform:scale(1.5);color:#fff}';
+  document.head.appendChild(_coinStyle);
+}
+
 // Crosshair dot (center of screen)
 const _fpCrosshair=document.createElement('div');
 _fpCrosshair.id='fpCrosshair';
-_fpCrosshair.style.cssText='position:fixed;top:50%;left:50%;width:8px;height:8px;border:2px solid rgba(255,255,255,0.6);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:10000;transition:border-color 0.15s,transform 0.15s;box-sizing:border-box';
+_fpCrosshair.style.cssText='position:fixed;top:50%;left:50%;width:10px;height:10px;border:2px solid rgba(226,239,255,0.8);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:10000;transition:border-color 0.15s,transform 0.15s,box-shadow 0.15s;box-sizing:border-box;box-shadow:0 0 0 2px rgba(9,14,20,0.6),0 0 10px rgba(0,0,0,0.35)';
 _fpCrosshair.style.display='none';
 document.body.appendChild(_fpCrosshair);
 
@@ -5368,13 +6516,30 @@ function toggleFirstPerson(){
     camera.fov=75; // wider FOV for first person
     camera.near=0.05;
     camera.updateProjectionMatrix();
+    // Pre-warm the audio context + bonk buffer now (we're inside a user
+    // gesture) so the first head-bonk doesn't stall the frame creating an
+    // AudioContext.
+    try{
+      const ac=_coinAC||(window.AudioContext||window.webkitAudioContext) && new (window.AudioContext||window.webkitAudioContext)();
+      if(ac){
+        _coinAC=ac;
+        if(ac.state==='suspended' && ac.resume) ac.resume();
+        _ensureBonkBuffer(ac);
+      }
+    }catch(e){}
     // Start near the purifier, on the floor — clamp to current room bounds
     const spBounds=_fpGetBounds();
     const spX=Math.max(spBounds.xMin+3, Math.min(spBounds.xMax-3, 0));
     const spZ=Math.max(spBounds.zMin+3, Math.min(spBounds.zMax-3, 30));
     _fpPos.set(spX, _fpFloorY-placementOffset.y, spZ);
     _fpYaw=0; // face toward purifier (toward -Z)
-    _fpPitch=0; _fpVy=0; _fpSpaceHeld=0;
+    _fpPitch=0; _fpVy=0; _fpSpaceHeld=0; _fpVelX=0; _fpVelZ=0; _fpBobPhase=0;
+    _setFpCamMode('cat'); // default to cat/third-person each time Play Mode starts
+    _setFpControlsOpen(false);
+    // World-space cat rig: place the cat ahead of spawn heading.
+    if(catGroup.parent!==scene) scene.add(catGroup);
+    catGroup.position.set(_fpPos.x, _fpPos.y - 4.0, _fpPos.z);
+    catGroup.rotation.set(0, _fpYaw+Math.PI, 0);
     _fpLookDX=0; _fpLookDY=0;
     _fpHoverTarget=null;
     _fpNextRaycastTs=0;
@@ -5396,6 +6561,9 @@ function toggleFirstPerson(){
     });
     // Request pointer lock for mouselook on desktop.
     if(!_isMobile && canvas.requestPointerLock) canvas.requestPointerLock();
+    _resetCoins();
+    _setCoinsVisible(true);
+    catGroup.visible=_fpCamMode==='cat';
   } else {
     camera.fov=_fpSavedFov;
     camera.near=0.1;
@@ -5406,16 +6574,18 @@ function toggleFirstPerson(){
       if(m._savedTransparent!==undefined) m.material.transparent=m._savedTransparent;
       if(m._savedDepthWrite!==undefined) m.material.depthWrite=m._savedDepthWrite;
     });
-    _fpKeys.w=false; _fpKeys.a=false; _fpKeys.s=false; _fpKeys.d=false; _fpKeys.space=false;
+    _fpKeys.w=false; _fpKeys.a=false; _fpKeys.s=false; _fpKeys.d=false; _fpKeys.space=false; _fpKeys.shift=false;
     _fpLookDX=0; _fpLookDY=0;
     _fpHoverTarget=null;
     _fpNextRaycastTs=0;
     _camKeys.w=false; _camKeys.a=false; _camKeys.s=false; _camKeys.d=false;
     if(document.exitPointerLock && document.pointerLockElement) document.exitPointerLock();
+    _setCoinsVisible(false);
+    _setFpControlsOpen(false);
+    if(catGroup.parent===camera) scene.add(catGroup);
+    catGroup.visible=false;
   }
 }
-
-// Pointer lock mouselook
 document.addEventListener('mousemove',e=>{
   if(!_fpMode||!document.pointerLockElement) return;
   const rawX=e.movementX||e.mozMovementX||0;
@@ -5427,11 +6597,24 @@ document.addEventListener('mousemove',e=>{
 // WASD keys for first-person (captured in keydown/keyup)
 document.addEventListener('keydown',e=>{
   if(!_fpMode) return;
+  if(e.key==='h'||e.key==='H'){
+    _setFpControlsOpen(!_fpControlsOpen);
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
+  if(e.key==='v'||e.key==='V'){
+    _setFpCamMode(_fpCamMode==='cat'?'first':'cat');
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
   if(e.key==='w'||e.key==='W') _fpKeys.w=true;
   if(e.key==='a'||e.key==='A'){ _fpKeys.a=true; e.stopImmediatePropagation(); }
   if(e.key==='s'||e.key==='S') _fpKeys.s=true;
   if(e.key==='d'||e.key==='D') _fpKeys.d=true;
   if(e.code==='Space'){ _fpKeys.space=true; e.preventDefault(); }
+  if(e.key==='Shift') _fpKeys.shift=true;
 });
 document.addEventListener('keyup',e=>{
   if(e.key==='w'||e.key==='W') _fpKeys.w=false;
@@ -5439,6 +6622,7 @@ document.addEventListener('keyup',e=>{
   if(e.key==='s'||e.key==='S') _fpKeys.s=false;
   if(e.key==='d'||e.key==='D') _fpKeys.d=false;
   if(e.code==='Space') _fpKeys.space=false;
+  if(e.key==='Shift') _fpKeys.shift=false;
 });
 document.addEventListener('keydown',e=>{
   if(_fpMode) return;
@@ -5470,6 +6654,7 @@ document.addEventListener('pointerlockchange',()=>{
 // Tiers: 0 = best, 3 = most conservative. Keep lighting/shadows intact; scale DPR and particles first.
 let qualityTier=0, qualitySamples=0, qualitySum=0, qualitySettled=false;
 const QUALITY_DPR_TIERS=_isMobile?[0.72,0.64,0.56,0.5]:[0.85,0.74,0.64,0.55];
+const QUALITY_SHADOW_TIERS=_isMobile?[1024,768,512,384]:[2048,1536,1024,768];
 const QUALITY_WINDOW=1500; // ms to average over before deciding
 let qualityWindowStart=performance.now();
 function downgrade(tier){
@@ -5477,6 +6662,9 @@ function downgrade(tier){
   const dprCap=QUALITY_DPR_TIERS[qualityTier]??QUALITY_DPR_TIERS[QUALITY_DPR_TIERS.length-1];
   renderer.setPixelRatio(Math.min(window.devicePixelRatio,dprCap));
   setActiveParticleCount(PARTICLE_TIER_COUNTS[qualityTier]??PARTICLE_COUNT);
+  const shSize=QUALITY_SHADOW_TIERS[qualityTier]??QUALITY_SHADOW_TIERS[QUALITY_SHADOW_TIERS.length-1];
+  key.shadow.mapSize.set(shSize,shSize);
+  if(key.shadow.map){ key.shadow.map.dispose(); key.shadow.map=null; }
   resize();
 }
 function checkPerformance(fps,isActive){
@@ -5526,7 +6714,251 @@ const purifierGroup=new THREE.Group();
   });
   toMove.forEach(c=>purifierGroup.add(c));
   purifierGroup.add(consoleProps); // console props ride with the purifier
+  purifierGroup.add(tvGameStackProps); // game stack rides with purifier in Under TV placement
   scene.add(purifierGroup);
+}
+
+// ─── Play Mode collectibles (coins) ───
+// Hidden by default; only shown in Play Mode. Pickup within _coinPickR units.
+const _coinGroup=new THREE.Group();
+_coinGroup.visible=false;
+scene.add(_coinGroup);
+const _coins=[];
+const _coinPickR=3.5;
+let _coinScore=0;
+let _coinTotal=0;
+function _makeCoin(){
+  // Shared geometry + material across all coins — much cheaper than 10 unique
+  // meshes with their own PointLights (which were forcing shader recompiles
+  // and per-pixel cost on every lit surface in the scene).
+  if(!_coinGeo){
+    _coinGeo=new THREE.CylinderGeometry(1.2, 1.2, 0.28, 12);
+    _coinGeo.rotateX(Math.PI/2);
+  }
+  if(!_coinMat){
+    _coinMat=new THREE.MeshStandardMaterial({
+      color:0xffd24a,
+      emissive:0xffb300,
+      emissiveIntensity:1.2, // strong self-glow replaces the per-coin point light
+      roughness:0.25,
+      metalness:0.85
+    });
+  }
+  const m=new THREE.Mesh(_coinGeo, _coinMat);
+  m.castShadow=false;
+  m.receiveShadow=false;
+  return m;
+}
+let _coinGeo=null, _coinMat=null;
+// Coin placements. Most are scene-relative (shift with placementOffset).
+// One rides inside the purifier (child of purifierGroup) so it travels with it.
+function _addCoin(parent, localPos, opts){
+  const coin=_makeCoin();
+  coin.position.copy(localPos);
+  parent.add(coin);
+  _coins.push({
+    mesh:coin,
+    basePos:localPos.clone(),
+    bobPhase:Math.random()*Math.PI*2,
+    spinSpeed:0.04+Math.random()*0.02,
+    parent,
+    collected:false,
+    insidePurifier:!!(opts&&opts.insidePurifier),
+    inDrawer:!!(opts&&opts.inDrawer),
+    consoleProp:!!(opts&&opts.consoleProp)
+  });
+  _coinTotal++;
+}
+{
+  // Room coins (scene-relative; apply -placementOffset each frame via group)
+  _addCoin(_coinGroup, new THREE.Vector3(-bedX, floorY+bedClearance-1.8, bedZ+4)); // under the bed (mirrored X)
+  _addCoin(_coinGroup, new THREE.Vector3(-tblX, floorY+tblH+5, tblZ)); // above nightstand (jump to grab)
+  _addCoin(_coinGroup, new THREE.Vector3(0, floorY+5, 10)); // middle of room, easy floor pickup
+  _addCoin(_coinGroup, new THREE.Vector3(25, floorY+6, -40)); // near TV wall
+  _addCoin(_coinGroup, new THREE.Vector3(-20, floorY+28, -60)); // high near mini split (jump!)
+  _addCoin(_coinGroup, new THREE.Vector3(-bedX, mattY+mattH/2+duvetH+3, mattCenterZ)); // on top of bed
+  _addCoin(_coinGroup, new THREE.Vector3(35, floorY+3, 20)); // near closet
+  // On the closet shelf — inside the walk-in, sitting on top of the shelf.
+  // Shelf world pos after X-mirror: x=-(sideWallX+0.5+(_closetDepth-0.5)/2),
+  // y=floorY+_closetH-10, z=_closetZ. Coin sits ~2.5" above shelf top.
+  _addCoin(_coinGroup, new THREE.Vector3(-(sideWallX+0.5+(_closetDepth-0.5)/2), floorY+_closetH-10+0.4+2.5, _closetZ));
+  // On top of mini split — bring coin slightly forward (toward +Z) so it's above the visible top surface.
+  _addCoin(_coinGroup, new THREE.Vector3(-msX, msY+msH/2+2.2, msZ-msD/2+1.5));
+  // On top of TV — sit it just above the bezel, in front of the wall.
+  _addCoin(_coinGroup, new THREE.Vector3(-tvCenterX, tvCenterY+tvH/2+bezel+2.2, tvZ-tvD/2+1.2));
+  // Closet corner coin (inside walk-in, floor corner near the opening/door side).
+  _addCoin(_coinGroup, new THREE.Vector3(-(sideWallX+2.0), floorY+2.5, _closetZ+_closetInteriorW/2-1.2));
+  // Coin on top of Switch game stack beside purifier.
+  _addCoin(purifierGroup, new THREE.Vector3(0, getPurifierFloorLocalY()-0.03+_tvGameStackH+2.3, -(D/2+ply+_tvGameCaseD/2+8.0)), {insidePurifier:true, consoleProp:true});
+  // Coin on top of Nintendo Switch tablet docked on purifier.
+  _addCoin(purifierGroup, new THREE.Vector3(0, (H/2+ply)+10.0, -6), {insidePurifier:true, consoleProp:true});
+  // Coin inside lamp shade, above the bulb (reachable by dropping through top opening).
+  _addCoin(_coinGroup, new THREE.Vector3(-(tblX+tblW/2-6), floorY+tblH+22.4, tblZ+tblD/2-6));
+  // Coin INSIDE the air purifier — rides with purifierGroup, at origin.
+  _addCoin(purifierGroup, new THREE.Vector3(0, 0, 0), {insidePurifier:true});
+  // Coin HIDDEN in a random dresser drawer. Parented to a placeholder group
+  // that _resetCoins re-parents to one of the 3 drawers each play session.
+  // Position is local-to-drawer, inside the tray: raised off the tray floor
+  // and pushed toward the back of the tray so it's more hidden.
+  const dTrayD=drawers[0]?._drawerTrayD||10;
+  _addCoin(drawers[0], new THREE.Vector3(0, -drawers[0]._drawerH/2+3.2, 0.4+dTrayD-2.2), {inDrawer:true});
+}
+function _setCoinsVisible(show){
+  _coinGroup.visible=show;
+  // Toggle the purifier-hosted coin too.
+  for(const c of _coins){
+    if(c.insidePurifier) c.mesh.visible=show && !c.collected && (!c.consoleProp || consoleProps.visible);
+    else if(c.inDrawer){
+      // Gated: only visible when parent drawer is open past a threshold.
+      const dg=c.mesh.parent;
+      const open=dg && dg._isDrawer && dg._drawerSlide > 2;
+      c.mesh.visible=show && !c.collected && open;
+    }
+    else if(c.consoleProp) c.mesh.visible=show && !c.collected && consoleProps.visible;
+    else c.mesh.visible=!c.collected;
+  }
+  // Update HUD counter.
+  const el=document.getElementById('coinCount');
+  if(el) el.textContent=_coinScore+' / '+_coinTotal;
+}
+function _updateCoins(ts){
+  if(!_fpMode) return;
+  // Keep _coinGroup aligned with the room (room objects are shifted by -placementOffset).
+  _coinGroup.position.set(-placementOffset.x, -placementOffset.y, -placementOffset.z);
+  const t=ts*0.001;
+  const camPos=_fpPos;
+  for(const c of _coins){
+    if(c.collected) continue;
+    // Spin + bob — cheap local-space updates.
+    c.mesh.rotation.y+=c.spinSpeed;
+    c.mesh.position.y=c.basePos.y+Math.sin(t*2+c.bobPhase)*0.25;
+    // Cheap AABB-ish distance check in local space before bothering with world matrix.
+    // Parent offset: either _coinGroup (room) or purifierGroup (traveling coin).
+    let wpx, wpy, wpz;
+    if(c.insidePurifier){
+      if(c.consoleProp && !consoleProps.visible){ c.mesh.visible=false; continue; }
+      // Use each coin mesh world position so coins offset on/around the
+      // purifier (e.g., Switch top, game stack top) are picked correctly.
+      c.mesh.getWorldPosition(_coinWorld);
+      wpx=_coinWorld.x; wpy=_coinWorld.y; wpz=_coinWorld.z;
+    } else if(c.inDrawer){
+      // Coin is a child of a drawer group. Only collectible when drawer is
+      // open past a threshold (else it's 'hidden' inside the body).
+      const dg=c.mesh.parent;
+      const open=dg && dg._isDrawer && dg._drawerSlide > 2;
+      if(!open){ c.mesh.visible=false; continue; }
+      c.mesh.visible=true;
+      c.mesh.getWorldPosition(_coinWorld);
+      wpx=_coinWorld.x; wpy=_coinWorld.y; wpz=_coinWorld.z;
+    } else if(c.consoleProp && !consoleProps.visible){
+      c.mesh.visible=false;
+      continue;
+    } else {
+      wpx=c.mesh.position.x+_coinGroup.position.x;
+      wpy=c.mesh.position.y+_coinGroup.position.y;
+      wpz=c.mesh.position.z+_coinGroup.position.z;
+    }
+    const dx=wpx-camPos.x, dy=wpy-camPos.y, dz=wpz-camPos.z;
+    const d2=dx*dx+dy*dy+dz*dz;
+    if(d2<=_coinPickR*_coinPickR){
+      c.collected=true;
+      c.mesh.visible=false;
+      _coinScore++;
+      const el=document.getElementById('coinCount');
+      if(el){
+        el.textContent=_coinScore+' / '+_coinTotal;
+        el.classList.add('pop');
+        setTimeout(()=>el.classList.remove('pop'), 350);
+      }
+      // Brief celebratory beep via WebAudio.
+      try{
+        const ac=_coinAC||(window.AudioContext||window.webkitAudioContext) && new (window.AudioContext||window.webkitAudioContext)();
+        if(ac){
+          _coinAC=ac;
+          const o=ac.createOscillator(), g=ac.createGain();
+          o.type='triangle'; o.frequency.value=880;
+          g.gain.value=0.12;
+          o.connect(g).connect(ac.destination);
+          o.start();
+          o.frequency.exponentialRampToValueAtTime(1760, ac.currentTime+0.12);
+          g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+0.25);
+          o.stop(ac.currentTime+0.26);
+        }
+      }catch(e){}
+    }
+  }
+}
+const _coinWorld=new THREE.Vector3();
+let _coinAC=null;
+// Pre-synthesized "bonk" AudioBuffer — created lazily on first user gesture,
+// then played via cheap BufferSourceNodes. Avoids per-hit oscillator setup
+// (which caused brief hitches on lower-end machines).
+let _bonkBuf=null;
+let _lastBonkTs=0;
+let _wasBonking=false;
+function _ensureBonkBuffer(ac){
+  if(_bonkBuf) return;
+  const dur=0.18;
+  const sr=ac.sampleRate;
+  const len=Math.floor(sr*dur);
+  const buf=ac.createBuffer(1, len, sr);
+  const data=buf.getChannelData(0);
+  // Low sine sweep 180→70 Hz with fast exponential decay. Phase-integrated
+  // so frequency can change smoothly. Simple noise-free tone = tiny buffer.
+  let phase=0;
+  for(let i=0;i<len;i++){
+    const t=i/sr;
+    const freq=180*Math.pow(70/180, t/dur);
+    phase+=2*Math.PI*freq/sr;
+    const env=Math.exp(-t*18);
+    data[i]=Math.sin(phase)*env;
+  }
+  _bonkBuf=buf;
+}
+function _playBonk(intensity){
+  const now=performance.now();
+  if(now-_lastBonkTs<350) return;
+  _lastBonkTs=now;
+  try{
+    const ac=_coinAC||(window.AudioContext||window.webkitAudioContext) && new (window.AudioContext||window.webkitAudioContext)();
+    if(!ac) return;
+    _coinAC=ac;
+    _ensureBonkBuffer(ac);
+    const src=ac.createBufferSource();
+    const g=ac.createGain();
+    src.buffer=_bonkBuf;
+    g.gain.value=Math.min(0.22, 0.08+(intensity||0.1)*0.6);
+    src.connect(g).connect(ac.destination);
+    src.start(0);
+  }catch(e){}
+}
+function _resetCoins(){
+  _coinScore=0;
+  // Randomize which drawer hides the coin this session.
+  const drawerCoin=_coins.find(c=>c.inDrawer);
+  if(drawerCoin && drawers.length){
+    const pickIdx=Math.floor(Math.random()*drawers.length);
+    const newParent=drawers[pickIdx];
+    if(drawerCoin.mesh.parent!==newParent){
+      drawerCoin.mesh.parent.remove(drawerCoin.mesh);
+      // Reset local position for the new drawer (drawers share dimensions).
+      drawerCoin.basePos.set(0, -newParent._drawerH/2+3.2, 0.4+newParent._drawerTrayD-2.2);
+      drawerCoin.mesh.position.copy(drawerCoin.basePos);
+      newParent.add(drawerCoin.mesh);
+      drawerCoin.parent=newParent;
+    }
+  }
+  for(const c of _coins){
+    c.collected=false;
+    if(c.inDrawer){
+      // Start hidden — only reveals when the drawer is opened.
+      c.mesh.visible=false;
+    } else {
+      c.mesh.visible=_fpMode;
+    }
+  }
+  const el=document.getElementById('coinCount');
+  if(el) el.textContent=_coinScore+' / '+_coinTotal;
 }
 function setTurntable(val){
   const deg=parseInt(val);
@@ -5545,9 +6977,37 @@ function resetPurifierPos(){
   document.getElementById('turntableSlider').value=deg;
   document.getElementById('turntableLabel').textContent=deg+'°';
 }
+
+const _startupCamTv={p:1.03,a:0.34,r:42,panX:0,panY:2,panZ:6};
+function applyStartupCameraForTv(){
+  polar=_startupCamTv.p;
+  azimuth=_startupCamTv.a;
+  radius=_startupCamTv.r;
+  panX=_startupCamTv.panX;
+  panY=_startupCamTv.panY;
+  panZ=_startupCamTv.panZ;
+}
+function startupCameraOutsideRoom(){
+  const camX=panX+radius*Math.sin(polar)*Math.sin(azimuth);
+  const camZ=panZ+radius*Math.sin(polar)*Math.cos(azimuth);
+  const roomMinX=Math.min(rightWall.position.x,leftWallBelow.position.x)+3;
+  const roomMaxX=Math.max(rightWall.position.x,leftWallBelow.position.x)-3;
+  const roomMinZ=Math.min(oppWall.position.z,wallMeshL.position.z)+3;
+  const roomMaxZ=Math.max(oppWall.position.z,wallMeshL.position.z)-3;
+  return camX<roomMinX || camX>roomMaxX || camZ<roomMinZ || camZ>roomMaxZ;
+}
+function ensureStartupCameraForTv(){
+  if(!_savedCam){
+    applyStartupCameraForTv();
+    return;
+  }
+  if(startupCameraOutsideRoom()) applyStartupCameraForTv();
+}
+
 updateFanLegend();
 // Default to Under TV placement
 setPlacement('tv');
+ensureStartupCameraForTv();
 // Highlight active board thickness button
 document.querySelectorAll('#btnBoardHalf,#btnBoard34').forEach(b=>b.classList.remove('on'));
 document.getElementById(_boardThickness==='34'?'btnBoard34':'btnBoardHalf').classList.add('on');
