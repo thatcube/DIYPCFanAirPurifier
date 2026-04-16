@@ -12,6 +12,16 @@
   status = 200
 
 [[redirects]]
+  from = "/play"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/play/"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
   from = "/api/*"
   to = "https://diy-air-purifier-leaderboard.essays-loges0y.workers.dev/api/:splat"
   status = 200
