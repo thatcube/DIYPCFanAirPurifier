@@ -10,7 +10,26 @@ Interactive 3D model of a DIY air purifier built from:
 
 This is a box-style air purifier designed around two rows of four Arctic P12 Pro fans pushing air through MERV 13 filtration. The 3D model lets you toggle between layout variants (front+back or front+top fan placement), switch wood stain options, and inspect the build from any angle.
 
-Open `index.html` in a browser to view the model — no build step needed.
+## Run Locally (Shared Leaderboard Enabled)
+
+The leaderboard now has a shared backend API. Run the app through the Node server:
+
+1. `npm install`
+2. `npm run dev`
+3. Open `http://localhost:8787`
+
+Opening `index.html` directly still renders the scene, but leaderboard sharing requires the API server.
+
+## Shared Leaderboard Anti-Exploit Notes
+
+Server-side protections in `server.js` include:
+
+- Server-authoritative run timing (`/api/run/start` to `/api/run/finish`)
+- Per-run coin claim validation (all required coins must be claimed)
+- Run token bound to client IP
+- Coin-claim pacing guard (minimum interval)
+- Run min/max duration checks
+- Basic per-IP rate limiting
 
 ## Features
 

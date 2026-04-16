@@ -1,0 +1,15 @@
+{
+  "name": "diypcfanairpurifier",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DIY PC fan air purifier interactive model with shared leaderboard backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "helmet": "^8.1.0"
+  }
+}

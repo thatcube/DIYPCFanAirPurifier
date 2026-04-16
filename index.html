@@ -6568,13 +6568,15 @@ function _setFpCamMode(mode){
   }
 }
 
-// Run timer + local leaderboard (fastest time first).
+// Run timer + leaderboard (shared API with local fallback).
 const _LB_STORE_KEY='diy_air_purifier_leaderboard_v1';
 const _LB_PLAYER_KEY='diy_air_purifier_player_name_v1';
 const _LB_MAX=25;
 const _LB_PER_PLAYER=3;
+const _LB_API_BASE=''; // same-origin API
+const _LB_SHARED_ENABLED=true;
 // Temporary testing toggle: clear saved player identity so completion asks again.
-const _LB_CLEAR_SAVED_NAME_ON_LOAD=true;
+const _LB_CLEAR_SAVED_NAME_ON_LOAD=false;
 if(_LB_CLEAR_SAVED_NAME_ON_LOAD){
   try{ localStorage.removeItem(_LB_PLAYER_KEY); }catch(e){}
 }
@@ -6588,6 +6590,10 @@ let _nameDialogAfterClose=null;
 let _nameDialogManualTyped=false;
 let _lbPlayerName='';
 let _leaderboard=[];
+let _lbSharedOnline=false;
+let _lbSharedRunId='';
+let _lbStatusNote=_LB_SHARED_ENABLED?'Connecting':'';
+const _lbClaimedCoinIds=new Set();
 
 function _escapeHtml(v){
   return String(v||'').replace(/[&<>"']/g,ch=>({
@@ -6623,6 +6629,82 @@ function _setPlayerName(name,persist=true){
   }
   const el=document.getElementById('fpPlayerName');
   if(el) el.textContent=_lbPlayerName;
+}
+
+async function _lbApiRequest(path, body){
+  const url=`${_LB_API_BASE}/api${path}`;
+  const init=body===undefined
+    ? { method:'GET', credentials:'same-origin' }
+    : {
+        method:'POST',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(body)
+      };
+  const res=await fetch(url, init);
+  let payload={};
+  try{ payload=await res.json(); }catch(e){}
+  if(!res.ok || payload.ok===false){
+    const msg=(payload&&payload.message)||`API ${res.status}`;
+    const err=new Error(msg);
+    err.apiCode=payload&&payload.code?String(payload.code):'';
+    err.httpStatus=res.status;
+    throw err;
+  }
+  return payload;
+}
+
+function _loadLeaderboardLocal(){
+  try{
+    const raw=localStorage.getItem(_LB_STORE_KEY);
+    const parsed=raw?JSON.parse(raw):[];
+    _leaderboard=_normalizeLeaderboard(Array.isArray(parsed)?parsed:[]);
+  }catch(e){
+    _leaderboard=[];
+  }
+}
+
+function _saveLeaderboardLocal(){
+  try{ localStorage.setItem(_LB_STORE_KEY,JSON.stringify(_leaderboard)); }catch(e){}
+}
+
+async function _refreshSharedLeaderboard(){
+  if(!_LB_SHARED_ENABLED) return;
+  try{
+    const data=await _lbApiRequest('/leaderboard');
+    _lbSharedOnline=true;
+    _lbStatusNote='';
+    _leaderboard=_normalizeLeaderboard(Array.isArray(data.leaderboard)?data.leaderboard:[]);
+  }catch(e){
+    _lbSharedOnline=false;
+    _lbStatusNote='Local fallback';
+    _loadLeaderboardLocal();
+  }
+  _renderLeaderboard();
+}
+
+async function _startSharedRun(){
+  _lbSharedRunId='';
+  _lbClaimedCoinIds.clear();
+  if(!_LB_SHARED_ENABLED) return;
+  try{
+    const data=await _lbApiRequest('/run/start',{});
+    _lbSharedRunId=String(data.runId||'');
+    _lbSharedOnline=!!_lbSharedRunId;
+    if(_lbSharedOnline) _lbStatusNote='';
+  }catch(e){
+    _lbSharedOnline=false;
+    _lbStatusNote='Local fallback';
+  }
+  _renderLeaderboard();
+}
+
+function _reportSharedCoin(coinId){
+  if(!_lbSharedRunId || !_lbSharedOnline || !coinId) return;
+  if(_lbClaimedCoinIds.has(coinId)) return;
+  _lbClaimedCoinIds.add(coinId);
+  _lbApiRequest('/run/coin',{runId:_lbSharedRunId, coinId})
+    .catch(()=>{ /* keep local run playable even if network blips */ });
 }
 
 function _hasCustomPlayerName(){
@@ -6745,16 +6827,14 @@ function _normalizeLeaderboard(rows){
   return kept;
 }
 function _loadLeaderboard(){
-  try{
-    const raw=localStorage.getItem(_LB_STORE_KEY);
-    const parsed=raw?JSON.parse(raw):[];
-    _leaderboard=_normalizeLeaderboard(Array.isArray(parsed)?parsed:[]);
-  }catch(e){
-    _leaderboard=[];
+  if(_LB_SHARED_ENABLED){
+    _refreshSharedLeaderboard();
+    return;
   }
+  _loadLeaderboardLocal();
 }
 function _saveLeaderboard(){
-  try{ localStorage.setItem(_LB_STORE_KEY,JSON.stringify(_leaderboard)); }catch(e){}
+  _saveLeaderboardLocal();
 }
 function _renderLeaderboard(){
   const list=document.getElementById('fpLeaderboardList');
@@ -6774,7 +6854,8 @@ function _renderLeaderboard(){
       </li>`;
     }).join('');
   }
-  meta.textContent=`Fastest first | Top ${_LB_MAX} | Max ${_LB_PER_PLAYER} per player`;
+  const mode=_lbSharedOnline?'Shared':'Local';
+  meta.textContent=`${mode} | Fastest first | Top ${_LB_MAX} | Max ${_LB_PER_PLAYER} per player${_lbStatusNote?` | ${_lbStatusNote}`:''}`;
 }
 function _updateTimerHud(nowMs){
   const txt=document.getElementById('runTimerText');
@@ -6808,7 +6889,7 @@ function _tickRunTimer(ts){
   if(_fpMode && _runTimerActive) _updateTimerHud(ts);
 }
 function _recordRun(timeMs){
-  const commitRun=()=>{
+  const commitRunLocal=()=>{
     const name=_lbPlayerName||'Player';
     const entry={name,timeMs:Math.floor(timeMs),at:Date.now()};
     _leaderboard=_normalizeLeaderboard(_leaderboard.concat(entry));
@@ -6823,6 +6904,46 @@ function _recordRun(timeMs){
     if(st){
       st.textContent=rank>0?`FINISHED #${rank}`:'FINISHED';
     }
+  };
+  const commitRunShared=async()=>{
+    if(!_lbSharedRunId || !_lbSharedOnline){
+      commitRunLocal();
+      return;
+    }
+    try{
+      const data=await _lbApiRequest('/run/finish', { runId:_lbSharedRunId, name:_lbPlayerName||'Player' });
+      _lbSharedRunId='';
+      _lbClaimedCoinIds.clear();
+      _lbSharedOnline=true;
+      _lbStatusNote='';
+      _leaderboard=_normalizeLeaderboard(Array.isArray(data.leaderboard)?data.leaderboard:[]);
+      _renderLeaderboard();
+      const st=document.getElementById('runTimerState');
+      if(st){
+        st.textContent=data.rank?`FINISHED #${data.rank}`:'FINISHED';
+      }
+    }catch(e){
+      _lbSharedRunId='';
+      _lbClaimedCoinIds.clear();
+      if(e && e.apiCode){
+        _lbSharedOnline=true;
+        _lbStatusNote=`Rejected (${e.apiCode})`;
+        void _refreshSharedLeaderboard();
+        const st=document.getElementById('runTimerState');
+        if(st) st.textContent='REJECTED';
+      } else {
+        _lbSharedOnline=false;
+        _lbStatusNote='Local fallback';
+        commitRunLocal();
+      }
+    }
+  };
+  const commitRun=()=>{
+    if(_LB_SHARED_ENABLED){
+      void commitRunShared();
+      return;
+    }
+    commitRunLocal();
   };
   if(_hasCustomPlayerName()){
     commitRun();
@@ -7221,11 +7342,13 @@ let _coinGeo=null, _coinMat=null;
 // One rides inside the purifier (child of purifierGroup) so it travels with it.
 function _addCoin(parent, localPos, opts){
   const coin=_makeCoin();
+  const coinId=(opts&&opts.id) || `coin_${_coinTotal+1}`;
   coin.position.copy(localPos);
   // Coins should never appear outside Play Mode.
   coin.visible=false;
   parent.add(coin);
   _coins.push({
+    id:coinId,
     mesh:coin,
     basePos:localPos.clone(),
     bobPhase:Math.random()*Math.PI*2,
@@ -7339,6 +7462,7 @@ function _updateCoins(ts){
       c.collected=true;
       c.mesh.visible=false;
       _coinScore++;
+      _reportSharedCoin(c.id);
       const el=document.getElementById('coinCount');
       if(el){
         el.textContent=_coinScore+' / '+_coinTotal;
@@ -7415,6 +7539,7 @@ function _playBonk(intensity){
 function _resetCoins(){
   _coinScore=0;
   _startRunTimer();
+  void _startSharedRun();
   // Randomize which drawer hides the coin this session.
   const drawerCoin=_coins.find(c=>c.inDrawer);
   if(drawerCoin && drawers.length){
