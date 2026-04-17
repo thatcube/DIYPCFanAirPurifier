@@ -378,13 +378,22 @@
     .play-mobile-look label { font-size: 10px; color: rgba(255,255,255,0.72); letter-spacing: 0.3px; text-transform: uppercase; }
     .play-mobile-look input[type=range] { flex: 1; min-width: 0; accent-color: #7dd3ff; }
     .play-mobile-look .sens-val { min-width: 32px; text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: rgba(255,255,255,0.92); }
-    .play-launcher { position: absolute; inset: 0; z-index: 40; display: none; align-items: center; justify-content: center; background: rgba(2,6,10,0.58); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 16px; }
+    .play-launcher { position: absolute; inset: 0; z-index: 40; display: none; align-items: center; justify-content: center; background: rgba(2,6,10,0.84); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 10px; }
     .play-launcher.show { display: flex; }
-    .play-launcher-card { width: min(92vw, 430px); border-radius: 16px; border: 1px solid rgba(145,214,255,0.42); background: linear-gradient(180deg, rgba(11,22,32,0.95), rgba(6,12,18,0.95)); color: rgba(238,248,255,0.95); padding: 14px 14px 12px; box-shadow: 0 16px 40px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.08); }
+    .play-launcher-card { width: min(98vw, 1500px); height: min(96vh, 980px); border-radius: 18px; border: 1px solid rgba(145,214,255,0.42); background: linear-gradient(180deg, rgba(11,22,32,0.95), rgba(6,12,18,0.95)); color: rgba(238,248,255,0.95); padding: 10px; box-shadow: 0 18px 44px rgba(0,0,0,0.48), inset 0 0 0 1px rgba(255,255,255,0.08); overflow: hidden; }
+    .play-launcher-shell { width: 100%; height: 100%; display: grid; grid-template-columns: minmax(0,1fr) 332px; gap: 10px; }
+    .play-launcher-preview-wrap { position: relative; border-radius: 14px; border: 1px solid rgba(145,214,255,0.28); background: radial-gradient(circle at 28% 22%, rgba(59,109,143,0.48), rgba(8,16,24,0.98) 62%); overflow: hidden; min-height: 300px; }
+    .play-launcher-preview-canvas { width: 100%; height: 100%; display: block; }
+    .play-launcher-preview-tip { position: absolute; left: 10px; bottom: 10px; font-size: 11px; color: rgba(210,234,248,0.8); padding: 4px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.34); pointer-events: none; }
+    .play-launcher-panel { border-radius: 14px; border: 1px solid rgba(145,214,255,0.24); background: rgba(3,10,15,0.44); padding: 12px; overflow: auto; }
     .play-launcher-title { font-size: 14px; font-weight: 800; letter-spacing: 0.7px; color: #9fe3ff; text-transform: uppercase; }
     .play-launcher-text { margin-top: 7px; font-size: 13px; color: rgba(219,239,255,0.86); }
     .play-launcher-preview { margin-top: 6px; font-size: 11px; color: rgba(191,226,246,0.78); }
     .play-launcher-sub { margin-top: 10px; font-size: 11px; opacity: 0.72; text-transform: uppercase; letter-spacing: 0.5px; }
+    .play-launcher-models { margin-top: 7px; display: grid; grid-template-columns: 1fr; gap: 7px; }
+    .play-launcher-model-btn { border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; background: rgba(255,255,255,0.08); color: rgba(245,251,255,0.9); font-size: 11px; padding: 8px 8px; cursor: pointer; text-align: left; }
+    .play-launcher-model-btn.on { border-color: rgba(159,227,255,0.8); box-shadow: 0 0 0 2px rgba(159,227,255,0.22) inset; }
+    .play-launcher-model-btn small { display: block; font-size: 10px; opacity: 0.72; margin-top: 2px; }
     .play-launcher-colors { margin-top: 7px; display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 7px; }
     .play-launcher-hair { margin-top: 7px; display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 7px; }
     .play-launcher-color { border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; background: rgba(255,255,255,0.08); color: rgba(245,251,255,0.9); font-size: 11px; padding: 7px 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
@@ -409,7 +418,9 @@
       .guide-fab { bottom: 12px; left: 12px; right: auto; width: 48px; min-width: 48px; font-size: 16px; height: 48px; padding: 0; border-radius: 14px; gap: 0; justify-content: center; }
       .guide-fab i { font-size: 20px; }
       .guide-fab span { display: none; }
-      .play-launcher-card { width: min(94vw, 440px); padding: 13px 12px 11px; }
+      .play-launcher-card { width: min(98vw, 600px); height: min(96vh, 980px); padding: 8px; }
+      .play-launcher-shell { grid-template-columns: 1fr; grid-template-rows: minmax(250px,58vh) minmax(0,1fr); }
+      .play-launcher-panel { padding: 10px; }
       .play-launcher-title { font-size: 13px; }
       .play-launcher-text { font-size: 12px; }
       .play-launcher-colors { grid-template-columns: repeat(2, minmax(0,1fr)); }
@@ -447,24 +458,43 @@
 </div>
 <div class="play-launcher" id="playLauncher" onclick="if(event.target===this) closePlayLauncher()">
   <div class="play-launcher-card">
-    <div class="play-launcher-title">Play Setup</div>
-    <div class="play-launcher-text">Collect all the coins.</div>
-    <div class="play-launcher-preview">Live preview: the cat in the room updates as you choose.</div>
-    <div class="play-launcher-sub">Choose cat color</div>
-    <div class="play-launcher-colors">
-      <button class="play-launcher-color on" id="catColorBtnGinger" onclick="setCatColorPreset('ginger')"><span class="play-launcher-dot" style="background:#c67f45"></span><span>Ginger</span></button>
-      <button class="play-launcher-color" id="catColorBtnTuxedo" onclick="setCatColorPreset('tuxedo')"><span class="play-launcher-dot" style="background:#5f6772"></span><span>Tuxedo</span></button>
-      <button class="play-launcher-color" id="catColorBtnCream" onclick="setCatColorPreset('cream')"><span class="play-launcher-dot" style="background:#d7ccb1"></span><span>Cream</span></button>
-      <button class="play-launcher-color" id="catColorBtnMidnight" onclick="setCatColorPreset('midnight')"><span class="play-launcher-dot" style="background:#41495a"></span><span>Midnight</span></button>
-    </div>
-    <div class="play-launcher-sub">Coat length</div>
-    <div class="play-launcher-hair">
-      <button class="play-launcher-hair-btn on" id="catHairBtnShort" onclick="setCatHairPreset('short')">Short Hair</button>
-      <button class="play-launcher-hair-btn" id="catHairBtnLong" onclick="setCatHairPreset('long')">Long Hair</button>
-    </div>
-    <div class="play-launcher-actions">
-      <button class="play-launcher-btn" onclick="closePlayLauncher()">Cancel</button>
-      <button class="play-launcher-btn start" onclick="startPlayModeFromLauncher()">Start Run</button>
+    <div class="play-launcher-shell">
+      <div class="play-launcher-preview-wrap">
+        <canvas id="playCatPreviewCanvas" class="play-launcher-preview-canvas"></canvas>
+        <div class="play-launcher-preview-tip">Drag to rotate · Scroll to zoom</div>
+      </div>
+      <div class="play-launcher-panel">
+        <div class="play-launcher-title">Play Setup</div>
+        <div class="play-launcher-text">Collect all the coins.</div>
+        <div class="play-launcher-preview">Live preview updates as you choose model and color.</div>
+        <div class="play-launcher-sub">Choose cat model</div>
+        <div class="play-launcher-models">
+          <button class="play-launcher-model-btn on" id="catModelBtnClassic" onclick="setCatModelPreset('classic')">Classic Cat<small>Default cat model</small></button>
+          <button class="play-launcher-model-btn" id="catModelBtnToon" onclick="setCatModelPreset('toon')">Toon Cat<small>Stylized Sketchfab cat</small></button>
+          <button class="play-launcher-model-btn" id="catModelBtnBababooey" onclick="setCatModelPreset('bababooey')">Bababooey Cat<small>Alt model with original baked colors</small></button>
+        </div>
+        <div id="catColorPanel">
+          <div class="play-launcher-sub">Choose cat color</div>
+          <div class="play-launcher-colors">
+            <button class="play-launcher-color on" id="catColorBtnGinger" onclick="setCatColorPreset('ginger')"><span class="play-launcher-dot" style="background:#c67f45"></span><span>Ginger</span></button>
+            <button class="play-launcher-color" id="catColorBtnTuxedo" onclick="setCatColorPreset('tuxedo')"><span class="play-launcher-dot" style="background:#5f6772"></span><span>Tuxedo</span></button>
+            <button class="play-launcher-color" id="catColorBtnCream" onclick="setCatColorPreset('cream')"><span class="play-launcher-dot" style="background:#d7ccb1"></span><span>Cream</span></button>
+            <button class="play-launcher-color" id="catColorBtnMidnight" onclick="setCatColorPreset('midnight')"><span class="play-launcher-dot" style="background:#41495a"></span><span>Midnight</span></button>
+          </div>
+        </div>
+        <div class="play-launcher-preview" id="catColorHint" style="display:none">This cat keeps its original baked colors.</div>
+        <div id="catHairPanel" style="display:none">
+        <div class="play-launcher-sub">Coat length</div>
+        <div class="play-launcher-hair">
+          <button class="play-launcher-hair-btn on" id="catHairBtnShort" onclick="setCatHairPreset('short')">Short Hair</button>
+          <button class="play-launcher-hair-btn" id="catHairBtnLong" onclick="setCatHairPreset('long')">Long Hair</button>
+        </div>
+        </div>
+        <div class="play-launcher-actions">
+          <button class="play-launcher-btn" onclick="closePlayLauncher()">Cancel</button>
+          <button class="play-launcher-btn start" onclick="startPlayModeFromLauncher()">Start Run</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -745,6 +775,7 @@
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 // Section collapse toggle
 function toggleSection(el){ el.closest('.section-group').classList.toggle('collapsed'); }
@@ -789,59 +820,400 @@ function syncPlayModeUI(){
 }
 const _PLAY_PATH_AUTO_OPEN = /^\/play\/?$/.test(location.pathname);
 const _catColorPresets={
-  ginger:{coat:0xc67f45,tint:0.76},
-  tuxedo:{coat:0x5f6772,tint:0.72},
-  cream:{coat:0xd7ccb1,tint:0.68},
-  midnight:{coat:0x41495a,tint:0.78}
+  ginger:{coat:0xd17b33,tint:0.99,coatMix:0.94},
+  tuxedo:{coat:0x434b56,tint:0.99,coatMix:0.96},
+  cream:{coat:0xe7dbc1,tint:0.98,coatMix:0.9},
+  midnight:{coat:0x242c38,tint:0.995,coatMix:0.98}
 };
 const _catHairPresets={
-  short:{sx:1.0,sy:1.0,sz:1.0,rough:1.0},
-  long:{sx:1.08,sy:1.04,sz:1.08,rough:1.08}
+  short:{sx:1.0,sy:1.0,sz:1.0,rough:0.9,furRim:0.05,bump:0.004,boneMode:'short'},
+  long:{sx:1.0,sy:1.0,sz:1.0,rough:1.34,furRim:1.0,bump:0.11,boneMode:'long'}
+};
+const _catModelPresets={
+  classic:{label:'Classic Cat',sources:['assets/cat.glb'],colorable:true,previewLift:0.0,gameLift:0.0,previewCamY:1.7,previewCamZ:4.7,previewTargetY:1.0,animSpeed:1.0,idleLoopPause:0,groundPinOffset:0.0,sprintAnimMult:1.0},
+  toon:{label:'Toon Cat',sources:['assets/tooncat.glb','assets/toon-cat.glb'],colorable:true,previewLift:0.0,gameLift:0.0,previewCamY:1.85,previewCamZ:5.15,previewTargetY:1.1,animSpeed:1.0,idleLoopPause:0,groundPinOffset:-1.25,sprintAnimMult:2},
+  bababooey:{label:'Bababooey Cat',sources:['assets/bababooey_cat.glb'],colorable:false,previewLift:0.0,gameLift:0.0,previewCamY:1.9,previewCamZ:5.35,previewTargetY:1.15,animSpeed:0.7,idleLoopPause:2.2,groundPinOffset:0.0,sprintAnimMult:1.4}
 };
 let _playLauncherOpen=false;
 let _launcherCatPreview=false;
+let _catModelKey='classic';
 let _catColorKey='ginger';
 let _catHairKey='short';
 const _catBaseScale=new THREE.Vector3(1,1,1);
+const _catPreviewBaseScale=new THREE.Vector3(1,1,1);
 const _catMatBaseColorMap=new WeakMap();
 const _catMatBaseRoughnessMap=new WeakMap();
+const _catBoneBaseScaleMap=new WeakMap();
+const _catMatBaseBumpScaleMap=new WeakMap();
+const _catMatBaseEmissiveMap=new WeakMap();
+const _catMatBaseEmissiveIntensityMap=new WeakMap();
 const _catTmpColorA=new THREE.Color();
 const _catTmpColorB=new THREE.Color();
+const _catTmpColorC=new THREE.Color();
 const _catTmpHSL={h:0,s:0,l:0};
+const _catTmpHSLB={h:0,s:0,l:0};
+const _catFurTintColor=new THREE.Color();
+let _catFurNoiseTexture=null;
+let _catPreviewRenderer=null;
+let _catPreviewScene=null;
+let _catPreviewCamera=null;
+let _catPreviewControls=null;
+let _catPreviewModel=null;
+let _catPreviewMixer=null;
+let _catPreviewIdleAction=null;
+let _catPreviewWalkAction=null;
+let _catPreviewLastTs=0;
+let _catPreviewW=0;
+let _catPreviewH=0;
+let _catPreviewLoadNonce=0;
+const _catPreviewBaseLocalPos=new THREE.Vector3();
+const _catPreviewBaseLocalQuat=new THREE.Quaternion();
+const _catGroundTmpParentPos=new THREE.Vector3();
 function _sanitizeCatColorKey(key){
   const k=String(key||'').trim().toLowerCase();
   return _catColorPresets[k]?k:'ginger';
+}
+function _sanitizeCatModelKey(key){
+  const k=String(key||'').trim().toLowerCase();
+  return _catModelPresets[k]?k:'classic';
 }
 function _sanitizeCatHairKey(key){
   const k=String(key||'').trim().toLowerCase();
   return _catHairPresets[k]?k:'short';
 }
-function _applyCatColorToModel(){
-  if(!catModel) return;
+function _getCatModelPreset(key){
+  return _catModelPresets[_sanitizeCatModelKey(key)]||_catModelPresets.classic;
+}
+function _getSelectedCatModelPreset(){
+  return _getCatModelPreset(_catModelKey);
+}
+function _isColorableCatModelKey(key){
+  return !!_getCatModelPreset(key).colorable;
+}
+function _isToonCatSource(src){
+  const s=String(src||'').toLowerCase();
+  return s.includes('tooncat.glb') || s.includes('toon-cat.glb');
+}
+function _getModelSource(model){
+  return String((model && model.userData && model.userData.modelSource) || '');
+}
+function _stripBababooeyBackdrop(model,loadedSource){
+  if(!model) return 0;
+  const src=String(loadedSource || _getModelSource(model) || '').toLowerCase();
+  if(!src.includes('bababooey_cat.glb')) return 0;
+
+  const nameHint=/(graph|chart|grid|axis|axes|backdrop|background|board|screen|panel|plane|pplane|lambert1)/;
+  const namedRemovals=[];
+  let bestPlanarMesh=null;
+  let bestPlanarScore=0;
+
+  model.traverse(o=>{
+    if(!o || !o.isMesh) return;
+    const mats=Array.isArray(o.material)?o.material:[o.material];
+    let matNames='';
+    let hasLambert1=false;
+    for(const m of mats){
+      if(m && m.name){
+        const n=String(m.name).toLowerCase();
+        matNames+=' '+n;
+        if(n==='lambert1') hasLambert1=true;
+      }
+    }
+    const meshName=String(o.name||'').toLowerCase();
+    const text=(meshName+' '+matNames).trim();
+    if(nameHint.test(text) || hasLambert1){
+      namedRemovals.push(o);
+      return;
+    }
+    if(!o.geometry) return;
+
+    if(!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    const bb=o.geometry.boundingBox;
+    if(!bb) return;
+    const sx=Math.abs(bb.max.x-bb.min.x);
+    const sy=Math.abs(bb.max.y-bb.min.y);
+    const sz=Math.abs(bb.max.z-bb.min.z);
+    const dims=[sx,sy,sz].sort((a,b)=>b-a);
+    const d0=dims[0], d1=dims[1], d2=dims[2];
+    if(!(d0>0 && d1>0)) return;
+
+    const isLarge=d0>0.9 && d1>0.45;
+    const isPlanar=(d1/d0)>0.35 && (d2/d0)<0.06;
+    if(!isLarge || !isPlanar) return;
+
+    const centerZ=(bb.min.z+bb.max.z)*0.5;
+    const depthBias=centerZ<-0.02?1.25:1.0;
+    const score=d0*d1*depthBias;
+    if(score>bestPlanarScore){
+      bestPlanarScore=score;
+      bestPlanarMesh=o;
+    }
+  });
+
+  const toRemove=namedRemovals.slice();
+  if(!toRemove.length && bestPlanarMesh) toRemove.push(bestPlanarMesh);
+
+  for(const node of toRemove){
+    if(node && node.parent) node.parent.remove(node);
+  }
+  if(toRemove.length) console.log('Removed Bababooey backdrop mesh(es):',toRemove.length);
+  return toRemove.length;
+}
+function _centerAndGroundModel(model,extraDrop){
+  if(!model) return;
+  const box=new THREE.Box3().setFromObject(model);
+  const center=box.getCenter(new THREE.Vector3());
+  model.position.x-=center.x;
+  model.position.z-=center.z;
+  model.position.y-=box.min.y;
+  model.updateMatrixWorld(true);
+  let minFootY=Infinity;
+  model.traverse(o=>{
+    if(!o || !o.isBone) return;
+    if(!/foot/i.test(String(o.name||''))) return;
+    const p=new THREE.Vector3();
+    o.getWorldPosition(p);
+    if(p.y<minFootY) minFootY=p.y;
+  });
+  if(Number.isFinite(minFootY)) model.position.y-=minFootY;
+  if(Number.isFinite(extraDrop)) model.position.y+=extraDrop;
+}
+function _pinModelToGround(model,baseLocalPos){
+  if(!model || !baseLocalPos) return;
+  const box=new THREE.Box3().setFromObject(model);
+  if(!Number.isFinite(box.min.y)) return;
+  const parent=model.parent;
+  if(!parent) return;
+  parent.getWorldPosition(_catGroundTmpParentPos);
+  // Convert world-space min Y to parent-local Y so grounding is stable when
+  // the avatar moves up/down onto furniture.
+  const localMinY=box.min.y-_catGroundTmpParentPos.y;
+  const pinOffset=Number(_getSelectedCatModelPreset().groundPinOffset)||0;
+  const targetLocalMinY=baseLocalPos.y+pinOffset+0.002;
+  const delta=targetLocalMinY-localMinY;
+  model.position.y+=delta;
+}
+function _getCatSourcesForModelKey(key){
+  const preset=_getCatModelPreset(key);
+  const out=preset.sources.slice();
+  if(!out.includes('assets/cat.glb')) out.push('assets/cat.glb');
+  return out;
+}
+function _loadCatAssetWithFallback(loader,onLoad,onError,sourcesOverride){
+  const sources=(Array.isArray(sourcesOverride) && sourcesOverride.length ? sourcesOverride : _getCatSourcesForModelKey(_catModelKey)).slice();
+  const tryLoad=(idx,lastErr)=>{
+    if(idx>=sources.length){
+      if(onError) onError(lastErr||new Error('No cat model could be loaded'));
+      return;
+    }
+    const src=sources[idx];
+    loader.load(src,(gltf)=>{
+      if(gltf){
+        gltf.userData=gltf.userData||{};
+        gltf.userData.modelSource=src;
+        if(gltf.scene){
+          gltf.scene.userData=gltf.scene.userData||{};
+          gltf.scene.userData.modelSource=src;
+        }
+      }
+      onLoad(gltf,src);
+    },undefined,(err)=>{
+      console.warn('Cat model load failed for',src,err);
+      tryLoad(idx+1,err);
+    });
+  };
+  tryLoad(0,null);
+}
+function _getCatFurNoiseTexture(){
+  if(_catFurNoiseTexture) return _catFurNoiseTexture;
+  const size=128;
+  const c=document.createElement('canvas');
+  c.width=size;
+  c.height=size;
+  const ctx=c.getContext('2d');
+  const img=ctx.createImageData(size,size);
+  for(let i=0;i<img.data.length;i+=4){
+    const n=(Math.random()*255)|0;
+    img.data[i]=n;
+    img.data[i+1]=n;
+    img.data[i+2]=n;
+    img.data[i+3]=255;
+  }
+  ctx.putImageData(img,0,0);
+  const tex=new THREE.CanvasTexture(c);
+  tex.wrapS=THREE.RepeatWrapping;
+  tex.wrapT=THREE.RepeatWrapping;
+  tex.repeat.set(18,18);
+  tex.needsUpdate=true;
+  _catFurNoiseTexture=tex;
+  return tex;
+}
+function _ensureCatFurShader(mat){
+  if(!mat || mat.userData._catFurShaderInit) return;
+  mat.userData._catFurShaderInit=true;
+  mat.onBeforeCompile=(shader)=>{
+    shader.uniforms.uCatFurAmount={value:Number(mat.userData._catFurAmount)||0};
+    shader.uniforms.uCatFurTint={value:new THREE.Color(Number(mat.userData._catFurTintHex)||0xffffff)};
+    shader.uniforms.uCatCoatTint={value:new THREE.Color(Number(mat.userData._catCoatTintHex)||0xffffff)};
+    shader.uniforms.uCatCoatAmount={value:Number(mat.userData._catCoatAmount)||0};
+    shader.fragmentShader=shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uCatFurAmount;\nuniform vec3 uCatFurTint;\nuniform vec3 uCatCoatTint;\nuniform float uCatCoatAmount;')
+      .replace('#include <output_fragment>', [
+        'float catViewDot = saturate( abs( dot( normal, normalize( vViewPosition ) ) ) );',
+        'float catRim = pow( 1.0 - catViewDot, 2.0 );',
+        'float catNoise = fract( sin( dot( vViewPosition.xy * 31.0 + normal.xy * 22.0, vec2(12.9898,78.233) ) ) * 43758.5453 );',
+        'float catFurRim = catRim * mix(0.62,1.45,catNoise);',
+        'float catTexLuma = dot( diffuseColor.rgb, vec3(0.2126,0.7152,0.0722) );',
+        'float catTexMax = max( diffuseColor.r, max( diffuseColor.g, diffuseColor.b ) );',
+        'float catTexMin = min( diffuseColor.r, min( diffuseColor.g, diffuseColor.b ) );',
+        'float catTexSat = (catTexMax - catTexMin) / max(0.0001, catTexMax);',
+        'float catFurMask = smoothstep(0.12,0.62,catTexLuma) * (1.0 - smoothstep(0.9,1.0,catTexLuma));',
+        'catFurMask *= mix(0.42,1.0,smoothstep(0.08,0.34,catTexSat));',
+        'vec3 catTinted = outgoingLight * (uCatCoatTint * 1.45);',
+        'vec3 catColorized = mix( outgoingLight, catTinted, uCatCoatAmount * (0.38 + (0.62 * catFurMask)) );',
+        'float catFuzz = mix(1.0, mix(0.76,1.28,catNoise), min(1.0, uCatFurAmount * 0.95) * catFurMask);',
+        'vec3 catFurGlow = uCatFurTint * (catFurRim * uCatFurAmount * catFurMask);',
+        'gl_FragColor = vec4( (catColorized * catFuzz) + catFurGlow, diffuseColor.a );'
+      ].join('\n'));
+    mat.userData._catFurShader=shader;
+  };
+  mat.customProgramCacheKey=()=> 'catFurShaderV5';
+  mat.needsUpdate=true;
+}
+function _applyCatHairToBones(model,hairCfg){
+  if(!model) return;
+  const isToon=_isToonCatSource(_getModelSource(model));
+  model.traverse(o=>{
+    if(!o || !o.isBone) return;
+    if(!_catBoneBaseScaleMap.has(o)) _catBoneBaseScaleMap.set(o,o.scale.clone());
+    const base=_catBoneBaseScaleMap.get(o);
+    if(isToon){
+      // Toon rig gets unstable and wrinkly when bones are scaled; keep it neutral.
+      o.scale.copy(base);
+      return;
+    }
+    o.scale.copy(base);
+  });
+}
+function _applyCatAppearanceToSingleModel(model,baseScale){
+  if(!model) return;
   const colorCfg=_catColorPresets[_sanitizeCatColorKey(_catColorKey)]||_catColorPresets.ginger;
   const hairCfg=_catHairPresets[_sanitizeCatHairKey(_catHairKey)]||_catHairPresets.short;
-  catModel.scale.set(_catBaseScale.x*hairCfg.sx,_catBaseScale.y*hairCfg.sy,_catBaseScale.z*hairCfg.sz);
-  catModel.traverse(o=>{
+  const isToon=_isToonCatSource(_getModelSource(model));
+  const isColorable=_isColorableCatModelKey(_catModelKey);
+  model.scale.set(baseScale.x*hairCfg.sx,baseScale.y*hairCfg.sy,baseScale.z*hairCfg.sz);
+  _applyCatHairToBones(model,hairCfg);
+  model.traverse(o=>{
     if(!o.isMesh || !o.material) return;
+    const meshName=String(o.name||'').toLowerCase();
     const mats=Array.isArray(o.material)?o.material:[o.material];
     for(const m of mats){
       if(!m || !(m.isMeshStandardMaterial||m.isMeshPhysicalMaterial) || !m.color) continue;
+      const matName=String(m.name||'').toLowerCase();
       if(!_catMatBaseColorMap.has(m)) _catMatBaseColorMap.set(m,m.color.clone());
       if(!_catMatBaseRoughnessMap.has(m)) _catMatBaseRoughnessMap.set(m,Number(m.roughness)||0.9);
+      if(!_catMatBaseBumpScaleMap.has(m)) _catMatBaseBumpScaleMap.set(m,Number(m.bumpScale)||0);
+      if(!_catMatBaseEmissiveMap.has(m)) _catMatBaseEmissiveMap.set(m,(m.emissive&&m.emissive.isColor)?m.emissive.clone():new THREE.Color(0x000000));
+      if(!_catMatBaseEmissiveIntensityMap.has(m)) _catMatBaseEmissiveIntensityMap.set(m,Number(m.emissiveIntensity)||0);
       const baseCol=_catMatBaseColorMap.get(m);
       const baseRough=_catMatBaseRoughnessMap.get(m);
+      const baseBump=_catMatBaseBumpScaleMap.get(m);
+      const baseEmi=_catMatBaseEmissiveMap.get(m);
+      const baseEmiI=_catMatBaseEmissiveIntensityMap.get(m);
+      const isDetail=/(eye|pupil|nose|mouth|tongue|tooth|teeth|whisker|inner|ear)/.test(meshName+' '+matName);
+      if(isDetail){
+        m.color.copy(baseCol);
+        m.roughness=baseRough;
+        m.bumpScale=baseBump;
+        if(m.emissive&&m.emissive.isColor){
+          m.emissive.copy(baseEmi);
+          m.emissiveIntensity=baseEmiI;
+        }
+        m.userData._catFurAmount=0;
+        m.userData._catCoatAmount=0;
+        if(m.userData._catFurShader){
+          m.userData._catFurShader.uniforms.uCatFurAmount.value=0;
+          m.userData._catFurShader.uniforms.uCatCoatAmount.value=0;
+        }
+        m.needsUpdate=true;
+        continue;
+      }
+      if(!isColorable){
+        m.color.copy(baseCol);
+        m.roughness=baseRough;
+        m.bumpScale=baseBump;
+        if(m.emissive&&m.emissive.isColor){
+          m.emissive.copy(baseEmi);
+          m.emissiveIntensity=baseEmiI;
+        }
+        if(m.userData._catFurShader){
+          m.userData._catFurShader.uniforms.uCatFurAmount.value=0;
+          m.userData._catFurShader.uniforms.uCatCoatAmount.value=0;
+        }
+        m.needsUpdate=true;
+        continue;
+      }
+      if(isToon){
+        _catTmpColorB.setHex(colorCfg.coat);
+        m.color.copy(baseCol).lerp(_catTmpColorB,0.82);
+        const toonLong=hairCfg.boneMode==='long';
+        m.roughness=Math.min(1,Math.max(0.45,baseRough*(toonLong?1.08:0.96)));
+        m.bumpMap=null;
+        m.bumpScale=0;
+        m.normalMap=null;
+        if(m.emissive&&m.emissive.isColor){
+          m.emissive.copy(baseEmi).lerp(_catTmpColorB,0.18);
+          m.emissiveIntensity=Math.max(baseEmiI,toonLong?0.14:0.08);
+        }
+        m.userData._catFurAmount=0;
+        m.userData._catFurTintHex=_catTmpColorB.getHex();
+        m.userData._catCoatTintHex=_catTmpColorB.getHex();
+        m.userData._catCoatAmount=0;
+        if(m.userData._catFurShader){
+          m.userData._catFurShader.uniforms.uCatFurAmount.value=0;
+          m.userData._catFurShader.uniforms.uCatCoatAmount.value=0;
+        }
+        m.needsUpdate=true;
+        continue;
+      }
       _catTmpColorA.copy(baseCol);
       _catTmpColorA.getHSL(_catTmpHSL);
       _catTmpColorB.setHex(colorCfg.coat);
-      let tint=colorCfg.tint;
-      if(_catTmpHSL.s<0.12) tint*=0.45;
-      if(_catTmpHSL.l<0.1 || _catTmpHSL.l>0.9) tint*=0.35;
-      tint=Math.max(0.08,Math.min(0.9,tint));
-      m.color.copy(_catTmpColorA.lerp(_catTmpColorB,tint));
+      _catTmpColorB.getHSL(_catTmpHSLB);
+      let tint=Math.max(0.15,Math.min(0.98,colorCfg.tint));
+      if(_catTmpHSL.s<0.06) tint=Math.max(tint,0.88);
+      // Keep luminance detail from the source texture while strongly shifting coat hue.
+      const sat=Math.max(0.12,Math.min(1,(_catTmpHSLB.s*0.92)+(_catTmpHSL.s*0.24)));
+      const lit=Math.max(0.08,Math.min(0.94,(_catTmpHSL.l*(1-(tint*0.34)))+(_catTmpHSLB.l*(tint*0.34))));
+      m.color.setHSL(_catTmpHSLB.h,sat,lit);
       m.roughness=Math.min(1,Math.max(0.55,baseRough*hairCfg.rough));
+      m.bumpMap=_getCatFurNoiseTexture();
+      m.bumpScale=Math.max(0.001,(Math.abs(baseBump)*0.35)+hairCfg.bump);
+      _catFurTintColor.setHex(colorCfg.coat).offsetHSL(0,0,0.14);
+      _catTmpColorC.setHex(colorCfg.coat).offsetHSL(0,0,0.02);
+      if(m.emissive&&m.emissive.isColor){
+        m.emissive.copy(baseEmi).lerp(_catTmpColorC,0.24 + (0.35*(Number(colorCfg.coatMix)||0.8)));
+        m.emissiveIntensity=Math.max(baseEmiI,0.18 + (hairCfg.boneMode==='long'?0.18:0.05));
+      }
+      _ensureCatFurShader(m);
+      m.userData._catFurAmount=hairCfg.furRim;
+      m.userData._catFurTintHex=_catFurTintColor.getHex();
+      m.userData._catCoatTintHex=_catTmpColorC.getHex();
+      m.userData._catCoatAmount=Math.max(0,Math.min(0.95,Number(colorCfg.coatMix)||0.8));
+      if(m.userData._catFurShader){
+        m.userData._catFurShader.uniforms.uCatFurAmount.value=hairCfg.furRim;
+        m.userData._catFurShader.uniforms.uCatFurTint.value.copy(_catFurTintColor);
+        m.userData._catFurShader.uniforms.uCatCoatTint.value.copy(_catTmpColorC);
+        m.userData._catFurShader.uniforms.uCatCoatAmount.value=Math.max(0,Math.min(0.95,Number(colorCfg.coatMix)||0.8));
+      }
       m.needsUpdate=true;
     }
   });
+  model.updateMatrixWorld(true);
+}
+function _applyCatColorToModel(){
+  _applyCatAppearanceToSingleModel(catModel,_catBaseScale);
+  _applyCatAppearanceToSingleModel(_catPreviewModel,_catPreviewBaseScale);
 }
 function _setCatColorButtons(){
   for(const key of Object.keys(_catColorPresets)){
@@ -857,30 +1229,261 @@ function _setCatHairButtons(){
     if(btn) btn.classList.toggle('on',key===_catHairKey);
   }
 }
+function _setCatModelButtons(){
+  const map={classic:'catModelBtnClassic',toon:'catModelBtnToon',bababooey:'catModelBtnBababooey'};
+  for(const key of Object.keys(map)){
+    const btn=document.getElementById(map[key]);
+    if(btn) btn.classList.toggle('on',key===_catModelKey);
+  }
+}
+function _updateCatCustomizationUi(){
+  const colorable=_isColorableCatModelKey(_catModelKey);
+  const colorPanel=document.getElementById('catColorPanel');
+  const colorHint=document.getElementById('catColorHint');
+  const hairPanel=document.getElementById('catHairPanel');
+  if(colorPanel) colorPanel.style.display=colorable?'':'none';
+  if(colorHint) colorHint.style.display=colorable?'none':'block';
+  if(hairPanel) hairPanel.style.display='none';
+}
+function setCatModelPreset(key){
+  const k=_sanitizeCatModelKey(key);
+  if(k===_catModelKey) return;
+  _catModelKey=k;
+  _catHairKey='short';
+  _setCatModelButtons();
+  _setCatHairButtons();
+  _updateCatCustomizationUi();
+  if(!_isColorableCatModelKey(_catModelKey)){
+    _catHairKey='short';
+  }
+  if(typeof _applyPreviewCameraPreset==='function') _applyPreviewCameraPreset();
+  if(typeof _loadPreviewCatFromSelection==='function') _loadPreviewCatFromSelection();
+  if(typeof _loadGameplayCatFromSelection==='function') _loadGameplayCatFromSelection();
+}
 function setCatColorPreset(key){
+  if(!_isColorableCatModelKey(_catModelKey)) return;
   _catColorKey=_sanitizeCatColorKey(key);
   _setCatColorButtons();
   _applyCatColorToModel();
 }
 function setCatHairPreset(key){
+  if(!_isColorableCatModelKey(_catModelKey)) return;
   _catHairKey=_sanitizeCatHairKey(key);
   _setCatHairButtons();
   _applyCatColorToModel();
 }
 function _setLauncherCatPreview(show){
   _launcherCatPreview=!!show;
-  if(!_launcherCatPreview && !_fpMode){
-    if(catGroup.parent===camera) scene.add(catGroup);
-    catGroup.visible=false;
+  if(_launcherCatPreview){
+    _initCatPreview();
+    _resizeCatPreview();
   }
+}
+function _resizeCatPreview(){
+  if(!_catPreviewRenderer || !_catPreviewCamera) return;
+  const canvasEl=document.getElementById('playCatPreviewCanvas');
+  if(!canvasEl) return;
+  const wrap=canvasEl.parentElement;
+  if(!wrap) return;
+  const w=Math.max(1,Math.floor(wrap.clientWidth));
+  const h=Math.max(1,Math.floor(wrap.clientHeight));
+  if(w===_catPreviewW && h===_catPreviewH) return;
+  _catPreviewW=w;
+  _catPreviewH=h;
+  _catPreviewRenderer.setSize(w,h,false);
+  _catPreviewCamera.aspect=w/h;
+  _catPreviewCamera.updateProjectionMatrix();
+}
+function _applyPreviewCameraPreset(){
+  if(!_catPreviewCamera) return;
+  const preset=_getSelectedCatModelPreset();
+  _catPreviewCamera.position.set(0,preset.previewCamY,preset.previewCamZ);
+  if(_catPreviewControls){
+    _catPreviewControls.target.set(0,preset.previewTargetY,0);
+    _catPreviewControls.update();
+  }
+}
+function _clearPreviewCatModel(){
+  if(_catPreviewMixer){
+    _catPreviewMixer.stopAllAction();
+    _catPreviewMixer=null;
+  }
+  _catPreviewIdleAction=null;
+  _catPreviewWalkAction=null;
+  if(_catPreviewModel && _catPreviewScene){
+    _catPreviewScene.remove(_catPreviewModel);
+  }
+  _catPreviewModel=null;
+}
+function _applyLoopPauseToAction(action,ts,pauseSeconds,allowPause){
+  if(!action) return;
+  const pauseMs=Math.max(0,Number(pauseSeconds)||0)*1000;
+  const st=action.userData||(action.userData={});
+  const t=Number(action.time)||0;
+  if(!Number.isFinite(st._loopPausePrevTime)) st._loopPausePrevTime=t;
+
+  if(pauseMs<=0 || !allowPause){
+    st._loopPauseUntil=0;
+    if(action.paused) action.paused=false;
+    st._loopPausePrevTime=t;
+    return;
+  }
+
+  if(action.paused){
+    const until=Number(st._loopPauseUntil)||0;
+    if(ts>=until){
+      action.paused=false;
+      st._loopPauseUntil=0;
+      st._loopPausePrevTime=Number(action.time)||0;
+    }
+    return;
+  }
+
+  // For looping clips, time wraps back to 0 every cycle. Detect that wrap and pause.
+  if(t+0.0005<st._loopPausePrevTime){
+    action.paused=true;
+    st._loopPauseUntil=ts+pauseMs;
+  }
+  st._loopPausePrevTime=t;
+}
+function _loadPreviewCatFromSelection(){
+  if(!_catPreviewScene) return;
+  const nonce=++_catPreviewLoadNonce;
+  _clearPreviewCatModel();
+  const loader=new THREE.GLTFLoader();
+  const sources=_getCatSourcesForModelKey(_catModelKey);
+  _loadCatAssetWithFallback(loader,(gltf,src)=>{
+    if(nonce!==_catPreviewLoadNonce) return;
+    _catPreviewModel=gltf.scene;
+    _stripBababooeyBackdrop(_catPreviewModel,src);
+    const box=new THREE.Box3().setFromObject(_catPreviewModel);
+    const size=box.getSize(new THREE.Vector3());
+    const h=size.y||1;
+    const s=2.2/h;
+    _catPreviewModel.scale.setScalar(s);
+    _catPreviewBaseScale.copy(_catPreviewModel.scale);
+    const preset=_getSelectedCatModelPreset();
+    _centerAndGroundModel(_catPreviewModel,preset.previewLift);
+    _catPreviewBaseLocalPos.copy(_catPreviewModel.position);
+    _catPreviewBaseLocalQuat.copy(_catPreviewModel.quaternion);
+
+    _catPreviewModel.traverse(o=>{
+      if(!o.isMesh) return;
+      const mats=Array.isArray(o.material)?o.material:[o.material];
+      for(const m of mats){
+        if(!m) continue;
+        if(m.isMeshStandardMaterial || m.isMeshPhysicalMaterial){
+          m.metalness=0;
+          m.roughness=Math.max(0.86,Number(m.roughness)||0.86);
+          if(m.clearcoat!==undefined) m.clearcoat=0;
+          if(m.sheen!==undefined) m.sheen=0;
+          m.needsUpdate=true;
+        }
+      }
+    });
+
+    _catPreviewScene.add(_catPreviewModel);
+    _applyCatColorToModel();
+
+    if(gltf.animations && gltf.animations.length){
+      _catPreviewMixer=new THREE.AnimationMixer(_catPreviewModel);
+      const byName=(names)=>{
+        for(const n of names){
+          const c=gltf.animations.find(a=>a.name.toLowerCase().includes(n));
+          if(c) return c;
+        }
+        return null;
+      };
+      const walkClip=byName(['walk','run','gallop']) || gltf.animations[0];
+      const idleClip=byName(['idle','sit','rest']) || gltf.animations[0];
+      if(walkClip){ _catPreviewWalkAction=_catPreviewMixer.clipAction(walkClip); _catPreviewWalkAction.play(); _catPreviewWalkAction.weight=0; }
+      if(idleClip && idleClip!==walkClip){ _catPreviewIdleAction=_catPreviewMixer.clipAction(idleClip); _catPreviewIdleAction.play(); _catPreviewIdleAction.weight=1; }
+      else if(_catPreviewWalkAction){ _catPreviewWalkAction.weight=1; }
+    }
+  },(err)=>{ console.warn('Preview cat load failed',err); },sources);
+}
+function _initCatPreview(){
+  if(_catPreviewRenderer) return;
+  const canvasEl=document.getElementById('playCatPreviewCanvas');
+  if(!canvasEl) return;
+  _catPreviewRenderer=new THREE.WebGLRenderer({canvas:canvasEl, antialias:true, alpha:false, powerPreference:'high-performance'});
+  _catPreviewRenderer.setPixelRatio(Math.min(window.devicePixelRatio,1.4));
+  _catPreviewRenderer.outputEncoding=THREE.sRGBEncoding;
+  _catPreviewRenderer.toneMapping=THREE.ACESFilmicToneMapping;
+  _catPreviewRenderer.toneMappingExposure=1.15;
+
+  _catPreviewScene=new THREE.Scene();
+  _catPreviewScene.background=new THREE.Color(0x0c1723);
+  _catPreviewCamera=new THREE.PerspectiveCamera(36,1,0.1,100);
+  _applyPreviewCameraPreset();
+
+  const hemi=new THREE.HemisphereLight(0x8ea5c5,0x273341,0.65);
+  _catPreviewScene.add(hemi);
+  const key=new THREE.DirectionalLight(0xfff0de,0.9);
+  key.position.set(2.8,5.0,3.5);
+  _catPreviewScene.add(key);
+  const fill=new THREE.DirectionalLight(0x9bc6ff,0.3);
+  fill.position.set(-2.5,2.3,-2.5);
+  _catPreviewScene.add(fill);
+
+  const floor=new THREE.Mesh(
+    new THREE.CircleGeometry(3.4,56),
+    new THREE.MeshStandardMaterial({color:0x1a2b3d,roughness:0.95,metalness:0})
+  );
+  floor.rotation.x=-Math.PI/2;
+  floor.position.y=0;
+  _catPreviewScene.add(floor);
+
+  if(THREE.OrbitControls){
+    _catPreviewControls=new THREE.OrbitControls(_catPreviewCamera,canvasEl);
+    _catPreviewControls.enablePan=false;
+    _catPreviewControls.enableDamping=true;
+    _catPreviewControls.dampingFactor=0.08;
+    _catPreviewControls.minDistance=2.6;
+    _catPreviewControls.maxDistance=8.5;
+    _applyPreviewCameraPreset();
+  }
+
+  _loadPreviewCatFromSelection();
+
+  _resizeCatPreview();
+}
+function _stepPreviewCatMixer(ts){
+  if(!_catPreviewMixer) return;
+  const animSpeed=Math.max(0.12,Number(_getSelectedCatModelPreset().animSpeed)||1);
+  const loopPause=Math.max(0,Number(_getSelectedCatModelPreset().idleLoopPause)||0);
+  const loopAction=_catPreviewIdleAction||_catPreviewWalkAction;
+  if(_catPreviewWalkAction && _catPreviewIdleAction){
+    _catPreviewWalkAction.weight=0;
+    _catPreviewIdleAction.weight=1;
+  }
+  _catPreviewMixer.update(Math.min(0.05,Math.max(0.001,(ts-(_catPreviewLastTs||ts))/1000))*animSpeed);
+  _applyLoopPauseToAction(loopAction,ts,loopPause,true);
+  if(_catPreviewModel){
+    _catPreviewModel.position.copy(_catPreviewBaseLocalPos);
+    _catPreviewModel.quaternion.copy(_catPreviewBaseLocalQuat);
+    if(_catModelKey!=='classic'){
+      _pinModelToGround(_catPreviewModel,_catPreviewBaseLocalPos);
+    }
+  }
+  _catPreviewLastTs=ts;
+}
+function _tickCatPreview(ts){
+  if(!_launcherCatPreview || !_playLauncherOpen || !_catPreviewRenderer || !_catPreviewScene || !_catPreviewCamera) return;
+  _resizeCatPreview();
+  _stepPreviewCatMixer(ts);
+  if(_catPreviewControls) _catPreviewControls.update();
+  _catPreviewRenderer.render(_catPreviewScene,_catPreviewCamera);
 }
 function openPlayLauncher(){
   if(_fpMode) return;
   _playLauncherOpen=true;
   const el=document.getElementById('playLauncher');
   if(el) el.classList.add('show');
+  _setCatModelButtons();
   _setCatColorButtons();
   _setCatHairButtons();
+  _updateCatCustomizationUi();
   _applyCatColorToModel();
   _setLauncherCatPreview(true);
 }
@@ -897,39 +1500,131 @@ function startPlayModeFromLauncher(){
 }
 function _stepCatMixer(ts,moveSpeed){
   if(!catMixer) return;
+  const preset=_getSelectedCatModelPreset();
+  const animSpeed=Math.max(0.12,Number(preset.animSpeed)||1);
+  const loopPause=Math.max(0,Number(preset.idleLoopPause)||0);
+  const sprintAnimMult=Math.max(1,Number(preset.sprintAnimMult)||1);
   const sp=Math.max(0,Number(moveSpeed)||0);
-  if(catWalkAction && catIdleAction){
-    const w=Math.min(1,sp/0.25);
-    catWalkAction.weight=w;
-    catIdleAction.weight=1-w;
-    if(catWalkAction.timeScale!==undefined) catWalkAction.timeScale=0.8+sp*2.0;
+  const dtRaw=Math.min(0.05,Math.max(0.001,(ts-(catMixer._lastTs||ts))/1000));
+  const dt=dtRaw*animSpeed;
+  const st=catMixer.userData||(catMixer.userData={});
+  if(!Number.isFinite(st._moveBlend)) st._moveBlend=sp>0.03?1:0;
+  if(!Number.isFinite(st._idleProceduralBlend)) st._idleProceduralBlend=0;
+  let targetMove=st._moveBlend;
+  if(sp>0.04) targetMove=1;
+  else if(sp<0.02) targetMove=0;
+  const ease=1-Math.exp(-dt*9.5);
+  st._moveBlend+=(targetMove-st._moveBlend)*ease;
+  const moveBlend=Math.max(0,Math.min(1,st._moveBlend));
+  const idleTarget=Math.max(0,Math.min(1,1-moveBlend));
+  const idleEase=1-Math.exp(-dt*7.0);
+  st._idleProceduralBlend+=(idleTarget-st._idleProceduralBlend)*idleEase;
+  const idleBlend=Math.max(0,Math.min(1,st._idleProceduralBlend));
+
+  if(catWalkAction) catWalkAction.paused=false;
+  if(catIdleAction) catIdleAction.paused=false;
+
+  if(catWalkAction && catWalkAction.timeScale!==undefined){
+    const sprinting=!!(_fpKeys && _fpKeys.shift) && sp>0.1;
+    const sprintBoost=sprinting?sprintAnimMult:1;
+    if(_catModelKey==='bababooey'){
+      // Bababooey ships a single bouncy "dance" clip. Use it as a subtle
+      // idle at a much lower speed, and ramp up for a crude run cycle
+      // while moving. Smoothly blend between the two so it doesn't pop.
+      const idleTs=0.18;
+      const runTs=(0.85+sp*1.8)*sprintBoost;
+      catWalkAction.timeScale=idleTs + (runTs-idleTs)*moveBlend;
+    } else {
+      catWalkAction.timeScale=(0.8+sp*2.0)*sprintBoost;
+    }
   }
-  catMixer.update(Math.min(0.05,Math.max(0.001,(ts-(catMixer._lastTs||ts))/1000)));
+  if(catWalkAction && catIdleAction){
+    const w=Math.min(1,sp/0.25)*moveBlend;
+    catWalkAction.weight=w;
+    catIdleAction.weight=(1-w)*moveBlend;
+  }
+  if(_catModelKey==='bababooey'){
+    // Smoothly ramp a dedicated procedural-run blend so we don't pop from
+    // the baked clip's pose into the procedural offsets at the start.
+    if(!Number.isFinite(st._bababooeyRunBlend)) st._bababooeyRunBlend=0;
+    const runTarget=Math.min(1,sp/0.25)*moveBlend;
+    const runEase=1-Math.exp(-dtRaw*5.0);
+    st._bababooeyRunBlend+=(runTarget-st._bababooeyRunBlend)*runEase;
+    const runBlend=Math.max(0,Math.min(1,st._bababooeyRunBlend));
+    // Kill the baked "dance" clip proportional to the run blend so the
+    // transition crossfades cleanly instead of fighting the procedural pose.
+    if(catWalkAction) catWalkAction.weight*=1-runBlend;
+    if(catIdleAction) catIdleAction.weight*=1-runBlend;
+    st._bababooeyRunBlendSmoothed=runBlend;
+  }
+  // For bababooey, the mixer must keep ticking even while idle so the subtle
+  // sway plays; other models pause the mixer when moveBlend is 0.
+  const mixerDt=_catModelKey==='bababooey' ? dt : dt*moveBlend;
+  catMixer.update(mixerDt>0.00001?mixerDt:0);
+  if(idleBlend<0.2) _refreshGameplayCatIdleBasePose();
+  if(idleBlend>0.001) _applyGameplayCatProceduralIdle(ts,idleBlend);
+  // Procedural walk/run for bababooey (bone rig has no walk clip).
+  if(_catModelKey==='bababooey' && moveBlend>0.001){
+    const runB=Number(st._bababooeyRunBlendSmoothed)||0;
+    if(runB>0.001) _applyBababooeyProceduralRun(ts,sp,runB);
+  }
+  const loopAction=catIdleAction||catWalkAction;
+  _applyLoopPauseToAction(loopAction,ts,loopPause,idleBlend>0.35 && sp<0.03);
   catMixer._lastTs=ts;
   if(catModel){
     catModel.position.copy(_catBaseLocalPos);
     catModel.quaternion.copy(_catBaseLocalQuat);
+    if(_catModelKey!=='classic'){
+      _pinModelToGround(catModel,_catBaseLocalPos);
+    }
+    // Jump squash-and-stretch for all cats:
+    // - Holding space (charging) → compress down like a spring
+    // - Just launched (rising)   → stretch tall
+    // - Falling                  → pancake wider/shorter
+    // Bababooey uses stronger pancake amplitudes on landing.
+    {
+      const st2=catMixer.userData;
+      if(!Number.isFinite(st2._squashBlend)) st2._squashBlend=0;
+      const vy=(typeof _fpVy==='number')?_fpVy:0;
+      const grounded=Math.abs(vy)<0.01;
+      const held=(typeof _fpSpaceHeld==='number')?_fpSpaceHeld:0;
+      const chargeN=Math.min(1, held/60); // 0..1 spring compression
+      const isBaba=_catModelKey==='bababooey';
+      const isToon=_catModelKey==='toon';
+      // Positive target = squash (short + wide), negative = stretch (tall + narrow).
+      let target=0;
+      if(grounded && held>0){
+        // Charging — squash grows with hold time.
+        target=0.55*chargeN;
+      } else if(vy>0.05){
+        // Launch/rise — stretch; amount scales with vertical velocity.
+        target=Math.max(-0.45, -vy*3.2);
+      } else if(vy<-0.03){
+        // Falling — pancake (stronger for bababooey; disabled for toon).
+        if(!isToon){
+          const k=isBaba?11:7;
+          target=Math.min(1, (-vy)*k);
+        }
+      }
+      const squashEase=1-Math.exp(-dtRaw*14);
+      st2._squashBlend+=(target-st2._squashBlend)*squashEase;
+      const s=st2._squashBlend;
+      // Per-model max squash/stretch amplitudes. Toon keeps body nearly normal —
+      // the crouch look comes from leg-bone shortening instead.
+      const syK=isBaba?0.55:(isToon?0.12:0.35);
+      const sxzK=isBaba?0.40:(isToon?0.06:0.22);
+      const sy=1 - s*syK;
+      const sxz=1 + s*sxzK;
+      catModel.scale.set(_catBaseScale.x*sxz, _catBaseScale.y*sy, _catBaseScale.z*sxz);
+      if(isToon){
+        _applyToonCatJumpLegs(s);
+        // Re-pin to ground after the leg-shrink so feet stay ON the floor
+        // rather than poking through it. The leg shortening brings the
+        // hips/belly down naturally, giving the sploot look.
+        _pinModelToGround(catModel,_catBaseLocalPos);
+      }
+    }
   }
-}
-function _updateLauncherCatPreview(ts){
-  if(!_launcherCatPreview || _fpMode || !catModel) return;
-  if(catGroup.parent!==scene) scene.add(catGroup);
-  const groundY=_fpFloorY-placementOffset.y;
-  const previewDist=Math.max(5.2,Math.min(7.5,radius*0.12));
-  const fwdX=-Math.sin(azimuth), fwdZ=-Math.cos(azimuth);
-  const rightX=Math.cos(azimuth), rightZ=-Math.sin(azimuth);
-  const px=panX+fwdX*previewDist+rightX*1.3;
-  const pz=panZ+fwdZ*previewDist+rightZ*0.3;
-  catGroup.position.set(px,groundY,pz);
-  const targetYaw=Math.atan2(camera.position.x-px,camera.position.z-pz);
-  let dYaw=targetYaw-catGroup.rotation.y;
-  while(dYaw>Math.PI) dYaw-=Math.PI*2;
-  while(dYaw<-Math.PI) dYaw+=Math.PI*2;
-  catGroup.rotation.y+=dYaw*0.22;
-  catGroup.rotation.x=0;
-  catGroup.rotation.z=0;
-  catGroup.visible=true;
-  _stepCatMixer(ts,0);
 }
 function enterPlayMode(){ if(!_fpMode) openPlayLauncher(); }
 function exitPlayMode(){ if(_fpMode) toggleFirstPerson(); }
@@ -1088,15 +1783,264 @@ const catGroup=new THREE.Group();
 catGroup.visible=false;
 scene.add(catGroup);
 let catModel=null, catMixer=null, catWalkAction=null, catIdleAction=null;
+let _catGameLoadNonce=0;
 let _catTargetHeight=4.0; // desired visual height in inches — small enough to fit near walls
 const _catBoxTmp=new THREE.Box3();
 const _catBaseLocalPos=new THREE.Vector3();
 const _catBaseLocalQuat=new THREE.Quaternion();
-(function loadCat(){
+const _catIdleTailBones=[];
+const _catIdleHeadBones=[];
+const _catIdleSpineBones=[];
+const _catIdleTmpEuler=new THREE.Euler(0,0,0,'XYZ');
+const _catIdleTmpQuat=new THREE.Quaternion();
+const _catIdleTmpQuatB=new THREE.Quaternion();
+// Bababooey-only procedural run rig. The GLB ships a single bouncy "dance"
+// clip and no separate walk/run, so we animate the paw/tail bones directly
+// when moving and fade the baked clip out while running.
+const _catBababooeyBones={left:null,right:null,up:null,down:null,mid:null};
+const _catBababooeyBase={left:null,right:null,up:null,down:null,mid:null};
+// Toon cat leg bones for jump leg-bend overlay.
+const _catToonLegBones={
+  thighBL:null,upperBL:null,lowerBL:null,footBL:null,
+  thighBR:null,upperBR:null,lowerBR:null,footBR:null,
+  upperFL:null,lowerFL:null,footFL:null,
+  upperFR:null,lowerFR:null,footFR:null
+};
+const _catToonLegBase={};
+function _resetGameplayCatIdleBones(){
+  _catIdleTailBones.length=0;
+  _catIdleHeadBones.length=0;
+  _catIdleSpineBones.length=0;
+}
+function _collectGameplayCatIdleBones(model){
+  _resetGameplayCatIdleBones();
+  if(!model) return;
+  const tailRe=/(^tail$|^tail[._]|_tail|tail_)/i;
+  const headRe=/(^head$|^head[._]|_head|head_|^neck$|^neck[._]|_neck|neck_)/i;
+  const spineRe=/(^spine$|^spine[._]|_spine|spine_|^chest$|^chest[._]|_chest|chest_)/i;
+  const heads=[];
+  // Reset bababooey-specific refs; repopulate below if bones are found.
+  _catBababooeyBones.left=_catBababooeyBones.right=_catBababooeyBones.up=_catBababooeyBones.down=_catBababooeyBones.mid=null;
+  _catBababooeyBase.left=_catBababooeyBase.right=_catBababooeyBase.up=_catBababooeyBase.down=_catBababooeyBase.mid=null;
+  // Reset toon leg refs.
+  for(const k in _catToonLegBones){ _catToonLegBones[k]=null; _catToonLegBase[k]=null; }
+  model.traverse(o=>{
+    if(!o || !o.isBone) return;
+    const n=String(o.name||'');
+    if(tailRe.test(n)) _catIdleTailBones.push(o);
+    if(headRe.test(n)) heads.push(o);
+    if(spineRe.test(n)) _catIdleSpineBones.push(o);
+    if(/joint_Left_04/i.test(n))  { _catBababooeyBones.left=o;  _catBababooeyBase.left=o.quaternion.clone(); }
+    if(/joint_Right_05/i.test(n)) { _catBababooeyBones.right=o; _catBababooeyBase.right=o.quaternion.clone(); }
+    if(/joint_Up_02/i.test(n))    { _catBababooeyBones.up=o;    _catBababooeyBase.up=o.quaternion.clone(); }
+    if(/joint_Down_03/i.test(n))  { _catBababooeyBones.down=o;  _catBababooeyBase.down=o.quaternion.clone(); }
+    if(/joint_M_01/i.test(n))     { _catBababooeyBones.mid=o;   _catBababooeyBase.mid=o.quaternion.clone(); }
+    // Toon cat leg bones.
+    const toonMap={
+      thighBL:/^thigh\.B\.L/i, upperBL:/^leg\.upper\.B\.L/i, lowerBL:/^leg\.lower\.B\.L/i, footBL:/^foot\.B\.L/i,
+      thighBR:/^thigh\.B\.R/i, upperBR:/^leg\.upper\.B\.R/i, lowerBR:/^leg\.lower\.B\.R/i, footBR:/^foot\.B\.R/i,
+      upperFL:/^leg\.upper\.F\.L/i, lowerFL:/^leg\.lower\.F(\.)?L/i, footFL:/^foot\.F\.L/i,
+      upperFR:/^leg\.upper\.F\.R/i, lowerFR:/^leg\.lower\.F\.R/i, footFR:/^foot\.F\.R/i
+    };
+    for(const k in toonMap){
+      if(_catToonLegBones[k]==null && toonMap[k].test(n)){
+        _catToonLegBones[k]=o;
+        _catToonLegBase[k]=o.quaternion.clone();
+      }
+    }
+  });
+  if(_catIdleTailBones.length>4) _catIdleTailBones.length=4;
+  if(_catIdleSpineBones.length>2) _catIdleSpineBones.length=2;
+  if(heads.length){
+    const headBone=heads.find(b=>/head/i.test(String(b.name||'')))||heads[0];
+    _catIdleHeadBones.push(headBone);
+    const neckBone=heads.find(b=>/neck/i.test(String(b.name||'')) && b!==headBone);
+    if(neckBone) _catIdleHeadBones.push(neckBone);
+  }
+}
+function _refreshGameplayCatIdleBasePose(){
+  const all=[..._catIdleTailBones,..._catIdleSpineBones,..._catIdleHeadBones];
+  for(const b of all){
+    if(!b || !b.isBone) continue;
+    if(!b.userData) b.userData={};
+    b.userData._catIdleBaseQuat=b.quaternion.clone();
+  }
+}
+function _applyGameplayCatProceduralIdle(ts,intensity){
+  if(intensity<=0) return;
+  const t=ts*0.001;
+  for(let i=0;i<_catIdleTailBones.length;i++){
+    const b=_catIdleTailBones[i];
+    if(!b || !b.isBone) continue;
+    const base=(b.userData && b.userData._catIdleBaseQuat && b.userData._catIdleBaseQuat.isQuaternion)
+      ? b.userData._catIdleBaseQuat
+      : b.quaternion;
+    const wave=0.75+(i*0.18);
+    const yaw=Math.sin((t*1.7*wave)+(i*0.55))*0.065*intensity;
+    const pitch=Math.sin((t*1.2*wave)+(i*0.4))*0.025*intensity;
+    const roll=Math.sin((t*1.05*wave)+(i*0.9))*0.012*intensity;
+    _catIdleTmpEuler.set(pitch,yaw,roll);
+    _catIdleTmpQuat.setFromEuler(_catIdleTmpEuler);
+    _catIdleTmpQuatB.copy(base).multiply(_catIdleTmpQuat);
+    b.quaternion.slerp(_catIdleTmpQuatB,Math.min(1,0.5*intensity));
+  }
+  for(let i=0;i<_catIdleSpineBones.length;i++){
+    const b=_catIdleSpineBones[i];
+    if(!b || !b.isBone) continue;
+    const base=(b.userData && b.userData._catIdleBaseQuat && b.userData._catIdleBaseQuat.isQuaternion)
+      ? b.userData._catIdleBaseQuat
+      : b.quaternion;
+    const swayScale=0.65-(i*0.12);
+    const yaw=Math.sin((t*0.82)+(i*0.45))*0.012*intensity*swayScale;
+    const pitch=Math.sin((t*0.62)+(i*0.35))*0.008*intensity*swayScale;
+    _catIdleTmpEuler.set(pitch,yaw,0);
+    _catIdleTmpQuat.setFromEuler(_catIdleTmpEuler);
+    _catIdleTmpQuatB.copy(base).multiply(_catIdleTmpQuat);
+    b.quaternion.slerp(_catIdleTmpQuatB,Math.min(1,0.32*intensity));
+  }
+  for(let i=0;i<_catIdleHeadBones.length;i++){
+    const b=_catIdleHeadBones[i];
+    if(!b || !b.isBone) continue;
+    const base=(b.userData && b.userData._catIdleBaseQuat && b.userData._catIdleBaseQuat.isQuaternion)
+      ? b.userData._catIdleBaseQuat
+      : b.quaternion;
+    const headScale=i===0?1:0.58;
+    const yaw=(Math.sin((t*0.8)+0.7)*0.12 + Math.sin((t*1.55)+0.2)*0.036)*intensity*headScale;
+    const pitch=(Math.sin((t*0.62)+1.1)*0.072 + Math.sin((t*1.35)+0.9)*0.021)*intensity*headScale;
+    _catIdleTmpEuler.set(pitch,yaw,0);
+    _catIdleTmpQuat.setFromEuler(_catIdleTmpEuler);
+    _catIdleTmpQuatB.copy(base).multiply(_catIdleTmpQuat);
+    b.quaternion.slerp(_catIdleTmpQuatB,Math.min(1,0.78*intensity));
+  }
+}
+function _applyToonCatJumpLegs(squash){
+  // squash in [-0.45, 1]: positive = charge/land (shorten + splay legs),
+  // negative = extend.
+  const L=_catToonLegBones;
+  const B=_catToonLegBase;
+  if(!L.upperBL && !L.upperBR && !L.upperFL && !L.upperFR) return;
+  const s=Math.max(-0.45,Math.min(1,squash));
+  // Leg length along Y.
+  const legScale = s>=0 ? (1 - s*0.55) : (1 + (-s)*0.33);
+  const shin = 1 - (1-legScale)*0.8;
+  const setScale=(bone,v)=>{ if(bone) bone.scale.y=v; };
+  setScale(L.thighBL,legScale); setScale(L.thighBR,legScale);
+  setScale(L.upperBL,legScale); setScale(L.upperBR,legScale);
+  setScale(L.upperFL,legScale); setScale(L.upperFR,legScale);
+  setScale(L.lowerBL,shin);     setScale(L.lowerBR,shin);
+  setScale(L.lowerFL,shin);     setScale(L.lowerFR,shin);
+  // Always reset leg bone quaternions to their base pose first. This fixes
+  // the "animation frozen after jump" bug: when the avatar is idle, the
+  // mixer ticks 0 and any quaternion we leave on a bone sticks forever.
+  const boneKeys=['thighBL','thighBR','upperBL','upperBR','upperFL','upperFR',
+                  'lowerBL','lowerBR','lowerFL','lowerFR'];
+  for(const k of boneKeys){
+    const bone=L[k]; const baseQ=B[k];
+    if(bone && baseQ) bone.quaternion.copy(baseQ);
+  }
+  // Splay/sploot only while charging (s>0). Runs after mixer.update() so
+  // it overrides the walk/idle clip.
+  const splayAmt=s>0 ? Math.min(1,s) : 0;
+  if(splayAmt<=0.001) return;
+  const ang=splayAmt*0.95;
+  const fwdTuck=splayAmt*0.55;
+  const applyOffset=(bone,baseQ,ex,ey,ez)=>{
+    if(!bone || !baseQ) return;
+    _catIdleTmpEuler.set(ex,ey,ez);
+    _catIdleTmpQuat.setFromEuler(_catIdleTmpEuler);
+    _catIdleTmpQuatB.copy(baseQ).multiply(_catIdleTmpQuat);
+    bone.quaternion.copy(_catIdleTmpQuatB);
+  };
+  applyOffset(L.thighBL,B.thighBL, +fwdTuck, 0, +ang);
+  applyOffset(L.thighBR,B.thighBR, +fwdTuck, 0, -ang);
+  applyOffset(L.upperBL,B.upperBL, +fwdTuck, 0, +ang);
+  applyOffset(L.upperBR,B.upperBR, +fwdTuck, 0, -ang);
+  applyOffset(L.upperFL,B.upperFL, -fwdTuck, 0, +ang);
+  applyOffset(L.upperFR,B.upperFR, -fwdTuck, 0, -ang);
+  const shinBend=splayAmt*0.7;
+  applyOffset(L.lowerBL,B.lowerBL, -shinBend*0.6, 0, -ang*0.4);
+  applyOffset(L.lowerBR,B.lowerBR, -shinBend*0.6, 0, +ang*0.4);
+  applyOffset(L.lowerFL,B.lowerFL, +shinBend*0.6, 0, -ang*0.4);
+  applyOffset(L.lowerFR,B.lowerFR, +shinBend*0.6, 0, +ang*0.4);
+}
+function _applyBababooeyProceduralRun(ts,moveSpeed,moveBlend){
+  const B=_catBababooeyBones;
+  if(!B.left && !B.right && !B.down && !B.up && !B.mid) return;
+  const t=ts*0.001;
+  // Stride cadence increases with speed; intensity scales with speed but is
+  // clamped so it reads as a clean run cycle at top speed.
+  const sp=Math.max(0,moveSpeed);
+  const spN=Math.min(1,sp/0.45); // 0..1 over walking..sprinting range
+  const blend=Math.max(0,Math.min(1,moveBlend))*spN;
+  if(blend<=0.001) return;
+  const cadence=6.0+spN*5.5; // rad/s of stride cycle
+  const phase=t*cadence;
+
+  // Paws alternate up/down — stride amplitude halved per tuning request.
+  const pawAmp=(0.55+spN*0.55)*0.5;
+  const lift=Math.sin(phase);
+  const liftR=Math.sin(phase+Math.PI);
+  const lL=lift*pawAmp*blend;
+  const lR=liftR*pawAmp*blend;
+
+  const apply=(bone,baseQ,euler,strength)=>{
+    if(!bone || !baseQ) return;
+    _catIdleTmpQuat.setFromEuler(euler);
+    _catIdleTmpQuatB.copy(baseQ).multiply(_catIdleTmpQuat);
+    // Soft takeover — caps at 0.65 so the first few frames can't snap into
+    // a fully procedural pose while the run blend is ramping in.
+    const s=Math.min(1,(strength!==undefined?strength:0.65)*blend);
+    bone.quaternion.slerp(_catIdleTmpQuatB,s);
+  };
+
+  // Left paw steps forward/back (z-rotation for fwd swing + small x-tuck).
+  _catIdleTmpEuler.set(-Math.abs(lL)*0.4, 0, lL*0.85);
+  apply(B.left,_catBababooeyBase.left,_catIdleTmpEuler,0.7);
+  // Right paw, opposite phase.
+  _catIdleTmpEuler.set(-Math.abs(lR)*0.4, 0, -lR*0.85);
+  apply(B.right,_catBababooeyBase.right,_catIdleTmpEuler,0.7);
+
+  // Tail wag: half of previous amplitude.
+  if(B.down){
+    _catIdleTmpEuler.set(Math.sin(phase*0.5)*0.09*blend, Math.sin(phase*0.5+1.2)*0.175*blend, 0);
+    apply(B.down,_catBababooeyBase.down,_catIdleTmpEuler,0.6);
+  }
+  // Head bob + slight forward lean.
+  if(B.up){
+    const lean=(0.08+spN*0.16)*0.5;
+    _catIdleTmpEuler.set(-lean*blend, Math.sin(phase*0.5)*0.03*blend, 0);
+    apply(B.up,_catBababooeyBase.up,_catIdleTmpEuler,0.6);
+  }
+  // Body side-to-side sway, halved.
+  if(B.mid){
+    _catIdleTmpEuler.set(Math.sin(phase)*0.02*blend, Math.sin(phase*0.5)*0.035*blend, Math.sin(phase)*0.025*blend);
+    apply(B.mid,_catBababooeyBase.mid,_catIdleTmpEuler,0.5);
+  }
+}
+function _clearGameplayCatModel(){
+  if(catMixer){
+    catMixer.stopAllAction();
+    catMixer=null;
+  }
+  catWalkAction=null;
+  catIdleAction=null;
+  if(catModel && catGroup){
+    catGroup.remove(catModel);
+  }
+  catModel=null;
+  _resetGameplayCatIdleBones();
+}
+function _loadGameplayCatFromSelection(){
   if(!THREE.GLTFLoader){ console.warn('GLTFLoader not available'); return; }
+  const nonce=++_catGameLoadNonce;
+  _clearGameplayCatModel();
   const loader=new THREE.GLTFLoader();
-  loader.load('assets/cat.glb', (gltf)=>{
+  const sources=_getCatSourcesForModelKey(_catModelKey);
+  _loadCatAssetWithFallback(loader, (gltf,src)=>{
+    if(nonce!==_catGameLoadNonce) return;
     catModel=gltf.scene;
+    _collectGameplayCatIdleBones(catModel);
+    _stripBababooeyBackdrop(catModel,src);
     // Auto-scale so cat height matches _catTargetHeight.
     const box=new THREE.Box3().setFromObject(catModel);
     const size=box.getSize(new THREE.Vector3());
@@ -1104,13 +2048,8 @@ const _catBaseLocalQuat=new THREE.Quaternion();
     const s=_catTargetHeight/h;
     catModel.scale.setScalar(s);
     _catBaseScale.copy(catModel.scale);
-    // Re-measure after scale. Center X/Z on the catGroup origin and rest the
-    // feet on y=0 so catGroup.position maps directly to "where the cat is".
-    const box2=new THREE.Box3().setFromObject(catModel);
-    const center2=box2.getCenter(new THREE.Vector3());
-    catModel.position.x-=center2.x;
-    catModel.position.z-=center2.z;
-    catModel.position.y-=box2.min.y;
+    const preset=_getSelectedCatModelPreset();
+    _centerAndGroundModel(catModel,preset.gameLift);
     _catBaseLocalPos.copy(catModel.position);
     _catBaseLocalQuat.copy(catModel.quaternion);
     // Shadows
@@ -1141,13 +2080,6 @@ const _catBaseLocalQuat=new THREE.Quaternion();
     // Animations — Quaternius cats ship w/ several clips. Pick walk + idle.
     if(gltf.animations && gltf.animations.length){
       catMixer=new THREE.AnimationMixer(catModel);
-      // Remove translation tracks so clips stay in-place relative to catGroup.
-      // This prevents root-motion drift where the cat walks away from camera.
-      const makeInPlace=(clip)=>{
-        const tracks=clip.tracks.filter(t=>!t.name.endsWith('.position'));
-        if(tracks.length===clip.tracks.length) return clip;
-        return new THREE.AnimationClip(clip.name+'_inPlace', clip.duration, tracks);
-      };
       const byName=(names)=>{
         for(const n of names){
           const c=gltf.animations.find(a=>a.name.toLowerCase().includes(n));
@@ -1155,13 +2087,16 @@ const _catBaseLocalQuat=new THREE.Quaternion();
         }
         return null;
       };
-      const walkClip=makeInPlace(byName(['walk','run','gallop']) || gltf.animations[0]);
-      const idleClip=makeInPlace(byName(['idle','sit','rest']) || gltf.animations[0]);
+      const walkClip=byName(['walk','run','gallop']) || gltf.animations[0];
+      const idleClip=byName(['idle','sit','rest']) || gltf.animations[0];
       if(walkClip){ catWalkAction=catMixer.clipAction(walkClip); catWalkAction.play(); catWalkAction.weight=0; }
       if(idleClip && idleClip!==walkClip){ catIdleAction=catMixer.clipAction(idleClip); catIdleAction.play(); catIdleAction.weight=1; }
       else if(catWalkAction){ catWalkAction.weight=1; }
     }
-  }, undefined, (err)=>{ console.warn('Cat load failed', err); });
+  }, (err)=>{ console.warn('Cat load failed', err); },sources);
+}
+(function loadCat(){
+  _loadGameplayCatFromSelection();
 })();
 
 // ─── Procedural environment map (fake indoor HDRI — free reflections) ───
@@ -3216,6 +4151,7 @@ canvas.addEventListener('gestureend',e=>{e.preventDefault();});
 function resize(){
   const w=canvas.parentElement.clientWidth,h=canvas.parentElement.clientHeight;
   renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
+  _resizeCatPreview();
 }
 resize(); window.addEventListener('resize',resize);
 
@@ -4055,11 +4991,98 @@ function makeGameSpineTexture(title,platform){
   return tex;
 }
 
+function makeSwitch2PokopiaCoverTexture(){
+  const cvs=document.createElement('canvas');
+  // Match case top face ratio (~W:D) so artwork keeps proper proportions.
+  cvs.width=1308;
+  cvs.height=800;
+  const ctx=cvs.getContext('2d');
+  const fontStack='-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+  const draw=(img,logo)=>{
+    ctx.clearRect(0,0,cvs.width,cvs.height);
+    // Rotate the whole composition 90deg so text + art run portrait/longways.
+    ctx.save();
+    ctx.translate(cvs.width/2,cvs.height/2);
+    ctx.rotate(-Math.PI/2);
+
+    // No outer padding/border — cover fills entire top face.
+    const rw=cvs.height;
+    const rh=cvs.width;
+    const x=-rw/2;
+    const y=-rh/2;
+
+    // Red top banner — matches case body color (#c4000f).
+    const stripH=Math.round(rh*0.16);
+    ctx.fillStyle='#c4000f';
+    ctx.fillRect(x,y,rw,stripH);
+
+    // Centered Switch 2 logo in the banner (replaces text label).
+    if(logo && logo.width>0 && logo.height>0){
+      const logoH=Math.round(stripH*0.7);
+      const logoW=logo.width*(logoH/logo.height);
+      const lx=x+(rw-logoW)/2;
+      const ly=y+(stripH-logoH)/2;
+      ctx.drawImage(logo,lx,ly,logoW,logoH);
+    }
+
+    // Cover art fills full width of the card; vertical fits to cover area.
+    const imgX=x;
+    const imgY=y+stripH;
+    const imgW=rw;
+    const imgH=rh-stripH;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(imgX,imgY,imgW,imgH);
+    ctx.clip();
+    ctx.fillStyle='#121212';
+    ctx.fillRect(imgX,imgY,imgW,imgH);
+    if(img && img.width>0 && img.height>0){
+      // Fill width exactly; crop vertical overflow via clip above.
+      const s=imgW/img.width;
+      const dw=imgW;
+      const dh=img.height*s;
+      const dx=imgX;
+      const dy=imgY+(imgH-dh)/2;
+      ctx.drawImage(img,dx,dy,dw,dh);
+    }
+    ctx.restore();
+
+    ctx.restore();
+  };
+
+  let loadedCover=null;
+  let loadedLogo=null;
+  draw(null,null);
+  const tex=new THREE.CanvasTexture(cvs);
+  tex.generateMipmaps=true;
+  tex.minFilter=THREE.LinearMipmapLinearFilter;
+  tex.magFilter=THREE.LinearFilter;
+  tex.anisotropy=Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  tex.needsUpdate=true;
+
+  const coverImg=new Image();
+  coverImg.onload=()=>{ loadedCover=coverImg; draw(loadedCover,loadedLogo); tex.needsUpdate=true; };
+  coverImg.onerror=()=>{};
+  coverImg.src='img/switch%202%20pokopia%20cover.jpg';
+
+  const logoImg=new Image();
+  logoImg.onload=()=>{ loadedLogo=logoImg; draw(loadedCover,loadedLogo); tex.needsUpdate=true; };
+  logoImg.onerror=()=>{};
+  // Strip the red background <rect> from the SVG so only the white mark renders.
+  fetch('img/Nintendo_Switch_2_logo.svg').then(r=>r.text()).then(svg=>{
+    const cleaned=svg.replace(/<path[^>]*fill="#e60012"[^>]*\/>/i,'');
+    logoImg.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(cleaned);
+  }).catch(()=>{ logoImg.src='img/Nintendo_Switch_2_logo.svg'; });
+  return tex;
+}
+
 {
   for(let i=0;i<_tvGameStackData.length;i++){
     const game=_tvGameStackData[i];
     const isSw2=game.platform==='switch2';
     const isGray=game.platform==='special-gray';
+    const isPokopiaSwitch2=isSw2 && /pokopia/i.test(String(game.title||''));
     const sideCol=isGray?0xb7b7b7:0xc4000f;
     const bodyMat=stdMat({color:sideCol, roughness:0.72, metalness:0.02});
     const spineMap=makeGameSpineTexture(game.title, game.platform);
@@ -4093,16 +5116,36 @@ function makeGameSpineTexture(title,platform){
     const decal=new THREE.Mesh(decalGeo,spineMat);
     decal.position.set(0,0,hd+0.003);
     caseMesh.add(decal);
+
+    if(isPokopiaSwitch2){
+      const coverTex=makeSwitch2PokopiaCoverTexture();
+      const coverMat=new THREE.MeshStandardMaterial({
+        map:coverTex,
+        roughness:0.72,
+        metalness:0.02,
+        side:THREE.DoubleSide,
+        polygonOffset:true,
+        polygonOffsetFactor:-1,
+        polygonOffsetUnits:-2
+      });
+      const coverGeo=new THREE.PlaneGeometry(_tvGameCaseW*0.94,_tvGameCaseD*0.94);
+      const cover=new THREE.Mesh(coverGeo,coverMat);
+      cover.rotation.x=-Math.PI/2;
+      cover.position.set(0,_tvGameCaseT/2+0.02,0);
+      caseMesh.add(cover);
+    }
     const y=(_tvGameStackData.length-1-i)*_tvGameCaseT+_tvGameCaseT/2;
     // Pseudo-random imperfect-stack jitter: small position and yaw offsets per case.
     const seed=i*12.9898;
-    const jx=(Math.sin(seed)*0.5)*0.09;
-    const jz=(Math.sin(seed*1.7+0.3)*0.5)*0.12;
-    const jyaw=(Math.sin(seed*2.3+1.1)*0.5)*0.025; // up to ~1.4°
-    const jtilt=(Math.sin(seed*3.1+2.2)*0.5)*0.008;
+    const jx=(Math.sin(seed)*0.5)*0.22;
+    const jz=(Math.sin(seed*1.7+0.3)*0.5)*0.28;
+    const jyaw=(Math.sin(seed*2.3+1.1)*0.5)*0.07; // up to ~4°
+    const jtilt=(Math.sin(seed*3.1+2.2)*0.5)*0.025;
+    const jroll=(Math.sin(seed*4.7+0.9)*0.5)*0.02;
     caseMesh.position.set(jx, y, jz);
     caseMesh.rotation.y=jyaw;
     caseMesh.rotation.x=jtilt;
+    caseMesh.rotation.z=jroll;
     caseMesh.castShadow=true;
     caseMesh.receiveShadow=true;
     tvGameStackProps.add(caseMesh);
@@ -5152,8 +6195,12 @@ tvFrame.material.metalness=0.6;
 // Screen — dark glossy panel, optionally displays an image (pokopia.jpg if present).
 const screenGeo=new THREE.PlaneGeometry(tvW, tvH);
 const screenMat=stdMat({color:0x0a0a0a,roughness:0.05,metalness:0.0,envMapIntensity:1.5});
+screenMat.polygonOffset=true;
+screenMat.polygonOffsetFactor=-2;
+screenMat.polygonOffsetUnits=-2;
+screenMat.depthWrite=false;
 const screen=new THREE.Mesh(screenGeo, screenMat);
-screen.position.set(tvCenterX, tvCenterY, tvZ+tvD/2+0.02);
+screen.position.set(tvCenterX, tvCenterY, tvZ+tvD/2+0.08);
 screen._isRoom=true;
 scene.add(screen);
 // Load TV screen image — falls back silently to dark glass if file is missing.
@@ -5173,6 +6220,46 @@ new THREE.TextureLoader().load(
   undefined,
   ()=>{ /* no-op if missing */ }
 );
+
+// Small bottom-center power nub (trapezoid pod + tiny center button).
+{
+  const nubGroup=new THREE.Group();
+  nubGroup.position.set(tvCenterX, tvCenterY-(tvH+bezel*2)/2-0.24, tvZ+tvD/2-0.06);
+  nubGroup._isRoom=true;
+
+  const nubWTop=2.25;
+  const nubWBot=1.55;
+  const nubH=0.4;
+  const nubD=0.12;
+  const nubShape=new THREE.Shape();
+  nubShape.moveTo(-nubWTop/2, nubH/2);
+  nubShape.lineTo(nubWTop/2, nubH/2);
+  nubShape.lineTo(nubWBot/2, -nubH/2);
+  nubShape.lineTo(-nubWBot/2, -nubH/2);
+  nubShape.lineTo(-nubWTop/2, nubH/2);
+  const nubGeo=new THREE.ExtrudeGeometry(nubShape,{depth:nubD,bevelEnabled:false});
+  nubGeo.translate(0,0,-nubD/2);
+  const nubMat=stdMat({color:0xaeb4bd,roughness:0.28,metalness:0.55});
+  const nubMesh=new THREE.Mesh(nubGeo,nubMat);
+  nubMesh.castShadow=false;
+  nubMesh.receiveShadow=true;
+  nubGroup.add(nubMesh);
+
+  const btnMat=stdMat({color:0x8c929b,roughness:0.3,metalness:0.4});
+  const btn=new THREE.Mesh(new THREE.CylinderGeometry(0.105,0.105,0.045,18),btnMat);
+  btn.rotation.x=Math.PI/2;
+  btn.position.set(0,-0.02,nubD/2+0.01);
+  nubGroup.add(btn);
+
+  const btnDot=new THREE.Mesh(
+    new THREE.CircleGeometry(0.03,16),
+    new THREE.MeshBasicMaterial({color:0xdadada,transparent:true,opacity:0.85})
+  );
+  btnDot.position.set(0,-0.02,nubD/2+0.028);
+  nubGroup.add(btnDot);
+
+  scene.add(nubGroup);
+}
 
 // ─── Mini split indoor unit (on TV wall, near closet wall, 1ft from ceiling) ───
 const msW=32, msH=11, msD=8; // typical wall-mount unit dimensions
@@ -6087,7 +7174,7 @@ function animate(ts){
     col.needsUpdate=true;
   }
 
-  _updateLauncherCatPreview(ts);
+  _tickCatPreview(ts);
 
   if(!_fpMode){
   _fpLastPhysicsTs=0;
