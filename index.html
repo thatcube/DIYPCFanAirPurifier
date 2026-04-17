@@ -1767,6 +1767,14 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, _isMobile?0.72:0.85));
 renderer.setClearColor(0xd4dce8, 1);
 renderer.shadowMap.enabled=true;
 renderer.shadowMap.type=THREE.VSMShadowMap; // softer look preferred; keep corner fix via larger occluders
+// Manual shadow updates: the scene is mostly static (camera orbit doesn't
+// change shadows). We only re-render shadow maps when something that casts
+// shadows actually moves (cat in FP mode, drawer/filter/bifold slide,
+// explode animation) or when lighting/layout changes (marked via
+// _markShadowsDirty()).
+renderer.shadowMap.autoUpdate=false;
+let _shadowDirtyOneShot=true; // force first-frame shadow render
+function _markShadowsDirty(){ _shadowDirtyOneShot=true; }
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.3;
 
@@ -4552,6 +4560,8 @@ function applyVisibility(){
   altBackGroup.visible=!isFB;
   // Alt top fan panel (always 4 fans, only visible in FT mode)
   altTop4.visible=!isFB;
+  // Geometry visibility changed — shadow map needs one refresh.
+  _markShadowsDirty();
 }
 function setLayout(mode){
   layoutMode=mode;
@@ -5168,6 +5178,7 @@ function showConsoleProps(show){
   consoleProps.visible=show;
   tvGameStackProps.visible=show;
   updateTvGameStackPlacement();
+  _markShadowsDirty();
 }
 
 // ─── Wall-mount bracket (shown in Wall placement mode) ───
@@ -5376,6 +5387,8 @@ function applyTimeOfDay(minuteOfDay){
     _savedLights.ambient=hemiLight.intensity;
     applyIsolate(true);
   }
+  // Lighting changed — refresh shadow map once.
+  _markShadowsDirty();
 }
 
 function formatTime(minutes){
@@ -6981,6 +6994,8 @@ function needsContinuousRender(){
 
 let _lastRenderTs=0;
 let _lastAnimTs=0;
+let _lastRainbowTs=0;
+const _rainbowIntervalMs=1000/30;
 const _idleFrameMs=1000/18; // low idle refresh to keep laptops cool
 // Helper: framerate-independent exponential ease. Given a rate (higher =
 // faster) and an elapsed dt in seconds, returns the 0..1 alpha such that
@@ -7010,8 +7025,12 @@ function animate(ts){
   // Play Mode collectibles — spin, bob, and check for pickup.
   _updateCoins(ts,animFrameScale);
 
-  // Rainbow RGB cycling — smooth gradient flowing across all fans
-  if(currentRGB==='rainbow'){
+  // Rainbow RGB cycling — smooth gradient flowing across all fans. The
+  // hue drift is slow (~0.06 rev/sec) so we don't need 60 Hz updates;
+  // throttling to ~30 Hz halves the per-blade material work without any
+  // visible difference.
+  if(currentRGB==='rainbow' && (ts-_lastRainbowTs)>=_rainbowIntervalMs){
+    _lastRainbowTs=ts;
     const t=performance.now()*0.001;
     // Slow smooth drift with gentle breathing modulation
     const breathe=0.5+0.5*Math.sin(t*0.35);
@@ -7488,6 +7507,22 @@ function animate(ts){
   }
   }
   } // end fading skip
+
+  // Decide whether the shadow map needs to re-render this frame. We drive
+  // shadow updates manually (autoUpdate=false) so orbiting the camera over a
+  // static scene doesn't pay the shadow-pass cost. Update when:
+  //   • First frame / any explicit one-shot dirty signal
+  //   • FP play mode is active (cat moves; player may interact with objects)
+  //   • Any slide/lerp animation is in progress (drawer/filter/bifold/explode)
+  if(_shadowDirtyOneShot
+     || _fpMode
+     || explodeLerping
+     || _filterLerps.length>0
+     || _drawerLerps.length>0
+     || _bifoldLerps.length>0){
+    renderer.shadowMap.needsUpdate=true;
+    _shadowDirtyOneShot=false;
+  }
 
   renderer.render(scene,camera);
   // Persist camera for live reload
@@ -8588,6 +8623,9 @@ function toggleFirstPerson(){
   _fpHud.style.display=_fpMode?'block':'none';
   document.getElementById('fpCrosshair').style.display=_fpMode?'block':'none';
   syncPlayModeUI();
+  // Toggle refreshes shadow casters (cat visibility). Mark dirty so first
+  // frame after the transition has up-to-date shadows.
+  _markShadowsDirty();
 
   if(_fpMode){
     _fpSavedFov=camera.fov;
