@@ -6980,7 +6980,16 @@ function needsContinuousRender(){
 }
 
 let _lastRenderTs=0;
+let _lastAnimTs=0;
 const _idleFrameMs=1000/18; // low idle refresh to keep laptops cool
+// Helper: framerate-independent exponential ease. Given a rate (higher =
+// faster) and an elapsed dt in seconds, returns the 0..1 alpha such that
+//   cur += (target - cur) * alpha
+// matches a continuous exponential decay independent of framerate. Matches
+// the old 60fps behavior when rate = -ln(1-kOld)*60 for a constant kOld.
+function _easeAlpha(rate,dtSec){
+  return 1 - Math.exp(-Math.max(0,rate)*Math.max(0,dtSec));
+}
 
 function animate(ts){
   requestAnimationFrame(animate);
@@ -6989,8 +6998,17 @@ function animate(ts){
   if(!continuous && (ts-_lastRenderTs)<_idleFrameMs) return;
   _lastRenderTs=ts;
 
+  // Time-based dt for all animation code below. Capped at 100ms so a
+  // background-tab resume (or breakpoint pause) doesn't fling objects across
+  // the world in a single step. animFrameScale = dt * 60, which lets us
+  // preserve old "per-frame-at-60fps" behavior literally while still being
+  // framerate-independent.
+  const animDtSec=_lastAnimTs ? Math.min(0.1, Math.max(0, (ts-_lastAnimTs)/1000)) : 1/60;
+  _lastAnimTs=ts;
+  const animFrameScale=animDtSec*60;
+
   // Play Mode collectibles — spin, bob, and check for pickup.
-  _updateCoins(ts);
+  _updateCoins(ts,animFrameScale);
 
   // Rainbow RGB cycling — smooth gradient flowing across all fans
   if(currentRGB==='rainbow'){
@@ -7053,52 +7071,63 @@ function animate(ts){
     for(const m of allBirchMats){ m.emissive.setHex(avgHex); m.emissiveIntensity=0.015*rb; }
   }
 
-  // Lerp explode positions (only while animating)
+  // Lerp explode positions (only while animating). Ease rates chosen to
+  // preserve the prior 60fps feel: old constant k=0.1/frame ≈ rate 6.32/sec.
   if(explodeLerping){
     let done=true;
+    const aExplode=_easeAlpha(6.32,animDtSec);
     for(const k in targets){
       if(parts[k]){
-        parts[k].position.lerp(targets[k],0.1);
+        parts[k].position.lerp(targets[k],aExplode);
         if(parts[k].position.distanceToSquared(targets[k])>0.001) done=false;
       }
     }
     if(done) explodeLerping=false;
   }
 
-  // Filter slide animation
-  for(let i=_filterLerps.length-1;i>=0;i--){
-    const fl=_filterLerps[i];
-    fl.obj.position.lerp(fl.target,0.12);
-    if(fl.obj.position.distanceToSquared(fl.target)<0.001){
-      fl.obj.position.copy(fl.target);
-      _filterLerps.splice(i,1);
+  // Filter slide animation. k=0.12/frame ≈ rate 7.67/sec.
+  {
+    const aFilter=_easeAlpha(7.67,animDtSec);
+    for(let i=_filterLerps.length-1;i>=0;i--){
+      const fl=_filterLerps[i];
+      fl.obj.position.lerp(fl.target,aFilter);
+      if(fl.obj.position.distanceToSquared(fl.target)<0.001){
+        fl.obj.position.copy(fl.target);
+        _filterLerps.splice(i,1);
+      }
     }
   }
 
   // Drawer slide animation — slides along Z only. Force the group's matrix to
   // update every frame of the animation (applyRoomDelta locks _isRoom matrices
   // after its initial shift, so we must re-enable autoupdate to see motion).
-  for(let i=_drawerLerps.length-1;i>=0;i--){
-    const dl=_drawerLerps[i];
-    const cur=dl.obj.position.z;
-    const next=cur+(dl.targetZ-cur)*0.15;
-    dl.obj.position.z=next;
-    dl.obj.matrixAutoUpdate=true;
-    dl.obj.updateMatrixWorld(true);
-    if(Math.abs(next-dl.targetZ)<0.01){
-      dl.obj.position.z=dl.targetZ;
+  {
+    // k=0.15/frame ≈ rate 9.76/sec.
+    const aDrawer=_easeAlpha(9.76,animDtSec);
+    for(let i=_drawerLerps.length-1;i>=0;i--){
+      const dl=_drawerLerps[i];
+      const cur=dl.obj.position.z;
+      const next=cur+(dl.targetZ-cur)*aDrawer;
+      dl.obj.position.z=next;
+      dl.obj.matrixAutoUpdate=true;
       dl.obj.updateMatrixWorld(true);
-      _drawerLerps.splice(i,1);
+      if(Math.abs(next-dl.targetZ)<0.01){
+        dl.obj.position.z=dl.targetZ;
+        dl.obj.updateMatrixWorld(true);
+        _drawerLerps.splice(i,1);
+      }
     }
   }
 
   // Bifold closet fold animation. leafPivot rotates by θ, innerGroup rotates
   // by -2θ (relative), so the panel endpoint stays on the wall-track line.
+  {
+    const aBifold=_easeAlpha(9.76,animDtSec);
   for(let i=_bifoldLerps.length-1;i>=0;i--){
     const bl=_bifoldLerps[i];
     const leaf=bl.leaf;
     const cur=leaf._leafAngle;
-    const next=cur+(leaf._leafTarget-cur)*0.15;
+    const next=cur+(leaf._leafTarget-cur)*aBifold;
     leaf._leafAngle=next;
     // Sign: after the room's one-time X-mirror, the wall sits at -X and the
     // room is at +X. The leafSide=-1 leaf's panels extend along local +Z from
@@ -7117,16 +7146,21 @@ function animate(ts){
       _bifoldLerps.splice(i,1);
     }
   }
+  }
 
-  // Fan spin — per-rotor with individual toggle
+  // Fan spin — per-rotor with individual toggle. Speed eases toward target
+  // (old k=0.03/frame ≈ rate 1.83/sec) and rotation advances at
+  // spinSpeed*60 radians/sec (spinSpeed was formerly in rad/frame-at-60fps).
   const globalTarget=spinning?SPIN_MAX*(fanSpeedPct/100):0;
+  const aFan=_easeAlpha(1.83,animDtSec);
   for(const rotor of allRotors){
     const target=rotor.userData.spinning?globalTarget:0;
-    rotor.userData.spinSpeed+=(target-rotor.userData.spinSpeed)*0.03;
+    rotor.userData.spinSpeed+=(target-rotor.userData.spinSpeed)*aFan;
     if(rotor.userData.spinSpeed>0.001){
       const ax=rotor.userData.axis;
-      if(ax.z!==0) rotor.rotation.z+=rotor.userData.spinSpeed*(ax.z>0?1:-1);
-      else if(ax.y!==0) rotor.rotation.z+=rotor.userData.spinSpeed*(ax.y>0?1:-1);
+      const step=rotor.userData.spinSpeed*animFrameScale;
+      if(ax.z!==0) rotor.rotation.z+=step*(ax.z>0?1:-1);
+      else if(ax.y!==0) rotor.rotation.z+=step*(ax.y>0?1:-1);
     }
   }
 
@@ -7135,8 +7169,11 @@ function animate(ts){
     const pos=particleGeo.attributes.position;
     const col=particleGeo.attributes.color;
     if(spinning){
-      // Directional flow through filter → fan → exhaust
-      const speedMul=0.4+0.6*(spinSpeed/SPIN_MAX);
+      // Directional flow through filter → fan → exhaust. particleTSpeed
+      // and 0.05 wobble step are tuned per-60fps-frame; multiply by
+      // animFrameScale for framerate independence.
+      const speedMul=(0.4+0.6*(spinSpeed/SPIN_MAX))*animFrameScale;
+      const wobStep=0.05*animFrameScale;
       for(let i=0;i<activeParticleCount;i++){
         particleT[i]+=particleTSpeed[i]*speedMul;
         if(particleT[i]>=1.0) initParticle(i,false);
@@ -7146,7 +7183,7 @@ function animate(ts){
         const x=pathX(t,sd,particleExhX[i]);
         const y=pathY(t,particleY0[i]);
         const z=pathZ(t,particleZ0[i],ed);
-        particleWobble[i]+=0.05;
+        particleWobble[i]+=wobStep;
         const wobY=Math.sin(particleWobble[i])*0.15;
         pos.setXYZ(i,x,y+wobY,z);
         let alpha=1.0;
@@ -7161,7 +7198,7 @@ function animate(ts){
     } else {
       // Stagnant ambient float — gentle Brownian drift, no directional movement
       for(let i=0;i<activeParticleCount;i++){
-        particleWobble[i]+=0.006+0.003*Math.sin(i*0.37);
+        particleWobble[i]+=(0.006+0.003*Math.sin(i*0.37))*animFrameScale;
         const p=particleWobble[i];
         const bx=stagnantBase[i*3]  +Math.sin(p*0.71)*0.8+Math.sin(p*1.37)*0.3;
         const by=stagnantBase[i*3+1]+Math.sin(p*1.13)*0.5+Math.cos(p*0.83)*0.2;
@@ -7374,7 +7411,8 @@ function animate(ts){
       let dYaw=targetYaw-catGroup.rotation.y;
       while(dYaw>Math.PI) dYaw-=Math.PI*2;
       while(dYaw<-Math.PI) dYaw+=Math.PI*2;
-      catGroup.rotation.y+=dYaw*0.28;
+      // Old k=0.28/frame at 60fps ≈ rate 19.74/sec.
+      catGroup.rotation.y+=dYaw*_easeAlpha(19.74,animDtSec);
       catGroup.rotation.x=0;
       catGroup.rotation.z=0;
     }
@@ -8890,17 +8928,18 @@ function _setCoinsVisible(show){
   const el=document.getElementById('coinCount');
   if(el) el.textContent=_coinScore+' / '+_coinTotal;
 }
-function _updateCoins(ts){
+function _updateCoins(ts,frameScale){
   if(!_fpMode) return;
   _tickRunTimer(ts);
   // Keep _coinGroup aligned with the room (room objects are shifted by -placementOffset).
   _coinGroup.position.set(-placementOffset.x, -placementOffset.y, -placementOffset.z);
   const t=ts*0.001;
   const camPos=_fpPos;
+  const fs=Number.isFinite(frameScale)?frameScale:1;
   for(const c of _coins){
     if(c.collected) continue;
-    // Spin + bob — cheap local-space updates.
-    c.mesh.rotation.y+=c.spinSpeed;
+    // Spin + bob \u2014 cheap local-space updates. spinSpeed is rad/frame-at-60fps.
+    c.mesh.rotation.y+=c.spinSpeed*fs;
     c.mesh.position.y=c.basePos.y+Math.sin(t*2+c.bobPhase)*0.25;
     // Cheap AABB-ish distance check in local space before bothering with world matrix.
     // Parent offset: either _coinGroup (room) or purifierGroup (traveling coin).
