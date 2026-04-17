@@ -145,6 +145,29 @@ Security notes:
 - **Room context** — bedroom scene with bed, nightstand, TV wall, window with curtains, and door alcove for scale
 - **Shareable results** — finish-time copy button plus a `/leaderboard` page with deep-link highlight support
 
+## Optional Cat Model Selector Assets
+
+Play Launcher now has a **cat model selector** with these keys:
+
+1. Classic Cat: `assets/cat.glb` (default)
+2. Toon Cat: `assets/tooncat.glb` (or `assets/toon-cat.glb`)
+3. Bababooey Cat: `assets/bababooey_cat.glb`
+
+If a selected model file is missing, the loader falls back to `assets/cat.glb`.
+
+To use the Sketchfab Toon Cat model:
+
+1. Download GLB from Sketchfab.
+2. Place it at `assets/tooncat.glb`.
+3. Open Play Launcher and select **Toon Cat**.
+
+License/attribution note:
+
+- The Sketchfab model is listed as CC BY 4.0 (Creative Commons Attribution).
+- If you ship it publicly, include attribution to **Omabuarts Studio** and link to:
+	`https://sketchfab.com/3d-models/toon-cat-free-b2bd1ee7858444bda366110a2d960386`
+	and `https://creativecommons.org/licenses/by/4.0/`.
+
 ## Room Layout
 
 The purifier sits in a bedroom scene for real-world scale context:
