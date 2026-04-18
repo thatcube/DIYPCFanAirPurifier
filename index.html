@@ -7047,26 +7047,54 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
       o._isMacbook=true;
       o._macbookRoot=root;
     });
-    // Find the screen mesh: pick the flattest mesh (smallest thin-axis
-    // relative to its largest axis). A MacBook screen is a flat quad,
-    // the body is chunky. This is independent of orientation/scaling.
-    let bestScreen=null, bestFlatness=Infinity;
-    const _dbg=[];
+    // The GLB has the lid+body merged into one mesh, so we can't swap
+    // just the screen material. Instead, create a dedicated overlay plane
+    // parented to the laptop root, positioned at the lid's front face.
+    // Dimensions and placement are derived from the geometry bbox of the
+    // largest (body+lid) mesh.
+    let bodyMesh=null, bodyVol=0;
     root.traverse(o=>{
       if(!o.isMesh || !o.geometry) return;
       o.geometry.computeBoundingBox();
       const gb=o.geometry.boundingBox;
       if(!gb) return;
-      const ws=gb.getSize(new THREE.Vector3());
-      const thin=Math.min(ws.x,ws.y,ws.z);
-      const thick=Math.max(ws.x,ws.y,ws.z);
-      const flatness=thick>0 ? thin/thick : 1;
-      _dbg.push({name:o.name, sx:ws.x.toFixed(2), sy:ws.y.toFixed(2), sz:ws.z.toFixed(2), flatness:flatness.toFixed(3)});
-      if(flatness<bestFlatness){ bestFlatness=flatness; bestScreen=o; }
+      const s=gb.getSize(new THREE.Vector3());
+      const vol=s.x*s.y*s.z;
+      if(vol>bodyVol){ bodyVol=vol; bodyMesh=o; }
     });
-    console.log('[macbook] mesh survey:', JSON.stringify(_dbg, null, 2));
-    _macbookScreen=bestScreen;
-    console.log('[macbook] picked screen mesh:', bestScreen && bestScreen.name, 'flatness=', bestFlatness.toFixed(3));
+    if(bodyMesh){
+      const gb=bodyMesh.geometry.boundingBox;
+      const size=gb.getSize(new THREE.Vector3());
+      const ctr=gb.getCenter(new THREE.Vector3());
+      // Assume lid occupies the upper half of bbox Y and is roughly the
+      // full X-width with the screen facing +Z (player-facing after the
+      // Math.PI Y-rotation of root).
+      const screenW=size.x*0.86;
+      const screenH=size.y*0.42;
+      const planeGeo=new THREE.PlaneGeometry(screenW, screenH);
+      const planeMat=new THREE.MeshBasicMaterial({
+        map:_macbookLogoTex,
+        color:0xffffff,
+        toneMapped:false,
+        side:THREE.DoubleSide
+      });
+      const screenPlane=new THREE.Mesh(planeGeo, planeMat);
+      screenPlane._isMacbook=true;
+      screenPlane._macbookRoot=root;
+      screenPlane.visible=false;
+      // Transform bodyMesh local bbox into root-local coords so the plane
+      // is placed correctly regardless of bodyMesh's own transform.
+      const worldCtr=ctr.clone().applyMatrix4(bodyMesh.matrixWorld);
+      const rootLocal=worldCtr.clone().applyMatrix4(new THREE.Matrix4().copy(root.matrixWorld).invert());
+      // Position: centered in X, upper region in Y, slightly forward (+Z
+      // in root-local; root.rotation.y=PI makes this face the player).
+      screenPlane.position.set(rootLocal.x, rootLocal.y + size.y*0.22, rootLocal.z + size.z*0.10);
+      screenPlane.rotation.y=Math.PI; // face -Z in root-local → +Z in world
+      root.add(screenPlane);
+      _macbookScreen=screenPlane;
+      _macbookScreenConfig={rootLocal, size};
+      console.log('[macbook] screen plane placed at', screenPlane.position, 'size', screenW, screenH);
+    }
     _macbookGroup.add(root);
     _macbookRoot=root;
     // Collision AABB from the final world-space bounding box.
@@ -7084,18 +7112,7 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
 }
 function _setMacbookScreenOn(on){
   _macbookOn=!!on;
-  const mesh=_macbookScreen;
-  if(!mesh) return;
-  if(!mesh.userData._origMat){
-    mesh.userData._origMat=mesh.material;
-    mesh.userData._litMat=new THREE.MeshBasicMaterial({
-      map:_macbookLogoTex,
-      color:0xffffff,
-      toneMapped:false,
-      side:THREE.DoubleSide
-    });
-  }
-  mesh.material=_macbookOn?mesh.userData._litMat:mesh.userData._origMat;
+  if(_macbookScreen) _macbookScreen.visible=_macbookOn;
   _markShadowsDirty && _markShadowsDirty();
 }
 function _triggerMacbookClick(){
