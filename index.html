@@ -7053,26 +7053,28 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
     // is reliable regardless of how root is oriented.
     const halfY=localBB.min.y + localSize.y*0.5;
     let bestScreen=null, bestArea=0;
+    let fallbackMesh=null, fallbackArea=0;
     const _dbg=[];
     root.traverse(o=>{
       if(!o.isMesh || !o.geometry) return;
       o.geometry.computeBoundingBox();
       const gb=o.geometry.boundingBox;
       if(!gb) return;
-      // Transform geometry bbox into root's local space (accounts for
-      // any per-mesh transforms inside the GLB).
       const wb=new THREE.Box3().copy(gb).applyMatrix4(o.matrixWorld).applyMatrix4(new THREE.Matrix4().copy(root.matrixWorld).invert());
       const ws=wb.getSize(new THREE.Vector3());
       const thin=Math.min(ws.x,ws.y,ws.z);
       const dims=[ws.x,ws.y,ws.z].sort((a,b)=>a-b);
-      const area=dims[1]*dims[2]; // area of the two longer sides
-      _dbg.push({name:o.name, thin:thin.toFixed(2), area:area.toFixed(1), maxY:wb.max.y.toFixed(1), halfY:halfY.toFixed(1)});
-      // Screen criteria: sits mostly in upper half AND is thin AND large.
+      const area=dims[1]*dims[2];
+      _dbg.push({name:o.name, sx:ws.x.toFixed(2), sy:ws.y.toFixed(2), sz:ws.z.toFixed(2), thin:thin.toFixed(2), area:area.toFixed(1), maxY:wb.max.y.toFixed(1), minY:wb.min.y.toFixed(1), halfY:halfY.toFixed(1)});
       if(wb.max.y>halfY && thin<Math.max(0.8, localSize.y*0.08) && area>bestArea){
         bestArea=area; bestScreen=o;
       }
+      // Fallback: largest area mesh overall (covers GLBs where the
+      // laptop is one mesh or where our screen heuristics miss).
+      if(area>fallbackArea){ fallbackArea=area; fallbackMesh=o; }
     });
-    console.log('[macbook] mesh survey:', _dbg);
+    console.log('[macbook] mesh survey:', JSON.stringify(_dbg, null, 2));
+    if(!bestScreen) bestScreen=fallbackMesh;
     _macbookScreen=bestScreen;
     console.log('[macbook] picked screen mesh:', bestScreen && bestScreen.name, bestScreen);
     _macbookGroup.add(root);
