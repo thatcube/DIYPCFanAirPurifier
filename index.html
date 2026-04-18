@@ -8936,6 +8936,34 @@ const _LB_STORE_KEY=_TEST_MODE
   ? 'diy_air_purifier_leaderboard_TEST_v1'
   : 'diy_air_purifier_leaderboard_v1';
 const _LB_PLAYER_KEY='diy_air_purifier_player_name_v1';
+// Persistent per-device player identity. Unlocks "multiple nicknames map to
+// one person" on the leaderboard: we send this opaque id with every run,
+// group per-player caps + own-row highlight by id (not by display name), and
+// let the user type a brand-new name on every finish without losing their
+// history.
+const _LB_PLAYER_ID_KEY='diy_air_purifier_player_id_v1';
+function _generatePlayerId(){
+  try{
+    if(window.crypto && typeof crypto.randomUUID==='function') return crypto.randomUUID();
+  }catch(e){}
+  // Fallback — 32-hex, good enough as a client-side opaque id.
+  let s='';
+  for(let i=0;i<32;i++) s+=Math.floor(Math.random()*16).toString(16);
+  return s;
+}
+function _sanitizePlayerId(id){
+  // Accept anything that looks like a uuid or hex blob; cap length. Empty
+  // string means "legacy row, no id", which is handled during render.
+  return String(id||'').trim().replace(/[^0-9a-fA-F-]/g,'').slice(0,64);
+}
+let _lbPlayerId='';
+try{
+  _lbPlayerId=_sanitizePlayerId(localStorage.getItem(_LB_PLAYER_ID_KEY)||'');
+}catch(e){ _lbPlayerId=''; }
+if(!_lbPlayerId){
+  _lbPlayerId=_generatePlayerId();
+  try{ localStorage.setItem(_LB_PLAYER_ID_KEY,_lbPlayerId); }catch(e){}
+}
 const _LB_MAX=25;
 // TEST MODE: allow up to 20 runs per player while looping fast test runs.
 // Production should stay tight (3) to keep the board diverse.
@@ -9267,7 +9295,16 @@ function _openNameDialog(force,onAfterClose){
   const input=document.getElementById('nameDialogInput');
   const hint=document.getElementById('nameDialogHint');
   _nameDialog.style.display='flex';
-  if(hint) hint.textContent='Press Enter to save, or Esc to cancel.';
+  // Prefill with the last-used name so a user who wants to keep it can just
+  // press Enter. We treat the prefill as user-accepted (manualTyped=true)
+  // because it came from our own localStorage, not from a password manager.
+  const lastName=_readPlayerName();
+  const prefill=lastName && lastName!=='Player' ? lastName : '';
+  if(hint){
+    hint.textContent=prefill
+      ? 'Press Enter to keep your last name, type to rename.'
+      : 'Press Enter to save, or Esc to cancel.';
+  }
   if(input){
     input.name=`run_tag_manual_${Math.random().toString(36).slice(2,10)}`;
     input.value='';
@@ -9275,7 +9312,13 @@ function _openNameDialog(force,onAfterClose){
     setTimeout(()=>{
       input.removeAttribute('readonly');
       input.focus();
-      if(!_nameDialogManualTyped) input.value='';
+      if(prefill){
+        input.value=prefill;
+        _nameDialogManualTyped=true; // prefilled value counts as accepted
+        try{ input.setSelectionRange(0, prefill.length); }catch(e){}
+      } else if(!_nameDialogManualTyped){
+        input.value='';
+      }
     }, 30);
   }
 }
@@ -9345,15 +9388,19 @@ function _normalizeLeaderboard(rows){
     const catColor=_sanitizeCatColorKey(r.catColor||'');
     const catHair=_sanitizeCatHairKey(r.catHair||'');
     const catModel=_sanitizeCatModelKey(r.catModel||'');
-    clean.push({id,name,timeMs,at:safeAt,catColor,catHair,catModel});
+    const playerId=_sanitizePlayerId(r.playerId||'');
+    clean.push({id,name,timeMs,at:safeAt,catColor,catHair,catModel,playerId});
   }
   clean.sort((a,b)=>a.timeMs-b.timeMs || a.at-b.at);
-  const perNameCount=new Map();
+  // Per-player cap. Group by stable playerId when present; legacy rows
+  // without an id fall back to grouping by display name.
+  const perPlayerCount=new Map();
   const kept=[];
   for(const r of clean){
-    const n=perNameCount.get(r.name)||0;
+    const key=r.playerId?`id:${r.playerId}`:`name:${r.name}`;
+    const n=perPlayerCount.get(key)||0;
     if(n>=_LB_PER_PLAYER) continue;
-    perNameCount.set(r.name,n+1);
+    perPlayerCount.set(key,n+1);
     kept.push(r);
     if(kept.length>=_LB_MAX) break;
   }
@@ -9373,13 +9420,30 @@ function _renderLeaderboard(){
   const list=document.getElementById('fpLeaderboardList');
   const meta=document.getElementById('fpLeaderboardMeta');
   const nameEl=document.getElementById('fpPlayerName');
-  if(nameEl) nameEl.textContent=_lbPlayerName||'Player';
+  if(nameEl){
+    // Show current display name + any prior aliases we've used (grouped by
+    // our persistent playerId). Lets you see your alter-egos at a glance.
+    const currentName=_lbPlayerName||'Player';
+    const aliases=[];
+    const seen=new Set([currentName]);
+    for(const r of _leaderboard){
+      if(r.playerId && r.playerId===_lbPlayerId && !seen.has(r.name)){
+        seen.add(r.name);
+        aliases.push(r.name);
+      }
+    }
+    nameEl.innerHTML=_escapeHtml(currentName) + (aliases.length
+      ? ` <span style="font-weight:500;opacity:0.55;font-size:10px">aka ${aliases.slice(0,3).map(a=>_escapeHtml(a)).join(', ')}${aliases.length>3?'…':''}</span>`
+      : '');
+  }
   if(!list || !meta) return;
   if(!_leaderboard.length){
     list.innerHTML='<li style="opacity:0.62;padding:4px 2px">No runs yet. Grab every coin to post a time.</li>';
   } else {
     list.innerHTML=_leaderboard.map((r,i)=>{
-      const own=r.name===_lbPlayerName;
+      // Own-row highlight: match by stable playerId first; fall back to
+      // name for legacy rows missing a playerId.
+      const own = r.playerId ? (r.playerId===_lbPlayerId) : (r.name===_lbPlayerName);
       const model=(r.catModel||'classic').toLowerCase();
       const emoji=_CAT_MODEL_EMOJI[model]||_CAT_MODEL_EMOJI.classic;
       const label=_CAT_MODEL_LABELS_SHORT[model]||'Cat';
@@ -9435,7 +9499,7 @@ function _recordRun(timeMs){
     const catColor=_sanitizeCatColorKey(_catColorKey);
     const catHair=_sanitizeCatHairKey(_catHairKey);
     const catModel=_sanitizeCatModelKey(_catModelKey);
-    const entry={id:_makeEntryId(name,timeMs,now),name,timeMs:Math.floor(timeMs),at:now,catColor,catHair,catModel};
+    const entry={id:_makeEntryId(name,timeMs,now),name,timeMs:Math.floor(timeMs),at:now,catColor,catHair,catModel,playerId:_lbPlayerId};
     _leaderboard=_normalizeLeaderboard(_leaderboard.concat(entry));
     _saveLeaderboard();
     _renderLeaderboard();
@@ -9473,6 +9537,7 @@ function _recordRun(timeMs){
       const data=await _lbApiRequest('/run/finish', {
         runId,
         name:_lbPlayerName||'Player',
+        playerId:_lbPlayerId,
         catColor:_sanitizeCatColorKey(_catColorKey),
         catHair:_sanitizeCatHairKey(_catHairKey),
         catModel:_sanitizeCatModelKey(_catModelKey)
@@ -9509,6 +9574,7 @@ function _recordRun(timeMs){
           const retryData=await _lbApiRequest('/run/finish', {
             runId,
             name:_lbPlayerName||'Player',
+            playerId:_lbPlayerId,
             catColor:_sanitizeCatColorKey(_catColorKey),
             catHair:_sanitizeCatHairKey(_catHairKey),
             catModel:_sanitizeCatModelKey(_catModelKey)
@@ -9567,11 +9633,11 @@ function _recordRun(timeMs){
     }
     commitRunLocal();
   };
-  if(_hasCustomPlayerName()){
-    commitRun();
-  } else {
-    _openNameDialog(true,commitRun);
-  }
+  // Always prompt at the end of a run so the user can pick a new nickname
+  // (or keep the last one with Enter). Their stable _lbPlayerId threads all
+  // aliases together on the leaderboard, so per-person caps + own-row
+  // highlighting still apply across names.
+  _openNameDialog(true,commitRun);
 }
 
 {
