@@ -7704,8 +7704,11 @@ const _fpBoxesBase=[
   // bun feet, to get ejected sideways out of the cabinet footprint). The
   // cabinet's filter side-walls and top panel are added dynamically in
   // _fpGetBoxes() below.
-  // TV — uses tvCenterX, tvW, bezel, tvH, tvCenterY, tvZ, tvD (X-mirrored: negate X)
-  {xMin:-(tvCenterX+(tvW+bezel*2)/2), xMax:-(tvCenterX-(tvW+bezel*2)/2), zMin:oppWallZ, zMax:tvZ+tvD/2+1, yTop:tvCenterY+tvH/2+bezel, room:true},
+  // TV — uses tvCenterX, tvW, bezel, tvH, tvCenterY, tvZ, tvD (X-mirrored: negate X).
+  // yBottom = lower edge of the TV frame so the player can walk UNDER the
+  // wall-mounted TV. Without yBottom the AABB defaulted to floor-to-top,
+  // turning the TV into a full-height wall block.
+  {xMin:-(tvCenterX+(tvW+bezel*2)/2), xMax:-(tvCenterX-(tvW+bezel*2)/2), zMin:oppWallZ, zMax:tvZ+tvD/2+1, yTop:tvCenterY+tvH/2+bezel, yBottom:tvCenterY-tvH/2-bezel, room:true},
   // Mini split — uses msX, msW, msH, msY, msZ, msD (X-mirrored: negate X).
   // yBottom lets you walk underneath the wall-mounted unit.
   {xMin:-(msX+msW/2), xMax:-(msX-msW/2), zMin:oppWallZ, zMax:msZ+msD/2+1, yTop:msY+msH/2, yBottom:msY-msH/2, room:true},
