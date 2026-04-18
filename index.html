@@ -6372,7 +6372,7 @@ const oppBaseboard=roomBox(132, 3, 0.6, 0xc0bbb4, -15, floorY+1.5, oppWallZ+0.5,
 // 65" OLED: diagonal=65", 16:9 → ~56.7"W × 31.9"H, bezel ~0.3", depth ~1"
 const tvW=56.7, tvH=31.9, tvD=1.0, bezel=0.3;
 const tvCenterX=bedX; // centered on the bed
-const tvCenterY=floorY+54; // center of screen ~54" from floor (raised up)
+const tvCenterY=floorY+48; // center of screen ~48" from floor
 const tvZ=oppWallZ+0.5+tvD/2+0.1;
 
 // Thin black bezel frame
@@ -8040,6 +8040,17 @@ const _fpBoxesBase=[
   // x<-sideWallX). oppWall's X span is world [-sideWallX, 81] which does NOT
   // overlap the closet footprint, so a single AABB covers the wall.
   {xMin:-sideWallX, xMax:15+132/2, zMin:oppWallZ-0.25, zMax:oppWallZ+0.25, yTop:floorY+wallHeight, room:true},
+  // Door extrusion — the pocket that bumps INTO the room from the back
+  // wall (see `recessDepth`/`extLeft`/`extRight`/`recessZ` above). It's
+  // a solid volume: front face has the closed door + jambs, the two
+  // sides are return walls, the top is a capped soffit. Modeled as ONE
+  // solid AABB covering the entire extrusion footprint so the player
+  // can't walk through the door, the side return, or the soffit.
+  // X range is the mirrored extrusion span (extLeft..extRight negated);
+  // Z range is recessZ (front face) to 49 (back wall). The back-wall
+  // bounds clamp (_fpBoundsBase.zMax) already blocks ingress from
+  // behind on the non-extrusion parts of the wall.
+  {xMin:-extRight, xMax:-extLeft, zMin:recessZ-0.25, zMax:49, yTop:floorY+wallHeight, room:true},
   // Nightstand — drawer holes span nearly the full front of the cabinet, so
   // instead of one solid AABB (which would block walking into an open drawer
   // hole), we use:
