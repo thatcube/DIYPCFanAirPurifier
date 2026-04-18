@@ -273,8 +273,8 @@
     body.night-mode .toggle-switch { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.1); }
     body.night-mode .toggle-switch.on { background: rgba(80,140,220,0.35); border-color: rgba(80,140,220,0.4); }
     body.night-mode .section-group { background: rgba(255,255,255,0.02); border-color: rgba(255,255,255,0.04); }
-    .fps { position: absolute; bottom: 8px; right: 10px; font-size: 10px; color: rgba(255,255,255,0.4); font-family: monospace; pointer-events: none; display: none; }
-    .fps.show { display: block; }
+    .fps { position: absolute; bottom: 8px; right: 10px; font-size: 10px; color: rgba(255,255,255,0.4); font-family: monospace; pointer-events: none; display: block; }
+    .fps.hide { display: none; }
 
     /* Part tooltip on hover */
     .part-tooltip { position: absolute; pointer-events: none; z-index: 50; opacity: 0; transition: opacity 0.2s ease; padding: 6px 10px; border-radius: 8px; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.12); font-size: 11px; color: rgba(255,255,255,0.9); white-space: nowrap; transform: translate(-50%, -100%); margin-top: -12px; }
@@ -575,7 +575,7 @@
   <div class="toggle-row icon-compact"><span class="toggle-label with-icon"><i class="ph ph-arrows-out-cardinal"></i><span>Isolate purifier</span></span><div class="toggle-switch" id="togIsolate" onclick="toggleIsolate()"></div></div>
   <div class="toggle-row icon-compact"><span class="toggle-label with-icon"><i class="ph ph-ruler"></i><span>Dimensions</span></span><div class="toggle-switch" id="togDims" onclick="toggleDimensions()"></div></div>
   <div class="toggle-row icon-compact"><span class="toggle-label with-icon"><i class="ph ph-scan"></i><span>X-ray mode</span></span><div class="toggle-switch" id="togXray" onclick="toggleXray()"></div></div>
-  <div class="toggle-row icon-compact"><span class="toggle-label with-icon"><i class="ph ph-gauge"></i><span>Show FPS</span></span><div class="toggle-switch" id="togFps" onclick="toggleFps()"></div></div>
+  <div class="toggle-row icon-compact"><span class="toggle-label with-icon"><i class="ph ph-gauge"></i><span>Show FPS</span></span><div class="toggle-switch on" id="togFps" onclick="toggleFps()"></div></div>
   <div class="section-note">Play Mode turns this scene into a first-person game prototype.</div>
   </div></div>
   </div>
@@ -5658,8 +5658,8 @@ function setRGBColor(hex){
 let xrayOn=false;
 function toggleFps(){
   const el=document.getElementById('fps');
-  el.classList.toggle('show');
-  document.getElementById('togFps').classList.toggle('on', el.classList.contains('show'));
+  el.classList.toggle('hide');
+  document.getElementById('togFps').classList.toggle('on', !el.classList.contains('hide'));
 }
 
 function toggleXray(){
@@ -7599,6 +7599,8 @@ function animate(ts){
     const ms=(fpsNow-fpsLast)/fpsFrames;
     const ri=renderer.info.render;
     document.getElementById('fps').textContent=fpsFrames+'fps '+ms.toFixed(1)+'ms | '+ri.calls+'dc '+ri.triangles+'tri Q'+qualityTier;
+    const fpsMini=document.getElementById('fpsMini');
+    if(fpsMini) fpsMini.textContent=fpsFrames+' fps';
     checkPerformance(fpsFrames, continuous);
     fpsFrames=0; fpsLast=fpsNow;
   }
@@ -7913,6 +7915,7 @@ _fpHud.innerHTML=`
     <span style="font-size:10px;opacity:0.8;letter-spacing:0.8px;margin-right:6px">TIME</span>
     <span id="runTimerText">00:00.000</span>
     <span id="runTimerState" style="margin-left:8px;font-size:10px;opacity:0.66">READY</span>
+    <div id="fpsMini" style="margin-top:3px;font-size:9px;letter-spacing:0.6px;opacity:0.42;font-family:'SF Mono',Menlo,Consolas,monospace;font-weight:600;color:#dbe6f2">— fps</div>
   </div>
   <div id="fpLeaderboard" style="position:fixed;top:16px;right:16px;min-width:290px;max-width:340px;
     background:linear-gradient(180deg,rgba(12,18,27,0.92),rgba(7,10,15,0.9));color:#e8eef7;
