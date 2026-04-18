@@ -1808,8 +1808,8 @@ const _catIdleTmpQuatB=new THREE.Quaternion();
 // Click-to-nod: exaggerated bobblehead pitch layered on top of whatever
 // animation is currently playing. Triggered from mousedown in Play Mode.
 let _catNodStartTs=-1e9;
-const _CAT_NOD_DUR_MS=720;
-const _CAT_NOD_AMP=0.85; // peak pitch in radians (~49°)
+const _CAT_NOD_DUR_MS=620;
+const _CAT_NOD_AMP=1.35; // peak pitch in radians (~77°) — big expressive nod
 function _triggerCatNod(){
   _catNodStartTs=(typeof performance!=='undefined'?performance.now():Date.now());
 }
@@ -1821,7 +1821,7 @@ function _applyCatHeadNod(ts){
   // ~2 damped nods. sin(t*2π*1.6) gives roughly 1.6 cycles; envelope
   // (1-t)^1.4 lets the motion settle smoothly back to the current pose.
   const env=Math.pow(1-t,1.4);
-  const nodPitch=Math.sin(t*Math.PI*2*1.6)*_CAT_NOD_AMP*env;
+  const nodPitch=Math.sin(t*Math.PI*2*2.2)*_CAT_NOD_AMP*env;
   if(Math.abs(nodPitch)<0.0005) return;
   for(let i=0;i<_catIdleHeadBones.length;i++){
     const b=_catIdleHeadBones[i];
@@ -3791,6 +3791,25 @@ window.addEventListener('mousedown',e=>{
     // Exaggerated head nod on every click, regardless of whether we hit an
     // interactive target. Feels playful and confirms the click registered.
     if(typeof _triggerCatNod==='function') _triggerCatNod();
+    // Crosshair click pulse — grow + glow briefly to confirm the click.
+    const _ch=document.getElementById('fpCrosshair');
+    if(_ch){
+      const hitting=!!window._fpLookTarget;
+      const color=hitting?'#44ff44':'#ffffff';
+      const shadow=hitting?'0 0 0 3px rgba(9,14,20,0.6),0 0 22px 6px rgba(68,255,68,0.85)'
+                          :'0 0 0 3px rgba(9,14,20,0.6),0 0 18px 4px rgba(255,255,255,0.7)';
+      _ch.style.transition='transform 60ms ease-out, box-shadow 60ms ease-out, border-color 60ms ease-out';
+      _ch.style.transform='translate(-50%,-50%) scale(2.4)';
+      _ch.style.borderColor=color;
+      _ch.style.boxShadow=shadow;
+      clearTimeout(window._fpCrosshairPulseT);
+      window._fpCrosshairPulseT=setTimeout(()=>{
+        // Restore the hover-driven size/color; the per-frame updater below
+        // reads _fpHoverTarget and resets the style.
+        _ch.style.transition='border-color 0.15s,transform 0.15s,box-shadow 0.15s';
+        _ch.style.boxShadow='0 0 0 2px rgba(9,14,20,0.6),0 0 10px rgba(0,0,0,0.35)';
+      }, 180);
+    }
     if(window._fpLookTarget) handleClickObject(window._fpLookTarget);
   }
 });
