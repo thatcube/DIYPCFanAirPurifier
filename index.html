@@ -2049,11 +2049,20 @@ function _loadGameplayCatFromSelection(){
     catModel=gltf.scene;
     _collectGameplayCatIdleBones(catModel);
     _stripBababooeyBackdrop(catModel,src);
-    // Auto-scale so cat height matches _catTargetHeight.
+    // Auto-scale to a consistent visual size across cat models. Height alone
+    // produced inconsistent results because some rigs include tall ears or a
+    // raised tail, which made those models shrink noticeably relative to
+    // Classic. Blend height with the larger horizontal dimension (width/depth)
+    // so the player-facing footprint is similar for every breed.
     const box=new THREE.Box3().setFromObject(catModel);
     const size=box.getSize(new THREE.Vector3());
-    const h=size.y||1;
-    const s=_catTargetHeight/h;
+    const h=Math.max(size.y,0.0001);
+    const w=Math.max(size.x,size.z,0.0001);
+    const sH=_catTargetHeight/h;            // match target height
+    const sW=(_catTargetHeight*1.6)/w;      // target footprint ≈ 1.6× height
+    // Weighted geometric mean — height-biased so the cat still looks like a
+    // cat, but pulled toward the footprint target for visual consistency.
+    const s=Math.pow(sH,0.65)*Math.pow(sW,0.35);
     catModel.scale.setScalar(s);
     _catBaseScale.copy(catModel.scale);
     const preset=_getSelectedCatModelPreset();
@@ -8007,19 +8016,31 @@ _finishDialogStyle.textContent=`
   #finishDialogBoard{padding:8px 14px 0;overflow-y:auto;flex:1}
   #finishDialogBoard h4{margin:8px 0 6px;font-size:11px;font-weight:800;letter-spacing:0.9px;color:#9fe3ff}
   #finishDialogList{list-style:none;margin:0;padding:0;display:grid;row-gap:4px}
-  #finishDialogList li{display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:center;padding:6px 8px;border-radius:9px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);font-size:13px}
+  #finishDialogList li{display:grid;grid-template-columns:30px 1fr auto auto;gap:8px;align-items:center;padding:6px 8px;border-radius:9px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);font-size:13px}
   #finishDialogList li.own{background:rgba(255,216,115,0.16);border-color:rgba(255,216,115,0.45);box-shadow:0 0 0 1px rgba(255,216,115,0.14)}
   #finishDialogList li .rk{opacity:0.66;font-variant-numeric:tabular-nums}
   #finishDialogList li .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #finishDialogList li .catBadge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:0.3px;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#cdd7e5;white-space:nowrap}
+  #finishDialogList li .catBadge .d{width:9px;height:9px;border-radius:50%;border:1px solid rgba(0,0,0,0.4);flex-shrink:0}
+  #finishDialogList li.own .catBadge{background:rgba(255,216,115,0.1);border-color:rgba(255,216,115,0.3);color:#ffeab2}
   #finishDialogList li .tm{font-variant-numeric:tabular-nums;font-weight:700;color:#9fe3ff}
   #finishDialogList li.own .tm{color:#ffd873}
   #finishDialogCustomize{padding:10px 16px 4px;border-top:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;gap:8px}
+  #finishDialogCustomize .header{display:flex;align-items:center;justify-content:space-between;gap:8px}
   #finishDialogCustomize h4{margin:0;font-size:11px;font-weight:800;letter-spacing:0.9px;color:#9fe3ff}
+  #finishDialogCustomize .toggle{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);color:#dde4ef;border-radius:999px;padding:4px 10px;font-size:10.5px;font-weight:700;letter-spacing:0.4px;cursor:pointer}
+  #finishDialogCustomize .toggle:hover{background:rgba(255,255,255,0.14)}
+  #finishDialogCustomize .toggle .chev{display:inline-block;margin-left:5px;transition:transform 0.15s}
+  #finishDialogCustomize.open .toggle .chev{transform:rotate(180deg)}
+  #finishDialogCustomize .body{display:none;flex-direction:column;gap:6px}
+  #finishDialogCustomize.open .body{display:flex}
   #finishDialogCustomize .row{display:flex;flex-wrap:wrap;gap:6px}
-  .finishColorBtn,.finishHairBtn{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:#dde4ef;font-size:11px;font-weight:700;letter-spacing:0.3px;cursor:pointer}
+  #finishDialogCustomize .rowLabel{font-size:9.5px;font-weight:800;letter-spacing:0.8px;color:#7fa2c2;margin-top:2px}
+  .finishColorBtn,.finishHairBtn,.finishModelBtn{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:#dde4ef;font-size:11px;font-weight:700;letter-spacing:0.3px;cursor:pointer}
   .finishColorBtn .dot{width:11px;height:11px;border-radius:50%;border:1px solid rgba(0,0,0,0.4)}
-  .finishColorBtn.on,.finishHairBtn.on{background:rgba(255,216,115,0.18);border-color:rgba(255,216,115,0.5);color:#ffe3a8}
-  .finishColorBtn:hover,.finishHairBtn:hover{background:rgba(255,255,255,0.11)}
+  .finishColorBtn.on,.finishHairBtn.on,.finishModelBtn.on{background:rgba(255,216,115,0.18);border-color:rgba(255,216,115,0.5);color:#ffe3a8}
+  .finishColorBtn:hover,.finishHairBtn:hover,.finishModelBtn:hover{background:rgba(255,255,255,0.11)}
+  .finishColorBtn[disabled],.finishHairBtn[disabled]{opacity:0.42;cursor:not-allowed}
   #finishDialogActions{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px 14px;border-top:1px solid rgba(255,255,255,0.06);background:linear-gradient(0deg,rgba(0,0,0,0.22),transparent)}
   .finishDlgBtn{border:none;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:700;letter-spacing:0.3px;cursor:pointer;transition:transform 0.08s}
   .finishDlgBtn:active{transform:translateY(1px)}
@@ -8050,16 +8071,29 @@ _finishDialog.innerHTML=`
       <ol id="finishDialogList"></ol>
     </div>
     <div id="finishDialogCustomize">
-      <h4>CHANGE CAT</h4>
-      <div class="row" id="finishDialogColors">
-        <button type="button" class="finishColorBtn" data-color="ginger"><span class="dot" style="background:#c67f45"></span>Ginger</button>
-        <button type="button" class="finishColorBtn" data-color="tuxedo"><span class="dot" style="background:#5f6772"></span>Tuxedo</button>
-        <button type="button" class="finishColorBtn" data-color="cream"><span class="dot" style="background:#d7ccb1"></span>Cream</button>
-        <button type="button" class="finishColorBtn" data-color="midnight"><span class="dot" style="background:#41495a"></span>Midnight</button>
+      <div class="header">
+        <h4>YOUR CAT</h4>
+        <button type="button" class="toggle" id="finishDialogCustomizeToggle">Change cat<span class="chev">▾</span></button>
       </div>
-      <div class="row" id="finishDialogHairs">
-        <button type="button" class="finishHairBtn" data-hair="short">Short Hair</button>
-        <button type="button" class="finishHairBtn" data-hair="long">Long Hair</button>
+      <div class="body">
+        <div class="rowLabel">Breed</div>
+        <div class="row" id="finishDialogModels">
+          <button type="button" class="finishModelBtn" data-model="classic">Classic</button>
+          <button type="button" class="finishModelBtn" data-model="toon">Toon</button>
+          <button type="button" class="finishModelBtn" data-model="bababooey">Bababooey</button>
+        </div>
+        <div class="rowLabel">Color</div>
+        <div class="row" id="finishDialogColors">
+          <button type="button" class="finishColorBtn" data-color="ginger"><span class="dot" style="background:#c67f45"></span>Ginger</button>
+          <button type="button" class="finishColorBtn" data-color="tuxedo"><span class="dot" style="background:#5f6772"></span>Tuxedo</button>
+          <button type="button" class="finishColorBtn" data-color="cream"><span class="dot" style="background:#d7ccb1"></span>Cream</button>
+          <button type="button" class="finishColorBtn" data-color="midnight"><span class="dot" style="background:#41495a"></span>Midnight</button>
+        </div>
+        <div class="rowLabel">Hair</div>
+        <div class="row" id="finishDialogHairs">
+          <button type="button" class="finishHairBtn" data-hair="short">Short</button>
+          <button type="button" class="finishHairBtn" data-hair="long">Long</button>
+        </div>
       </div>
     </div>
     <div id="finishDialogActions">
@@ -8599,7 +8633,8 @@ function _normalizeLeaderboard(rows){
     const id=String(r.id||'').trim()||_makeEntryId(name,timeMs,safeAt);
     const catColor=_sanitizeCatColorKey(r.catColor||'');
     const catHair=_sanitizeCatHairKey(r.catHair||'');
-    clean.push({id,name,timeMs,at:safeAt,catColor,catHair});
+    const catModel=_sanitizeCatModelKey(r.catModel||'');
+    clean.push({id,name,timeMs,at:safeAt,catColor,catHair,catModel});
   }
   clean.sort((a,b)=>a.timeMs-b.timeMs || a.at-b.at);
   const perNameCount=new Map();
@@ -8682,7 +8717,8 @@ function _recordRun(timeMs){
     const now=Date.now();
     const catColor=_sanitizeCatColorKey(_catColorKey);
     const catHair=_sanitizeCatHairKey(_catHairKey);
-    const entry={id:_makeEntryId(name,timeMs,now),name,timeMs:Math.floor(timeMs),at:now,catColor,catHair};
+    const catModel=_sanitizeCatModelKey(_catModelKey);
+    const entry={id:_makeEntryId(name,timeMs,now),name,timeMs:Math.floor(timeMs),at:now,catColor,catHair,catModel};
     _leaderboard=_normalizeLeaderboard(_leaderboard.concat(entry));
     _saveLeaderboard();
     _renderLeaderboard();
@@ -8699,7 +8735,8 @@ function _recordRun(timeMs){
       coins:_coinTotal,
       coinTotal:_coinTotal,
       catColor:entry.catColor,
-      catHair:entry.catHair
+      catHair:entry.catHair,
+      catModel:entry.catModel
     });
     const st=document.getElementById('runTimerState');
     if(st){
@@ -8719,7 +8756,8 @@ function _recordRun(timeMs){
         runId,
         name:_lbPlayerName||'Player',
         catColor:_sanitizeCatColorKey(_catColorKey),
-        catHair:_sanitizeCatHairKey(_catHairKey)
+        catHair:_sanitizeCatHairKey(_catHairKey),
+        catModel:_sanitizeCatModelKey(_catModelKey)
       });
       _lbSharedRunId='';
       _lbClaimedCoinIds.clear();
@@ -8737,7 +8775,8 @@ function _recordRun(timeMs){
         coins:_coinTotal,
         coinTotal:_coinTotal,
         catColor:_sanitizeCatColorKey(serverEntry.catColor||_catColorKey),
-        catHair:_sanitizeCatHairKey(serverEntry.catHair||_catHairKey)
+        catHair:_sanitizeCatHairKey(serverEntry.catHair||_catHairKey),
+        catModel:_sanitizeCatModelKey(serverEntry.catModel||_catModelKey)
       });
       _renderLeaderboard();
       const st=document.getElementById('runTimerState');
@@ -8752,7 +8791,8 @@ function _recordRun(timeMs){
             runId,
             name:_lbPlayerName||'Player',
             catColor:_sanitizeCatColorKey(_catColorKey),
-            catHair:_sanitizeCatHairKey(_catHairKey)
+            catHair:_sanitizeCatHairKey(_catHairKey),
+            catModel:_sanitizeCatModelKey(_catModelKey)
           });
           _lbSharedRunId='';
           _lbClaimedCoinIds.clear();
@@ -8770,7 +8810,8 @@ function _recordRun(timeMs){
             coins:_coinTotal,
             coinTotal:_coinTotal,
             catColor:_sanitizeCatColorKey(retryEntry.catColor||_catColorKey),
-            catHair:_sanitizeCatHairKey(retryEntry.catHair||_catHairKey)
+            catHair:_sanitizeCatHairKey(retryEntry.catHair||_catHairKey),
+            catModel:_sanitizeCatModelKey(retryEntry.catModel||_catModelKey)
           });
           _renderLeaderboard();
           const st=document.getElementById('runTimerState');
@@ -9189,7 +9230,12 @@ const _coinGroup=new THREE.Group();
 _coinGroup.visible=false;
 scene.add(_coinGroup);
 const _coins=[];
-const _coinPickR=3.5;
+// Pickup radius grew from 3.5 to 4.6 so larger cat models can't visually
+// walk through a coin without grabbing it. Pickup uses the cat's mid-body
+// center (see _updateCoins) rather than the head, so vertical reach is more
+// symmetric around the cat.
+const _coinPickR=4.6;
+const _coinCamTmp=new THREE.Vector3();
 // Quick test mode: keep only the Switch game-stack coin so full runs are fast.
 // Driven by the global _TEST_MODE flag so one toggle controls both the coin
 // layout and the isolated-leaderboard behavior.
@@ -9305,7 +9351,10 @@ function _updateCoins(ts,frameScale){
   // Keep _coinGroup aligned with the room (room objects are shifted by -placementOffset).
   _coinGroup.position.set(-placementOffset.x, -placementOffset.y, -placementOffset.z);
   const t=ts*0.001;
-  const camPos=_fpPos;
+  // Pickup sphere center is the cat's mid-body (feet + half cat height),
+  // not the player's eye position. _fpPos.y is eye height (~4" above feet);
+  // the cat is ~4" tall so its center sits ~_fpPos.y - 2.
+  const camPos=_coinCamTmp.set(_fpPos.x, _fpPos.y-2, _fpPos.z);
   const fs=Number.isFinite(frameScale)?frameScale:1;
   for(const c of _coins){
     if(c.collected) continue;
