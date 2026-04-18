@@ -4871,7 +4871,9 @@ origins.console=consoleProps.position.clone();
   const _swW_for_slot=10.5 - 2*1.4; // matches swW below
   const _swD_for_slot=0.3;          // matches swD below
   const slotD=_swD_for_slot+0.5;
-  const dkW=Math.max(6.5, _swW_for_slot+1.6), dkH=4.0, dkD=Math.max(2.5, slotD+1.2);
+  const dkW=Math.max(6.5, _swW_for_slot+1.6), dkH=2.0, dkD=Math.max(2.5, slotD+1.2);
+  const notchFromBottom=0.75; // notch floor sits 0.75" above dock bottom
+  const floorY=topY+notchFromBottom;
   const wallD=(dkD-slotD)/2;
   const dkMat=stdMat({color:0x222222,roughness:0.6});
   // Front and back walls of the dock, with a full-width trench between.
@@ -4881,10 +4883,15 @@ origins.console=consoleProps.position.clone();
   const wallBack=new THREE.Mesh(new THREE.BoxGeometry(dkW, dkH, wallD), dkMat);
   wallBack.position.set(0, topY+dkH/2, -(slotD+wallD)/2);
   switchGroup.add(wallBack);
-  // Solid floor spanning the trench so you can't see through.
+  // Solid floor of the notch so you can't see through.
   const dockFloor=new THREE.Mesh(new THREE.BoxGeometry(dkW, 0.1, slotD), dkMat);
-  dockFloor.position.set(0, topY+0.05, 0);
+  dockFloor.position.set(0, floorY-0.05, 0);
   switchGroup.add(dockFloor);
+  // Also a filler below the notch floor so the trench looks like a
+  // carved-out slot rather than an open-bottom tunnel.
+  const dockBase=new THREE.Mesh(new THREE.BoxGeometry(dkW, notchFromBottom, slotD), dkMat);
+  dockBase.position.set(0, topY+notchFromBottom/2, 0);
+  switchGroup.add(dockBase);
 
   // Nintendo Switch 2 console in dock — the black tablet body is ONLY
   // the screen bezel; it sits between the two Joy-Cons (not behind
@@ -4894,14 +4901,15 @@ origins.console=consoleProps.position.clone();
   const swW=10.5 - 2*jcW; // tablet width = space between Joy-Cons
   const swMat=stdMat({color:0x111111,roughness:0.5});
   const sw2=new THREE.Mesh(new THREE.BoxGeometry(swW,swH,swD),swMat);
-  // Sticking up out of dock
-  sw2.position.set(0, topY+dkH+swH*0.35, 0);
+  // Tablet sits with its bottom flush on the notch floor.
+  const swCenterY=floorY+swH/2;
+  sw2.position.set(0, swCenterY, 0);
   switchGroup.add(sw2);
   // Joy-Con 2 controllers — iconic blue (left) + red (right) with sticks
   // and button clusters. They sit attached to the ends of the tablet. The
   // outer-top and outer-bottom corners are rounded (like the real
   // hardware); the inner side stays square where it meets the rail.
-  const jcYBase=topY+dkH+swH*0.35;
+  const jcYBase=swCenterY;
   const jcColors={left:0x1f6feb, right:0xe53935};
   // Build a rounded-side shape. outerDir=+1 rounds the +X side (right
   // controller), outerDir=-1 rounds the -X side (left controller). The
