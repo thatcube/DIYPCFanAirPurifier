@@ -4142,6 +4142,7 @@ function handleClickObject(obj){
   }
   // Clicked the MacBook → toggle screen + spawn secret coin on first click.
   if(obj._isMacbook){
+    console.log('[macbook] handleClickObject hit', obj);
     if(typeof _triggerMacbookClick==='function') _triggerMacbookClick();
     return;
   }
@@ -7053,14 +7054,12 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
         _macbookScreen=o;
       }
     });
-    // Build our own screen plane overlay as a child of root. This is the
-    // reliable "on" indicator — its position is computed from the local
-    // bounding box, so it works no matter how the GLB is named/structured.
-    // The top half of the local bbox is the lid; the player faces root's
-    // -Z direction after the Math.PI Y-rotation, so the screen face lives
-    // at local z ~= localBB.min.z and faces -Z.
-    const lidH=localSize.y*0.48;
-    const lidW=localSize.x*0.86;
+    // Build our own screen billboard overlay. We attach TWO planes back-to-back
+    // (facing +Z and -Z in local space) above the body, so no matter which
+    // way the lid faces in the GLB, the logo is always visible from the
+    // player's approach. Sized generously based on the lid's local bbox.
+    const lidW=Math.max(localSize.x, localSize.z)*0.78;
+    const lidH=Math.max(localSize.x, localSize.z)*0.52;
     const planeGeo=new THREE.PlaneGeometry(lidW, lidH);
     const planeMat=new THREE.MeshBasicMaterial({
       map:_macbookLogoTex,
@@ -7074,11 +7073,11 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
     screenPlane._isMacbook=true;
     screenPlane._macbookRoot=root;
     screenPlane.visible=false;
-    // Local position: just inside the front face, centered in the lid.
-    const lidCenterY=localBB.min.y + localSize.y*0.72;
-    const frontZ=localBB.min.z + 0.15; // slightly inset so it doesn't z-fight
-    screenPlane.position.set(0, lidCenterY, frontZ);
-    screenPlane.rotation.y=Math.PI; // face -Z (toward the player)
+    // Hover the billboard just above the laptop, centered over it.
+    const hoverY=localBB.max.y + lidH*0.55;
+    screenPlane.position.set(0, hoverY, 0);
+    // Make it billboard toward the camera each frame.
+    screenPlane._isBillboard=true;
     root.add(screenPlane);
     _macbookScreen=screenPlane;
     _macbookGroup.add(root);
@@ -7099,8 +7098,30 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
 function _setMacbookScreenOn(on){
   _macbookOn=!!on;
   if(_macbookScreen) _macbookScreen.visible=_macbookOn;
+  // Glow the laptop body too so the change reads even if the billboard
+  // happens to be occluded.
+  if(_macbookRoot){
+    _macbookRoot.traverse(o=>{
+      if(!o.isMesh || !o.material || o===_macbookScreen) return;
+      const m=o.material;
+      if(m.emissive===undefined) return;
+      if(_macbookOn){
+        if(o.userData._savedEmissive===undefined){
+          o.userData._savedEmissive=m.emissive.clone();
+          o.userData._savedEmissiveIntensity=m.emissiveIntensity||0;
+        }
+        m.emissive.setHex(0x3a5cff);
+        m.emissiveIntensity=0.35;
+      } else if(o.userData._savedEmissive!==undefined){
+        m.emissive.copy(o.userData._savedEmissive);
+        m.emissiveIntensity=o.userData._savedEmissiveIntensity||0;
+      }
+    });
+  }
+  _markShadowsDirty && _markShadowsDirty();
 }
 function _triggerMacbookClick(){
+  console.log('[macbook] click fired. screen=', _macbookScreen, 'on=', _macbookOn);
   _setMacbookScreenOn(!_macbookOn);
   if(!_macbookCoinSpawned && _macbookRoot){
     _macbookCoinSpawned=true;
@@ -7230,6 +7251,13 @@ function animate(ts){
 
   // Play Mode collectibles — spin, bob, and check for pickup.
   _updateCoins(ts,animFrameScale);
+
+  // Billboard the MacBook screen toward the camera when lit.
+  if(_macbookScreen && _macbookScreen.visible){
+    const camWorld=new THREE.Vector3();
+    camera.getWorldPosition(camWorld);
+    _macbookScreen.lookAt(camWorld);
+  }
 
   // Rainbow RGB cycling — smooth gradient flowing across all fans. The
   // hue drift is slow (~0.06 rev/sec) so we don't need 60 Hz updates;
