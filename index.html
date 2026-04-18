@@ -7692,7 +7692,23 @@ function animate(ts){
     else if(nx>bxMax){ nx=bxMax; _fpVelX=Math.min(_fpVelX,0); }
     if(nz<bzMin){ nz=bzMin; _fpVelZ=Math.max(_fpVelZ,0); }
     else if(nz>bzMax){ nz=bzMax; _fpVelZ=Math.min(_fpVelZ,0); }
-    // Furniture collision — AABB push-out + standing on top (dynamic)
+    // Furniture collision — AABB push-out + standing on top (dynamic).
+    //
+    // IMPORTANT CAMERA-FEEL INVARIANT:
+    //   When the player's HEAD hits the underside of a box (ceiling,
+    //   overhang, shelf bottom, etc.) we MUST clamp along Y only. Do NOT
+    //   fall through to the XZ push-out branch. A horizontal shove at
+    //   head-contact time is experienced as "the cursor moving" / "the
+    //   view getting yanked sideways" because camera.lookAt() then
+    //   reaims from the new horizontal position. Always prefer a Y
+    //   clamp (pure elevation change) over an XZ push when the contact
+    //   is with the box's bottom face.
+    //
+    //   The head-intrusion branch below handles ALL vertical phases of
+    //   a jump (rising, peak, falling) as long as feet are still below
+    //   the box's yBottom. The bonk SFX/intensity only fires when
+    //   actively rising (_fpVy>0) so grazing the ceiling at the peak of
+    //   a jump is silent but still smoothly clamped.
     const eyeH=4; // eye height
     let groundY=_fpFloorY-placementOffset.y; // floor moves with room Y offset
     const _curBoxes=_fpGetBoxes();
@@ -7778,6 +7794,18 @@ function animate(ts){
       catGroup.visible=false;
     } else {
       // Cat (third-person) camera.
+      //
+      // CAMERA AIM INVARIANT — read before touching this block:
+      //   The camera's AIM (where it's looking) must always come from
+      //   the player's controlled pitch/yaw (lookDir), NEVER from a
+      //   lookAt(focal) call. Reason: the camera POSITION gets clamped
+      //   (walls, ceiling, floor) while the focal point does not. If we
+      //   aimed with lookAt(focal), any clamp would rotate the view
+      //   toward the focal — e.g. near the ceiling the camera gets
+      //   pushed down but the focal stays at head height, so lookAt
+      //   tilts the view UP even when the player is holding pitch down.
+      //   That reads as "the cursor moving on its own" and is the bug
+      //   we fixed in 51468a3. Preserve this: aim with lookDir always.
       const focal=_fpLookTarget.set(_fpPos.x+fwd.x*0.6, _fpPos.y+0.7, _fpPos.z+fwd.z*0.6);
       // NOTE: we intentionally do NOT clamp the focal point here. Clamping
       // the focal rotates camera.lookAt on frames where the eye briefly
@@ -7821,11 +7849,11 @@ function animate(ts){
       if(cyC>cyMax) cyC=cyMax;
       else if(cyC<cyMin) cyC=cyMin;
       camera.position.set(cxC, cyC, czC);
-      // Aim the camera along the player's look direction instead of at
-      // the focal point. When the camera Y gets clamped down near the
-      // ceiling, a focal-locked lookAt would rotate the view upward
-      // (because the camera is now level with or below the focal) — even
-      // when the player is looking down. Using lookDir preserves pitch.
+      // Aim along the player's look direction (lookDir is built from
+      // _fpYaw/_fpPitch above). DO NOT replace this with
+      // camera.lookAt(focal) — see the CAMERA AIM INVARIANT comment
+      // above for why. The 10-unit forward distance is arbitrary; only
+      // the direction matters for setting the camera's rotation.
       camera.lookAt(cxC+lookDir.x*10, cyC+lookDir.y*10, czC+lookDir.z*10);
       if(catGroup.parent!==scene) scene.add(catGroup);
       catGroup.visible=true;
