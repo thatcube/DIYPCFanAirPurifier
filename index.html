@@ -8145,6 +8145,19 @@ const _fpBoxesBase=[
   // the shelf mesh constants (shelfDrop=24, shelfXDepth=14, shelfBackGap=0.1)
   // in the closet block.
   {xMin:-((sideWallX+_closetDepth-0.5-0.1-14/2)+14/2), xMax:-((sideWallX+_closetDepth-0.5-0.1-14/2)-14/2), zMin:_closetZ-(_closetInteriorW-1)/2, zMax:_closetZ+(_closetInteriorW-1)/2, yTop:floorY+_closetInteriorH-24+0.4, yBottom:floorY+_closetInteriorH-24-0.4, room:true},
+  // Closet shelf dividers — 3 vertical panels at 1/4, 2/4, 3/4 of the shelf
+  // length, from shelf top up to just below the ceiling. Z-thick matches
+  // the mesh's divThick=0.6; X span matches shelfXDepth=14.
+  {xMin:-((sideWallX+_closetDepth-0.5-0.1-14/2)+14/2), xMax:-((sideWallX+_closetDepth-0.5-0.1-14/2)-14/2), zMin:(_closetZ-(_closetInteriorW-1)/2)+(_closetInteriorW-1)*1/4-0.3, zMax:(_closetZ-(_closetInteriorW-1)/2)+(_closetInteriorW-1)*1/4+0.3, yTop:floorY+_closetInteriorH-0.5, yBottom:floorY+_closetInteriorH-24+0.4, room:true},
+  {xMin:-((sideWallX+_closetDepth-0.5-0.1-14/2)+14/2), xMax:-((sideWallX+_closetDepth-0.5-0.1-14/2)-14/2), zMin:(_closetZ-(_closetInteriorW-1)/2)+(_closetInteriorW-1)*2/4-0.3, zMax:(_closetZ-(_closetInteriorW-1)/2)+(_closetInteriorW-1)*2/4+0.3, yTop:floorY+_closetInteriorH-0.5, yBottom:floorY+_closetInteriorH-24+0.4, room:true},
+  {xMin:-((sideWallX+_closetDepth-0.5-0.1-14/2)+14/2), xMax:-((sideWallX+_closetDepth-0.5-0.1-14/2)-14/2), zMin:(_closetZ-(_closetInteriorW-1)/2)+(_closetInteriorW-1)*3/4-0.3, zMax:(_closetZ-(_closetInteriorW-1)/2)+(_closetInteriorW-1)*3/4+0.3, yTop:floorY+_closetInteriorH-0.5, yBottom:floorY+_closetInteriorH-24+0.4, room:true},
+  // Clothes rod — horizontal pole along Z at y = floorY+_closetInteriorH-30,
+  // centered on innerCx. Approximate the cylinder with a thin AABB; radius 0.4.
+  {xMin:-((sideWallX+0.5)+(_closetDepth-0.5)/2+0.4), xMax:-((sideWallX+0.5)+(_closetDepth-0.5)/2-0.4), zMin:_closetZ-(_closetInteriorW-2)/2, zMax:_closetZ+(_closetInteriorW-2)/2, yTop:floorY+_closetInteriorH-30+0.4, yBottom:floorY+_closetInteriorH-30-0.4, room:true},
+  // Closet door header trim — the casing above the bifold opening, spans
+  // closetW + 2*trimW along Z, headerH=4 tall starting at floorY+_closetH.
+  // sits on the room-facing side of the wall (closetX = sideWallX-0.5).
+  {xMin:-(sideWallX), xMax:-(sideWallX-1), zMin:_closetZ-_closetW/2-2.5, zMax:_closetZ+_closetW/2+2.5, yTop:floorY+_closetH+4, yBottom:floorY+_closetH, room:true},
   // Opposite (front/TV) wall — explicit collision. Previously relied on the
   // global bounds clamp, but we loosened that to allow walking into the
   // closet interior (which extends past oppWallZ along Z, entirely at
