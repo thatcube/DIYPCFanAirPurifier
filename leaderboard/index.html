@@ -92,7 +92,7 @@
     }
     .row {
       display: grid;
-      grid-template-columns: 48px 1fr auto;
+      grid-template-columns: 48px 1fr auto auto;
       gap: 10px;
       align-items: center;
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -107,6 +107,28 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    .catBadge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      padding: 2px 8px 2px 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #cdd7e5;
+      white-space: nowrap;
+    }
+    .catBadge .catEmoji { font-size: 13px; line-height: 1; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.35)); }
+    .catBadge .catDot {
+      width: 8px; height: 8px; border-radius: 50%;
+      border: 1px solid rgba(0,0,0,0.45);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.12);
+      flex-shrink: 0;
+    }
+    .row.hit .catBadge { background: rgba(255,216,115,0.1); border-color: rgba(255,216,115,0.3); color: #ffeab2; }
     .time {
       font-variant-numeric: tabular-nums;
       color: var(--accent);
@@ -129,7 +151,7 @@
       .head { padding: 13px 12px 9px; }
       .meta { padding: 10px 12px; }
       .list { padding: 8px; }
-      .row { grid-template-columns: 42px 1fr auto; padding: 8px 9px; }
+      .row { grid-template-columns: 42px 1fr auto auto; padding: 8px 9px; }
       .right { margin-left: 0; }
     }
   </style>
@@ -176,6 +198,21 @@
       return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(z).padStart(3, '0')}`;
     }
 
+    // Cat model → emoji/label. Kept in sync with index.html's _CAT_MODEL_EMOJI.
+    const CAT_MODEL_EMOJI = { classic: '🐱', toon: '🦁', bababooey: '🐿️' };
+    const CAT_MODEL_LABEL = { classic: 'Classic', toon: 'Toon', bababooey: 'Bababooey' };
+    const CAT_COLOR_HEX = { ginger: '#d97a2a', tuxedo: '#151a22', cream: '#e8d9b3', midnight: '#323a55' };
+    function catBadgeHtml(row) {
+      const model = String((row && row.catModel) || 'classic').toLowerCase();
+      const emoji = CAT_MODEL_EMOJI[model] || CAT_MODEL_EMOJI.classic;
+      const label = CAT_MODEL_LABEL[model] || 'Cat';
+      const colorable = model !== 'bababooey';
+      const color = CAT_COLOR_HEX[String((row && row.catColor) || 'ginger').toLowerCase()] || CAT_COLOR_HEX.ginger;
+      const dot = colorable ? `<span class="catDot" style="background:${color}"></span>` : '';
+      const title = colorable ? `${label} · ${(row && row.catColor) || 'ginger'}` : label;
+      return `<span class="catBadge" title="${escapeHtml(title)}"><span class="catEmoji">${emoji}</span>${dot}<span>${label}</span></span>`;
+    }
+
     async function copyText(text) {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(text);
@@ -211,6 +248,7 @@
           return `<li class="row${hit ? ' hit' : ''}" data-entry-id="${escapeHtml(rowId)}">
             <div class="rank">#${i + 1}</div>
             <div class="name">${escapeHtml(r.name)}</div>
+            ${catBadgeHtml(r)}
             <div class="time">${fmtRun(r.timeMs)}</div>
           </li>`;
         }).join('');
