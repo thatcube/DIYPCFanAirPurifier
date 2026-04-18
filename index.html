@@ -7047,36 +7047,26 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
       o._isMacbook=true;
       o._macbookRoot=root;
     });
-    // Find the screen mesh: look for the thinnest, largest-area mesh in
-    // the upper half of the laptop's local bbox. Compare using LOCAL
-    // geometry bounds (not world-rotated), so the lid-plane detection
-    // is reliable regardless of how root is oriented.
-    const halfY=localBB.min.y + localSize.y*0.5;
-    let bestScreen=null, bestArea=0;
-    let fallbackMesh=null, fallbackArea=0;
+    // Find the screen mesh: pick the flattest mesh (smallest thin-axis
+    // relative to its largest axis). A MacBook screen is a flat quad,
+    // the body is chunky. This is independent of orientation/scaling.
+    let bestScreen=null, bestFlatness=Infinity;
     const _dbg=[];
     root.traverse(o=>{
       if(!o.isMesh || !o.geometry) return;
       o.geometry.computeBoundingBox();
       const gb=o.geometry.boundingBox;
       if(!gb) return;
-      const wb=new THREE.Box3().copy(gb).applyMatrix4(o.matrixWorld).applyMatrix4(new THREE.Matrix4().copy(root.matrixWorld).invert());
-      const ws=wb.getSize(new THREE.Vector3());
+      const ws=gb.getSize(new THREE.Vector3());
       const thin=Math.min(ws.x,ws.y,ws.z);
-      const dims=[ws.x,ws.y,ws.z].sort((a,b)=>a-b);
-      const area=dims[1]*dims[2];
-      _dbg.push({name:o.name, sx:ws.x.toFixed(2), sy:ws.y.toFixed(2), sz:ws.z.toFixed(2), thin:thin.toFixed(2), area:area.toFixed(1), maxY:wb.max.y.toFixed(1), minY:wb.min.y.toFixed(1), halfY:halfY.toFixed(1)});
-      if(wb.max.y>halfY && thin<Math.max(0.8, localSize.y*0.08) && area>bestArea){
-        bestArea=area; bestScreen=o;
-      }
-      // Fallback: largest area mesh overall (covers GLBs where the
-      // laptop is one mesh or where our screen heuristics miss).
-      if(area>fallbackArea){ fallbackArea=area; fallbackMesh=o; }
+      const thick=Math.max(ws.x,ws.y,ws.z);
+      const flatness=thick>0 ? thin/thick : 1;
+      _dbg.push({name:o.name, sx:ws.x.toFixed(2), sy:ws.y.toFixed(2), sz:ws.z.toFixed(2), flatness:flatness.toFixed(3)});
+      if(flatness<bestFlatness){ bestFlatness=flatness; bestScreen=o; }
     });
     console.log('[macbook] mesh survey:', JSON.stringify(_dbg, null, 2));
-    if(!bestScreen) bestScreen=fallbackMesh;
     _macbookScreen=bestScreen;
-    console.log('[macbook] picked screen mesh:', bestScreen && bestScreen.name, bestScreen);
+    console.log('[macbook] picked screen mesh:', bestScreen && bestScreen.name, 'flatness=', bestFlatness.toFixed(3));
     _macbookGroup.add(root);
     _macbookRoot=root;
     // Collision AABB from the final world-space bounding box.
