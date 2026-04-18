@@ -7440,12 +7440,11 @@ function animate(ts){
     } else {
       // Cat (third-person) camera.
       const focal=_fpLookTarget.set(_fpPos.x+fwd.x*0.6, _fpPos.y+0.7, _fpPos.z+fwd.z*0.6);
-      // Clamp focal to stay inside the room too — when the player jumps the
-      // eye can briefly poke above the ceiling, which would drag the camera
-      // with it. Pin the focal a few inches below the ceiling.
-      const ceilY0=(typeof ceiling!=='undefined' && ceiling)?ceiling.position.y:(floorY+80);
-      if(focal.y>ceilY0-3) focal.y=ceilY0-3;
-      if(focal.y<floorY+3) focal.y=floorY+3;
+      // NOTE: we intentionally do NOT clamp the focal point here. Clamping
+      // the focal rotates camera.lookAt on frames where the eye briefly
+      // punches above the ceiling, which reads as the view yanking away
+      // from what you're aiming at. We only clamp the camera *position*
+      // below — that alone keeps the exterior from becoming visible.
       const camDist=7.3;
       const camLift=2.2;
       const camShoulder=0.9;
