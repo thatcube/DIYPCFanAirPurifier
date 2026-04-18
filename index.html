@@ -9309,11 +9309,11 @@ function toggleFirstPerson(){
         m.material.depthWrite=true;
       }
     });
-    // Hide the world-outside-the-window backdrop in play mode so the room
-    // feels enclosed — cat-sized game, no sky beyond the walls.
+    // Keep the world-outside-the-window backdrop visible in play mode so the
+    // great-outdoors sky/trees/grass show through the window.
     if(typeof outdoor!=='undefined' && outdoor){
       outdoor._fpSavedVisible=outdoor.visible;
-      outdoor.visible=false;
+      outdoor.visible=true;
     }
     // Request pointer lock for mouselook on desktop.
     if(!_isMobile && canvas.requestPointerLock) canvas.requestPointerLock();
