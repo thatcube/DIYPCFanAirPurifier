@@ -7050,14 +7050,33 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
     // The GLB has the lid+body merged into one mesh, so we can't swap
     // just the screen material. Instead, create a dedicated overlay plane
     // parented to the laptop root, positioned at the lid's front face.
-    // Use localSize (post-scale world bbox) so the plane lands at a
-    // reasonable inch-scale size. Aspect ratio ~16:10 (real MBP).
-    //
-    // === TWEAK THESE TO RESIZE / ROUND THE SCREEN ===
-    const screenW=localSize.x*0.82;   // width  — bigger = wider
-    const screenH=screenW*0.625;      // height — bigger = taller (0.625 = 16:10)
-    const cornerR=screenH*0.08;       // corner radius — bigger = rounder
-    // =================================================
+
+    // ╔══════════════════════════════════════════════════════════════╗
+    // ║  MACBOOK SCREEN KNOBS — tweak these to tune the overlay      ║
+    // ║                                                              ║
+    // ║  All values are multipliers of the laptop's bounding box     ║
+    // ║  (localSize), so they scale naturally if the laptop model    ║
+    // ║  gets resized. Save + reload the page to see changes.        ║
+    // ╠══════════════════════════════════════════════════════════════╣
+    // ║  SIZE & SHAPE                                                ║
+    // ╚══════════════════════════════════════════════════════════════╝
+    const screenW = localSize.x * 0.88;   // WIDTH  — larger = wider screen
+    const screenH = screenW      * 0.625; // HEIGHT — 0.625 is 16:10 (real MBP)
+    const cornerR = screenH      * 0.08;  // CORNER RADIUS — larger = rounder
+
+    // ╔══════════════════════════════════════════════════════════════╗
+    // ║  POSITION (in the lid's local coordinate system)             ║
+    // ║                                                              ║
+    // ║  X  → left/right on the lid  (0.5 = centered)                ║
+    // ║  Y  → up/down on the lid     (0.5 = middle, 0.72 = upper)    ║
+    // ║  Z  → forward/back           (negative pushes toward player) ║
+    // ╚══════════════════════════════════════════════════════════════╝
+    const screenX_frac = 0.5;   // X — fraction across lid width  (0…1)
+    const screenY_frac = 0.5;   // Y — fraction up lid height      (0…1)
+    const screenZ_off  = 0.2;   // Z — inches in front of lid face (+ = toward player)
+
+    // ── end tweakable knobs ─────────────────────────────────────────
+
     // Build a rounded-rect shape centered on origin.
     const rrShape=(()=>{
       const s=new THREE.Shape();
@@ -7096,21 +7115,19 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
     screenPlane._isMacbook=true;
     screenPlane._macbookRoot=root;
     screenPlane.visible=false;
-    // Because root.scale is applied, and we're adding as root's child,
-    // localSize is already in world-space inches; the plane will inherit
-    // root.scale and be drawn at world scale * size. We want real-world
-    // inches, so pre-divide by root's scale.
+    // The plane inherits root.scale (~45×), so we pre-divide by that
+    // scale to get real-world inches.
     const invScale=1/(root.scale.x||1);
     screenPlane.scale.setScalar(invScale);
-    // Position in root-local coords. Upper Y = lid; flip to the +Z side
-    // (player-facing after root.rotation.y=Math.PI) — the other side has
-    // the Apple logo.
-    const cx=(localBB.min.x+localBB.max.x)*0.5 * invScale;
-    const lidY=(localBB.min.y + localSize.y*0.6) * invScale;
-    const frontZ=(localBB.min.z - -0.2) * invScale; // slightly in front of lid
+    // Apply position knobs. All three use the laptop's local bounding
+    // box (localBB/localSize) so the screen stays attached to the lid
+    // regardless of the laptop's world position/rotation.
+    const cx     = THREE.MathUtils.lerp(localBB.min.x, localBB.max.x, screenX_frac) * invScale;
+    const lidY   = (localBB.min.y + localSize.y * screenY_frac) * invScale;
+    const frontZ = (localBB.min.z - screenZ_off) * invScale;
     screenPlane.position.set(cx, lidY, frontZ);
-    // Flip so the plane's front face (and correctly-oriented texture) is
-    // visible from the player side of the lid, not the Apple-logo side.
+    // Rotate 180° so the plane's front face (correct texture orientation)
+    // points toward the player — the other side is the Apple-logo side.
     screenPlane.rotation.y=Math.PI;
     root.add(screenPlane);
     _macbookScreen=screenPlane;
