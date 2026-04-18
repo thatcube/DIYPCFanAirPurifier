@@ -4871,9 +4871,13 @@ origins.console=consoleProps.position.clone();
   dock.position.set(0, topY+dkH/2, 0);
   switchGroup.add(dock);
 
-  // Nintendo Switch 2 console in dock — ~10.5"W × 4.7"H visible × 0.3"D
-  const swW=10.5, swH=4.7, swD=0.3;
-  const swMat=stdMat({color:0x1a1a1a,roughness:0.5});
+  // Nintendo Switch 2 console in dock — the black tablet body is ONLY
+  // the screen bezel; it sits between the two Joy-Cons (not behind
+  // them). Joy-Cons attach on its left/right edges.
+  const swH=4.7, swD=0.3;
+  const jcW=1.4, jcH=swH*0.95, jcD=swD+0.2;
+  const swW=10.5 - 2*jcW; // tablet width = space between Joy-Cons
+  const swMat=stdMat({color:0x111111,roughness:0.5});
   const sw2=new THREE.Mesh(new THREE.BoxGeometry(swW,swH,swD),swMat);
   // Sticking up out of dock
   sw2.position.set(0, topY+dkH+swH*0.35, 0);
@@ -4882,7 +4886,6 @@ origins.console=consoleProps.position.clone();
   // and button clusters. They sit attached to the ends of the tablet. The
   // outer-top and outer-bottom corners are rounded (like the real
   // hardware); the inner side stays square where it meets the rail.
-  const jcW=1.4, jcH=swH*0.95, jcD=swD+0.2;
   const jcYBase=topY+dkH+swH*0.35;
   const jcColors={left:0x1f6feb, right:0xe53935};
   // Build a rounded-side shape. outerDir=+1 rounds the +X side (right
@@ -4919,12 +4922,12 @@ origins.console=consoleProps.position.clone();
     // Center the extruded depth (it's built along +Z from 0 to jcD).
     geo.translate(0, 0, -jcD/2);
     const jc=new THREE.Mesh(geo, jcBodyMat);
-    jc.position.set(side*(swW/2-jcW), jcYBase, 0);
+    jc.position.set(side*(swW/2), jcYBase, 0);
     switchGroup.add(jc);
     // Analog stick — raised cap on a post.
     const stickMat=stdMat({color:0x111111, roughness:0.4});
     const stickPost=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.28,0.22,16), stickMat);
-    stickPost.position.set(side*(swW/2-jcW/2), jcYBase + (side<0 ? jcH*0.22 : -jcH*0.22), jcD/2+0.12);
+    stickPost.position.set(side*(swW/2+jcW/2), jcYBase + (side<0 ? jcH*0.22 : -jcH*0.22), jcD/2+0.12);
     stickPost.rotation.x=Math.PI/2;
     switchGroup.add(stickPost);
     const stickCap=new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.26,0.08,16), stickMat);
@@ -4935,7 +4938,7 @@ origins.console=consoleProps.position.clone();
     // Button cluster (4 small circles).
     const btnMat=stdMat({color:0x0f0f0f, roughness:0.5});
     const clusterY=jcYBase + (side<0 ? -jcH*0.22 : jcH*0.22);
-    const clusterX=side*(swW/2-jcW/2);
+    const clusterX=side*(swW/2+jcW/2);
     const btnOffsets=[[0,0.32],[0,-0.32],[-0.32,0],[0.32,0]];
     for(const [ox,oy] of btnOffsets){
       const btn=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.05,14), btnMat);
@@ -4952,16 +4955,14 @@ origins.console=consoleProps.position.clone();
     // tablet, echoing the real hardware.
     const railMat=stdMat({color:0xd6d6d6, roughness:0.4, metalness:0.4});
     const rail=new THREE.Mesh(new THREE.BoxGeometry(0.08, jcH*0.92, jcD*0.6), railMat);
-    rail.position.set(side*(swW/2-jcW+0.04), jcYBase, 0);
+    rail.position.set(side*(swW/2+0.04), jcYBase, 0);
     switchGroup.add(rail);
   }
-  // Screen (blue-ish rectangle) — sits flush with the front face of the
-  // Joy-Cons so the tablet + controllers read as one coplanar surface.
-  // Width is only as wide as the space between the two Joy-Con inner
-  // rails, so it never extends past them.
-  const screenW=(swW-2*jcW)*0.96;
-  const scrMat=stdMat({color:0x1133aa, emissive:0x0a1a44, emissiveIntensity:0.3, roughness:0.3});
-  const scr=new THREE.Mesh(new THREE.PlaneGeometry(screenW, swH*0.8),scrMat);
+  // Screen — subtle dark display slightly inset from the tablet bezel,
+  // sitting flush with the front face of the Joy-Cons.
+  const screenW=swW*0.94;
+  const scrMat=stdMat({color:0x050510, roughness:0.2, metalness:0.1});
+  const scr=new THREE.Mesh(new THREE.PlaneGeometry(screenW, swH*0.82),scrMat);
   scr.position.set(0, jcYBase, jcD/2+0.001);
   switchGroup.add(scr);
   consoleProps.add(switchGroup);
