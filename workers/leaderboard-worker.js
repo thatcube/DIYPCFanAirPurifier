@@ -5,10 +5,12 @@ const SCHEMA_STATEMENTS = [
     time_ms INTEGER NOT NULL,
     at_ms INTEGER NOT NULL,
     cat_color TEXT NOT NULL DEFAULT 'ginger',
-    cat_hair TEXT NOT NULL DEFAULT 'short'
+    cat_hair TEXT NOT NULL DEFAULT 'short',
+    player_id TEXT NOT NULL DEFAULT ''
   )`,
   `CREATE INDEX IF NOT EXISTS idx_lb_time ON leaderboard_entries(time_ms ASC, at_ms ASC)`,
   `CREATE INDEX IF NOT EXISTS idx_lb_name ON leaderboard_entries(name, time_ms ASC, at_ms ASC)`,
+  `CREATE INDEX IF NOT EXISTS idx_lb_player ON leaderboard_entries(player_id, time_ms ASC, at_ms ASC)`,
   `CREATE TABLE IF NOT EXISTS run_sessions (
     run_id TEXT PRIMARY KEY,
     ip_hash TEXT NOT NULL,
@@ -128,6 +130,9 @@ async function ensureLeaderboardAppearanceColumns(db) {
   }
   if (!existing.has('cat_hair')) {
     alters.push(db.prepare(`ALTER TABLE leaderboard_entries ADD COLUMN cat_hair TEXT NOT NULL DEFAULT 'short'`).bind());
+  }
+  if (!existing.has('player_id')) {
+    alters.push(db.prepare(`ALTER TABLE leaderboard_entries ADD COLUMN player_id TEXT NOT NULL DEFAULT ''`).bind());
   }
   if (alters.length) await db.batch(alters);
 }
@@ -265,6 +270,7 @@ async function handleRunFinish(request, env, cfg) {
   const name = sanitizeName(body?.name || '', cfg.MAX_NAME_LEN);
   const catColor = sanitizeCatColor(body?.catColor);
   const catHair = sanitizeCatHair(body?.catHair);
+  const playerId = sanitizePlayerId(body?.playerId);
   if (!runId) return apiError(400, 'bad_request', 'runId is required');
 
   const run = await env.LB_DB.prepare(
@@ -296,14 +302,15 @@ async function handleRunFinish(request, env, cfg) {
   const entryId = await makeEntryId(finalName, Math.floor(elapsed), now);
 
   await env.LB_DB.prepare(
-    `INSERT INTO leaderboard_entries (id, name, time_ms, at_ms, cat_color, cat_hair) VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO leaderboard_entries (id, name, time_ms, at_ms, cat_color, cat_hair, player_id) VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     entryId,
     finalName,
     Math.floor(elapsed),
     now,
     catColor,
-    catHair
+    catHair,
+    playerId
   ).run();
 
   await deleteRun(env.LB_DB, runId);
@@ -319,6 +326,7 @@ async function handleRunFinish(request, env, cfg) {
     at: now,
     catColor,
     catHair,
+    playerId,
   };
 
   return jsonResponse(200, {
@@ -419,7 +427,7 @@ async function getNormalizedLeaderboard(db, cfg) {
   const scanLimit = Math.max(cfg.LB_MAX * cfg.LB_PER_PLAYER * 6, 200);
   const rows = await db
     .prepare(
-      `SELECT id, name, time_ms, at_ms, cat_color, cat_hair
+      `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, player_id
        FROM leaderboard_entries ORDER BY time_ms ASC, at_ms ASC LIMIT ?`
     )
     .bind(scanLimit)
@@ -463,17 +471,21 @@ function normalizeLeaderboard(rows, maxEntries, perPlayer) {
     const safeAt = Number.isFinite(at) && at > 0 ? at : Date.now();
     const catColor = sanitizeCatColor(row.cat_color ?? row.catColor);
     const catHair = sanitizeCatHair(row.cat_hair ?? row.catHair);
-    clean.push({ id, name, timeMs, at: safeAt, catColor, catHair });
+    const playerId = sanitizePlayerId(row.player_id ?? row.playerId);
+    clean.push({ id, name, timeMs, at: safeAt, catColor, catHair, playerId });
   }
 
   clean.sort((a, b) => a.timeMs - b.timeMs || a.at - b.at);
 
-  const perName = new Map();
+  // Per-player cap: group by stable playerId when present; fall back to
+  // display name for legacy rows with no playerId.
+  const perPlayerCount = new Map();
   const kept = [];
   for (const row of clean) {
-    const current = perName.get(row.name) || 0;
+    const key = row.playerId ? `id:${row.playerId}` : `name:${row.name}`;
+    const current = perPlayerCount.get(key) || 0;
     if (current >= perPlayer) continue;
-    perName.set(row.name, current + 1);
+    perPlayerCount.set(key, current + 1);
     kept.push(row);
     if (kept.length >= maxEntries) break;
   }
@@ -520,6 +532,12 @@ function sanitizeCatColor(value) {
 function sanitizeCatHair(value) {
   const key = String(value || '').trim().toLowerCase();
   return key === 'long' || key === 'short' ? key : 'short';
+}
+
+function sanitizePlayerId(value) {
+  // Opaque client-generated id (uuid or hex). Strip anything but
+  // hex + hyphen, cap at 64 chars. Empty string is valid (legacy).
+  return String(value || '').trim().replace(/[^0-9a-fA-F-]/g, '').slice(0, 64);
 }
 
 async function makeEntryId(name, timeMs, at) {

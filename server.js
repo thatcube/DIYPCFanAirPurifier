@@ -38,6 +38,10 @@ function sanitizeName(name) {
   return String(name || '').trim().replace(/\s+/g, ' ').slice(0, MAX_NAME_LEN);
 }
 
+function sanitizePlayerId(id) {
+  return String(id || '').trim().replace(/[^0-9a-fA-F-]/g, '').slice(0, 64);
+}
+
 function makeEntryId(name, timeMs, at) {
   return crypto
     .createHash('sha1')
@@ -59,16 +63,20 @@ function normalizeLeaderboard(rows) {
     const id = (typeof row.id === 'string' && row.id.trim())
       ? row.id.trim().slice(0, 64)
       : makeEntryId(name, timeMs, safeAt);
-    clean.push({ id, name, timeMs, at: safeAt });
+    const playerId = sanitizePlayerId(row.playerId);
+    clean.push({ id, name, timeMs, at: safeAt, playerId });
   }
   clean.sort((a, b) => a.timeMs - b.timeMs || a.at - b.at);
 
-  const perName = new Map();
+  // Per-player cap: group by stable playerId when present; fall back to
+  // name for legacy rows.
+  const perPlayer = new Map();
   const kept = [];
   for (const row of clean) {
-    const n = perName.get(row.name) || 0;
+    const key = row.playerId ? `id:${row.playerId}` : `name:${row.name}`;
+    const n = perPlayer.get(key) || 0;
     if (n >= LB_PER_PLAYER) continue;
-    perName.set(row.name, n + 1);
+    perPlayer.set(key, n + 1);
     kept.push(row);
     if (kept.length >= LB_MAX) break;
   }
@@ -253,6 +261,7 @@ app.post('/api/run/finish', (req, res) => {
 
   const runId = String(req.body?.runId || '');
   const name = sanitizeName(req.body?.name || '');
+  const playerId = sanitizePlayerId(req.body?.playerId || '');
   if (!runId) return apiError(res, 400, 'bad_request', 'runId is required');
 
   const run = activeRuns.get(runId);
@@ -283,6 +292,7 @@ app.post('/api/run/finish', (req, res) => {
     name: name || 'Player',
     timeMs: Math.floor(elapsed),
     at: now,
+    playerId,
   };
 
   leaderboard = normalizeLeaderboard(leaderboard.concat(entry));
