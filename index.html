@@ -4861,15 +4861,44 @@ origins.console=consoleProps.position.clone();
   vent.position.set(0, topY+xbH+0.08, 8);
   consoleProps.add(vent);
 
-  // Nintendo Switch 2 Dock — roughly 6.5"W × 4"H × 2.5"D
+  // Nintendo Switch 2 Dock — widened slightly so the tablet can slot in
+  // with a ~0.25" gap on each side. Built from ExtrudeGeometry with a
+  // rectangular hole on top to create the cutout.
   const switchGroup=new THREE.Group();
   switchGroup.rotation.y=-Math.PI/2; // face +Z direction
   switchGroup.position.z=-6; // shift along purifier length
-  const dkW=6.5, dkH=4.0, dkD=2.5;
+  // Tablet dims (defined again below; mirror the values here for slot sizing).
+  const _swW_for_slot=10.5 - 2*1.4; // matches swW below
+  const _swD_for_slot=0.3;          // matches swD below
+  const slotW=_swW_for_slot+0.5;
+  const slotD=_swD_for_slot+0.5;
+  const dkW=Math.max(6.5, slotW+0.6), dkH=4.0, dkD=Math.max(2.5, slotD+1.2);
   const dkMat=stdMat({color:0x222222,roughness:0.6});
-  const dock=new THREE.Mesh(new THREE.BoxGeometry(dkW,dkH,dkD),dkMat);
-  dock.position.set(0, topY+dkH/2, 0);
+  const dockShape=new THREE.Shape();
+  dockShape.moveTo(-dkW/2,-dkD/2);
+  dockShape.lineTo( dkW/2,-dkD/2);
+  dockShape.lineTo( dkW/2, dkD/2);
+  dockShape.lineTo(-dkW/2, dkD/2);
+  dockShape.lineTo(-dkW/2,-dkD/2);
+  const slotHole=new THREE.Path();
+  slotHole.moveTo(-slotW/2,-slotD/2);
+  slotHole.lineTo( slotW/2,-slotD/2);
+  slotHole.lineTo( slotW/2, slotD/2);
+  slotHole.lineTo(-slotW/2, slotD/2);
+  slotHole.lineTo(-slotW/2,-slotD/2);
+  dockShape.holes.push(slotHole);
+  const dockGeo=new THREE.ExtrudeGeometry(dockShape, {depth:dkH, bevelEnabled:false, steps:1, curveSegments:1});
+  // ExtrudeGeometry extrudes along +Z from 0 to dkH. Rotate so that
+  // extrusion direction becomes +Y (world up) and the shape (currently
+  // in XY) lies in the XZ plane.
+  dockGeo.rotateX(-Math.PI/2);
+  const dock=new THREE.Mesh(dockGeo, dkMat);
+  dock.position.set(0, topY, 0);
   switchGroup.add(dock);
+  // Solid floor inside the slot so you don't see through the dock.
+  const dockFloor=new THREE.Mesh(new THREE.BoxGeometry(slotW, 0.1, slotD), dkMat);
+  dockFloor.position.set(0, topY+0.05, 0);
+  switchGroup.add(dockFloor);
 
   // Nintendo Switch 2 console in dock — the black tablet body is ONLY
   // the screen bezel; it sits between the two Joy-Cons (not behind
