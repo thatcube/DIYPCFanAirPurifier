@@ -7039,47 +7039,42 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
     const worldZ=bedZ+6;        // just past the bed's center toward the foot
     root.position.set(-rawX, bedTopY-localBB.min.y, worldZ);
     root.rotation.y=Math.PI;    // face toward the foot of the bed (player)
-    // Tag every mesh as clickable and pick the display mesh.
+    // Tag every mesh as clickable.
     root.traverse(o=>{
       if(!o.isMesh) return;
       o.castShadow=true;
       o.receiveShadow=true;
       o._isMacbook=true;
       o._macbookRoot=root;
-      const name=String(o.name||'').toLowerCase();
-      const matName=String((o.material && o.material.name)||'').toLowerCase();
-      if(!_macbookScreen && (
-          name.includes('screen')||name.includes('display')||name.includes('lcd')||
-          name.includes('panel')||matName.includes('screen')||matName.includes('display'))){
-        _macbookScreen=o;
+    });
+    // Find the screen mesh: look for the thinnest, largest-area mesh in
+    // the upper half of the laptop's local bbox. Compare using LOCAL
+    // geometry bounds (not world-rotated), so the lid-plane detection
+    // is reliable regardless of how root is oriented.
+    const halfY=localBB.min.y + localSize.y*0.5;
+    let bestScreen=null, bestArea=0;
+    const _dbg=[];
+    root.traverse(o=>{
+      if(!o.isMesh || !o.geometry) return;
+      o.geometry.computeBoundingBox();
+      const gb=o.geometry.boundingBox;
+      if(!gb) return;
+      // Transform geometry bbox into root's local space (accounts for
+      // any per-mesh transforms inside the GLB).
+      const wb=new THREE.Box3().copy(gb).applyMatrix4(o.matrixWorld).applyMatrix4(new THREE.Matrix4().copy(root.matrixWorld).invert());
+      const ws=wb.getSize(new THREE.Vector3());
+      const thin=Math.min(ws.x,ws.y,ws.z);
+      const dims=[ws.x,ws.y,ws.z].sort((a,b)=>a-b);
+      const area=dims[1]*dims[2]; // area of the two longer sides
+      _dbg.push({name:o.name, thin:thin.toFixed(2), area:area.toFixed(1), maxY:wb.max.y.toFixed(1), halfY:halfY.toFixed(1)});
+      // Screen criteria: sits mostly in upper half AND is thin AND large.
+      if(wb.max.y>halfY && thin<Math.max(0.8, localSize.y*0.08) && area>bestArea){
+        bestArea=area; bestScreen=o;
       }
     });
-    // Build our own screen billboard overlay. We attach TWO planes back-to-back
-    // (facing +Z and -Z in local space) above the body, so no matter which
-    // way the lid faces in the GLB, the logo is always visible from the
-    // player's approach. Sized generously based on the lid's local bbox.
-    const lidW=Math.max(localSize.x, localSize.z)*0.78;
-    const lidH=Math.max(localSize.x, localSize.z)*0.52;
-    const planeGeo=new THREE.PlaneGeometry(lidW, lidH);
-    const planeMat=new THREE.MeshBasicMaterial({
-      map:_macbookLogoTex,
-      color:0xffffff,
-      toneMapped:false,
-      transparent:true,
-      depthWrite:false,
-      side:THREE.DoubleSide
-    });
-    const screenPlane=new THREE.Mesh(planeGeo, planeMat);
-    screenPlane._isMacbook=true;
-    screenPlane._macbookRoot=root;
-    screenPlane.visible=false;
-    // Hover the billboard just above the laptop, centered over it.
-    const hoverY=localBB.max.y + lidH*0.55;
-    screenPlane.position.set(0, hoverY, 0);
-    // Make it billboard toward the camera each frame.
-    screenPlane._isBillboard=true;
-    root.add(screenPlane);
-    _macbookScreen=screenPlane;
+    console.log('[macbook] mesh survey:', _dbg);
+    _macbookScreen=bestScreen;
+    console.log('[macbook] picked screen mesh:', bestScreen && bestScreen.name, bestScreen);
     _macbookGroup.add(root);
     _macbookRoot=root;
     // Collision AABB from the final world-space bounding box.
@@ -7097,27 +7092,18 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
 }
 function _setMacbookScreenOn(on){
   _macbookOn=!!on;
-  if(_macbookScreen) _macbookScreen.visible=_macbookOn;
-  // Glow the laptop body too so the change reads even if the billboard
-  // happens to be occluded.
-  if(_macbookRoot){
-    _macbookRoot.traverse(o=>{
-      if(!o.isMesh || !o.material || o===_macbookScreen) return;
-      const m=o.material;
-      if(m.emissive===undefined) return;
-      if(_macbookOn){
-        if(o.userData._savedEmissive===undefined){
-          o.userData._savedEmissive=m.emissive.clone();
-          o.userData._savedEmissiveIntensity=m.emissiveIntensity||0;
-        }
-        m.emissive.setHex(0x3a5cff);
-        m.emissiveIntensity=0.35;
-      } else if(o.userData._savedEmissive!==undefined){
-        m.emissive.copy(o.userData._savedEmissive);
-        m.emissiveIntensity=o.userData._savedEmissiveIntensity||0;
-      }
+  const mesh=_macbookScreen;
+  if(!mesh) return;
+  if(!mesh.userData._origMat){
+    mesh.userData._origMat=mesh.material;
+    mesh.userData._litMat=new THREE.MeshBasicMaterial({
+      map:_macbookLogoTex,
+      color:0xffffff,
+      toneMapped:false,
+      side:THREE.DoubleSide
     });
   }
+  mesh.material=_macbookOn?mesh.userData._litMat:mesh.userData._origMat;
   _markShadowsDirty && _markShadowsDirty();
 }
 function _triggerMacbookClick(){
@@ -7251,13 +7237,6 @@ function animate(ts){
 
   // Play Mode collectibles — spin, bob, and check for pickup.
   _updateCoins(ts,animFrameScale);
-
-  // Billboard the MacBook screen toward the camera when lit.
-  if(_macbookScreen && _macbookScreen.visible){
-    const camWorld=new THREE.Vector3();
-    camera.getWorldPosition(camWorld);
-    _macbookScreen.lookAt(camWorld);
-  }
 
   // Rainbow RGB cycling — smooth gradient flowing across all fans. The
   // hue drift is slow (~0.06 rev/sec) so we don't need 60 Hz updates;
