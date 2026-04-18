@@ -6,6 +6,7 @@ const SCHEMA_STATEMENTS = [
     at_ms INTEGER NOT NULL,
     cat_color TEXT NOT NULL DEFAULT 'ginger',
     cat_hair TEXT NOT NULL DEFAULT 'short',
+    cat_model TEXT NOT NULL DEFAULT 'classic',
     player_id TEXT NOT NULL DEFAULT ''
   )`,
   `CREATE INDEX IF NOT EXISTS idx_lb_time ON leaderboard_entries(time_ms ASC, at_ms ASC)`,
@@ -130,6 +131,9 @@ async function ensureLeaderboardAppearanceColumns(db) {
   }
   if (!existing.has('cat_hair')) {
     alters.push(db.prepare(`ALTER TABLE leaderboard_entries ADD COLUMN cat_hair TEXT NOT NULL DEFAULT 'short'`).bind());
+  }
+  if (!existing.has('cat_model')) {
+    alters.push(db.prepare(`ALTER TABLE leaderboard_entries ADD COLUMN cat_model TEXT NOT NULL DEFAULT 'classic'`).bind());
   }
   if (!existing.has('player_id')) {
     alters.push(db.prepare(`ALTER TABLE leaderboard_entries ADD COLUMN player_id TEXT NOT NULL DEFAULT ''`).bind());
@@ -270,6 +274,7 @@ async function handleRunFinish(request, env, cfg) {
   const name = sanitizeName(body?.name || '', cfg.MAX_NAME_LEN);
   const catColor = sanitizeCatColor(body?.catColor);
   const catHair = sanitizeCatHair(body?.catHair);
+  const catModel = sanitizeCatModel(body?.catModel);
   const playerId = sanitizePlayerId(body?.playerId);
   if (!runId) return apiError(400, 'bad_request', 'runId is required');
 
@@ -302,7 +307,7 @@ async function handleRunFinish(request, env, cfg) {
   const entryId = await makeEntryId(finalName, Math.floor(elapsed), now);
 
   await env.LB_DB.prepare(
-    `INSERT INTO leaderboard_entries (id, name, time_ms, at_ms, cat_color, cat_hair, player_id) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO leaderboard_entries (id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     entryId,
     finalName,
@@ -310,6 +315,7 @@ async function handleRunFinish(request, env, cfg) {
     now,
     catColor,
     catHair,
+    catModel,
     playerId
   ).run();
 
@@ -326,6 +332,7 @@ async function handleRunFinish(request, env, cfg) {
     at: now,
     catColor,
     catHair,
+    catModel,
     playerId,
   };
 
@@ -427,7 +434,7 @@ async function getNormalizedLeaderboard(db, cfg) {
   const scanLimit = Math.max(cfg.LB_MAX * cfg.LB_PER_PLAYER * 6, 200);
   const rows = await db
     .prepare(
-      `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, player_id
+      `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id
        FROM leaderboard_entries ORDER BY time_ms ASC, at_ms ASC LIMIT ?`
     )
     .bind(scanLimit)
@@ -471,8 +478,9 @@ function normalizeLeaderboard(rows, maxEntries, perPlayer) {
     const safeAt = Number.isFinite(at) && at > 0 ? at : Date.now();
     const catColor = sanitizeCatColor(row.cat_color ?? row.catColor);
     const catHair = sanitizeCatHair(row.cat_hair ?? row.catHair);
+    const catModel = sanitizeCatModel(row.cat_model ?? row.catModel);
     const playerId = sanitizePlayerId(row.player_id ?? row.playerId);
-    clean.push({ id, name, timeMs, at: safeAt, catColor, catHair, playerId });
+    clean.push({ id, name, timeMs, at: safeAt, catColor, catHair, catModel, playerId });
   }
 
   clean.sort((a, b) => a.timeMs - b.timeMs || a.at - b.at);
@@ -532,6 +540,11 @@ function sanitizeCatColor(value) {
 function sanitizeCatHair(value) {
   const key = String(value || '').trim().toLowerCase();
   return key === 'long' || key === 'short' ? key : 'short';
+}
+
+function sanitizeCatModel(value) {
+  const key = String(value || '').trim().toLowerCase();
+  return key === 'classic' || key === 'toon' || key === 'bababooey' ? key : 'classic';
 }
 
 function sanitizePlayerId(value) {

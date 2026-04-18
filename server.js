@@ -42,6 +42,19 @@ function sanitizePlayerId(id) {
   return String(id || '').trim().replace(/[^0-9a-fA-F-]/g, '').slice(0, 64);
 }
 
+function sanitizeCatModel(value) {
+  const key = String(value || '').trim().toLowerCase();
+  return key === 'classic' || key === 'toon' || key === 'bababooey' ? key : 'classic';
+}
+function sanitizeCatColor(value) {
+  const key = String(value || '').trim().toLowerCase();
+  return key === 'ginger' || key === 'tuxedo' || key === 'cream' || key === 'midnight' ? key : 'ginger';
+}
+function sanitizeCatHair(value) {
+  const key = String(value || '').trim().toLowerCase();
+  return key === 'long' || key === 'short' ? key : 'short';
+}
+
 function makeEntryId(name, timeMs, at) {
   return crypto
     .createHash('sha1')
@@ -64,7 +77,10 @@ function normalizeLeaderboard(rows) {
       ? row.id.trim().slice(0, 64)
       : makeEntryId(name, timeMs, safeAt);
     const playerId = sanitizePlayerId(row.playerId);
-    clean.push({ id, name, timeMs, at: safeAt, playerId });
+    const catColor = sanitizeCatColor(row.catColor);
+    const catHair = sanitizeCatHair(row.catHair);
+    const catModel = sanitizeCatModel(row.catModel);
+    clean.push({ id, name, timeMs, at: safeAt, catColor, catHair, catModel, playerId });
   }
   clean.sort((a, b) => a.timeMs - b.timeMs || a.at - b.at);
 
@@ -262,6 +278,9 @@ app.post('/api/run/finish', (req, res) => {
   const runId = String(req.body?.runId || '');
   const name = sanitizeName(req.body?.name || '');
   const playerId = sanitizePlayerId(req.body?.playerId || '');
+  const catColor = sanitizeCatColor(req.body?.catColor || '');
+  const catHair = sanitizeCatHair(req.body?.catHair || '');
+  const catModel = sanitizeCatModel(req.body?.catModel || '');
   if (!runId) return apiError(res, 400, 'bad_request', 'runId is required');
 
   const run = activeRuns.get(runId);
@@ -292,6 +311,9 @@ app.post('/api/run/finish', (req, res) => {
     name: name || 'Player',
     timeMs: Math.floor(elapsed),
     at: now,
+    catColor,
+    catHair,
+    catModel,
     playerId,
   };
 
