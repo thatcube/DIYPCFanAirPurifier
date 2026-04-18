@@ -6493,7 +6493,10 @@ const wallHeight=80;
 // walk-in feels like a real walk-in. Because the interior can extend past
 // the rightWall's Z span, we add extra wall panels on the main wall plane
 // (x=sideWallX) to close off the gap.
-const _closetW=48, _closetH=80, _closetDepth=36, _closetInteriorW=78;
+// _closetH is the door *opening* height (and matches the bifold door height).
+// The walk-in interior still uses the full room wallHeight for its ceiling,
+// so _closetInteriorH is kept separate.
+const _closetW=48, _closetH=66, _closetInteriorH=wallHeight, _closetDepth=36, _closetInteriorW=78;
 const _closetZ=oppWallZ+_closetW/2+4;
 const rightWall=(()=>{
   // Build the wall as an extruded rectangle with a rectangular hole at the
@@ -6639,9 +6642,10 @@ const sideBaseboard2=roomBox(0.6, 3, (-15 + wallDepth/2) - (_closetZ+_closetW/2)
   // Moulding / trim around the opening
   const trimMat=new THREE.MeshStandardMaterial({color:0xe4ddd1,roughness:0.7,metalness:0.0});
   const trimW=2.5, trimD=1;
+  const headerH=4; // taller top casing for a proper door-header look
   // Top header
-  const trimTop=new THREE.Mesh(new THREE.BoxGeometry(trimD, trimW, closetW+trimW*2), trimMat);
-  trimTop.position.set(closetX-trimD/2, floorY+closetH+trimW/2, closetZ);
+  const trimTop=new THREE.Mesh(new THREE.BoxGeometry(trimD, headerH, closetW+trimW*2), trimMat);
+  trimTop.position.set(closetX-trimD/2, floorY+closetH+headerH/2, closetZ);
   trimTop.castShadow=true; trimTop.receiveShadow=true; trimTop._isRoom=true; scene.add(trimTop);
   // Left jamb
   const trimL=new THREE.Mesh(new THREE.BoxGeometry(trimD, closetH, trimW), trimMat);
@@ -6659,36 +6663,46 @@ const sideBaseboard2=roomBox(0.6, 3, (-15 + wallDepth/2) - (_closetZ+_closetW/2)
   // (avoiding z-fighting where they cross the solid part of the wall).
   const closetDepth=_closetDepth;
   const interiorW=_closetInteriorW;
+  const interiorH=_closetInteriorH; // full room-height interior, independent of door opening
   const wallBack=0.5; // rightWall thickness
   const innerDepth=closetDepth-wallBack;
   const innerCx=sideWallX+wallBack+innerDepth/2;
   const insideMat=new THREE.MeshStandardMaterial({color:0xe4dcce,roughness:0.85,metalness:0.0});
   // Back wall
-  const closetBack=new THREE.Mesh(new THREE.BoxGeometry(0.5, closetH, interiorW), insideMat);
-  closetBack.position.set(sideWallX+closetDepth, floorY+closetH/2, closetZ);
+  const closetBack=new THREE.Mesh(new THREE.BoxGeometry(0.5, interiorH, interiorW), insideMat);
+  closetBack.position.set(sideWallX+closetDepth, floorY+interiorH/2, closetZ);
   closetBack.castShadow=false; closetBack.receiveShadow=true; closetBack._isRoom=true; scene.add(closetBack);
   // +Z side wall
-  const closetSideP=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, closetH, 0.5), insideMat);
-  closetSideP.position.set(innerCx, floorY+closetH/2, closetZ+interiorW/2);
+  const closetSideP=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, interiorH, 0.5), insideMat);
+  closetSideP.position.set(innerCx, floorY+interiorH/2, closetZ+interiorW/2);
   closetSideP.receiveShadow=true; closetSideP._isRoom=true; scene.add(closetSideP);
   // -Z side wall
-  const closetSideN=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, closetH, 0.5), insideMat);
-  closetSideN.position.set(innerCx, floorY+closetH/2, closetZ-interiorW/2);
+  const closetSideN=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, interiorH, 0.5), insideMat);
+  closetSideN.position.set(innerCx, floorY+interiorH/2, closetZ-interiorW/2);
   closetSideN.receiveShadow=true; closetSideN._isRoom=true; scene.add(closetSideN);
   // Ceiling
   const closetCeil=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, 0.5, interiorW), insideMat);
-  closetCeil.position.set(innerCx, floorY+closetH, closetZ);
+  closetCeil.position.set(innerCx, floorY+interiorH, closetZ);
   closetCeil.receiveShadow=true; closetCeil._isRoom=true; scene.add(closetCeil);
+  // Header panel: closes off the gap between the door opening top and the
+  // interior ceiling so you don't see daylight above the doors from inside
+  // the closet. Spans the door-opening width only.
+  if(interiorH>closetH){
+    const headerH=interiorH-closetH;
+    const header=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, headerH, closetW), insideMat);
+    header.position.set(innerCx, floorY+closetH+headerH/2, closetZ);
+    header.receiveShadow=true; header._isRoom=true; scene.add(header);
+  }
   // Clothes rod across the closet, ~14" below the ceiling
   const rodMat=new THREE.MeshStandardMaterial({color:0xb8b8b8,roughness:0.35,metalness:0.6});
   const rod=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,interiorW-2,14), rodMat);
   rod.rotation.x=Math.PI/2;
-  rod.position.set(innerCx, floorY+closetH-14, closetZ);
+  rod.position.set(innerCx, floorY+interiorH-14, closetZ);
   rod.castShadow=true; rod._isRoom=true; scene.add(rod);
   // Shelf above the rod
   const shelfMat=new THREE.MeshStandardMaterial({color:0xdcd2c0,roughness:0.75,metalness:0.0});
   const shelf=new THREE.Mesh(new THREE.BoxGeometry(innerDepth-2, 0.8, interiorW-1), shelfMat);
-  shelf.position.set(innerCx, floorY+closetH-10, closetZ);
+  shelf.position.set(innerCx, floorY+interiorH-10, closetZ);
   shelf.castShadow=true; shelf.receiveShadow=true; shelf._isRoom=true; scene.add(shelf);
 }
 
@@ -7249,11 +7263,19 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
     const final=new THREE.Box3().setFromObject(root);
     if(detached) root.add(_macbookScreen);
     if(_macbookScreen && savedVis!==null) _macbookScreen.visible=savedVis;
+    // Expand the computed bbox slightly so the player (cat) reliably
+    // bonks into the laptop instead of clipping through — the GLB's tight
+    // bbox can be smaller than the visible silhouette. Also force a
+    // minimum height of ~2" so a closed 14" MBP (~0.6" thick) can't be
+    // stood on trivially but still reads as a solid obstacle.
+    const pad=1.0;
+    const minTopBoost=Math.max(0, (final.min.y + 2.0) - final.max.y);
     _fpBoxesBase.push({
-      xMin:final.min.x, xMax:final.max.x,
-      zMin:final.min.z, zMax:final.max.z,
-      yTop:final.max.y, yBottom:final.min.y,
-      room:true
+      xMin:final.min.x-pad, xMax:final.max.x+pad,
+      zMin:final.min.z-pad, zMax:final.max.z+pad,
+      yTop:final.max.y+minTopBoost, yBottom:final.min.y,
+      room:true,
+      _macbook:true
     });
   }, undefined, err=>{
     console.warn('MacBook GLB failed to load:', err);
