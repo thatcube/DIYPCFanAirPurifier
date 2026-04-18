@@ -7052,9 +7052,40 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
     // parented to the laptop root, positioned at the lid's front face.
     // Use localSize (post-scale world bbox) so the plane lands at a
     // reasonable inch-scale size. Aspect ratio ~16:10 (real MBP).
-    const screenW=localSize.x*0.82;
-    const screenH=screenW*0.625;
-    const planeGeo=new THREE.PlaneGeometry(screenW, screenH);
+    //
+    // === TWEAK THESE TO RESIZE / ROUND THE SCREEN ===
+    const screenW=localSize.x*0.82;   // width  — bigger = wider
+    const screenH=screenW*0.625;      // height — bigger = taller (0.625 = 16:10)
+    const cornerR=screenH*0.08;       // corner radius — bigger = rounder
+    // =================================================
+    // Build a rounded-rect shape centered on origin.
+    const rrShape=(()=>{
+      const s=new THREE.Shape();
+      const w=screenW, h=screenH, r=Math.min(cornerR, w/2, h/2);
+      const x=-w/2, y=-h/2;
+      s.moveTo(x+r, y);
+      s.lineTo(x+w-r, y);
+      s.quadraticCurveTo(x+w, y, x+w, y+r);
+      s.lineTo(x+w, y+h-r);
+      s.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+      s.lineTo(x+r, y+h);
+      s.quadraticCurveTo(x, y+h, x, y+h-r);
+      s.lineTo(x, y+r);
+      s.quadraticCurveTo(x, y, x+r, y);
+      return s;
+    })();
+    const planeGeo=new THREE.ShapeGeometry(rrShape, 12);
+    // Remap UVs to [0,1] across the bbox so the logo texture fills the
+    // rounded rect correctly (default ShapeGeometry UVs use raw XY).
+    {
+      const pos=planeGeo.attributes.position;
+      const uv=planeGeo.attributes.uv;
+      for(let i=0;i<pos.count;i++){
+        const x=pos.getX(i), y=pos.getY(i);
+        uv.setXY(i, (x+screenW/2)/screenW, (y+screenH/2)/screenH);
+      }
+      uv.needsUpdate=true;
+    }
     const planeMat=new THREE.MeshBasicMaterial({
       map:_macbookLogoTex,
       color:0xffffff,
@@ -7075,8 +7106,8 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
     // (player-facing after root.rotation.y=Math.PI) — the other side has
     // the Apple logo.
     const cx=(localBB.min.x+localBB.max.x)*0.5 * invScale;
-    const lidY=(localBB.min.y + localSize.y*0.72) * invScale;
-    const frontZ=(localBB.min.z - 0.2) * invScale; // slightly in front of lid
+    const lidY=(localBB.min.y + localSize.y*0.6) * invScale;
+    const frontZ=(localBB.min.z - -0.2) * invScale; // slightly in front of lid
     screenPlane.position.set(cx, lidY, frontZ);
     // Flip so the plane's front face (and correctly-oriented texture) is
     // visible from the player side of the lid, not the Apple-logo side.
