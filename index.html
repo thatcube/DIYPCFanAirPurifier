@@ -7262,7 +7262,77 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
 function _setMacbookScreenOn(on){
   _macbookOn=!!on;
   if(_macbookScreen) _macbookScreen.visible=_macbookOn;
+  if(_macbookOn) _startMacbookMusic(); else _stopMacbookMusic();
   _markShadowsDirty && _markShadowsDirty();
+}
+
+// ─── MacBook music (fun chiptune loop) ─────────────────────────────
+// When the laptop turns on we schedule a short, looping bass+lead
+// pattern using WebAudio oscillators. Schedules ~2 bars ahead so the
+// loop stays tight; a setTimeout re-schedules as the playhead advances.
+// Stopping tears down the scheduler and ramps the master gain down.
+let _mbMusicTimer=null;
+let _mbMusicGain=null;
+let _mbMusicStart=0;
+let _mbMusicStep=0;
+const _MB_BPM=120;
+const _MB_STEP=60/_MB_BPM/2; // 8th-note grid
+// Happy major-key groove (C major): bass roots + lead melody, 16 steps.
+const _MB_BASS=[48,48,55,48, 53,53,60,53, 50,50,57,50, 55,55,50,47]; // MIDI
+const _MB_LEAD=[72,76,79,76, 77,81,84,81, 74,77,81,77, 79,76,72,71];
+function _mtof(m){ return 440*Math.pow(2,(m-69)/12); }
+function _scheduleMacbookBeat(ac, t, midi, type, dur, gain){
+  const o=ac.createOscillator(), g=ac.createGain();
+  o.type=type; o.frequency.value=_mtof(midi);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain, t+0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.connect(g).connect(_mbMusicGain);
+  o.start(t); o.stop(t+dur+0.02);
+}
+function _startMacbookMusic(){
+  try{
+    const ac=_coinAC||(window.AudioContext||window.webkitAudioContext) && new (window.AudioContext||window.webkitAudioContext)();
+    if(!ac) return;
+    _coinAC=ac;
+    if(ac.state==='suspended' && ac.resume) ac.resume();
+    // Already playing — don't stack.
+    if(_mbMusicTimer) return;
+    _mbMusicGain=ac.createGain();
+    _mbMusicGain.gain.value=0;
+    _mbMusicGain.gain.linearRampToValueAtTime(0.18, ac.currentTime+0.08);
+    _mbMusicGain.connect(ac.destination);
+    _mbMusicStart=ac.currentTime+0.05;
+    _mbMusicStep=0;
+    const tick=()=>{
+      if(!_mbMusicGain) return;
+      // Schedule ~8 steps ahead so we always have buffered audio.
+      const now=ac.currentTime;
+      const aheadSteps=8;
+      while(_mbMusicStart + _mbMusicStep*_MB_STEP < now + aheadSteps*_MB_STEP){
+        const stepIdx=_mbMusicStep % _MB_BASS.length;
+        const t=_mbMusicStart + _mbMusicStep*_MB_STEP;
+        _scheduleMacbookBeat(ac, t, _MB_BASS[stepIdx]-12, 'triangle', _MB_STEP*1.6, 0.45);
+        _scheduleMacbookBeat(ac, t, _MB_LEAD[stepIdx],    'square',   _MB_STEP*0.9, 0.18);
+        _mbMusicStep++;
+      }
+      _mbMusicTimer=setTimeout(tick, _MB_STEP*1000*2);
+    };
+    tick();
+  }catch(e){ console.warn('[macbook] music start failed', e); }
+}
+function _stopMacbookMusic(){
+  if(_mbMusicTimer){ clearTimeout(_mbMusicTimer); _mbMusicTimer=null; }
+  if(_mbMusicGain && _coinAC){
+    const g=_mbMusicGain, ac=_coinAC;
+    try{
+      g.gain.cancelScheduledValues(ac.currentTime);
+      g.gain.setValueAtTime(g.gain.value, ac.currentTime);
+      g.gain.linearRampToValueAtTime(0, ac.currentTime+0.12);
+      setTimeout(()=>{ try{ g.disconnect(); }catch(_){} }, 200);
+    }catch(_){}
+  }
+  _mbMusicGain=null;
 }
 function _triggerMacbookClick(){
   console.log('[macbook] click fired. screen=', _macbookScreen, 'on=', _macbookOn);
