@@ -6684,15 +6684,6 @@ const sideBaseboard2=roomBox(0.6, 3, (-15 + wallDepth/2) - (_closetZ+_closetW/2)
   const closetCeil=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, 0.5, interiorW), insideMat);
   closetCeil.position.set(innerCx, floorY+interiorH, closetZ);
   closetCeil.receiveShadow=true; closetCeil._isRoom=true; scene.add(closetCeil);
-  // Header panel: closes off the gap between the door opening top and the
-  // interior ceiling so you don't see daylight above the doors from inside
-  // the closet. Spans the door-opening width only.
-  if(interiorH>closetH){
-    const headerH=interiorH-closetH;
-    const header=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, headerH, closetW), insideMat);
-    header.position.set(innerCx, floorY+closetH+headerH/2, closetZ);
-    header.receiveShadow=true; header._isRoom=true; scene.add(header);
-  }
   // Clothes rod across the closet, ~14" below the ceiling
   const rodMat=new THREE.MeshStandardMaterial({color:0xb8b8b8,roughness:0.35,metalness:0.6});
   const rod=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,interiorW-2,14), rodMat);
