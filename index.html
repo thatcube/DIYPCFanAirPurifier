@@ -8220,12 +8220,20 @@ function _setFpCamMode(mode){
 }
 
 // Run timer + leaderboard (shared API with local fallback).
-const _LB_STORE_KEY='diy_air_purifier_leaderboard_v1';
+// TEST MODE: flip _TEST_MODE to true to (a) spawn only the Switch-stack coin
+// for fast loops and (b) isolate the leaderboard from the real shared one.
+// When on, scores are stored under a *separate* localStorage key and the
+// shared API is bypassed, so the production leaderboard is untouched and
+// reappears the moment _TEST_MODE is flipped back to false.
+const _TEST_MODE=true;
+const _LB_STORE_KEY=_TEST_MODE
+  ? 'diy_air_purifier_leaderboard_TEST_v1'
+  : 'diy_air_purifier_leaderboard_v1';
 const _LB_PLAYER_KEY='diy_air_purifier_player_name_v1';
 const _LB_MAX=25;
 const _LB_PER_PLAYER=3;
 const _LB_API_BASE=''; // same-origin API
-const _LB_SHARED_ENABLED=true;
+const _LB_SHARED_ENABLED=!_TEST_MODE;
 // Temporary testing toggle: clear saved player identity so completion asks again.
 const _LB_CLEAR_SAVED_NAME_ON_LOAD=false;
 if(_LB_CLEAR_SAVED_NAME_ON_LOAD){
@@ -9174,8 +9182,9 @@ scene.add(_coinGroup);
 const _coins=[];
 const _coinPickR=3.5;
 // Quick test mode: keep only the Switch game-stack coin so full runs are fast.
-// Set to false to restore all coin placements.
-const _coinQuickTestMode=false;
+// Driven by the global _TEST_MODE flag so one toggle controls both the coin
+// layout and the isolated-leaderboard behavior.
+const _coinQuickTestMode=(typeof _TEST_MODE!=='undefined')?!!_TEST_MODE:false;
 let _coinScore=0;
 let _coinTotal=0;
 function _makeCoin(){
