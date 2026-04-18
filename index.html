@@ -8071,8 +8071,9 @@ _finishDialogStyle.textContent=`
   #finishDialogList li.own{background:rgba(255,216,115,0.16);border-color:rgba(255,216,115,0.45);box-shadow:0 0 0 1px rgba(255,216,115,0.14)}
   #finishDialogList li .rk{opacity:0.66;font-variant-numeric:tabular-nums}
   #finishDialogList li .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #finishDialogList li .catBadge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:0.3px;padding:2px 7px 2px 5px;border-radius:999px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#cdd7e5;white-space:nowrap}
-  #finishDialogList li .catBadge .catIcon{display:inline-flex;align-items:center;line-height:0;filter:drop-shadow(0 1px 0 rgba(0,0,0,0.35))}
+  #finishDialogList li .catBadge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:0.3px;padding:2px 8px 2px 6px;border-radius:999px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#cdd7e5;white-space:nowrap}
+  #finishDialogList li .catBadge .catEmoji{font-size:13px;line-height:1;filter:drop-shadow(0 1px 0 rgba(0,0,0,0.35))}
+  #finishDialogList li .catBadge .catDot{width:8px;height:8px;border-radius:50%;border:1px solid rgba(0,0,0,0.45);box-shadow:0 0 0 1px rgba(255,255,255,0.12);flex-shrink:0}
   #finishDialogList li.own .catBadge{background:rgba(255,216,115,0.1);border-color:rgba(255,216,115,0.3);color:#ffeab2}
   #finishDialogList li .tm{font-variant-numeric:tabular-nums;font-weight:700;color:#9fe3ff}
   #finishDialogList li.own .tm{color:#ffd873}
@@ -8427,39 +8428,29 @@ function _fmtRun(ms){
   const z=total%1000;
   return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(z).padStart(3,'0')}`;
 }
-// Inline SVG icons for each cat model. All three use the same construction:
-// 24×24 viewBox, solid fill via currentColor (tinted with the run's coat
-// color), with tiny dark eye dots for personality. Kept filled (not
-// outline) so they read clearly at 11px on the HUD leaderboard.
-const _CAT_MODEL_ICONS={
-  // Classic: rounded tabby head with two tall triangular ears.
-  classic:'<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M5.2 3.1c-.5-.2-1 .2-1 .7L4.6 9a8.4 7 0 0 0-1.1 3.5C3.5 16.6 7.3 20 12 20s8.5-3.4 8.5-7.5c0-1.3-.4-2.5-1.1-3.5l.4-5.2c0-.5-.5-.9-1-.7L16 5.5a9.5 7.5 0 0 0-8 0L5.2 3.1Z"/><circle cx="9" cy="12.5" r="1" fill="#0b1320"/><circle cx="15" cy="12.5" r="1" fill="#0b1320"/><path d="M10.6 15.3c.4.4 2.4.4 2.8 0" stroke="#0b1320" stroke-width="0.8" fill="none" stroke-linecap="round"/></svg>',
-  // Toon: blocky stylized head — same silhouette footprint but squarer
-  // ears and a wider muzzle, with square pupils.
-  toon:'<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M3.8 4c-.3-.3-.8-.1-.8.3L3.4 9c-.6 1-.9 2.2-.9 3.4 0 4.2 3.8 7.6 8.5 7.6h2c4.7 0 8.5-3.4 8.5-7.6 0-1.2-.3-2.4-.9-3.4l.4-4.7c0-.4-.5-.6-.8-.3L17 6.3a9 7 0 0 0-10 0L3.8 4Z"/><rect x="7.8" y="11.2" width="2.2" height="2.2" rx="0.4" fill="#0b1320"/><rect x="14" y="11.2" width="2.2" height="2.2" rx="0.4" fill="#0b1320"/><path d="M10 16.2h4" stroke="#0b1320" stroke-width="0.9" fill="none" stroke-linecap="round"/></svg>',
-  // Bababooey: squirrel profile — head + pointy ears + big curled tail
-  // arcing up behind the body. Shape is deliberately read-at-a-glance
-  // even at 11px: big round head on the left, tall tail on the right.
-  bababooey:'<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M19 4.5c-.4-.3-.9 0-.9.4l.1 2.1a5.6 4.8 0 0 0-5.7-2.2c-3 .3-5.3 2.7-5.4 5.6-.8.1-1.5.5-2 1-1.4 1.3-1.5 3.5-.3 4.9-.6.5-1 1.3-1 2.1 0 1.5 1.2 2.8 2.7 2.8h6.1c2.2 0 4.2-.9 5.6-2.4 1-1.1 1.7-2.4 1.9-3.9 1.1-.7 1.8-2 1.8-3.4 0-1.2-.5-2.2-1.3-3 .6-.5 1-1.3 1-2.1 0-.6-.2-1.2-.6-1.7L19 4.5Z"/><path d="M19.5 5.2c.9-.4 2-.2 2.7.5-.4.9-1.3 1.5-2.3 1.5" fill="currentColor"/><circle cx="10.5" cy="11.8" r="1.05" fill="#0b1320"/><circle cx="14" cy="10.8" r="1.05" fill="#0b1320"/><ellipse cx="12.2" cy="13.4" rx="0.7" ry="0.5" fill="#0b1320"/><path d="M6 10c-.8-1.2-.7-2.8.3-3.9.5 1.1.5 2.4 0 3.5" fill="currentColor"/></svg>'
-};
+// Native emoji per cat model. Emoji render as polished full-color glyphs
+// (Apple Color Emoji on macOS, Segoe UI Emoji on Windows, Noto on Linux)
+// so they look great at any size. Downside: we can't tint them, so the
+// coat color is communicated via a separate colored dot in the badge.
+const _CAT_MODEL_EMOJI={classic:'🐱',toon:'😼',bababooey:'🐿️'};
 const _CAT_MODEL_LABELS_SHORT={classic:'Classic',toon:'Toon',bababooey:'Bababooey'};
 function _catColorHex(key){
   const p=_catColorPresets && _catColorPresets[String(key||'').toLowerCase()];
   if(!p) return '#9aa4b4';
   return '#'+(p.coat>>>0).toString(16).padStart(6,'0');
 }
-// Returns an HTML snippet showing the cat model icon tinted with the cat's
-// coat color, plus a short label. Used in leaderboard rows so you can tell
-// who's using which cat/color at a glance.
+// Returns an HTML snippet: [emoji] [color dot] [label]. Used in leaderboard
+// rows so you can tell the model + color at a glance. Bababooey has baked
+// colors, so it skips the color dot.
 function _catBadgeHtml(entry){
   const model=String((entry && entry.catModel)||'classic').toLowerCase();
-  const icon=_CAT_MODEL_ICONS[model]||_CAT_MODEL_ICONS.classic;
+  const emoji=_CAT_MODEL_EMOJI[model]||_CAT_MODEL_EMOJI.classic;
   const label=_CAT_MODEL_LABELS_SHORT[model]||'Cat';
-  // Bababooey has baked-in colors so the per-entry color is meaningless —
-  // use a neutral tint so it doesn't imply a coat swatch the run didn't have.
   const colorable=(model!=='bababooey');
-  const hex=colorable?_catColorHex(entry && entry.catColor):'#c9a57a';
-  return `<span class="catBadge" title="${label}${colorable?(' · '+(entry && entry.catColor||'ginger')):''}"><span class="catIcon" style="color:${hex}">${icon}</span><span class="catLabel">${label}</span></span>`;
+  const colorKey=entry && entry.catColor||'ginger';
+  const dot=colorable?`<span class="catDot" style="background:${_catColorHex(colorKey)}"></span>`:'';
+  const title=colorable?`${label} · ${colorKey}`:label;
+  return `<span class="catBadge" title="${_escapeHtml(title)}"><span class="catEmoji">${emoji}</span>${dot}<span class="catLabel">${label}</span></span>`;
 }
 function _makeEntryId(name,timeMs,at){
   const base=`${_sanitizePlayerName(name)||'Player'}|${Math.floor(Number(timeMs)||0)}|${Math.floor(Number(at)||Date.now())}`;
@@ -8810,10 +8801,15 @@ function _renderLeaderboard(){
   } else {
     list.innerHTML=_leaderboard.map((r,i)=>{
       const own=r.name===_lbPlayerName;
+      const model=(r.catModel||'classic').toLowerCase();
+      const emoji=_CAT_MODEL_EMOJI[model]||_CAT_MODEL_EMOJI.classic;
+      const label=_CAT_MODEL_LABELS_SHORT[model]||'Cat';
+      const colorable=(model!=='bababooey');
+      const dot=colorable?`<span style="width:7px;height:7px;border-radius:50%;background:${_catColorHex(r.catColor)};border:1px solid rgba(0,0,0,0.45);box-shadow:0 0 0 1px rgba(255,255,255,0.12)"></span>`:'';
       return `<li style="display:grid;grid-template-columns:26px 1fr auto auto;gap:6px;align-items:center;padding:3px 6px;border-radius:8px;${own?'background:rgba(255,216,115,0.14);border:1px solid rgba(255,216,115,0.3);':'background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);'}">
         <span style="opacity:0.68">#${i+1}</span>
         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_escapeHtml(r.name)}</span>
-        <span class="catBadge" style="display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:0.25px;padding:1px 6px 1px 4px;border-radius:999px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#cdd7e5;white-space:nowrap" title="${_escapeHtml((_CAT_MODEL_LABELS_SHORT[(r.catModel||'classic').toLowerCase()]||'Cat'))}"><span style="display:inline-flex;line-height:0;color:${(r.catModel||'').toLowerCase()==='bababooey'?'#c9a57a':_catColorHex(r.catColor)}">${(_CAT_MODEL_ICONS[(r.catModel||'classic').toLowerCase()]||_CAT_MODEL_ICONS.classic).replace('width="14" height="14"','width="11" height="11"')}</span><span>${_CAT_MODEL_LABELS_SHORT[(r.catModel||'classic').toLowerCase()]||'Cat'}</span></span>
+        <span style="display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:0.25px;padding:1px 7px 1px 5px;border-radius:999px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#cdd7e5;white-space:nowrap" title="${_escapeHtml(colorable?label+' · '+(r.catColor||'ginger'):label)}"><span style="font-size:11px;line-height:1">${emoji}</span>${dot}<span>${label}</span></span>
         <span style="font-variant-numeric:tabular-nums;font-weight:700;color:${own?'#ffd873':'#9fe3ff'}">${_fmtRun(r.timeMs)}</span>
       </li>`;
     }).join('');
