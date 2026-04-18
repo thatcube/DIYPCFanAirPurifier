@@ -4885,22 +4885,54 @@ origins.console=consoleProps.position.clone();
   switchGroup.add(scr);
   // Joy-Con 2 controllers — iconic blue (left) + red (right) with sticks
   // and button clusters. They sit attached to the ends of the tablet. The
-  // tablet width (swW) already includes their footprint, so we overlay
-  // them on the outer ~1.4" of each side and push them slightly forward
-  // so the thumbsticks/buttons are visible.
+  // outer-top and outer-bottom corners are rounded (like the real
+  // hardware); the inner side stays square where it meets the rail.
   const jcW=1.4, jcH=swH*0.95, jcD=swD+0.55;
   const jcYBase=topY+dkH+swH*0.35;
   const jcColors={left:0x1f6feb, right:0xe53935};
+  // Build a rounded-side shape. outerDir=+1 rounds the +X side (right
+  // controller), outerDir=-1 rounds the -X side (left controller). The
+  // opposite side stays square where it meets the rail.
+  const makeJoyConGeo=(outerDir)=>{
+    const s=new THREE.Shape();
+    const w=jcW, h=jcH, r=Math.min(w*0.38, h*0.18);
+    if(outerDir>0){
+      // Rounded on +X (right)
+      s.moveTo(0,-h/2);
+      s.lineTo(w-r,-h/2);
+      s.quadraticCurveTo(w,-h/2, w,-h/2+r);
+      s.lineTo(w,h/2-r);
+      s.quadraticCurveTo(w,h/2, w-r,h/2);
+      s.lineTo(0,h/2);
+      s.lineTo(0,-h/2);
+    } else {
+      // Rounded on -X (left); square edge at x=0 on the inner (+X) side
+      s.moveTo(0,-h/2);
+      s.lineTo(0,h/2);
+      s.lineTo(-w+r,h/2);
+      s.quadraticCurveTo(-w,h/2, -w,h/2-r);
+      s.lineTo(-w,-h/2+r);
+      s.quadraticCurveTo(-w,-h/2, -w+r,-h/2);
+      s.lineTo(0,-h/2);
+    }
+    return new THREE.ExtrudeGeometry(s, {depth:jcD, bevelEnabled:false, steps:1, curveSegments:8});
+  };
   for(const side of [-1,1]){
     const key=side<0 ? 'left' : 'right';
     const jcBodyMat=stdMat({color:jcColors[key], roughness:0.55, metalness:0.05});
-    const jc=new THREE.Mesh(new THREE.BoxGeometry(jcW, jcH, jcD),jcBodyMat);
-    jc.position.set(side*(swW/2-jcW/2), jcYBase, 0);
+    const geo=makeJoyConGeo(side);
+    // Center the extruded depth (it's built along +Z from 0 to jcD).
+    geo.translate(0, 0, -jcD/2);
+    const jc=new THREE.Mesh(geo, jcBodyMat);
+    // Push Joy-Cons outward slightly in Z so their face sits in front of
+    // the tablet screen plane (prevents the buttons/stick from clipping
+    // through the screen's blue rectangle).
+    jc.position.set(side*(swW/2-jcW), jcYBase, 0.12);
     switchGroup.add(jc);
     // Analog stick — raised cap on a post.
     const stickMat=stdMat({color:0x111111, roughness:0.4});
     const stickPost=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.28,0.22,16), stickMat);
-    stickPost.position.set(side*(swW/2-jcW/2), jcYBase + (side<0 ? jcH*0.22 : -jcH*0.22), jcD/2+0.12);
+    stickPost.position.set(side*(swW/2-jcW/2), jcYBase + (side<0 ? jcH*0.22 : -jcH*0.22), jcD/2+0.24);
     stickPost.rotation.x=Math.PI/2;
     switchGroup.add(stickPost);
     const stickCap=new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.26,0.08,16), stickMat);
@@ -4908,29 +4940,27 @@ origins.console=consoleProps.position.clone();
     stickCap.position.z+=0.13;
     stickCap.rotation.x=Math.PI/2;
     switchGroup.add(stickCap);
-    // Button cluster (4 small circles). Left side = D-pad style dark
-    // squares; right side = A/B/X/Y circles. Both rendered as small
-    // disks facing the player.
+    // Button cluster (4 small circles).
     const btnMat=stdMat({color:0x0f0f0f, roughness:0.5});
     const clusterY=jcYBase + (side<0 ? -jcH*0.22 : jcH*0.22);
     const clusterX=side*(swW/2-jcW/2);
     const btnOffsets=[[0,0.32],[0,-0.32],[-0.32,0],[0.32,0]];
     for(const [ox,oy] of btnOffsets){
       const btn=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.05,14), btnMat);
-      btn.position.set(clusterX+ox, clusterY+oy, jcD/2+0.04);
+      btn.position.set(clusterX+ox, clusterY+oy, jcD/2+0.16);
       btn.rotation.x=Math.PI/2;
       switchGroup.add(btn);
     }
     // Plus/minus pill near top-inner of each joycon.
     const symMat=stdMat({color:0x222222, roughness:0.5});
     const sym=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.28,0.04), symMat);
-    sym.position.set(clusterX - side*0.35, jcYBase + (side<0 ? -jcH*0.05 : jcH*0.05), jcD/2+0.03);
+    sym.position.set(clusterX - side*0.35, jcYBase + (side<0 ? -jcH*0.05 : jcH*0.05), jcD/2+0.15);
     switchGroup.add(sym);
     // Inner rail — thin light-gray strip where the joycon meets the
     // tablet, echoing the real hardware.
     const railMat=stdMat({color:0xd6d6d6, roughness:0.4, metalness:0.4});
     const rail=new THREE.Mesh(new THREE.BoxGeometry(0.08, jcH*0.92, jcD*0.6), railMat);
-    rail.position.set(side*(swW/2-jcW+0.04), jcYBase, 0);
+    rail.position.set(side*(swW/2-jcW+0.04), jcYBase, 0.12);
     switchGroup.add(rail);
   }
   consoleProps.add(switchGroup);
