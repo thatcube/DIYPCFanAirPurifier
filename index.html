@@ -7076,10 +7076,11 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
     // the Apple logo.
     const cx=(localBB.min.x+localBB.max.x)*0.5 * invScale;
     const lidY=(localBB.min.y + localSize.y*0.72) * invScale;
-    const frontZ=(localBB.max.z + 0.2) * invScale; // front face of lid
+    const frontZ=(localBB.min.z - 0.2) * invScale; // slightly in front of lid
     screenPlane.position.set(cx, lidY, frontZ);
-    // Face +Z in root-local (no rotation). After root.rotation.y=Math.PI,
-    // this ends up facing the player.
+    // Flip so the plane's front face (and correctly-oriented texture) is
+    // visible from the player side of the lid, not the Apple-logo side.
+    screenPlane.rotation.y=Math.PI;
     root.add(screenPlane);
     _macbookScreen=screenPlane;
     console.log('[macbook] screen plane pos=', screenPlane.position, 'scale=', screenPlane.scale, 'size=', screenW, screenH);
