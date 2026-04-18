@@ -3844,7 +3844,7 @@ let _hoverCheckTimer=0;
 function getInteractiveTarget(obj){
   let p=obj;
   while(p){
-    if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf) return p;
+    if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isMacbook) return p;
     p=p.parent;
   }
   return null;
@@ -4138,6 +4138,11 @@ function handleClickObject(obj){
     const openAng=80*Math.PI/180;
     leaf._leafTarget=leaf._leafOpen ? openAng : 0;
     _bifoldLerps.push({leaf});
+    return;
+  }
+  // Clicked the MacBook → toggle screen + spawn secret coin on first click.
+  if(obj._isMacbook){
+    if(typeof _triggerMacbookClick==='function') _triggerMacbookClick();
     return;
   }
 }
@@ -6984,6 +6989,122 @@ scene.traverse(obj=>{
   }
 });
 
+// ─── Scummit MacBook on the bed (secret coin spawner) ───
+// Loads assets/macbook.glb and positions it on the mattress near the window
+// edge, headboard side. Clicking the laptop turns its screen on (Scummit
+// Discord server logo) and spawns a bonus coin the first time. The group
+// tracks placementOffset so the laptop stays pinned to the bed when the
+// purifier/room is repositioned.
+const _macbookGroup=new THREE.Group();
+// Tag as a room object so applyRoomDelta() shifts it whenever the user
+// nudges the purifier placement (same system that moves the bed/TV/etc).
+// Note: the X-mirror traverse above has already run, so this flag won't
+// cause a redundant second mirror.
+_macbookGroup._isRoom=true;
+scene.add(_macbookGroup);
+let _macbookRoot=null;
+let _macbookScreen=null;
+let _macbookOn=false;
+let _macbookCoinSpawned=false;
+// Scummit Discord server icon, hosted locally (not hotlinked) in assets/.
+// Animated webp is decoded as a single still frame by THREE.TextureLoader,
+// which is fine for a tiny laptop screen.
+const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp', t=>{
+  try{ t.colorSpace=THREE.SRGBColorSpace||t.colorSpace; }catch(e){}
+  try{ t.encoding=THREE.sRGBEncoding; }catch(e){}
+  t.anisotropy=Math.min(4, renderer.capabilities.getMaxAnisotropy());
+  t.needsUpdate=true;
+});
+{
+  const macbookLoader=new THREE.GLTFLoader();
+  macbookLoader.load('assets/macbook.glb', gltf=>{
+    const root=gltf.scene;
+    // Normalize to ~14" along the longest horizontal dimension (a real
+    // 14" MacBook Pro is ~12.3"W × 8.7"D closed).
+    const preBB=new THREE.Box3().setFromObject(root);
+    const preSize=preBB.getSize(new THREE.Vector3());
+    const longest=Math.max(preSize.x, preSize.z);
+    if(longest>0) root.scale.setScalar(14/longest);
+    root.updateMatrixWorld(true);
+    const bb=new THREE.Box3().setFromObject(root);
+    // Land on top of the duvet. Position uses world (post-mirror) coords
+    // directly since we add it after the X-mirror traverse.
+    const bedTopY=mattY+mattH/2+duvetH;
+    const rawX=bedX-mattW/2+12; // 12" in from window-edge of mattress
+    const worldZ=bedZ+6;        // just past the bed's center toward the foot
+    root.position.set(-rawX, bedTopY-bb.min.y, worldZ);
+    root.rotation.y=Math.PI;    // face toward the foot of the bed (player)
+    // Tag every mesh as clickable and pick the display mesh.
+    root.traverse(o=>{
+      if(!o.isMesh) return;
+      o.castShadow=true;
+      o.receiveShadow=true;
+      o._isMacbook=true;
+      o._macbookRoot=root;
+      const name=String(o.name||'').toLowerCase();
+      if(!_macbookScreen && (name.includes('screen')||name.includes('display')||name.includes('lcd')||name.includes('panel'))){
+        _macbookScreen=o;
+      }
+    });
+    // Fallback: thinnest large mesh in the upper half of the model.
+    if(!_macbookScreen){
+      const midY=bb.min.y+(bb.max.y-bb.min.y)*0.5;
+      let bestArea=0;
+      root.traverse(o=>{
+        if(!o.isMesh) return;
+        const mb=new THREE.Box3().setFromObject(o);
+        const ms=mb.getSize(new THREE.Vector3());
+        const thin=Math.min(ms.x,ms.y,ms.z);
+        const flat=Math.max(ms.x*ms.y, ms.x*ms.z, ms.y*ms.z);
+        if(mb.max.y>midY && thin<0.6 && flat>bestArea){ bestArea=flat; _macbookScreen=o; }
+      });
+    }
+    _macbookGroup.add(root);
+    _macbookRoot=root;
+    // Collision AABB from the final world-space bounding box.
+    root.updateMatrixWorld(true);
+    const final=new THREE.Box3().setFromObject(root);
+    _fpBoxesBase.push({
+      xMin:final.min.x, xMax:final.max.x,
+      zMin:final.min.z, zMax:final.max.z,
+      yTop:final.max.y, yBottom:final.min.y,
+      room:true
+    });
+  }, undefined, err=>{
+    console.warn('MacBook GLB failed to load:', err);
+  });
+}
+function _setMacbookScreenOn(on){
+  _macbookOn=!!on;
+  const mesh=_macbookScreen;
+  if(!mesh) return;
+  if(!mesh.userData._origMat){
+    mesh.userData._origMat=mesh.material;
+    mesh.userData._litMat=new THREE.MeshBasicMaterial({
+      map:_macbookLogoTex,
+      toneMapped:false,
+      side:(mesh.material && mesh.material.side)||THREE.FrontSide
+    });
+  }
+  mesh.material=_macbookOn?mesh.userData._litMat:mesh.userData._origMat;
+}
+function _triggerMacbookClick(){
+  _setMacbookScreenOn(!_macbookOn);
+  if(!_macbookCoinSpawned && _macbookRoot){
+    _macbookCoinSpawned=true;
+    // Coin floats ~9" above the laptop. _coinGroup already tracks
+    // placementOffset (`_coinGroup.position = -placementOffset`), so we
+    // convert world→local before adding.
+    const worldPos=new THREE.Vector3();
+    _macbookRoot.getWorldPosition(worldPos);
+    const local=worldPos.clone().sub(_coinGroup.position);
+    local.y+=9;
+    _addCoin(_coinGroup, local, {secret:true});
+    // Refresh visibility so the new coin shows immediately in Play Mode.
+    if(typeof _setCoinsVisible==='function') _setCoinsVisible(_coinGroup.visible);
+  }
+}
+
 // Collect all room meshes for proximity fading
 const fadingWalls=[];
 scene.traverse(obj=>{
@@ -9387,7 +9508,7 @@ const _coinCamTmp=new THREE.Vector3();
 const _coinQuickTestMode=(typeof _TEST_MODE!=='undefined')?!!_TEST_MODE:false;
 let _coinScore=0;
 let _coinTotal=0;
-function _makeCoin(){
+function _makeCoin(opts){
   // Shared geometry + material across all coins — much cheaper than 10 unique
   // meshes with their own PointLights (which were forcing shader recompiles
   // and per-pixel cost on every lit surface in the scene).
@@ -9404,17 +9525,30 @@ function _makeCoin(){
       metalness:0.85
     });
   }
-  const m=new THREE.Mesh(_coinGeo, _coinMat);
+  // Secret coins are blue; they use a separate shared material so the gold
+  // coins stay on the hot instancing path.
+  if(opts && opts.secret && !_coinSecretMat){
+    _coinSecretMat=new THREE.MeshStandardMaterial({
+      color:0x4ab8ff,
+      emissive:0x1e88e5,
+      emissiveIntensity:1.4,
+      roughness:0.25,
+      metalness:0.85
+    });
+  }
+  const mat=(opts && opts.secret)?_coinSecretMat:_coinMat;
+  const m=new THREE.Mesh(_coinGeo, mat);
   m.castShadow=false;
   m.receiveShadow=false;
   return m;
 }
-let _coinGeo=null, _coinMat=null;
+let _coinGeo=null, _coinMat=null, _coinSecretMat=null;
 // Coin placements. Most are scene-relative (shift with placementOffset).
 // One rides inside the purifier (child of purifierGroup) so it travels with it.
 function _addCoin(parent, localPos, opts){
-  const coin=_makeCoin();
-  const coinId=(opts&&opts.id) || `coin_${_coinTotal+1}`;
+  const coin=_makeCoin(opts);
+  const secret=!!(opts && opts.secret);
+  const coinId=(opts&&opts.id) || (secret?`secret_${(_coins.filter(c=>c.secret).length)+1}`:`coin_${_coinTotal+1}`);
   coin.position.copy(localPos);
   // Coins should never appear outside Play Mode.
   coin.visible=false;
@@ -9429,9 +9563,13 @@ function _addCoin(parent, localPos, opts){
     collected:false,
     insidePurifier:!!(opts&&opts.insidePurifier),
     inDrawer:!!(opts&&opts.inDrawer),
-    consoleProp:!!(opts&&opts.consoleProp)
+    consoleProp:!!(opts&&opts.consoleProp),
+    secret
   });
-  _coinTotal++;
+  // Secret coins are intentionally excluded from _coinTotal so the HUD
+  // counter (and the finish-dialog total) only reflects the "official"
+  // coins players are meant to find.
+  if(!secret) _coinTotal++;
 }
 {
   if(_coinQuickTestMode){
@@ -9537,13 +9675,18 @@ function _updateCoins(ts,frameScale){
     if(d2<=_coinPickR*_coinPickR){
       c.collected=true;
       c.mesh.visible=false;
-      _coinScore++;
-      _reportSharedCoin(c.id);
-      const el=document.getElementById('coinCount');
-      if(el){
-        el.textContent=_coinScore+' / '+_coinTotal;
-        el.classList.add('pop');
-        setTimeout(()=>el.classList.remove('pop'), 350);
+      // Secret coins exist outside the main objective: they don't count
+      // toward the score or the "X / Y" HUD, and we skip the shared-coin
+      // report so they stay invisible to any server-side tallying.
+      if(!c.secret){
+        _coinScore++;
+        _reportSharedCoin(c.id);
+        const el=document.getElementById('coinCount');
+        if(el){
+          el.textContent=_coinScore+' / '+_coinTotal;
+          el.classList.add('pop');
+          setTimeout(()=>el.classList.remove('pop'), 350);
+        }
       }
       // Brief celebratory beep via WebAudio.
       try{
