@@ -8076,23 +8076,25 @@ _finishDialogStyle.textContent=`
   #finishDialogList li.own .catBadge{background:rgba(255,216,115,0.1);border-color:rgba(255,216,115,0.3);color:#ffeab2}
   #finishDialogList li .tm{font-variant-numeric:tabular-nums;font-weight:700;color:#9fe3ff}
   #finishDialogList li.own .tm{color:#ffd873}
-  #finishDialogCustomize{padding:10px 16px 4px;border-top:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;gap:8px}
-  #finishDialogCustomize .header{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  #finishDialogCustomize h4{margin:0;font-size:11px;font-weight:800;letter-spacing:0.9px;color:#9fe3ff}
-  #finishDialogCustomize .toggle{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);color:#dde4ef;border-radius:999px;padding:4px 10px;font-size:10.5px;font-weight:700;letter-spacing:0.4px;cursor:pointer}
-  #finishDialogCustomize .toggle:hover{background:rgba(255,255,255,0.14)}
-  #finishDialogCustomize .toggle .chev{display:inline-block;margin-left:5px;transition:transform 0.15s}
-  #finishDialogCustomize.open .toggle .chev{transform:rotate(180deg)}
-  #finishDialogCustomize .body{display:none;flex-direction:column;gap:6px}
-  #finishDialogCustomize.open .body{display:flex}
-  #finishDialogCustomize .row{display:flex;flex-wrap:wrap;gap:6px}
-  #finishDialogCustomize .rowLabel{font-size:9.5px;font-weight:800;letter-spacing:0.8px;color:#7fa2c2;margin-top:2px}
-  .finishColorBtn,.finishHairBtn,.finishModelBtn{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:#dde4ef;font-size:11px;font-weight:700;letter-spacing:0.3px;cursor:pointer}
+  /* Two-page dialog: results page vs cat-picker page. */
+  #finishDialogCard [data-page]{display:none;flex-direction:column;min-height:0}
+  #finishDialogCard.page-results [data-page="results"]{display:flex;flex:1;min-height:0}
+  #finishDialogCard.page-cat [data-page="cat"]{display:flex;flex:1;min-height:0}
+  #finishDialogBackBtn{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);color:#dde4ef;border-radius:999px;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;cursor:pointer;padding:0;line-height:1}
+  #finishDialogBackBtn:hover{background:rgba(255,255,255,0.16)}
+  #finishDialogCatHeader{padding:14px 18px 10px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between;gap:10px}
+  #finishDialogCatTitle{font-size:13px;font-weight:800;letter-spacing:1.1px;color:#9fe3ff;margin:0}
+  #finishDialogCatBody{padding:14px 18px 6px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:10px}
+  #finishDialogCatBody .rowLabel{font-size:10px;font-weight:800;letter-spacing:0.9px;color:#7fa2c2;margin:4px 0 2px}
+  #finishDialogCatBody .row{display:flex;flex-wrap:wrap;gap:7px}
+  #finishDialogChangeCat{background:rgba(159,227,255,0.12);border:1px solid rgba(159,227,255,0.38);color:#c9ecff;border-radius:999px;padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:0.4px;cursor:pointer}
+  #finishDialogChangeCat:hover{background:rgba(159,227,255,0.2)}
+  .finishColorBtn,.finishHairBtn,.finishModelBtn{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:#dde4ef;font-size:12px;font-weight:700;letter-spacing:0.3px;cursor:pointer}
   .finishColorBtn .dot{width:11px;height:11px;border-radius:50%;border:1px solid rgba(0,0,0,0.4)}
   .finishColorBtn.on,.finishHairBtn.on,.finishModelBtn.on{background:rgba(255,216,115,0.18);border-color:rgba(255,216,115,0.5);color:#ffe3a8}
   .finishColorBtn:hover,.finishHairBtn:hover,.finishModelBtn:hover{background:rgba(255,255,255,0.11)}
   .finishColorBtn[disabled],.finishHairBtn[disabled]{opacity:0.42;cursor:not-allowed}
-  #finishDialogActions{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px 14px;border-top:1px solid rgba(255,255,255,0.06);background:linear-gradient(0deg,rgba(0,0,0,0.22),transparent)}
+  .finishDialogActions{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px 14px;border-top:1px solid rgba(255,255,255,0.06);background:linear-gradient(0deg,rgba(0,0,0,0.22),transparent);flex-wrap:wrap}
   .finishDlgBtn{border:none;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:700;letter-spacing:0.3px;cursor:pointer;transition:transform 0.08s}
   .finishDlgBtn:active{transform:translateY(1px)}
   .finishDlgBtn.secondary{background:rgba(255,255,255,0.1);color:#e0e8f4}
@@ -8107,56 +8109,71 @@ document.head.appendChild(_finishDialogStyle);
 const _finishDialog=document.createElement('div');
 _finishDialog.id='finishDialogOverlay';
 _finishDialog.innerHTML=`
-  <div id="finishDialogCard" role="dialog" aria-modal="true" aria-labelledby="finishDialogEyebrow">
-    <div id="finishDialogHeader">
-      <div id="finishDialogEyebrow">
-        <span>RUN COMPLETE</span>
-        <span class="tag" id="finishDialogCoinBadge">0 / 0 coins</span>
+  <div id="finishDialogCard" class="page-results" role="dialog" aria-modal="true" aria-labelledby="finishDialogEyebrow">
+    <div data-page="results">
+      <div id="finishDialogHeader">
+        <div id="finishDialogEyebrow">
+          <span>RUN COMPLETE</span>
+          <span class="tag" id="finishDialogCoinBadge">0 / 0 coins</span>
+        </div>
+        <div id="finishDialogTime">00:00.000</div>
+        <div id="finishDialogSubline"><b id="finishDialogName">Player</b> · <span id="finishDialogRankText">Great run!</span></div>
+        <div id="finishDialogRank" style="display:none"></div>
       </div>
-      <div id="finishDialogTime">00:00.000</div>
-      <div id="finishDialogSubline"><b id="finishDialogName">Player</b> · <span id="finishDialogRankText">Great run!</span></div>
-      <div id="finishDialogRank" style="display:none"></div>
-    </div>
-    <div id="finishDialogBoard">
-      <h4>LEADERBOARD · TOP 25</h4>
-      <ol id="finishDialogList"></ol>
-    </div>
-    <div id="finishDialogCustomize">
-      <div class="header">
-        <h4>YOUR CAT</h4>
-        <button type="button" class="toggle" id="finishDialogCustomizeToggle">Change cat<span class="chev">▾</span></button>
+      <div id="finishDialogBoard">
+        <h4>LEADERBOARD · TOP 25</h4>
+        <ol id="finishDialogList"></ol>
       </div>
-      <div class="body">
-        <div class="rowLabel">Breed</div>
+      <div class="finishDialogActions">
+        <button type="button" class="finishDlgBtn danger" id="finishDialogExit">Exit</button>
+        <button type="button" id="finishDialogChangeCat">Change cat →</button>
+        <button type="button" class="finishDlgBtn secondary" id="finishDialogAgain">Play again</button>
+        <button type="button" class="finishDlgBtn primary" id="finishDialogCopy">Copy result</button>
+      </div>
+    </div>
+    <div data-page="cat">
+      <div id="finishDialogCatHeader">
+        <h4 id="finishDialogCatTitle">CUSTOMIZE YOUR CAT</h4>
+        <button type="button" id="finishDialogBackBtn" aria-label="Back to results" title="Back to results">←</button>
+      </div>
+      <div id="finishDialogCatBody">
+        <div class="rowLabel">BREED</div>
         <div class="row" id="finishDialogModels">
           <button type="button" class="finishModelBtn" data-model="classic">Classic</button>
           <button type="button" class="finishModelBtn" data-model="toon">Toon</button>
           <button type="button" class="finishModelBtn" data-model="bababooey">Bababooey</button>
         </div>
-        <div class="rowLabel">Color</div>
+        <div class="rowLabel">COLOR</div>
         <div class="row" id="finishDialogColors">
           <button type="button" class="finishColorBtn" data-color="ginger"><span class="dot" style="background:#c67f45"></span>Ginger</button>
           <button type="button" class="finishColorBtn" data-color="tuxedo"><span class="dot" style="background:#5f6772"></span>Tuxedo</button>
           <button type="button" class="finishColorBtn" data-color="cream"><span class="dot" style="background:#d7ccb1"></span>Cream</button>
           <button type="button" class="finishColorBtn" data-color="midnight"><span class="dot" style="background:#41495a"></span>Midnight</button>
         </div>
-        <div class="rowLabel">Hair</div>
+        <div class="rowLabel">HAIR</div>
         <div class="row" id="finishDialogHairs">
           <button type="button" class="finishHairBtn" data-hair="short">Short</button>
           <button type="button" class="finishHairBtn" data-hair="long">Long</button>
         </div>
       </div>
-    </div>
-    <div id="finishDialogActions">
-      <button type="button" class="finishDlgBtn danger" id="finishDialogExit">Exit</button>
-      <button type="button" class="finishDlgBtn secondary" id="finishDialogAgain">Play again</button>
-      <button type="button" class="finishDlgBtn primary" id="finishDialogCopy">Copy result</button>
+      <div class="finishDialogActions">
+        <button type="button" class="finishDlgBtn secondary" id="finishDialogCatBack">Back to leaderboard</button>
+        <button type="button" class="finishDlgBtn primary" id="finishDialogCatPlay">Play again</button>
+      </div>
     </div>
   </div>`;
 document.body.appendChild(_finishDialog);
 
 let _finishDialogOpen=false;
 let _finishDialogData=null;
+const _finishDialogCard=_finishDialog.querySelector('#finishDialogCard');
+function _setFinishDialogPage(page){
+  if(!_finishDialogCard) return;
+  const p=(page==='cat')?'cat':'results';
+  _finishDialogCard.classList.toggle('page-results',p==='results');
+  _finishDialogCard.classList.toggle('page-cat',p==='cat');
+  if(p==='cat') _syncFinishDialogCatButtons();
+}
 function _openFinishDialog(data){
   _finishDialogData=data||null;
   _finishDialogOpen=true;
@@ -8164,6 +8181,7 @@ function _openFinishDialog(data){
   _fpIgnorePointerUnlock=true;
   if(document.exitPointerLock && document.pointerLockElement) document.exitPointerLock();
   _clearPlayInputState();
+  _setFinishDialogPage('results');
   _renderFinishDialog();
   _finishDialog.style.display='flex';
 }
@@ -8239,6 +8257,9 @@ function _renderFinishDialog(){
 // Wire up buttons + ESC.
 function _syncFinishDialogCatButtons(){
   const colorable=(typeof _isColorableCatModelKey==='function')?_isColorableCatModelKey(_catModelKey):true;
+  document.querySelectorAll('#finishDialogModels .finishModelBtn').forEach(b=>{
+    b.classList.toggle('on', b.dataset.model===_catModelKey);
+  });
   document.querySelectorAll('#finishDialogColors .finishColorBtn').forEach(b=>{
     b.classList.toggle('on', b.dataset.color===_catColorKey);
     b.disabled=!colorable;
@@ -8250,6 +8271,14 @@ function _syncFinishDialogCatButtons(){
     b.style.opacity=colorable?'1':'0.45';
   });
 }
+document.querySelectorAll('#finishDialogModels .finishModelBtn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const k=btn.dataset.model;
+    if(!k) return;
+    setCatModelPreset(k);
+    _syncFinishDialogCatButtons();
+  });
+});
 document.querySelectorAll('#finishDialogColors .finishColorBtn').forEach(btn=>{
   btn.addEventListener('click',()=>{
     const k=btn.dataset.color;
@@ -8265,6 +8294,20 @@ document.querySelectorAll('#finishDialogHairs .finishHairBtn').forEach(btn=>{
     setCatHairPreset(k);
     _syncFinishDialogCatButtons();
   });
+});
+// Two-page navigation: results ↔ cat picker.
+document.getElementById('finishDialogChangeCat').addEventListener('click',()=>{
+  _setFinishDialogPage('cat');
+});
+document.getElementById('finishDialogBackBtn').addEventListener('click',()=>{
+  _setFinishDialogPage('results');
+});
+document.getElementById('finishDialogCatBack').addEventListener('click',()=>{
+  _setFinishDialogPage('results');
+});
+document.getElementById('finishDialogCatPlay').addEventListener('click',()=>{
+  _closeFinishDialog(true);
+  _resetFpRun();
 });
 document.getElementById('finishDialogCopy').addEventListener('click',async()=>{
   if(!_finishDialogData) return;
