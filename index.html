@@ -7434,25 +7434,34 @@ function animate(ts){
       const camDist=7.3;
       const camLift=2.2;
       const camShoulder=0.9;
-      let cxC=focal.x - lookDir.x*camDist + right.x*camShoulder;
-      let cyC=focal.y - lookDir.y*camDist + camLift;
-      let czC=focal.z - lookDir.z*camDist + right.z*camShoulder;
-      // Keep camera strictly inside the player's walking bounds with a 0.5"
-      // safety margin. This matches the same bounds collision uses.
+      // Full desired offset from focal to camera.
+      let dxC=-lookDir.x*camDist + right.x*camShoulder;
+      let dyC=-lookDir.y*camDist + camLift;
+      let dzC=-lookDir.z*camDist + right.z*camShoulder;
+      // Walls + ceiling/floor clamps as distances from the focal point. If
+      // any clamp is violated we scale the entire offset vector down by the
+      // tightest ratio — this pulls the camera closer along the same view
+      // line instead of sliding it forward/sideways, preserving the
+      // player's look angle (no more "look forward for a second" jerk when
+      // the cat gets near the ceiling).
       const bnd=_fpGetBounds();
       const m=0.5;
-      if(cxC<bnd.xMin+m) cxC=bnd.xMin+m;
-      else if(cxC>bnd.xMax-m) cxC=bnd.xMax-m;
-      if(czC<bnd.zMin+m) czC=bnd.zMin+m;
-      else if(czC>bnd.zMax-m) czC=bnd.zMax-m;
-      // Vertical clamp: keep the camera below the ceiling and above the
-      // floor so you don't see through the room from the outside when the
-      // cat is climbing (e.g. on top of the closet shelf). Ceiling is a
-      // flat plane at floorY+80; bias 3" inside each surface.
       const ceilY=(typeof ceiling!=='undefined' && ceiling)?ceiling.position.y:(floorY+80);
       const cyMin=floorY+3, cyMax=ceilY-3;
-      if(cyC<cyMin) cyC=cyMin;
-      else if(cyC>cyMax) cyC=cyMax;
+      const maxDX=(dxC>0?(bnd.xMax-m-focal.x):(focal.x-(bnd.xMin+m)));
+      const maxDY=(dyC>0?(cyMax-focal.y):(focal.y-cyMin));
+      const maxDZ=(dzC>0?(bnd.zMax-m-focal.z):(focal.z-(bnd.zMin+m)));
+      const absDX=Math.abs(dxC), absDY=Math.abs(dyC), absDZ=Math.abs(dzC);
+      let scale=1;
+      if(absDX>maxDX && absDX>1e-4) scale=Math.min(scale, Math.max(0,maxDX)/absDX);
+      if(absDY>maxDY && absDY>1e-4) scale=Math.min(scale, Math.max(0,maxDY)/absDY);
+      if(absDZ>maxDZ && absDZ>1e-4) scale=Math.min(scale, Math.max(0,maxDZ)/absDZ);
+      // Don't collapse all the way to the focal point — keep at least 18%
+      // of the intended distance so the cat is still visible.
+      scale=Math.max(scale, 0.18);
+      const cxC=focal.x + dxC*scale;
+      const cyC=focal.y + dyC*scale;
+      const czC=focal.z + dzC*scale;
       camera.position.set(cxC, cyC, czC);
       camera.lookAt(focal.x, focal.y, focal.z);
       if(catGroup.parent!==scene) scene.add(catGroup);
