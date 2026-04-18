@@ -7051,9 +7051,9 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
     // just the screen material. Instead, create a dedicated overlay plane
     // parented to the laptop root, positioned at the lid's front face.
     // Use localSize (post-scale world bbox) so the plane lands at a
-    // reasonable inch-scale size.
-    const screenW=localSize.x*0.86;
-    const screenH=localSize.y*0.42;
+    // reasonable inch-scale size. Aspect ratio ~16:10 (real MBP).
+    const screenW=localSize.x*0.82;
+    const screenH=screenW*0.625;
     const planeGeo=new THREE.PlaneGeometry(screenW, screenH);
     const planeMat=new THREE.MeshBasicMaterial({
       map:_macbookLogoTex,
@@ -7071,17 +7071,15 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
     // inches, so pre-divide by root's scale.
     const invScale=1/(root.scale.x||1);
     screenPlane.scale.setScalar(invScale);
-    // Position relative to root's origin (pre-position/rotation) in
-    // root-local coordinates. Upper Y = lid; +Z after root.rotation.y=PI
-    // ends up facing the player (toward -Z world).
+    // Position in root-local coords. Upper Y = lid; flip to the +Z side
+    // (player-facing after root.rotation.y=Math.PI) — the other side has
+    // the Apple logo.
     const cx=(localBB.min.x+localBB.max.x)*0.5 * invScale;
     const lidY=(localBB.min.y + localSize.y*0.72) * invScale;
-    const frontZ=(localBB.min.z - 0.2) * invScale; // slightly in front of lid
+    const frontZ=(localBB.max.z + 0.2) * invScale; // front face of lid
     screenPlane.position.set(cx, lidY, frontZ);
-    // Plane's front (+Z normal) needs to face -Z in root-local, because
-    // root gets rotated Math.PI around Y after this, making -Z local
-    // point toward the player.
-    screenPlane.rotation.y=Math.PI;
+    // Face +Z in root-local (no rotation). After root.rotation.y=Math.PI,
+    // this ends up facing the player.
     root.add(screenPlane);
     _macbookScreen=screenPlane;
     console.log('[macbook] screen plane pos=', screenPlane.position, 'scale=', screenPlane.scale, 'size=', screenW, screenH);
