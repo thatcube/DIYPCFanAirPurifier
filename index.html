@@ -8375,22 +8375,49 @@ function _fpGetBoxes(){
       out.room=false;
       _fpBoxesOut.push(out);
     } else {
-      // One leaf closed, one open — block only the closed half.
+      // Any leaf not fully closed: compute the world-space AABB of the leaf
+      // group (outer + inner panels in their current folded pose) and push
+      // it as a solid obstacle. This gives real collision for open/mid-
+      // swing doors so the cat can't walk through the folded panels.
+      const _bifoldBox=new THREE.Box3();
       for(let li=0;li<2;li++){
         const lf=_bifoldRef[li];
         if(!lf) continue;
         const closed=Math.abs(lf._leafAngle||0)<0.25 && !lf._leafOpen;
-        if(!closed) continue;
-        const side=lf._leafSide||(li===0?-1:1);
-        // leaf occupies half-opening from its pivot toward the center.
-        const zLo=side===-1?(_closetZ-_closetW/2):_closetZ;
-        const zHi=side===-1?_closetZ:(_closetZ+_closetW/2);
-        const out=_acquireBox();
-        out.xMin=-(sideWallX+0.5)-ox; out.xMax=-(sideWallX-1.5)-ox;
-        out.zMin=zLo-oz; out.zMax=zHi-oz;
-        out.yTop=(floorY+_closetH)-oy; out.yBottom=floorY-oy;
-        out.room=false;
-        _fpBoxesOut.push(out);
+        if(closed){
+          // Closed leaf: use the explicit in-plane slab (flush with wall),
+          // same as the both-closed case but for only half the opening.
+          const side=lf._leafSide||(li===0?-1:1);
+          const zLo=side===-1?(_closetZ-_closetW/2):_closetZ;
+          const zHi=side===-1?_closetZ:(_closetZ+_closetW/2);
+          const out=_acquireBox();
+          out.xMin=-(sideWallX+0.5)-ox; out.xMax=-(sideWallX-1.5)-ox;
+          out.zMin=zLo-oz; out.zMax=zHi-oz;
+          out.yTop=(floorY+_closetH)-oy; out.yBottom=floorY-oy;
+          out.room=false;
+          _fpBoxesOut.push(out);
+        } else {
+          // Open/folding leaf: derive from the actual mesh bbox. The leaf's
+          // world transform already accounts for the room X-mirror (leaves
+          // are _isRoom children and applyRoomDelta shifts them along with
+          // everything else), so the box is already in play-space.
+          lf.updateWorldMatrix(true, true);
+          _bifoldBox.setFromObject(lf);
+          if(!_bifoldBox.isEmpty()){
+            const out=_acquireBox();
+            // The leaves are room-scoped; their world positions include the
+            // current roomOffset. play-space coords subtract -roomOffset as
+            // usual (same convention as room:true base boxes above: we
+            // subtract ox/oy/oz which equal -roomOffset when room:true).
+            // Since the box is already at the live world position, don't
+            // subtract anything else — room:false path.
+            out.xMin=_bifoldBox.min.x; out.xMax=_bifoldBox.max.x;
+            out.zMin=_bifoldBox.min.z; out.zMax=_bifoldBox.max.z;
+            out.yTop=_bifoldBox.max.y; out.yBottom=_bifoldBox.min.y;
+            out.room=false;
+            _fpBoxesOut.push(out);
+          }
+        }
       }
     }
   }
