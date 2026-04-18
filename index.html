@@ -1568,6 +1568,9 @@ function _stepCatMixer(ts,moveSpeed){
     const runB=Number(st._bababooeyRunBlendSmoothed)||0;
     if(runB>0.001) _applyBababooeyProceduralRun(ts,sp,runB);
   }
+  // Click-to-nod: applied AFTER baked/procedural animations so it cleanly
+  // layers on top of whatever pose the cat is in (idle, walk, run, dance).
+  _applyCatHeadNod(ts);
   const loopAction=catIdleAction||catWalkAction;
   _applyLoopPauseToAction(loopAction,ts,loopPause,idleBlend>0.35 && sp<0.03);
   catMixer._lastTs=ts;
@@ -1802,6 +1805,35 @@ const _catIdleSpineBones=[];
 const _catIdleTmpEuler=new THREE.Euler(0,0,0,'XYZ');
 const _catIdleTmpQuat=new THREE.Quaternion();
 const _catIdleTmpQuatB=new THREE.Quaternion();
+// Click-to-nod: exaggerated bobblehead pitch layered on top of whatever
+// animation is currently playing. Triggered from mousedown in Play Mode.
+let _catNodStartTs=-1e9;
+const _CAT_NOD_DUR_MS=720;
+const _CAT_NOD_AMP=0.85; // peak pitch in radians (~49°)
+function _triggerCatNod(){
+  _catNodStartTs=(typeof performance!=='undefined'?performance.now():Date.now());
+}
+function _applyCatHeadNod(ts){
+  if(!_catIdleHeadBones.length) return;
+  const elapsed=ts-_catNodStartTs;
+  if(elapsed<0 || elapsed>_CAT_NOD_DUR_MS) return;
+  const t=elapsed/_CAT_NOD_DUR_MS; // 0..1
+  // ~2 damped nods. sin(t*2π*1.6) gives roughly 1.6 cycles; envelope
+  // (1-t)^1.4 lets the motion settle smoothly back to the current pose.
+  const env=Math.pow(1-t,1.4);
+  const nodPitch=Math.sin(t*Math.PI*2*1.6)*_CAT_NOD_AMP*env;
+  if(Math.abs(nodPitch)<0.0005) return;
+  for(let i=0;i<_catIdleHeadBones.length;i++){
+    const b=_catIdleHeadBones[i];
+    if(!b || !b.isBone) continue;
+    // Head bone gets the full nod; neck (second bone in the list) gets ~45%
+    // so the motion reads as a head tilt rather than the whole spine bending.
+    const scale=i===0?1:0.45;
+    _catIdleTmpEuler.set(nodPitch*scale,0,0);
+    _catIdleTmpQuat.setFromEuler(_catIdleTmpEuler);
+    b.quaternion.multiply(_catIdleTmpQuat);
+  }
+}
 // Bababooey-only procedural run rig. The GLB ships a single bouncy "dance"
 // clip and no separate walk/run, so we animate the paw/tail bones directly
 // when moving and fade the baked clip out while running.
@@ -3755,8 +3787,11 @@ window.addEventListener('mouseup',e=>{
 });
 window.addEventListener('mousedown',e=>{
   if(e.button!==0) return;
-  if(_fpMode && document.pointerLockElement && window._fpLookTarget){
-    handleClickObject(window._fpLookTarget);
+  if(_fpMode && document.pointerLockElement){
+    // Exaggerated head nod on every click, regardless of whether we hit an
+    // interactive target. Feels playful and confirms the click registered.
+    if(typeof _triggerCatNod==='function') _triggerCatNod();
+    if(window._fpLookTarget) handleClickObject(window._fpLookTarget);
   }
 });
 window.addEventListener('touchend',e=>{
@@ -8290,13 +8325,28 @@ const _LB_STORE_KEY=_TEST_MODE
   : 'diy_air_purifier_leaderboard_v1';
 const _LB_PLAYER_KEY='diy_air_purifier_player_name_v1';
 const _LB_MAX=25;
-const _LB_PER_PLAYER=3;
+// TEST MODE: allow up to 20 runs per player while looping fast test runs.
+// Production should stay tight (3) to keep the board diverse.
+const _LB_PER_PLAYER=_TEST_MODE?20:3;
 const _LB_API_BASE=''; // same-origin API
 const _LB_SHARED_ENABLED=!_TEST_MODE;
 // Temporary testing toggle: clear saved player identity so completion asks again.
 const _LB_CLEAR_SAVED_NAME_ON_LOAD=false;
 if(_LB_CLEAR_SAVED_NAME_ON_LOAD){
   try{ localStorage.removeItem(_LB_PLAYER_KEY); }catch(e){}
+}
+// One-shot wipe of the isolated TEST leaderboard. Fires once per browser
+// (guarded by a separate flag key) and only when _TEST_MODE is on, so the
+// production leaderboard key is never touched. Bump the version in the
+// guard key to force another wipe later.
+if(_TEST_MODE){
+  const wipeGuard='diy_air_purifier_test_lb_wiped_v1';
+  try{
+    if(!localStorage.getItem(wipeGuard)){
+      localStorage.removeItem(_LB_STORE_KEY);
+      localStorage.setItem(wipeGuard,'1');
+    }
+  }catch(e){}
 }
 let _runTimerStartMs=0;
 let _runTimerEndMs=0;
