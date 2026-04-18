@@ -7997,8 +7997,16 @@ function animate(ts){
       for(const h of _fpHits){
         if(h.distance>_fpInteractRange) break; // interaction range
         if(!isAncestorVisible(h.object)) continue;
+        // Skip the player's own body (only visible in 3rd-person cat cam)
+        // so the cat doesn't block its own interaction ray.
+        let _self=false;
+        for(let p=h.object; p; p=p.parent){ if(p===catGroup){ _self=true; break; } }
+        if(_self) continue;
         const target=getInteractiveTarget(h.object);
         if(target){ _fpHoverTarget=target; break; }
+        // Non-interactive visible solid in the line of sight: stop here
+        // so you can't click interactables through walls, doors, etc.
+        break;
       }
     }
     const _fpTarget=_fpHoverTarget;
