@@ -7440,6 +7440,12 @@ function animate(ts){
     } else {
       // Cat (third-person) camera.
       const focal=_fpLookTarget.set(_fpPos.x+fwd.x*0.6, _fpPos.y+0.7, _fpPos.z+fwd.z*0.6);
+      // Clamp focal to stay inside the room too — when the player jumps the
+      // eye can briefly poke above the ceiling, which would drag the camera
+      // with it. Pin the focal a few inches below the ceiling.
+      const ceilY0=(typeof ceiling!=='undefined' && ceiling)?ceiling.position.y:(floorY+80);
+      if(focal.y>ceilY0-3) focal.y=ceilY0-3;
+      if(focal.y<floorY+3) focal.y=floorY+3;
       const camDist=7.3;
       const camLift=2.2;
       const camShoulder=0.9;
@@ -7468,9 +7474,14 @@ function animate(ts){
       // Don't collapse all the way to the focal point — keep at least 18%
       // of the intended distance so the cat is still visible.
       scale=Math.max(scale, 0.18);
-      const cxC=focal.x + dxC*scale;
-      const cyC=focal.y + dyC*scale;
-      const czC=focal.z + dzC*scale;
+      let cxC=focal.x + dxC*scale;
+      let cyC=focal.y + dyC*scale;
+      let czC=focal.z + dzC*scale;
+      // Final hard Y clamp — the 0.18 minimum-scale above can still let the
+      // camera poke above the ceiling if the focal is very close to it.
+      // Clamp here wins regardless, so the camera never shows the outside.
+      if(cyC>cyMax) cyC=cyMax;
+      else if(cyC<cyMin) cyC=cyMin;
       camera.position.set(cxC, cyC, czC);
       camera.lookAt(focal.x, focal.y, focal.z);
       if(catGroup.parent!==scene) scene.add(catGroup);
