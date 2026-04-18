@@ -8099,11 +8099,11 @@ const _fpBoxesBase=[
   // opening (walk-through). Solid sections of rightWall outside the opening
   // are blocked by the two "right wall solid" AABBs below.
   // Back wall
-  {xMin:-(sideWallX+_closetDepth+0.25), xMax:-(sideWallX+_closetDepth-0.25), zMin:_closetZ-_closetInteriorW/2, zMax:_closetZ+_closetInteriorW/2, yTop:floorY+_closetH, room:true},
+  {xMin:-(sideWallX+_closetDepth+0.25), xMax:-(sideWallX+_closetDepth-0.25), zMin:_closetZ-_closetInteriorW/2, zMax:_closetZ+_closetInteriorW/2, yTop:floorY+_closetInteriorH, room:true},
   // +Z side wall
-  {xMin:-(sideWallX+_closetDepth), xMax:-(sideWallX+0.5), zMin:_closetZ+_closetInteriorW/2-0.25, zMax:_closetZ+_closetInteriorW/2+0.25, yTop:floorY+_closetH, room:true},
+  {xMin:-(sideWallX+_closetDepth), xMax:-(sideWallX+0.5), zMin:_closetZ+_closetInteriorW/2-0.25, zMax:_closetZ+_closetInteriorW/2+0.25, yTop:floorY+_closetInteriorH, room:true},
   // -Z side wall
-  {xMin:-(sideWallX+_closetDepth), xMax:-(sideWallX+0.5), zMin:_closetZ-_closetInteriorW/2-0.25, zMax:_closetZ-_closetInteriorW/2+0.25, yTop:floorY+_closetH, room:true},
+  {xMin:-(sideWallX+_closetDepth), xMax:-(sideWallX+0.5), zMin:_closetZ-_closetInteriorW/2-0.25, zMax:_closetZ-_closetInteriorW/2+0.25, yTop:floorY+_closetInteriorH, room:true},
   // Right wall — solid portions flanking the closet opening. Blocks the
   // player from walking through the main wall; the opening zMin.._closetZ-
   // _closetW/2.._closetZ+_closetW/2..49 is deliberately left clear.
@@ -8111,12 +8111,12 @@ const _fpBoxesBase=[
   {xMin:-(sideWallX+0.5), xMax:-sideWallX, zMin:_closetZ+_closetW/2, zMax:49, yTop:floorY+wallHeight, room:true},
   // Wings between the wall opening edges and the closet's wider side walls —
   // blocks squeezing sideways into the 15" pocket behind rightWall.
-  {xMin:-(sideWallX+0.5), xMax:-sideWallX, zMin:_closetZ+_closetW/2, zMax:_closetZ+_closetInteriorW/2, yTop:floorY+_closetH, room:true},
-  {xMin:-(sideWallX+0.5), xMax:-sideWallX, zMin:_closetZ-_closetInteriorW/2, zMax:_closetZ-_closetW/2, yTop:floorY+_closetH, room:true},
+  {xMin:-(sideWallX+0.5), xMax:-sideWallX, zMin:_closetZ+_closetW/2, zMax:_closetZ+_closetInteriorW/2, yTop:floorY+_closetInteriorH, room:true},
+  {xMin:-(sideWallX+0.5), xMax:-sideWallX, zMin:_closetZ-_closetInteriorW/2, zMax:_closetZ-_closetW/2, yTop:floorY+_closetInteriorH, room:true},
   // Closet shelf — standable surface ~10" below the ceiling, spans inner
-  // depth and interior width (minus small margins). Top at floorY+_closetH-
-  // 10+0.4, bottom at floorY+_closetH-10-0.4. X range covers the shelf body.
-  {xMin:-(sideWallX+0.5+(_closetDepth-0.5)-1), xMax:-(sideWallX+0.5+1), zMin:_closetZ-_closetInteriorW/2+0.5, zMax:_closetZ+_closetInteriorW/2-0.5, yTop:floorY+_closetH-10+0.4, yBottom:floorY+_closetH-10-0.4, room:true},
+  // depth and interior width (minus small margins). Top at floorY+_closetInteriorH-
+  // 10+0.4, bottom at floorY+_closetInteriorH-10-0.4. X range covers the shelf body.
+  {xMin:-(sideWallX+0.5+(_closetDepth-0.5)-1), xMax:-(sideWallX+0.5+1), zMin:_closetZ-_closetInteriorW/2+0.5, zMax:_closetZ+_closetInteriorW/2-0.5, yTop:floorY+_closetInteriorH-10+0.4, yBottom:floorY+_closetInteriorH-10-0.4, room:true},
   // Opposite (front/TV) wall — explicit collision. Previously relied on the
   // global bounds clamp, but we loosened that to allow walking into the
   // closet interior (which extends past oppWallZ along Z, entirely at
@@ -9919,8 +9919,8 @@ function _addCoin(parent, localPos, opts){
     _addCoin(_coinGroup, new THREE.Vector3(35, floorY+3, 20)); // near closet
     // On the closet shelf — inside the walk-in, sitting on top of the shelf.
     // Shelf world pos after X-mirror: x=-(sideWallX+0.5+(_closetDepth-0.5)/2),
-    // y=floorY+_closetH-10, z=_closetZ. Coin sits ~2.5" above shelf top.
-    _addCoin(_coinGroup, new THREE.Vector3(-(sideWallX+0.5+(_closetDepth-0.5)/2), floorY+_closetH-10+0.4+2.5, _closetZ));
+    // y=floorY+_closetInteriorH-10, z=_closetZ. Coin sits ~2.5" above shelf top.
+    _addCoin(_coinGroup, new THREE.Vector3(-(sideWallX+0.5+(_closetDepth-0.5)/2), floorY+_closetInteriorH-10+0.4+2.5, _closetZ));
     // On top of mini split — bring coin slightly forward (toward +Z) so it's above the visible top surface.
     _addCoin(_coinGroup, new THREE.Vector3(-msX, msY+msH/2+2.2, msZ-msD/2+1.5));
     // On top of TV — sit it just above the bezel, in front of the wall.
