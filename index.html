@@ -8559,7 +8559,7 @@ _fpHud.innerHTML=`
       </div>
       <span style="font-size:10px;opacity:0.62;background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:999px">Space</span>
     </div>
-    <div style="margin-top:7px;font-size:10px;opacity:0.52"><kbd style="background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.16)">R</kbd> reset · <kbd style="background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.16)">H</kbd> help · <kbd style="background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.16)">Esc</kbd> exit</div>
+    <div style="margin-top:7px;font-size:10px;opacity:0.52"><kbd style="background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.16)">R</kbd> reset · <kbd style="background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.16)">H</kbd> help · <kbd style="background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.16)">Esc</kbd> pause</div>
   </div>
   <div id="fpControlsPanel" style="position:fixed;right:16px;bottom:16px;background:linear-gradient(180deg,rgba(12,18,27,0.92),rgba(7,10,15,0.9));color:#e8eef7;
     padding:11px 12px;border-radius:14px;font-family:system-ui;font-size:12px;display:none;
@@ -8574,7 +8574,7 @@ _fpHud.innerHTML=`
       <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">R</span> reset run</div>
       <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">N</span> rename</div>
       <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">H</span> toggle help</div>
-      <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">Esc</span> exit play mode</div>
+      <div><span style="display:inline-block;min-width:46px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;text-align:center">Esc</span> pause</div>
     </div>
     ${_isMobile?'<div style="opacity:0.72;margin-top:5px">Touch drag to look</div>':''}
   </div>`;
@@ -8616,7 +8616,71 @@ _nameDialog.innerHTML=`
   </div>`;
 document.body.appendChild(_nameDialog);
 
-// ─── Finish-run dialog ────────────────────────────────────────────────────
+// ─── Pause overlay ────────────────────────────────────────────────────────
+// Triggered by Esc (or Tab / window blur / tab-hidden) while in play mode.
+// The run timer keeps ticking — this is intentionally a "soft" pause so you
+// can't game your time by Esc-scumming. The overlay blocks input, releases
+// pointer lock, and gives a clear Exit / Resume choice plus a mute toggle
+// and controls reference. Closing the overlay re-locks the pointer and
+// resumes gameplay seamlessly.
+const _pauseOverlayStyle=document.createElement('style');
+_pauseOverlayStyle.textContent=`
+  #fpPauseOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:11500;background:rgba(3,7,12,0.62);backdrop-filter:blur(10px);font-family:system-ui;color:#e8eef7}
+  #fpPauseCard{width:min(92vw,460px);background:linear-gradient(180deg,rgba(16,23,34,0.98),rgba(9,13,20,0.98));border:1px solid rgba(128,190,232,0.32);border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,0.55);padding:18px 20px 16px}
+  #fpPauseTitle{font-size:13px;font-weight:800;letter-spacing:1.2px;color:#9fe3ff;text-transform:uppercase}
+  #fpPauseHeadline{font-size:26px;font-weight:800;margin-top:2px;letter-spacing:0.4px}
+  #fpPauseSub{font-size:12px;opacity:0.7;margin-top:2px}
+  #fpPauseActions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+  .fpPauseBtn{appearance:none;border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);color:#e8eef7;border-radius:11px;padding:11px 12px;font-size:13px;font-weight:700;cursor:pointer;transition:background 0.12s,border-color 0.12s,transform 0.1s}
+  .fpPauseBtn:hover{background:rgba(255,255,255,0.1);border-color:rgba(159,227,255,0.45)}
+  .fpPauseBtn:active{transform:translateY(1px)}
+  .fpPauseBtn.primary{background:linear-gradient(90deg,#5cd8ff,#ffd873);color:#081019;border-color:transparent}
+  .fpPauseBtn.danger{border-color:rgba(255,120,120,0.35);color:#ffd0d0}
+  .fpPauseBtn.danger:hover{background:rgba(255,80,80,0.1);border-color:rgba(255,120,120,0.6)}
+  #fpPauseToggles{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .fpPauseToggle{display:inline-flex;align-items:center;gap:6px;font-size:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);padding:6px 10px;border-radius:999px;cursor:pointer;user-select:none}
+  .fpPauseToggle:hover{background:rgba(255,255,255,0.08)}
+  .fpPauseToggle input{accent-color:#5cd8ff}
+  #fpPauseControls{margin-top:14px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px}
+  #fpPauseControls .hdr{font-size:10px;font-weight:700;letter-spacing:0.9px;color:#9fe3ff;opacity:0.85;margin-bottom:7px}
+  #fpPauseControls .grid{display:grid;grid-template-columns:1fr 1fr;row-gap:5px;column-gap:12px;font-size:12px;opacity:0.9}
+  #fpPauseControls kbd{display:inline-block;min-width:30px;text-align:center;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.16);padding:1px 6px;border-radius:6px;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:11px;margin-right:6px}
+  #fpPauseHint{margin-top:10px;font-size:10px;opacity:0.55;text-align:center;letter-spacing:0.3px}
+`;
+document.head.appendChild(_pauseOverlayStyle);
+
+const _pauseOverlay=document.createElement('div');
+_pauseOverlay.id='fpPauseOverlay';
+_pauseOverlay.innerHTML=`
+  <div id="fpPauseCard" role="dialog" aria-modal="true" aria-labelledby="fpPauseHeadline">
+    <div id="fpPauseTitle">Paused</div>
+    <div id="fpPauseHeadline">Take a breath</div>
+    <div id="fpPauseSub">The run timer keeps going — pause doesn't stop the clock.</div>
+    <div id="fpPauseActions">
+      <button type="button" class="fpPauseBtn primary" id="fpPauseResume">Resume</button>
+      <button type="button" class="fpPauseBtn danger" id="fpPauseExit">Exit play mode</button>
+    </div>
+    <div id="fpPauseToggles">
+      <label class="fpPauseToggle"><input type="checkbox" id="fpPauseMute"><span>Mute sounds</span></label>
+      <button type="button" class="fpPauseBtn" id="fpPauseReset" style="padding:6px 12px;font-size:12px;border-radius:999px">Reset run</button>
+      <button type="button" class="fpPauseBtn" id="fpPauseRename" style="padding:6px 12px;font-size:12px;border-radius:999px">Rename</button>
+    </div>
+    <div id="fpPauseControls">
+      <div class="hdr">CONTROLS</div>
+      <div class="grid">
+        <div><kbd>WASD</kbd>move</div>
+        <div><kbd>Space</kbd>jump (hold)</div>
+        <div><kbd>Shift</kbd>sprint</div>
+        <div><kbd>V</kbd>switch view</div>
+        <div><kbd>R</kbd>reset run</div>
+        <div><kbd>N</kbd>rename</div>
+        <div><kbd>H</kbd>toggle help</div>
+        <div><kbd>Esc</kbd>pause / resume</div>
+      </div>
+    </div>
+    <div id="fpPauseHint">Press <kbd style="background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.16)">Esc</kbd> to resume</div>
+  </div>`;
+document.body.appendChild(_pauseOverlay);
 // Large modal that appears when the run completes. Shows the finish time in
 // huge letters, the top of the leaderboard with the player's own row
 // highlighted, and a Copy Result button. Releases pointer lock while open so
@@ -8922,6 +8986,67 @@ function _setFpCamMode(mode){
   if(_fpMode){
     catGroup.visible=_fpCamMode==='cat';
     if(catGroup.visible && catGroup.parent!==scene) scene.add(catGroup);
+  }
+}
+
+// ─── Pause + audio mute ───────────────────────────────────────────────────
+let _fpPaused=false;
+const _LB_MUTE_KEY='diy_air_purifier_muted_v1';
+let _sfxMuted=false;
+try{ _sfxMuted=localStorage.getItem(_LB_MUTE_KEY)==='1'; }catch(e){}
+function _applyAudioMute(){
+  // Suspend/resume the shared AudioContext so every sound path (coin chime,
+  // bonk, MacBook chiptune) goes silent with a single switch. Also ramps the
+  // macbook music gain to zero to avoid a click when suspending mid-note.
+  try{
+    if(typeof _mbMusicGain!=='undefined' && _mbMusicGain && _coinAC){
+      _mbMusicGain.gain.setTargetAtTime(_sfxMuted?0:0.06, _coinAC.currentTime, 0.08);
+    }
+  }catch(e){}
+  try{
+    if(_coinAC){
+      if(_sfxMuted && _coinAC.state==='running' && _coinAC.suspend) _coinAC.suspend();
+      else if(!_sfxMuted && _coinAC.state==='suspended' && _coinAC.resume) _coinAC.resume();
+    }
+  }catch(e){}
+}
+function _setSfxMuted(muted){
+  _sfxMuted=!!muted;
+  try{ localStorage.setItem(_LB_MUTE_KEY, _sfxMuted?'1':'0'); }catch(e){}
+  _applyAudioMute();
+  const cb=document.getElementById('fpPauseMute');
+  if(cb) cb.checked=_sfxMuted;
+}
+function _setFpPaused(paused){
+  if(!_fpMode) return;
+  const next=!!paused;
+  if(next===_fpPaused) return;
+  _fpPaused=next;
+  const ov=document.getElementById('fpPauseOverlay');
+  if(ov) ov.style.display=_fpPaused?'flex':'none';
+  if(_fpPaused){
+    // Drop any held keys so we don't drift on resume, release pointer lock,
+    // and hide the crosshair (can't interact while paused).
+    _fpKeys.w=false; _fpKeys.a=false; _fpKeys.s=false; _fpKeys.d=false;
+    _fpKeys.space=false; _fpKeys.shift=false;
+    _fpLookDX=0; _fpLookDY=0;
+    // Reset physics dt so the resume frame doesn't apply a giant velocity
+    // step from accumulated wall-clock time.
+    _fpLastPhysicsTs=0;
+    const ch=document.getElementById('fpCrosshair');
+    if(ch) ch.style.opacity='0.25';
+    _fpIgnorePointerUnlock=true;
+    if(document.exitPointerLock && document.pointerLockElement) document.exitPointerLock();
+    // Sync mute toggle state on open.
+    const cb=document.getElementById('fpPauseMute');
+    if(cb) cb.checked=_sfxMuted;
+  } else {
+    const ch=document.getElementById('fpCrosshair');
+    if(ch) ch.style.opacity='';
+    if(!_isMobile && canvas.requestPointerLock) canvas.requestPointerLock();
+    // Release the pointer-unlock guard after the browser has had a moment
+    // to refresh pointer-lock state.
+    setTimeout(()=>{ _fpIgnorePointerUnlock=false; }, 220);
   }
 }
 
@@ -9849,6 +9974,14 @@ function toggleFirstPerson(){
     if(document.exitPointerLock && document.pointerLockElement) document.exitPointerLock();
     _setCoinsVisible(false);
     _setFpControlsOpen(false);
+    // Clear pause state so re-entering play mode doesn't immediately pause.
+    if(_fpPaused){
+      _fpPaused=false;
+      const ov=document.getElementById('fpPauseOverlay');
+      if(ov) ov.style.display='none';
+      const ch=document.getElementById('fpCrosshair');
+      if(ch) ch.style.opacity='';
+    }
     if(catGroup.parent===camera) scene.add(catGroup);
     catGroup.visible=false;
   }
@@ -9866,6 +9999,29 @@ document.addEventListener('keydown',e=>{
   if(!_fpMode) return;
   if(_nameDialogOpen) return;
   if(_finishDialogOpen) return;
+  // Esc toggles pause. When paused, only Esc is honored at this layer —
+  // everything else falls through to the pause overlay buttons.
+  if(e.key==='Escape'){
+    _setFpPaused(!_fpPaused);
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
+  if(_fpPaused) return;
+  // Tab also pauses (and stops the browser from tabbing away the canvas).
+  if(e.key==='Tab'){
+    _setFpPaused(true);
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
+  if(e.key==='m'||e.key==='M'){
+    _setSfxMuted(!_sfxMuted);
+    _showFpResetIndicator(_sfxMuted?'MUTED':'UNMUTED');
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
   if(e.key==='h'||e.key==='H'){
     _setFpControlsOpen(!_fpControlsOpen);
     e.preventDefault();
@@ -9926,15 +10082,46 @@ document.addEventListener('keyup',e=>{
   if(k==='w'||k==='a'||k==='s'||k==='d') _camKeys[k]=false;
 });
 // Re-lock pointer on canvas click while in FP mode
-canvas.addEventListener('click',()=>{ if(_fpMode && !_isMobile && !document.pointerLockElement && canvas.requestPointerLock) canvas.requestPointerLock(); });
-// Exit FP mode if pointer lock is released via browser (Esc press)
+canvas.addEventListener('click',()=>{ if(_fpMode && !_fpPaused && !_isMobile && !document.pointerLockElement && canvas.requestPointerLock) canvas.requestPointerLock(); });
+// Exit FP mode if pointer lock is released via browser (Esc press) — but
+// only when not already paused; Esc in play mode should just pause, which
+// releases the lock itself via the guard flag.
 document.addEventListener('pointerlockchange',()=>{
   if(_fpIgnorePointerUnlock) return;
-  if(_fpMode && !_isMobile && !document.pointerLockElement){
-    // Small delay to distinguish intentional exit from browser Esc
-    setTimeout(()=>{ if(_fpMode && !document.pointerLockElement) toggleFirstPerson(); }, 100);
+  if(_fpMode && !_fpPaused && !_isMobile && !document.pointerLockElement){
+    // Small delay to distinguish intentional exit from browser Esc. Rather
+    // than exiting play mode outright, open the pause overlay and let the
+    // user choose to resume or exit.
+    setTimeout(()=>{ if(_fpMode && !document.pointerLockElement && !_fpPaused) _setFpPaused(true); }, 100);
   }
 });
+
+// Auto-pause on tab switch / window blur so the user doesn't wander off
+// the keyboard and come back to an exited run. Timer keeps ticking.
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden && _fpMode && !_fpPaused) _setFpPaused(true);
+});
+window.addEventListener('blur',()=>{
+  if(_fpMode && !_fpPaused) _setFpPaused(true);
+});
+
+// Pause overlay button wiring.
+document.getElementById('fpPauseResume').addEventListener('click',()=>_setFpPaused(false));
+document.getElementById('fpPauseExit').addEventListener('click',()=>{
+  _setFpPaused(false);
+  if(_fpMode) toggleFirstPerson();
+});
+document.getElementById('fpPauseMute').addEventListener('change',e=>_setSfxMuted(!!e.target.checked));
+document.getElementById('fpPauseReset').addEventListener('click',()=>{
+  _setFpPaused(false);
+  _resetFpRun();
+});
+document.getElementById('fpPauseRename').addEventListener('click',()=>{
+  _setFpPaused(false);
+  _openNameDialog(true,()=>_renderLeaderboard());
+});
+// Sync initial mute state on load.
+_applyAudioMute();
 
 // ─── Adaptive quality ───
 // Monitors FPS over several seconds and downgrades rendering if needed.
