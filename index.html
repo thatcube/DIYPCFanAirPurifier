@@ -7050,56 +7050,56 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
     // The GLB has the lid+body merged into one mesh, so we can't swap
     // just the screen material. Instead, create a dedicated overlay plane
     // parented to the laptop root, positioned at the lid's front face.
-    // Dimensions and placement are derived from the geometry bbox of the
-    // largest (body+lid) mesh.
-    let bodyMesh=null, bodyVol=0;
-    root.traverse(o=>{
-      if(!o.isMesh || !o.geometry) return;
-      o.geometry.computeBoundingBox();
-      const gb=o.geometry.boundingBox;
-      if(!gb) return;
-      const s=gb.getSize(new THREE.Vector3());
-      const vol=s.x*s.y*s.z;
-      if(vol>bodyVol){ bodyVol=vol; bodyMesh=o; }
+    // Use localSize (post-scale world bbox) so the plane lands at a
+    // reasonable inch-scale size.
+    const screenW=localSize.x*0.86;
+    const screenH=localSize.y*0.42;
+    const planeGeo=new THREE.PlaneGeometry(screenW, screenH);
+    const planeMat=new THREE.MeshBasicMaterial({
+      map:_macbookLogoTex,
+      color:0xffffff,
+      toneMapped:false,
+      side:THREE.DoubleSide
     });
-    if(bodyMesh){
-      const gb=bodyMesh.geometry.boundingBox;
-      const size=gb.getSize(new THREE.Vector3());
-      const ctr=gb.getCenter(new THREE.Vector3());
-      // Assume lid occupies the upper half of bbox Y and is roughly the
-      // full X-width with the screen facing +Z (player-facing after the
-      // Math.PI Y-rotation of root).
-      const screenW=size.x*0.86;
-      const screenH=size.y*0.42;
-      const planeGeo=new THREE.PlaneGeometry(screenW, screenH);
-      const planeMat=new THREE.MeshBasicMaterial({
-        map:_macbookLogoTex,
-        color:0xffffff,
-        toneMapped:false,
-        side:THREE.DoubleSide
-      });
-      const screenPlane=new THREE.Mesh(planeGeo, planeMat);
-      screenPlane._isMacbook=true;
-      screenPlane._macbookRoot=root;
-      screenPlane.visible=false;
-      // Transform bodyMesh local bbox into root-local coords so the plane
-      // is placed correctly regardless of bodyMesh's own transform.
-      const worldCtr=ctr.clone().applyMatrix4(bodyMesh.matrixWorld);
-      const rootLocal=worldCtr.clone().applyMatrix4(new THREE.Matrix4().copy(root.matrixWorld).invert());
-      // Position: centered in X, upper region in Y, slightly forward (+Z
-      // in root-local; root.rotation.y=PI makes this face the player).
-      screenPlane.position.set(rootLocal.x, rootLocal.y + size.y*0.22, rootLocal.z + size.z*0.10);
-      screenPlane.rotation.y=Math.PI; // face -Z in root-local → +Z in world
-      root.add(screenPlane);
-      _macbookScreen=screenPlane;
-      _macbookScreenConfig={rootLocal, size};
-      console.log('[macbook] screen plane placed at', screenPlane.position, 'size', screenW, screenH);
-    }
+    const screenPlane=new THREE.Mesh(planeGeo, planeMat);
+    screenPlane._isMacbook=true;
+    screenPlane._macbookRoot=root;
+    screenPlane.visible=false;
+    // Because root.scale is applied, and we're adding as root's child,
+    // localSize is already in world-space inches; the plane will inherit
+    // root.scale and be drawn at world scale * size. We want real-world
+    // inches, so pre-divide by root's scale.
+    const invScale=1/(root.scale.x||1);
+    screenPlane.scale.setScalar(invScale);
+    // Position relative to root's origin (pre-position/rotation) in
+    // root-local coordinates. Upper Y = lid; +Z after root.rotation.y=PI
+    // ends up facing the player (toward -Z world).
+    const cx=(localBB.min.x+localBB.max.x)*0.5 * invScale;
+    const lidY=(localBB.min.y + localSize.y*0.72) * invScale;
+    const frontZ=(localBB.min.z - 0.2) * invScale; // slightly in front of lid
+    screenPlane.position.set(cx, lidY, frontZ);
+    // Plane's front (+Z normal) needs to face -Z in root-local, because
+    // root gets rotated Math.PI around Y after this, making -Z local
+    // point toward the player.
+    screenPlane.rotation.y=Math.PI;
+    root.add(screenPlane);
+    _macbookScreen=screenPlane;
+    console.log('[macbook] screen plane pos=', screenPlane.position, 'scale=', screenPlane.scale, 'size=', screenW, screenH);
     _macbookGroup.add(root);
     _macbookRoot=root;
-    // Collision AABB from the final world-space bounding box.
+    // Collision AABB: exclude the overlay plane. Temporarily hide it,
+    // compute bbox, then restore. This prevents a hidden-screen plane
+    // from ballooning the collision box even if its world position
+    // happens to land outside the body.
     root.updateMatrixWorld(true);
+    const savedVis=_macbookScreen ? _macbookScreen.visible : null;
+    if(_macbookScreen) _macbookScreen.visible=false;
+    // temporarily detach to exclude from bbox
+    const detached=_macbookScreen && _macbookScreen.parent===root;
+    if(detached) root.remove(_macbookScreen);
     const final=new THREE.Box3().setFromObject(root);
+    if(detached) root.add(_macbookScreen);
+    if(_macbookScreen && savedVis!==null) _macbookScreen.visible=savedVis;
     _fpBoxesBase.push({
       xMin:final.min.x, xMax:final.max.x,
       zMin:final.min.z, zMax:final.max.z,
