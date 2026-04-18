@@ -7269,26 +7269,19 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
     console.log('[macbook] screen plane pos=', screenPlane.position, 'scale=', screenPlane.scale, 'size=', screenW, screenH);
     _macbookGroup.add(root);
     _macbookRoot=root;
-    // Collision: ONLY the open lid/screen — not the keyboard. The cat can
-    // walk across the keyboard (its body passes through the thin base) but
-    // bumps into the screen plane. We use the screenPlane's world bbox
-    // (which is ~0 thickness along the lid-normal axis) and pad it a bit
-    // to make a solid slab. This works regardless of the laptop's rotation.
-    root.updateMatrixWorld(true);
-    screenPlane.updateWorldMatrix(true,true);
-    const screenBB=new THREE.Box3().setFromObject(screenPlane);
-    if(!screenBB.isEmpty()){
-      const thickZ=0.8; // slab thickness along Z (lid-normal axis in world)
-      const padX=0.5;   // small XY pad so 2.2" body radius can't glide around edges
-      const padY=0.5;
-      _fpBoxesBase.push({
-        xMin:screenBB.min.x-padX, xMax:screenBB.max.x+padX,
-        zMin:screenBB.min.z-thickZ/2, zMax:screenBB.max.z+thickZ/2,
-        yTop:screenBB.max.y+padY, yBottom:screenBB.min.y-padY,
-        room:true,
-        _macbook:true
-      });
-    }
+    // Collision: ONLY the open lid/screen — not the keyboard. Store the
+    // screen plane's local-rect corners; _fpGetBoxes will transform them
+    // by the plane's live world matrix each frame to get an accurate AABB
+    // (the plane's orientation depends on the laptop's rotation and the
+    // room nudges, so a baked bbox would drift).
+    // screenPlane.geometry is a ShapeGeometry built at (±screenW/2, ±screenH/2, 0).
+    screenPlane._collisionCorners = [
+      new THREE.Vector3(-screenW/2, -screenH/2, 0),
+      new THREE.Vector3( screenW/2, -screenH/2, 0),
+      new THREE.Vector3(-screenW/2,  screenH/2, 0),
+      new THREE.Vector3( screenW/2,  screenH/2, 0)
+    ];
+    window._macbookScreenRef = screenPlane;
   }, undefined, err=>{
     console.warn('MacBook GLB failed to load:', err);
   });
@@ -8427,6 +8420,35 @@ function _fpGetBoxes(){
       out.zMin=b.zMin; out.zMax=b.zMax;
       out.yTop=b.yTop; out.yBottom=b.yBottom;
     }
+    out.room=false;
+    _fpBoxesOut.push(out);
+  }
+  // MacBook open screen — live AABB from the four geometry corners
+  // transformed by the plane's current world matrix. This handles the
+  // plane's local scale, its parent root's 45× scale, the 180° rotations,
+  // and room nudges (the root is _isRoom so applyRoomDelta has already
+  // shifted its matrix). Thickens the slab along the plane's minor axis
+  // so the cat can't squeeze through.
+  const _mbScreen=window._macbookScreenRef;
+  if(_mbScreen && _mbScreen._collisionCorners){
+    _mbScreen.updateWorldMatrix(true,true);
+    let xMin=Infinity,xMax=-Infinity,yMin=Infinity,yMax=-Infinity,zMin=Infinity,zMax=-Infinity;
+    const _tmp=new THREE.Vector3();
+    for(const c of _mbScreen._collisionCorners){
+      _tmp.copy(c).applyMatrix4(_mbScreen.matrixWorld);
+      if(_tmp.x<xMin) xMin=_tmp.x; if(_tmp.x>xMax) xMax=_tmp.x;
+      if(_tmp.y<yMin) yMin=_tmp.y; if(_tmp.y>yMax) yMax=_tmp.y;
+      if(_tmp.z<zMin) zMin=_tmp.z; if(_tmp.z>zMax) zMax=_tmp.z;
+    }
+    // The plane is effectively 0-thick along whichever axis is its normal.
+    // Thicken whichever is smallest to a minimum usable slab.
+    const minSlab=1.2;
+    if(xMax-xMin<minSlab){ const m=(xMin+xMax)/2; xMin=m-minSlab/2; xMax=m+minSlab/2; }
+    if(zMax-zMin<minSlab){ const m=(zMin+zMax)/2; zMin=m-minSlab/2; zMax=m+minSlab/2; }
+    const out=_acquireBox();
+    out.xMin=xMin-0.3; out.xMax=xMax+0.3;
+    out.zMin=zMin-0.3; out.zMax=zMax+0.3;
+    out.yTop=yMax+0.3; out.yBottom=yMin-0.3;
     out.room=false;
     _fpBoxesOut.push(out);
   }
