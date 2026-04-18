@@ -8158,6 +8158,11 @@ const _fpBoxesBase=[
   // closetW + 2*trimW along Z, headerH=4 tall starting at floorY+_closetH.
   // sits on the room-facing side of the wall (closetX = sideWallX-0.5).
   {xMin:-(sideWallX), xMax:-(sideWallX-1), zMin:_closetZ-_closetW/2-2.5, zMax:_closetZ+_closetW/2+2.5, yTop:floorY+_closetH+4, yBottom:floorY+_closetH, room:true},
+  // Solid wall above the closet door opening — from the top of the
+  // door opening (_closetH) up to the ceiling, spanning only the opening's
+  // Z range. The left/right flanking wall AABBs handle the rest; without
+  // this, a player standing on the header trim can walk through the wall.
+  {xMin:-(sideWallX+0.5), xMax:-sideWallX, zMin:_closetZ-_closetW/2, zMax:_closetZ+_closetW/2, yTop:floorY+wallHeight, yBottom:floorY+_closetH, room:true},
   // Opposite (front/TV) wall — explicit collision. Previously relied on the
   // global bounds clamp, but we loosened that to allow walking into the
   // closet interior (which extends past oppWallZ along Z, entirely at
