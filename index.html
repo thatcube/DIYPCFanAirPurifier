@@ -3915,7 +3915,35 @@ canvas.addEventListener('touchmove',e=>{
   polar=Math.max(0.1,Math.min(Math.PI-0.1,polar-(e.touches[0].clientY-py)*0.013));
   px=e.touches[0].clientX;py=e.touches[0].clientY;
 },{passive:false});
-canvas.addEventListener('wheel',e=>{e.preventDefault();radius=Math.max(20,Math.min(130,radius+e.deltaY*0.55));},{passive:false});
+// Wheel zoom — differentiate mouse wheel vs trackpad for sane sensitivity.
+// A mouse-wheel notch typically fires a single event with |deltaY| >= ~40
+// (often 100). Trackpads stream many small events, often deltaMode=0 with
+// |deltaY| < ~40. Mouse wheel ticks felt way too aggressive vs trackpad, so
+// we scale mouse ticks down to roughly match one notch ≈ 5% of the zoom
+// range; trackpads keep their smooth per-pixel feel.
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  // Heuristics for "this is a mouse wheel, not a trackpad":
+  //   • deltaMode === DOM_DELTA_LINE / DOM_DELTA_PAGE (1 or 2) → definitely wheel
+  //   • deltaMode 0 with a large-magnitude delta (>40) is almost always a
+  //     discrete wheel notch on macOS/Windows Chrome, where trackpads emit
+  //     small per-pixel deltas.
+  const mag=Math.abs(e.deltaY);
+  const isMouseWheel = e.deltaMode!==0 || mag>=40;
+  let step;
+  if(isMouseWheel){
+    // Fixed-size soft notch; one click ≈ 5.5 inches of zoom regardless of
+    // how aggressively the OS reports the wheel delta (some OS send 100 per
+    // notch, some send 33, some send 150 with "smooth scroll"). Keeps feel
+    // consistent across devices.
+    step = Math.sign(e.deltaY)*5.5;
+  } else {
+    // Trackpad: smooth per-pixel zoom. Slightly gentler than the original
+    // 0.55× so a two-finger swipe doesn't overshoot the whole range.
+    step = e.deltaY*0.32;
+  }
+  radius=Math.max(20,Math.min(130, radius+step));
+},{passive:false});
 
 // ─── Interactive click: tap fans to toggle spin, tap filters to slide in/out ───
 // Tag interactive groups
@@ -7903,6 +7931,180 @@ _nameDialog.innerHTML=`
   </div>`;
 document.body.appendChild(_nameDialog);
 
+// ─── Finish-run dialog ────────────────────────────────────────────────────
+// Large modal that appears when the run completes. Shows the finish time in
+// huge letters, the top of the leaderboard with the player's own row
+// highlighted, and a Copy Result button. Releases pointer lock while open so
+// the user can actually click the button (pointer-lock previously hijacked
+// the cursor and made the HUD share button unreachable).
+const _finishDialogStyle=document.createElement('style');
+_finishDialogStyle.textContent=`
+  #finishDialogOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:12500;background:rgba(3,7,12,0.62);backdrop-filter:blur(7px);font-family:system-ui}
+  #finishDialogCard{width:min(94vw,520px);max-height:min(92vh,780px);overflow:hidden;display:flex;flex-direction:column;background:linear-gradient(180deg,rgba(16,23,34,0.98),rgba(7,11,17,0.98));border:1px solid rgba(128,190,232,0.4);border-radius:18px;box-shadow:0 20px 48px rgba(0,0,0,0.55);color:#e8eef7}
+  #finishDialogHeader{padding:16px 20px 10px;border-bottom:1px solid rgba(255,255,255,0.06)}
+  #finishDialogEyebrow{font-size:11px;font-weight:800;letter-spacing:1.2px;color:#9fe3ff;display:flex;align-items:center;gap:8px}
+  #finishDialogEyebrow .tag{background:rgba(255,216,115,0.18);color:#ffd873;padding:2px 8px;border-radius:999px;border:1px solid rgba(255,216,115,0.35);font-size:10px}
+  #finishDialogTime{font-family:'SF Mono',Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;font-size:56px;font-weight:800;letter-spacing:1px;line-height:1.05;margin-top:6px;color:#fff;text-shadow:0 2px 24px rgba(159,227,255,0.25)}
+  #finishDialogSubline{font-size:12px;opacity:0.8;margin-top:4px}
+  #finishDialogSubline b{color:#ffd873;font-weight:700}
+  #finishDialogRank{margin-top:8px;display:inline-block;font-size:12px;font-weight:700;letter-spacing:0.5px;padding:4px 10px;border-radius:999px;background:rgba(80,180,255,0.16);border:1px solid rgba(80,180,255,0.38);color:#c9ecff}
+  #finishDialogRank.medal{background:rgba(255,216,115,0.18);border-color:rgba(255,216,115,0.45);color:#ffe3a8}
+  #finishDialogBoard{padding:8px 14px 0;overflow-y:auto;flex:1}
+  #finishDialogBoard h4{margin:8px 0 6px;font-size:11px;font-weight:800;letter-spacing:0.9px;color:#9fe3ff}
+  #finishDialogList{list-style:none;margin:0;padding:0;display:grid;row-gap:4px}
+  #finishDialogList li{display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:center;padding:6px 8px;border-radius:9px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);font-size:13px}
+  #finishDialogList li.own{background:rgba(255,216,115,0.16);border-color:rgba(255,216,115,0.45);box-shadow:0 0 0 1px rgba(255,216,115,0.14)}
+  #finishDialogList li .rk{opacity:0.66;font-variant-numeric:tabular-nums}
+  #finishDialogList li .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #finishDialogList li .tm{font-variant-numeric:tabular-nums;font-weight:700;color:#9fe3ff}
+  #finishDialogList li.own .tm{color:#ffd873}
+  #finishDialogActions{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px 14px;border-top:1px solid rgba(255,255,255,0.06);background:linear-gradient(0deg,rgba(0,0,0,0.22),transparent)}
+  .finishDlgBtn{border:none;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:700;letter-spacing:0.3px;cursor:pointer;transition:transform 0.08s}
+  .finishDlgBtn:active{transform:translateY(1px)}
+  .finishDlgBtn.secondary{background:rgba(255,255,255,0.1);color:#e0e8f4}
+  .finishDlgBtn.secondary:hover{background:rgba(255,255,255,0.14)}
+  .finishDlgBtn.primary{background:linear-gradient(90deg,#5cd8ff,#ffd873);color:#081019}
+  .finishDlgBtn.primary:hover{filter:brightness(1.05)}
+  .finishDlgBtn.danger{background:rgba(255,95,110,0.16);border:1px solid rgba(255,95,110,0.42);color:#ffc6cb}
+  .finishDlgBtn.danger:hover{background:rgba(255,95,110,0.25)}
+`;
+document.head.appendChild(_finishDialogStyle);
+
+const _finishDialog=document.createElement('div');
+_finishDialog.id='finishDialogOverlay';
+_finishDialog.innerHTML=`
+  <div id="finishDialogCard" role="dialog" aria-modal="true" aria-labelledby="finishDialogEyebrow">
+    <div id="finishDialogHeader">
+      <div id="finishDialogEyebrow">
+        <span>RUN COMPLETE</span>
+        <span class="tag" id="finishDialogCoinBadge">0 / 0 coins</span>
+      </div>
+      <div id="finishDialogTime">00:00.000</div>
+      <div id="finishDialogSubline"><b id="finishDialogName">Player</b> · <span id="finishDialogRankText">Great run!</span></div>
+      <div id="finishDialogRank" style="display:none"></div>
+    </div>
+    <div id="finishDialogBoard">
+      <h4>LEADERBOARD · TOP 25</h4>
+      <ol id="finishDialogList"></ol>
+    </div>
+    <div id="finishDialogActions">
+      <button type="button" class="finishDlgBtn danger" id="finishDialogExit">Exit</button>
+      <button type="button" class="finishDlgBtn secondary" id="finishDialogAgain">Play again</button>
+      <button type="button" class="finishDlgBtn primary" id="finishDialogCopy">Copy result</button>
+    </div>
+  </div>`;
+document.body.appendChild(_finishDialog);
+
+let _finishDialogOpen=false;
+let _finishDialogData=null;
+function _openFinishDialog(data){
+  _finishDialogData=data||null;
+  _finishDialogOpen=true;
+  // Release pointer lock so the user can actually click the buttons.
+  _fpIgnorePointerUnlock=true;
+  if(document.exitPointerLock && document.pointerLockElement) document.exitPointerLock();
+  _clearPlayInputState();
+  _renderFinishDialog();
+  _finishDialog.style.display='flex';
+}
+function _closeFinishDialog(resumeLock){
+  if(!_finishDialogOpen) return;
+  _finishDialogOpen=false;
+  _finishDialog.style.display='none';
+  _finishDialogData=null;
+  _setFinishCopyLabel('Copy result');
+  _clearPlayInputState();
+  if(resumeLock && _fpMode && !_isMobile && canvas.requestPointerLock){
+    canvas.requestPointerLock();
+    setTimeout(()=>{ _fpIgnorePointerUnlock=false; }, 180);
+  } else {
+    _fpIgnorePointerUnlock=false;
+  }
+}
+function _setFinishCopyLabel(text){
+  const btn=document.getElementById('finishDialogCopy');
+  if(btn) btn.textContent=String(text||'Copy result');
+}
+function _renderFinishDialog(){
+  const data=_finishDialogData||{};
+  const timeEl=document.getElementById('finishDialogTime');
+  const nameEl=document.getElementById('finishDialogName');
+  const rankText=document.getElementById('finishDialogRankText');
+  const rankChip=document.getElementById('finishDialogRank');
+  const coinBadge=document.getElementById('finishDialogCoinBadge');
+  const list=document.getElementById('finishDialogList');
+  const ms=Math.max(0,Math.floor(Number(data.timeMs)||0));
+  if(timeEl) timeEl.textContent=_fmtRun(ms);
+  if(nameEl) nameEl.textContent=data.name||_lbPlayerName||'Player';
+  const rank=Math.floor(Number(data.rank)||0);
+  if(rankChip){
+    if(rank>0){
+      rankChip.style.display='inline-block';
+      rankChip.textContent=`#${rank} on the board`;
+      rankChip.classList.toggle('medal', rank<=3);
+    } else {
+      rankChip.style.display='none';
+    }
+  }
+  if(rankText){
+    if(rank===1) rankText.textContent='First place — legendary.';
+    else if(rank>0 && rank<=3) rankText.textContent='Podium finish!';
+    else if(rank>0) rankText.textContent=`Finished #${rank}.`;
+    else rankText.textContent='Every coin collected.';
+  }
+  if(coinBadge){
+    const c=Math.floor(Number(data.coins)||0);
+    const t=Math.floor(Number(data.coinTotal)||_coinTotal||0);
+    coinBadge.textContent=`${c} / ${t} coins`;
+  }
+  if(list){
+    if(!_leaderboard.length){
+      list.innerHTML='<li style="opacity:0.62;padding:8px 10px">No runs yet.</li>';
+    } else {
+      const ownId=String(data.entryId||'');
+      const ownName=(data.name||_lbPlayerName||'');
+      list.innerHTML=_leaderboard.map((r,i)=>{
+        const own=(ownId && r.id===ownId) || (!ownId && r.name===ownName);
+        return `<li class="${own?'own':''}"><span class="rk">#${i+1}</span><span class="nm">${_escapeHtml(r.name)}</span><span class="tm">${_fmtRun(r.timeMs)}</span></li>`;
+      }).join('');
+      // Scroll the highlighted row into view.
+      setTimeout(()=>{
+        const ownLi=list.querySelector('li.own');
+        if(ownLi && ownLi.scrollIntoView) ownLi.scrollIntoView({block:'center'});
+      }, 0);
+    }
+  }
+}
+// Wire up buttons + ESC.
+document.getElementById('finishDialogCopy').addEventListener('click',async()=>{
+  if(!_finishDialogData) return;
+  try{
+    await _copyTextToClipboard(_buildShareText(_finishDialogData));
+    _setFinishCopyLabel('Copied!');
+    setTimeout(()=>_setFinishCopyLabel('Copy result'),1300);
+  }catch(err){
+    _setFinishCopyLabel('Copy failed');
+    setTimeout(()=>_setFinishCopyLabel('Copy result'),1500);
+  }
+});
+document.getElementById('finishDialogAgain').addEventListener('click',()=>{
+  _closeFinishDialog(true);
+  _resetFpRun();
+});
+document.getElementById('finishDialogExit').addEventListener('click',()=>{
+  _closeFinishDialog(false);
+  if(_fpMode) toggleFirstPerson();
+});
+_finishDialog.addEventListener('click',e=>{
+  // Click on overlay backdrop resumes play; click on card is ignored.
+  if(e.target===_finishDialog) _closeFinishDialog(true);
+});
+_finishDialog.addEventListener('keydown',e=>{ e.stopPropagation(); });
+document.addEventListener('keydown',e=>{
+  if(!_finishDialogOpen) return;
+  if(e.key==='Escape'){ e.preventDefault(); _closeFinishDialog(true); }
+});
+
 // Camera mode inside Play Mode: 'cat' (third person) or 'first'.
 let _fpCamMode='cat';
 let _fpControlsOpen=false;
@@ -8031,6 +8233,12 @@ function _showShareButton(data){
   const row=document.getElementById('fpShareRow');
   if(row) row.style.display=_lastRunShareData?'block':'none';
   _setShareButtonLabel('Copy result');
+  // Pop the big finish dialog (time + leaderboard + copy button). This is
+  // the primary end-of-run UI; the HUD share button stays as a backup so
+  // you can still copy your result after dismissing the dialog.
+  if(_lastRunShareData && typeof _openFinishDialog==='function'){
+    _openFinishDialog(_lastRunShareData);
+  }
 }
 function _readPlayerName(){
   try{
@@ -8668,6 +8876,12 @@ function toggleFirstPerson(){
         m.material.depthWrite=true;
       }
     });
+    // Hide the world-outside-the-window backdrop in play mode so the room
+    // feels enclosed — cat-sized game, no sky beyond the walls.
+    if(typeof outdoor!=='undefined' && outdoor){
+      outdoor._fpSavedVisible=outdoor.visible;
+      outdoor.visible=false;
+    }
     // Request pointer lock for mouselook on desktop.
     if(!_isMobile && canvas.requestPointerLock) canvas.requestPointerLock();
     _resetCoins();
@@ -8683,6 +8897,10 @@ function toggleFirstPerson(){
       if(m._savedTransparent!==undefined) m.material.transparent=m._savedTransparent;
       if(m._savedDepthWrite!==undefined) m.material.depthWrite=m._savedDepthWrite;
     });
+    // Restore outdoor backdrop visibility (window view).
+    if(typeof outdoor!=='undefined' && outdoor){
+      outdoor.visible = outdoor._fpSavedVisible!==undefined ? outdoor._fpSavedVisible : true;
+    }
     _fpKeys.w=false; _fpKeys.a=false; _fpKeys.s=false; _fpKeys.d=false; _fpKeys.space=false; _fpKeys.shift=false;
     _fpLookDX=0; _fpLookDY=0;
     _fpHoverTarget=null;
@@ -8707,6 +8925,7 @@ document.addEventListener('mousemove',e=>{
 document.addEventListener('keydown',e=>{
   if(!_fpMode) return;
   if(_nameDialogOpen) return;
+  if(_finishDialogOpen) return;
   if(e.key==='h'||e.key==='H'){
     _setFpControlsOpen(!_fpControlsOpen);
     e.preventDefault();
