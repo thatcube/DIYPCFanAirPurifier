@@ -7713,12 +7713,18 @@ function animate(ts){
           groundY=Math.max(groundY, box.yTop+eyeH);
         } else if(box.yBottom!==undefined && newHead<=box.yBottom-0.2){
           // Player fully beneath this box (walking under the bed/mini split).
-        } else if(box.yBottom!==undefined && _fpPos.y<=box.yBottom && newHead>box.yBottom-0.2 && _fpVy>0){
-          // Jumping up into the underside — clamp head just below it.
-          _bonkedThisFrame=true;
-          _bonkIntensity=Math.max(_bonkIntensity, _fpVy*1.2);
+        } else if(box.yBottom!==undefined && newFeet<box.yBottom-0.2){
+          // Head-only intrusion: body walks under, but head would cross
+          // into the box's underside. Clamp the head instead of pushing
+          // horizontally (which would yank the camera sideways and feel
+          // like the cursor moving). Covers both rising (_fpVy>0) and
+          // the peak/falling arc of a jump.
+          if(_fpVy>0){
+            _bonkedThisFrame=true;
+            _bonkIntensity=Math.max(_bonkIntensity, _fpVy*1.2);
+          }
           newY=box.yBottom-0.2;
-          _fpVy=0;
+          if(_fpVy>0) _fpVy=0;
         } else {
           // Push out of box on smallest XZ penetration axis.
           const pushXL=box.xMax+r-nx;
