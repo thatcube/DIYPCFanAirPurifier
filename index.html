@@ -7269,33 +7269,26 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
     console.log('[macbook] screen plane pos=', screenPlane.position, 'scale=', screenPlane.scale, 'size=', screenW, screenH);
     _macbookGroup.add(root);
     _macbookRoot=root;
-    // Collision AABB: exclude the overlay plane. Temporarily hide it,
-    // compute bbox, then restore. This prevents a hidden-screen plane
-    // from ballooning the collision box even if its world position
-    // happens to land outside the body.
+    // Collision: ONLY the open lid/screen — not the keyboard. The cat can
+    // walk across the keyboard (its body passes through the thin base) but
+    // bumps into the screen plane. We use the screenPlane's world bbox
+    // (which is ~0 thickness along the lid-normal axis) and pad it a bit
+    // to make a solid slab. This works regardless of the laptop's rotation.
     root.updateMatrixWorld(true);
-    const savedVis=_macbookScreen ? _macbookScreen.visible : null;
-    if(_macbookScreen) _macbookScreen.visible=false;
-    // temporarily detach to exclude from bbox
-    const detached=_macbookScreen && _macbookScreen.parent===root;
-    if(detached) root.remove(_macbookScreen);
-    const final=new THREE.Box3().setFromObject(root);
-    if(detached) root.add(_macbookScreen);
-    if(_macbookScreen && savedVis!==null) _macbookScreen.visible=savedVis;
-    // Expand the computed bbox so the cat reliably collides with the
-    // laptop. The closed 14" MBP is only ~0.6" thick, so without a height
-    // boost the cat steps over it like a speed bump. Pad XZ so the body
-    // radius (2.2) doesn't glide past the laptop edges.
-    const pad=2.0;
-    const minHeight=5.0; // inches — substantial enough to bonk into
-    const minTopBoost=Math.max(0, (final.min.y + minHeight) - final.max.y);
-    _fpBoxesBase.push({
-      xMin:final.min.x-pad, xMax:final.max.x+pad,
-      zMin:final.min.z-pad, zMax:final.max.z+pad,
-      yTop:final.max.y+minTopBoost, yBottom:final.min.y,
-      room:true,
-      _macbook:true
-    });
+    screenPlane.updateWorldMatrix(true,true);
+    const screenBB=new THREE.Box3().setFromObject(screenPlane);
+    if(!screenBB.isEmpty()){
+      const thickZ=0.8; // slab thickness along Z (lid-normal axis in world)
+      const padX=0.5;   // small XY pad so 2.2" body radius can't glide around edges
+      const padY=0.5;
+      _fpBoxesBase.push({
+        xMin:screenBB.min.x-padX, xMax:screenBB.max.x+padX,
+        zMin:screenBB.min.z-thickZ/2, zMax:screenBB.max.z+thickZ/2,
+        yTop:screenBB.max.y+padY, yBottom:screenBB.min.y-padY,
+        room:true,
+        _macbook:true
+      });
+    }
   }, undefined, err=>{
     console.warn('MacBook GLB failed to load:', err);
   });
