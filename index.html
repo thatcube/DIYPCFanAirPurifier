@@ -7821,7 +7821,12 @@ function animate(ts){
       if(cyC>cyMax) cyC=cyMax;
       else if(cyC<cyMin) cyC=cyMin;
       camera.position.set(cxC, cyC, czC);
-      camera.lookAt(focal.x, focal.y, focal.z);
+      // Aim the camera along the player's look direction instead of at
+      // the focal point. When the camera Y gets clamped down near the
+      // ceiling, a focal-locked lookAt would rotate the view upward
+      // (because the camera is now level with or below the focal) — even
+      // when the player is looking down. Using lookDir preserves pitch.
+      camera.lookAt(cxC+lookDir.x*10, cyC+lookDir.y*10, czC+lookDir.z*10);
       if(catGroup.parent!==scene) scene.add(catGroup);
       catGroup.visible=true;
       // World-space yaw rig: keep cat parallel to floor and anchored to the
