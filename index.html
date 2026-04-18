@@ -8066,6 +8066,14 @@ _fpHud.innerHTML=`
     <span style="font-size:10px;opacity:0.8;letter-spacing:0.8px;margin-right:6px">COINS</span>
     <span id="coinCount">0 / 0</span>
   </div>
+  <div id="secretCoinHud" style="position:fixed;top:16px;left:155px;background:rgba(10,13,18,0.78);
+    color:#8ed4ff;padding:7px 12px;border-radius:12px;font-family:system-ui;font-size:15px;font-weight:700;
+    pointer-events:none;z-index:9999;backdrop-filter:blur(8px);letter-spacing:0.4px;
+    border:1px solid rgba(120,184,255,0.4);box-shadow:0 8px 18px rgba(0,0,0,0.35);display:none;transition:transform 0.2s">
+    <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#cfe7ff,#1e88e5);vertical-align:middle;margin-right:7px;box-shadow:0 0 10px rgba(74,184,255,0.9)"></span>
+    <span style="font-size:10px;opacity:0.85;letter-spacing:0.8px;margin-right:6px">SECRET</span>
+    <span id="secretCoinCount">0</span>
+  </div>
   <div id="runTimerHud" style="position:fixed;top:68px;left:16px;background:rgba(10,13,18,0.78);
     color:#b3ecff;padding:7px 12px;border-radius:12px;font-family:system-ui;font-size:14px;font-weight:700;
     pointer-events:none;z-index:9999;backdrop-filter:blur(8px);letter-spacing:0.4px;
@@ -8605,8 +8613,10 @@ function _buildShareText(data){
     ? ` ${_CAT_COLOR_EMOJI[catColor]||''} ${catColor.charAt(0).toUpperCase()+catColor.slice(1)}`
     : '';
   const url=_makeShareUrl(row.entryId||'');
+  const secretCount=Math.floor(Number(row.secretCoins)||0);
+  const secretChip=secretCount>0 ? ` · 🔵 ${secretCount} secret${secretCount>1?'s':''}` : '';
   return [
-    `${who} · DIY Air Purifier · ${_fmtRun(row.timeMs||0)} · ${rankTxt} · ${modelEmoji} ${modelLabel}${colorChip}`,
+    `${who} · DIY Air Purifier · ${_fmtRun(row.timeMs||0)} · ${rankTxt} · ${modelEmoji} ${modelLabel}${colorChip}${secretChip}`,
     url
   ].join('\n');
 }
@@ -9000,6 +9010,7 @@ function _recordRun(timeMs){
       timeMs:entry.timeMs,
       coins:_coinTotal,
       coinTotal:_coinTotal,
+      secretCoins:_coinSecretScore,
       catColor:entry.catColor,
       catHair:entry.catHair,
       catModel:entry.catModel
@@ -9040,6 +9051,7 @@ function _recordRun(timeMs){
         timeMs:Math.floor(Number(serverEntry.timeMs)||Math.floor(timeMs)),
         coins:_coinTotal,
         coinTotal:_coinTotal,
+        secretCoins:_coinSecretScore,
         catColor:_sanitizeCatColorKey(serverEntry.catColor||_catColorKey),
         catHair:_sanitizeCatHairKey(serverEntry.catHair||_catHairKey),
         catModel:_sanitizeCatModelKey(serverEntry.catModel||_catModelKey)
@@ -9075,6 +9087,7 @@ function _recordRun(timeMs){
             timeMs:Math.floor(Number(retryEntry.timeMs)||Math.floor(timeMs)),
             coins:_coinTotal,
             coinTotal:_coinTotal,
+            secretCoins:_coinSecretScore,
             catColor:_sanitizeCatColorKey(retryEntry.catColor||_catColorKey),
             catHair:_sanitizeCatHairKey(retryEntry.catHair||_catHairKey),
             catModel:_sanitizeCatModelKey(retryEntry.catModel||_catModelKey)
@@ -9131,7 +9144,7 @@ _updateTimerHud(performance.now());
 // Coin pickup pop animation
 {
   const _coinStyle=document.createElement('style');
-  _coinStyle.textContent='#coinCount{display:inline-block;transition:transform 0.2s,color 0.2s;transform-origin:center} #coinCount.pop{transform:scale(1.5);color:#fff}';
+  _coinStyle.textContent='#coinCount,#secretCoinCount{display:inline-block;transition:transform 0.2s,color 0.2s;transform-origin:center} #coinCount.pop{transform:scale(1.5);color:#fff} #secretCoinCount.pop{transform:scale(1.6);color:#e9f6ff}';
   document.head.appendChild(_coinStyle);
 }
 
@@ -9507,6 +9520,7 @@ const _coinCamTmp=new THREE.Vector3();
 // layout and the isolated-leaderboard behavior.
 const _coinQuickTestMode=(typeof _TEST_MODE!=='undefined')?!!_TEST_MODE:false;
 let _coinScore=0;
+let _coinSecretScore=0;
 let _coinTotal=0;
 function _makeCoin(opts){
   // Shared geometry + material across all coins — much cheaper than 10 unique
@@ -9687,6 +9701,16 @@ function _updateCoins(ts,frameScale){
           el.classList.add('pop');
           setTimeout(()=>el.classList.remove('pop'), 350);
         }
+      } else {
+        _coinSecretScore++;
+        const hud=document.getElementById('secretCoinHud');
+        const el=document.getElementById('secretCoinCount');
+        if(hud) hud.style.display='';
+        if(el){
+          el.textContent=String(_coinSecretScore);
+          el.classList.add('pop');
+          setTimeout(()=>el.classList.remove('pop'), 350);
+        }
       }
       // Brief celebratory beep via WebAudio.
       try{
@@ -9757,6 +9781,11 @@ function _playBonk(intensity){
 }
 function _resetCoins(){
   _coinScore=0;
+  _coinSecretScore=0;
+  const secEl=document.getElementById('secretCoinCount');
+  if(secEl) secEl.textContent='0';
+  const secHud=document.getElementById('secretCoinHud');
+  if(secHud) secHud.style.display='none';
   _startRunTimer();
   void _startSharedRun();
   // Randomize which drawer hides the coin this session.
