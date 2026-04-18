@@ -6684,19 +6684,24 @@ const sideBaseboard2=roomBox(0.6, 3, (-15 + wallDepth/2) - (_closetZ+_closetW/2)
   const closetCeil=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, 0.5, interiorW), insideMat);
   closetCeil.position.set(innerCx, floorY+interiorH, closetZ);
   closetCeil.receiveShadow=true; closetCeil._isRoom=true; scene.add(closetCeil);
-  // Clothes rod across the closet, ~14" below the ceiling
+  // Clothes rod across the closet, ~30" below the ceiling
   const rodMat=new THREE.MeshStandardMaterial({color:0xb8b8b8,roughness:0.35,metalness:0.6});
   const rod=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,interiorW-2,14), rodMat);
   rod.rotation.x=Math.PI/2;
-  rod.position.set(innerCx, floorY+interiorH-14, closetZ);
+  rod.position.set(innerCx, floorY+interiorH-30, closetZ);
   rod.castShadow=true; rod._isRoom=true; scene.add(rod);
   // Shelf above the rod. Position constants are shared with the shelf
-  // collision AABB and the shelf coin further below.
-  const shelfDrop=16;      // inches below the ceiling
-  const shelfBackOff=4;    // inches pushed further back (+x, away from the room)
+  // collision AABB and the shelf coin further below. Shelf is shallower
+  // along X than the closet and pushed flush against the back wall.
+  const shelfDrop=24;         // inches below the ceiling
+  const shelfXDepth=14;       // shelf depth along X (room-to-back axis)
+  const shelfBackGap=0.6;     // gap between shelf and back wall
+  // Back wall inner face is at sideWallX+closetDepth-0.5. Center the shelf
+  // against it with shelfBackGap of clearance.
+  const shelfCenterX=sideWallX+closetDepth-0.5-shelfBackGap-shelfXDepth/2;
   const shelfMat=new THREE.MeshStandardMaterial({color:0xdcd2c0,roughness:0.75,metalness:0.0});
-  const shelf=new THREE.Mesh(new THREE.BoxGeometry(innerDepth-2, 0.8, interiorW-1), shelfMat);
-  shelf.position.set(innerCx+shelfBackOff, floorY+interiorH-shelfDrop, closetZ);
+  const shelf=new THREE.Mesh(new THREE.BoxGeometry(shelfXDepth, 0.8, interiorW-1), shelfMat);
+  shelf.position.set(shelfCenterX, floorY+interiorH-shelfDrop, closetZ);
   shelf.castShadow=true; shelf.receiveShadow=true; shelf._isRoom=true; scene.add(shelf);
 }
 
@@ -8117,8 +8122,9 @@ const _fpBoxesBase=[
   {xMin:-(sideWallX+0.5), xMax:-sideWallX, zMin:_closetZ+_closetW/2, zMax:_closetZ+_closetInteriorW/2, yTop:floorY+_closetInteriorH, room:true},
   {xMin:-(sideWallX+0.5), xMax:-sideWallX, zMin:_closetZ-_closetInteriorW/2, zMax:_closetZ-_closetW/2, yTop:floorY+_closetInteriorH, room:true},
   // Closet shelf — standable surface below the ceiling. Keep in sync with
-  // the shelf mesh constants (shelfDrop, shelfBackOff) in the closet block.
-  {xMin:-(sideWallX+0.5+(_closetDepth-0.5)-1+4), xMax:-(sideWallX+0.5+1+4), zMin:_closetZ-_closetInteriorW/2+0.5, zMax:_closetZ+_closetInteriorW/2-0.5, yTop:floorY+_closetInteriorH-16+0.4, yBottom:floorY+_closetInteriorH-16-0.4, room:true},
+  // the shelf mesh constants (shelfDrop=24, shelfXDepth=14, shelfBackGap=0.6)
+  // in the closet block. Shelf center X = sideWallX+_closetDepth-0.5-0.6-7 = 77.9.
+  {xMin:-((sideWallX+_closetDepth-0.5-0.6-14/2)+14/2), xMax:-((sideWallX+_closetDepth-0.5-0.6-14/2)-14/2), zMin:_closetZ-_closetInteriorW/2+0.5, zMax:_closetZ+_closetInteriorW/2-0.5, yTop:floorY+_closetInteriorH-24+0.4, yBottom:floorY+_closetInteriorH-24-0.4, room:true},
   // Opposite (front/TV) wall — explicit collision. Previously relied on the
   // global bounds clamp, but we loosened that to allow walking into the
   // closet interior (which extends past oppWallZ along Z, entirely at
@@ -9921,8 +9927,8 @@ function _addCoin(parent, localPos, opts){
     _addCoin(_coinGroup, new THREE.Vector3(35, floorY+3, 20)); // near closet
     // On the closet shelf — inside the walk-in, sitting on top of the shelf.
     // Shelf world pos after X-mirror: x=-(sideWallX+0.5+(_closetDepth-0.5)/2),
-    // Shelf coin — sits ~2.5" above shelf top. Keep in sync with shelfDrop/shelfBackOff.
-    _addCoin(_coinGroup, new THREE.Vector3(-(sideWallX+0.5+(_closetDepth-0.5)/2+4), floorY+_closetInteriorH-16+0.4+2.5, _closetZ));
+    // Shelf coin — sits ~2.5" above shelf top at the shelf's X center (77.9).
+    _addCoin(_coinGroup, new THREE.Vector3(-(sideWallX+_closetDepth-0.5-0.6-14/2), floorY+_closetInteriorH-24+0.4+2.5, _closetZ));
     // On top of mini split — bring coin slightly forward (toward +Z) so it's above the visible top surface.
     _addCoin(_coinGroup, new THREE.Vector3(-msX, msY+msH/2+2.2, msZ-msD/2+1.5));
     // On top of TV — sit it just above the bezel, in front of the wall.
