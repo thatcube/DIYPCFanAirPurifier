@@ -4875,7 +4875,7 @@ origins.console=consoleProps.position.clone();
   // the screen bezel; it sits between the two Joy-Cons (not behind
   // them). Joy-Cons attach on its left/right edges.
   const swH=4.7, swD=0.3;
-  const jcW=1.4, jcH=swH*0.95, jcD=swD+0.2;
+  const jcW=1.4, jcH=swH, jcD=swD;
   const swW=10.5 - 2*jcW; // tablet width = space between Joy-Cons
   const swMat=stdMat({color:0x111111,roughness:0.5});
   const sw2=new THREE.Mesh(new THREE.BoxGeometry(swW,swH,swD),swMat);
