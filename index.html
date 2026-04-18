@@ -8448,7 +8448,16 @@ function _fpGetBoxes(){
     const out=_acquireBox();
     out.xMin=xMin-0.3; out.xMax=xMax+0.3;
     out.zMin=zMin-0.3; out.zMax=zMax+0.3;
-    out.yTop=yMax+0.3; out.yBottom=yMin-0.3;
+    // Extend the slab down to the laptop base so the cat can't duck under
+    // the screen's bottom edge. The laptop root sits on the duvet with its
+    // bbox bottom at duvet top, so we use _macbookRoot's world bbox min.y.
+    let baseY=yMin-0.3;
+    if(_macbookRoot){
+      _macbookRoot.updateWorldMatrix(true,true);
+      const rootBB=new THREE.Box3().setFromObject(_macbookRoot);
+      if(!rootBB.isEmpty()) baseY=Math.min(baseY, rootBB.min.y);
+    }
+    out.yTop=yMax+0.3; out.yBottom=baseY;
     out.room=false;
     _fpBoxesOut.push(out);
   }
