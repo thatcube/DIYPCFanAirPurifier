@@ -7282,13 +7282,13 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
     const final=new THREE.Box3().setFromObject(root);
     if(detached) root.add(_macbookScreen);
     if(_macbookScreen && savedVis!==null) _macbookScreen.visible=savedVis;
-    // Expand the computed bbox slightly so the player (cat) reliably
-    // bonks into the laptop instead of clipping through — the GLB's tight
-    // bbox can be smaller than the visible silhouette. Also force a
-    // minimum height of ~2" so a closed 14" MBP (~0.6" thick) can't be
-    // stood on trivially but still reads as a solid obstacle.
-    const pad=1.0;
-    const minTopBoost=Math.max(0, (final.min.y + 2.0) - final.max.y);
+    // Expand the computed bbox so the cat reliably collides with the
+    // laptop. The closed 14" MBP is only ~0.6" thick, so without a height
+    // boost the cat steps over it like a speed bump. Pad XZ so the body
+    // radius (2.2) doesn't glide past the laptop edges.
+    const pad=2.0;
+    const minHeight=5.0; // inches — substantial enough to bonk into
+    const minTopBoost=Math.max(0, (final.min.y + minHeight) - final.max.y);
     _fpBoxesBase.push({
       xMin:final.min.x-pad, xMax:final.max.x+pad,
       zMin:final.min.z-pad, zMax:final.max.z+pad,
