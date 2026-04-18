@@ -6422,6 +6422,7 @@ const sideBaseboard2=roomBox(0.6, 3, (-15 + wallDepth/2) - (_closetZ+_closetW/2)
   // and innerGroup.rotation.y = -2θ so the two panels fold into a V whose
   // endpoint stays along the wall track.
   const bifoldLeaves=[];
+  window._bifoldLeavesRef=bifoldLeaves; // exposed for first-person collision
   const handleMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.3,metalness:0.15});
   for(let leafIdx=0; leafIdx<2; leafIdx++){
     const leafSide=leafIdx===0?-1:1; // -1 → -Z jamb leaf, +1 → +Z jamb leaf
@@ -7444,6 +7445,14 @@ function animate(ts){
       else if(cxC>bnd.xMax-m) cxC=bnd.xMax-m;
       if(czC<bnd.zMin+m) czC=bnd.zMin+m;
       else if(czC>bnd.zMax-m) czC=bnd.zMax-m;
+      // Vertical clamp: keep the camera below the ceiling and above the
+      // floor so you don't see through the room from the outside when the
+      // cat is climbing (e.g. on top of the closet shelf). Ceiling is a
+      // flat plane at floorY+80; bias 3" inside each surface.
+      const ceilY=(typeof ceiling!=='undefined' && ceiling)?ceiling.position.y:(floorY+80);
+      const cyMin=floorY+3, cyMax=ceilY-3;
+      if(cyC<cyMin) cyC=cyMin;
+      else if(cyC>cyMax) cyC=cyMax;
       camera.position.set(cxC, cyC, czC);
       camera.lookAt(focal.x, focal.y, focal.z);
       if(catGroup.parent!==scene) scene.add(catGroup);
@@ -7796,6 +7805,43 @@ function _fpGetBoxes(){
     const bMin=Math.min(zInB-sZ*tw, zInB), bMax=Math.max(zInB-sZ*tw, zInB);
     push(dx-w/2+tw, dx+w/2-tw, bMin, bMax, yT, yB+tw);
   }
+  // Closed closet doors — block the opening when both bifold leaves are
+  // shut. Each leaf's pivot lives at world (+X) sideWallX-0.5 (before the
+  // room's X-flip, so the collision AABB uses the mirrored X values like
+  // the rest of _fpBoxesBase). We also allow partially-closed as blocking
+  // (angle near 0) so you can't squeeze through mid-swing.
+  const _bifoldRef=window._bifoldLeavesRef;
+  if(_bifoldRef && _bifoldRef.length===2){
+    const closedA=Math.abs(_bifoldRef[0]._leafAngle||0)<0.25 && !_bifoldRef[0]._leafOpen;
+    const closedB=Math.abs(_bifoldRef[1]._leafAngle||0)<0.25 && !_bifoldRef[1]._leafOpen;
+    if(closedA && closedB){
+      // Single slab spanning the whole opening, flush against the wall.
+      const out=_acquireBox();
+      out.xMin=-(sideWallX+0.5)-ox; out.xMax=-(sideWallX-1.5)-ox;
+      out.zMin=(_closetZ-_closetW/2)-oz; out.zMax=(_closetZ+_closetW/2)-oz;
+      out.yTop=(floorY+_closetH)-oy; out.yBottom=floorY-oy;
+      out.room=false;
+      _fpBoxesOut.push(out);
+    } else {
+      // One leaf closed, one open — block only the closed half.
+      for(let li=0;li<2;li++){
+        const lf=_bifoldRef[li];
+        if(!lf) continue;
+        const closed=Math.abs(lf._leafAngle||0)<0.25 && !lf._leafOpen;
+        if(!closed) continue;
+        const side=lf._leafSide||(li===0?-1:1);
+        // leaf occupies half-opening from its pivot toward the center.
+        const zLo=side===-1?(_closetZ-_closetW/2):_closetZ;
+        const zHi=side===-1?_closetZ:(_closetZ+_closetW/2);
+        const out=_acquireBox();
+        out.xMin=-(sideWallX+0.5)-ox; out.xMax=-(sideWallX-1.5)-ox;
+        out.zMin=zLo-oz; out.zMax=zHi-oz;
+        out.yTop=(floorY+_closetH)-oy; out.yBottom=floorY-oy;
+        out.room=false;
+        _fpBoxesOut.push(out);
+      }
+    }
+  }
   // Append room-scoped base boxes with the placement offset applied.
   for(const b of _fpBoxesBase){
     const out=_acquireBox();
@@ -7958,6 +8004,13 @@ _finishDialogStyle.textContent=`
   #finishDialogList li .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #finishDialogList li .tm{font-variant-numeric:tabular-nums;font-weight:700;color:#9fe3ff}
   #finishDialogList li.own .tm{color:#ffd873}
+  #finishDialogCustomize{padding:10px 16px 4px;border-top:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;gap:8px}
+  #finishDialogCustomize h4{margin:0;font-size:11px;font-weight:800;letter-spacing:0.9px;color:#9fe3ff}
+  #finishDialogCustomize .row{display:flex;flex-wrap:wrap;gap:6px}
+  .finishColorBtn,.finishHairBtn{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:#dde4ef;font-size:11px;font-weight:700;letter-spacing:0.3px;cursor:pointer}
+  .finishColorBtn .dot{width:11px;height:11px;border-radius:50%;border:1px solid rgba(0,0,0,0.4)}
+  .finishColorBtn.on,.finishHairBtn.on{background:rgba(255,216,115,0.18);border-color:rgba(255,216,115,0.5);color:#ffe3a8}
+  .finishColorBtn:hover,.finishHairBtn:hover{background:rgba(255,255,255,0.11)}
   #finishDialogActions{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px 14px;border-top:1px solid rgba(255,255,255,0.06);background:linear-gradient(0deg,rgba(0,0,0,0.22),transparent)}
   .finishDlgBtn{border:none;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:700;letter-spacing:0.3px;cursor:pointer;transition:transform 0.08s}
   .finishDlgBtn:active{transform:translateY(1px)}
@@ -7986,6 +8039,19 @@ _finishDialog.innerHTML=`
     <div id="finishDialogBoard">
       <h4>LEADERBOARD · TOP 25</h4>
       <ol id="finishDialogList"></ol>
+    </div>
+    <div id="finishDialogCustomize">
+      <h4>CHANGE CAT</h4>
+      <div class="row" id="finishDialogColors">
+        <button type="button" class="finishColorBtn" data-color="ginger"><span class="dot" style="background:#c67f45"></span>Ginger</button>
+        <button type="button" class="finishColorBtn" data-color="tuxedo"><span class="dot" style="background:#5f6772"></span>Tuxedo</button>
+        <button type="button" class="finishColorBtn" data-color="cream"><span class="dot" style="background:#d7ccb1"></span>Cream</button>
+        <button type="button" class="finishColorBtn" data-color="midnight"><span class="dot" style="background:#41495a"></span>Midnight</button>
+      </div>
+      <div class="row" id="finishDialogHairs">
+        <button type="button" class="finishHairBtn" data-hair="short">Short Hair</button>
+        <button type="button" class="finishHairBtn" data-hair="long">Long Hair</button>
+      </div>
     </div>
     <div id="finishDialogActions">
       <button type="button" class="finishDlgBtn danger" id="finishDialogExit">Exit</button>
@@ -8074,8 +8140,38 @@ function _renderFinishDialog(){
       }, 0);
     }
   }
+  _syncFinishDialogCatButtons();
 }
 // Wire up buttons + ESC.
+function _syncFinishDialogCatButtons(){
+  const colorable=(typeof _isColorableCatModelKey==='function')?_isColorableCatModelKey(_catModelKey):true;
+  document.querySelectorAll('#finishDialogColors .finishColorBtn').forEach(b=>{
+    b.classList.toggle('on', b.dataset.color===_catColorKey);
+    b.disabled=!colorable;
+    b.style.opacity=colorable?'1':'0.45';
+  });
+  document.querySelectorAll('#finishDialogHairs .finishHairBtn').forEach(b=>{
+    b.classList.toggle('on', b.dataset.hair===_catHairKey);
+    b.disabled=!colorable;
+    b.style.opacity=colorable?'1':'0.45';
+  });
+}
+document.querySelectorAll('#finishDialogColors .finishColorBtn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const k=btn.dataset.color;
+    if(!k) return;
+    setCatColorPreset(k);
+    _syncFinishDialogCatButtons();
+  });
+});
+document.querySelectorAll('#finishDialogHairs .finishHairBtn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const k=btn.dataset.hair;
+    if(!k) return;
+    setCatHairPreset(k);
+    _syncFinishDialogCatButtons();
+  });
+});
 document.getElementById('finishDialogCopy').addEventListener('click',async()=>{
   if(!_finishDialogData) return;
   try{
