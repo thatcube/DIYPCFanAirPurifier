@@ -8052,7 +8052,10 @@ const _fpBoxesBase=[
   {xMin:-(bedX+hbW/2), xMax:-(bedX-hbW/2), zMin:bedZ+bedL/2-hbThick, zMax:bedZ+bedL/2, yTop:floorY+bedClearance+hbH, room:true},
 ];
 // Wall bounds derived from actual wall variables (X-mirrored, with 2\" buffer)
-const _fpBoundsBase={xMin:-(sideWallX+_closetDepth)+2, xMax:-(leftWallX)-2, zMin:oppWallZ-_closetInteriorW/2, zMax:49-2};
+// Back-wall mesh is at z=49, depth 0.5, so its interior face sits at
+// z=48.75. Use 0.25 buffer so the collision box matches the wall face
+// (previously 2" buffer made the player bonk 2" short of the wall).
+const _fpBoundsBase={xMin:-(sideWallX+_closetDepth)+2, xMax:-(leftWallX)-2, zMin:oppWallZ-_closetInteriorW/2, zMax:49-0.25};
 // Scratch vectors for drawer-AABB computation (avoid per-frame allocation).
 const _drawerWorldTmp=new THREE.Vector3();
 const _drawerDirTmp=new THREE.Vector3();
@@ -8109,10 +8112,14 @@ function _fpGetBoxes(){
     {xMin:fRx-fHalf, xMax:fRx+fHalf, zMin:-D/2, zMax:D/2, yTop:yTopInner, yBottom:yBotInner},
     // Xbox Series X on top (only when consoles visible).
     {xMin:-5.94/2, xMax:5.94/2, zMin:8-5.94/2, zMax:8+5.94/2, yTop:yTopPanel+11.85, yBottom:yTopPanel, _consoleProp:true},
-    // Nintendo Switch dock on top (only when consoles visible).
-    {xMin:-2.5/2, xMax:2.5/2, zMin:-6-6.5/2, zMax:-6+6.5/2, yTop:yTopPanel+4.0, yBottom:yTopPanel, _consoleProp:true},
-    // Nintendo Switch 2 tablet above dock (only when consoles visible).
-    {xMin:-0.6/2, xMax:0.6/2, zMin:-6-10.5/2, zMax:-6+10.5/2, yTop:yTopPanel+8.0, yBottom:yTopPanel+3.2, _consoleProp:true},
+    // Nintendo Switch dock on top (only when consoles visible). dkH=3.5,
+    // dkD=2.5 (local X = purifier-local X after 90° rotation), dkW=7.7
+    // (local X = purifier-local Z).
+    {xMin:-2.5/2, xMax:2.5/2, zMin:-6-7.7/2, zMax:-6+7.7/2, yTop:yTopPanel+3.5, yBottom:yTopPanel, _consoleProp:true},
+    // Nintendo Switch 2 tablet+Joy-Cons above dock (swD=0.55 depth,
+    // 10.5 full width including Joy-Cons, swH=4.7 with bottom 0.75
+    // above yTopPanel resting in the dock notch).
+    {xMin:-0.55/2, xMax:0.55/2, zMin:-6-10.5/2, zMax:-6+10.5/2, yTop:yTopPanel+5.45, yBottom:yTopPanel+0.75, _consoleProp:true},
     // Floor game-case stack next to purifier (only when consoles visible).
     {xMin:-_tvGameCaseD/2, xMax:_tvGameCaseD/2,
       zMin:-(D/2+ply+_tvGameCaseD/2+8.0)-_tvGameCaseW/2,
@@ -9774,6 +9781,8 @@ function _addCoin(parent, localPos, opts){
     _addCoin(_coinGroup, new THREE.Vector3(25, floorY+6, -40)); // near TV wall
     _addCoin(_coinGroup, new THREE.Vector3(-20, floorY+28, -60)); // high near mini split (jump!)
     _addCoin(_coinGroup, new THREE.Vector3(-bedX, mattY+mattH/2+duvetH+3, mattCenterZ)); // on top of bed
+    // Coin on top of the headboard (back of the bed against the wall).
+    _addCoin(_coinGroup, new THREE.Vector3(-bedX, floorY+bedClearance+hbH+2.5, bedZ+bedL/2-hbThick/2));
     _addCoin(_coinGroup, new THREE.Vector3(35, floorY+3, 20)); // near closet
     // On the closet shelf — inside the walk-in, sitting on top of the shelf.
     // Shelf world pos after X-mirror: x=-(sideWallX+0.5+(_closetDepth-0.5)/2),
