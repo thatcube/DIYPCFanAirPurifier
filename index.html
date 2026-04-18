@@ -8467,18 +8467,25 @@ function _makeShareUrl(entryId){
   const base=`${location.origin}/leaderboard`;
   return clean?`${base}?entry=${encodeURIComponent(clean)}`:base;
 }
+// Color emoji for each coat preset — used in the share text so the pasted
+// summary visually echoes the leaderboard badge (model emoji + color dot).
+const _CAT_COLOR_EMOJI={ginger:'🟠',tuxedo:'⚫',cream:'🟡',midnight:'🔵'};
 function _buildShareText(data){
   const row=data||{};
   const rankTxt=row.rank&&row.rank>0?`#${row.rank}`:'Unranked';
   const who=_sanitizePlayerName(row.name)||(_lbPlayerName||'Player');
-  const coins=Number.isFinite(Number(row.coins))?Math.floor(Number(row.coins)):_coinTotal;
-  const total=Number.isFinite(Number(row.coinTotal))?Math.floor(Number(row.coinTotal)):_coinTotal;
   const catColor=_sanitizeCatColorKey(row.catColor||_catColorKey);
-  const catHair=_sanitizeCatHairKey(row.catHair||_catHairKey);
+  const catModel=_sanitizeCatModelKey(row.catModel||_catModelKey);
+  const modelEmoji=_CAT_MODEL_EMOJI[catModel]||'🐱';
+  const modelLabel=_CAT_MODEL_LABELS_SHORT[catModel]||'Cat';
+  // Bababooey has baked colors so the coat chip is meaningless.
+  const colorable=(catModel!=='bababooey');
+  const colorChip=colorable
+    ? ` ${_CAT_COLOR_EMOJI[catColor]||''} ${catColor.charAt(0).toUpperCase()+catColor.slice(1)}`
+    : '';
   const url=_makeShareUrl(row.entryId||'');
   return [
-    `${who} finished DIY Air Purifier Run`,
-    `Time ${_fmtRun(row.timeMs||0)} | Rank ${rankTxt} | Coins ${coins}/${total} | Cat ${catColor}/${catHair}`,
+    `${who} · DIY Air Purifier · ${_fmtRun(row.timeMs||0)} · ${rankTxt} · ${modelEmoji} ${modelLabel}${colorChip}`,
     url
   ].join('\n');
 }
