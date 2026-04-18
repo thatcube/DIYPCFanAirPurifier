@@ -8071,8 +8071,8 @@ _finishDialogStyle.textContent=`
   #finishDialogList li.own{background:rgba(255,216,115,0.16);border-color:rgba(255,216,115,0.45);box-shadow:0 0 0 1px rgba(255,216,115,0.14)}
   #finishDialogList li .rk{opacity:0.66;font-variant-numeric:tabular-nums}
   #finishDialogList li .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #finishDialogList li .catBadge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:0.3px;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#cdd7e5;white-space:nowrap}
-  #finishDialogList li .catBadge .d{width:9px;height:9px;border-radius:50%;border:1px solid rgba(0,0,0,0.4);flex-shrink:0}
+  #finishDialogList li .catBadge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:0.3px;padding:2px 7px 2px 5px;border-radius:999px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#cdd7e5;white-space:nowrap}
+  #finishDialogList li .catBadge .catIcon{display:inline-flex;align-items:center;line-height:0;filter:drop-shadow(0 1px 0 rgba(0,0,0,0.35))}
   #finishDialogList li.own .catBadge{background:rgba(255,216,115,0.1);border-color:rgba(255,216,115,0.3);color:#ffeab2}
   #finishDialogList li .tm{font-variant-numeric:tabular-nums;font-weight:700;color:#9fe3ff}
   #finishDialogList li.own .tm{color:#ffd873}
@@ -8082,13 +8082,14 @@ _finishDialogStyle.textContent=`
   #finishDialogCard.page-cat [data-page="cat"]{display:flex;flex:1;min-height:0}
   #finishDialogBackBtn{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);color:#dde4ef;border-radius:999px;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;cursor:pointer;padding:0;line-height:1}
   #finishDialogBackBtn:hover{background:rgba(255,255,255,0.16)}
-  #finishDialogCatHeader{padding:14px 18px 10px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between;gap:10px}
-  #finishDialogCatTitle{font-size:13px;font-weight:800;letter-spacing:1.1px;color:#9fe3ff;margin:0}
+  #finishDialogCatHeader{padding:14px 18px 10px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:10px}
+  #finishDialogCatTitle{font-size:13px;font-weight:800;letter-spacing:1.1px;color:#9fe3ff;margin:0;flex:1}
   #finishDialogCatBody{padding:14px 18px 6px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:10px}
   #finishDialogCatBody .rowLabel{font-size:10px;font-weight:800;letter-spacing:0.9px;color:#7fa2c2;margin:4px 0 2px}
   #finishDialogCatBody .row{display:flex;flex-wrap:wrap;gap:7px}
-  #finishDialogChangeCat{background:rgba(159,227,255,0.12);border:1px solid rgba(159,227,255,0.38);color:#c9ecff;border-radius:999px;padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:0.4px;cursor:pointer}
-  #finishDialogChangeCat:hover{background:rgba(159,227,255,0.2)}
+  #finishDialogChangeCat{margin-right:auto;display:inline-flex;align-items:center;gap:7px;background:transparent;border:1px dashed rgba(159,227,255,0.55);color:#c9ecff;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;letter-spacing:0.3px;cursor:pointer;transition:background 0.12s,border-color 0.12s}
+  #finishDialogChangeCat:hover{background:rgba(159,227,255,0.12);border-color:rgba(159,227,255,0.9);border-style:solid}
+  #finishDialogChangeCat .icon{width:16px;height:16px;display:inline-block}
   .finishColorBtn,.finishHairBtn,.finishModelBtn{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:#dde4ef;font-size:12px;font-weight:700;letter-spacing:0.3px;cursor:pointer}
   .finishColorBtn .dot{width:11px;height:11px;border-radius:50%;border:1px solid rgba(0,0,0,0.4)}
   .finishColorBtn.on,.finishHairBtn.on,.finishModelBtn.on{background:rgba(255,216,115,0.18);border-color:rgba(255,216,115,0.5);color:#ffe3a8}
@@ -8126,15 +8127,15 @@ _finishDialog.innerHTML=`
       </div>
       <div class="finishDialogActions">
         <button type="button" class="finishDlgBtn danger" id="finishDialogExit">Exit</button>
-        <button type="button" id="finishDialogChangeCat">Change cat →</button>
+        <button type="button" id="finishDialogChangeCat" title="Customize your cat"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10l3-5 3 3 3-3 3 5v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><circle cx="9" cy="13" r="0.8" fill="currentColor"/><circle cx="15" cy="13" r="0.8" fill="currentColor"/></svg>Change cat</button>
         <button type="button" class="finishDlgBtn secondary" id="finishDialogAgain">Play again</button>
         <button type="button" class="finishDlgBtn primary" id="finishDialogCopy">Copy result</button>
       </div>
     </div>
     <div data-page="cat">
       <div id="finishDialogCatHeader">
-        <h4 id="finishDialogCatTitle">CUSTOMIZE YOUR CAT</h4>
         <button type="button" id="finishDialogBackBtn" aria-label="Back to results" title="Back to results">←</button>
+        <h4 id="finishDialogCatTitle">CUSTOMIZE YOUR CAT</h4>
       </div>
       <div id="finishDialogCatBody">
         <div class="rowLabel">BREED</div>
@@ -8243,7 +8244,7 @@ function _renderFinishDialog(){
       const ownName=(data.name||_lbPlayerName||'');
       list.innerHTML=_leaderboard.map((r,i)=>{
         const own=(ownId && r.id===ownId) || (!ownId && r.name===ownName);
-        return `<li class="${own?'own':''}"><span class="rk">#${i+1}</span><span class="nm">${_escapeHtml(r.name)}</span><span class="tm">${_fmtRun(r.timeMs)}</span></li>`;
+        return `<li class="${own?'own':''}"><span class="rk">#${i+1}</span><span class="nm">${_escapeHtml(r.name)}</span>${_catBadgeHtml(r)}<span class="tm">${_fmtRun(r.timeMs)}</span></li>`;
       }).join('');
       // Scroll the highlighted row into view.
       setTimeout(()=>{
@@ -8428,6 +8429,33 @@ function _fmtRun(ms){
   const s=Math.floor((total%60000)/1000);
   const z=total%1000;
   return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(z).padStart(3,'0')}`;
+}
+// Inline SVG icons for each cat model. 16×16 viewBox, uses currentColor.
+// Classic = rounded tabby silhouette, Toon = simpler blocky head, Bababooey
+// = wide goofy head with whiskers.
+const _CAT_MODEL_ICONS={
+  classic:'<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M3.2 3.4 4.7 6c.8-.3 1.7-.5 2.6-.5H8.7c.9 0 1.8.2 2.6.5l1.5-2.6c.2-.4.8-.3.9.2l.5 2.7c.5.8.8 1.8.8 2.8 0 2.8-2.5 5.1-5.6 5.1h-.8c-3.1 0-5.6-2.3-5.6-5.1 0-1 .3-2 .8-2.8l.5-2.7c.1-.5.7-.6.9-.2Z"/><circle cx="6.3" cy="9.2" r="0.7" fill="#0b1320"/><circle cx="9.7" cy="9.2" r="0.7" fill="#0b1320"/></svg>',
+  toon:'<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M2.5 4 4 7a5.5 5 0 0 0 0 4c0 2.5 1.8 4 4 4s4-1.5 4-4a5.5 5 0 0 0 0-4l1.5-3c.2-.4-.2-.8-.6-.6L11 4.3a6 5 0 0 0-6 0L3.1 3.4c-.4-.2-.8.2-.6.6Z"/><rect x="5.6" y="8.7" width="1.4" height="1.4" rx="0.3" fill="#0b1320"/><rect x="9" y="8.7" width="1.4" height="1.4" rx="0.3" fill="#0b1320"/></svg>',
+  bababooey:'<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M2 5.5 3.4 3.2c.2-.4.8-.3.9.2l.4 1.9a6.5 5.5 0 0 1 6.6 0l.4-1.9c.1-.5.7-.6.9-.2L14 5.5a5.5 5.5 0 0 1 .4 2c0 3-2.9 5.5-6.4 5.5S1.6 10.5 1.6 7.5a5.5 5.5 0 0 1 .4-2Z"/><circle cx="6.2" cy="8.6" r="0.8" fill="#0b1320"/><circle cx="9.8" cy="8.6" r="0.8" fill="#0b1320"/><path d="M6.5 11.2 3 11M9.5 11.2 13 11" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" fill="none"/></svg>'
+};
+const _CAT_MODEL_LABELS_SHORT={classic:'Classic',toon:'Toon',bababooey:'Bababooey'};
+function _catColorHex(key){
+  const p=_catColorPresets && _catColorPresets[String(key||'').toLowerCase()];
+  if(!p) return '#9aa4b4';
+  return '#'+(p.coat>>>0).toString(16).padStart(6,'0');
+}
+// Returns an HTML snippet showing the cat model icon tinted with the cat's
+// coat color, plus a short label. Used in leaderboard rows so you can tell
+// who's using which cat/color at a glance.
+function _catBadgeHtml(entry){
+  const model=String((entry && entry.catModel)||'classic').toLowerCase();
+  const icon=_CAT_MODEL_ICONS[model]||_CAT_MODEL_ICONS.classic;
+  const label=_CAT_MODEL_LABELS_SHORT[model]||'Cat';
+  // Bababooey has baked-in colors so the per-entry color is meaningless —
+  // use a neutral tint so it doesn't imply a coat swatch the run didn't have.
+  const colorable=(model!=='bababooey');
+  const hex=colorable?_catColorHex(entry && entry.catColor):'#c9a57a';
+  return `<span class="catBadge" title="${label}${colorable?(' · '+(entry && entry.catColor||'ginger')):''}"><span class="catIcon" style="color:${hex}">${icon}</span><span class="catLabel">${label}</span></span>`;
 }
 function _makeEntryId(name,timeMs,at){
   const base=`${_sanitizePlayerName(name)||'Player'}|${Math.floor(Number(timeMs)||0)}|${Math.floor(Number(at)||Date.now())}`;
@@ -8778,9 +8806,10 @@ function _renderLeaderboard(){
   } else {
     list.innerHTML=_leaderboard.map((r,i)=>{
       const own=r.name===_lbPlayerName;
-      return `<li style="display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:center;padding:3px 6px;border-radius:8px;${own?'background:rgba(255,216,115,0.14);border:1px solid rgba(255,216,115,0.3);':'background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);'}">
+      return `<li style="display:grid;grid-template-columns:26px 1fr auto auto;gap:6px;align-items:center;padding:3px 6px;border-radius:8px;${own?'background:rgba(255,216,115,0.14);border:1px solid rgba(255,216,115,0.3);':'background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);'}">
         <span style="opacity:0.68">#${i+1}</span>
         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_escapeHtml(r.name)}</span>
+        <span class="catBadge" style="display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;letter-spacing:0.25px;padding:1px 6px 1px 4px;border-radius:999px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#cdd7e5;white-space:nowrap" title="${_escapeHtml((_CAT_MODEL_LABELS_SHORT[(r.catModel||'classic').toLowerCase()]||'Cat'))}"><span style="display:inline-flex;line-height:0;color:${(r.catModel||'').toLowerCase()==='bababooey'?'#c9a57a':_catColorHex(r.catColor)}">${(_CAT_MODEL_ICONS[(r.catModel||'classic').toLowerCase()]||_CAT_MODEL_ICONS.classic).replace('width="14" height="14"','width="11" height="11"')}</span><span>${_CAT_MODEL_LABELS_SHORT[(r.catModel||'classic').toLowerCase()]||'Cat'}</span></span>
         <span style="font-variant-numeric:tabular-nums;font-weight:700;color:${own?'#ffd873':'#9fe3ff'}">${_fmtRun(r.timeMs)}</span>
       </li>`;
     }).join('');
