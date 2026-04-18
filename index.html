@@ -6912,13 +6912,17 @@ const _bp=blanketGeo.attributes.position;
 for(let i=0;i<_bp.count;i++){
   let x=_bp.getX(i), y=_bp.getY(i), z=_bp.getZ(i);
   z-=_bFootHang/2; // shift so extra length extends past foot (-Z)
-  let drop=0;
   // Side drape: vertices past mattress edge drop nearly straight down
   const sx=Math.max(0,Math.abs(x)-mattW/2);
-  if(sx>0){ const t=sx/_bSideHang; drop+=_bMaxDrape*t; x=Math.sign(x)*(mattW/2+sx*0.25); }
+  const sideDrop=sx>0 ? _bMaxDrape*(sx/_bSideHang) : 0;
+  if(sx>0) x=Math.sign(x)*(mattW/2+sx*0.25);
   // Foot drape: vertices past foot edge drop nearly straight down
   const fz=Math.max(0,-duvetL/2-z);
-  if(fz>0){ const t=fz/_bFootHang; drop+=_bMaxDrape*t; z=-duvetL/2-fz*0.25; }
+  const footDrop=fz>0 ? _bMaxDrape*(fz/_bFootHang) : 0;
+  if(fz>0) z=-duvetL/2-fz*0.25;
+  // Use the larger of the two drops at corners (not the sum) so corner
+  // vertices don't stretch to an unnatural point below the edge drape.
+  const drop=Math.max(sideDrop, footDrop);
   _bp.setX(i,x); _bp.setY(i,y-drop); _bp.setZ(i,z);
 }
 blanketGeo.computeVertexNormals();
@@ -7060,9 +7064,9 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
     // ╠══════════════════════════════════════════════════════════════╣
     // ║  SIZE & SHAPE                                                ║
     // ╚══════════════════════════════════════════════════════════════╝
-    const screenW = localSize.x * 0.88;   // WIDTH  — larger = wider screen
-    const screenH = screenW      * 0.625; // HEIGHT — 0.625 is 16:10 (real MBP)
-    const cornerR = screenH      * 0.08;  // CORNER RADIUS — larger = rounder
+    const screenW = localSize.x * 0.96;   // WIDTH  — larger = wider screen
+    const screenH = screenW      * 0.68; // HEIGHT — 0.625 is 16:10 (real MBP)
+    const cornerR = screenH      * 0.04;  // CORNER RADIUS — larger = rounder
 
     // ╔══════════════════════════════════════════════════════════════╗
     // ║  POSITION (in the lid's local coordinate system)             ║
@@ -7072,8 +7076,8 @@ const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp',
     // ║  Z  → forward/back           (negative pushes toward player) ║
     // ╚══════════════════════════════════════════════════════════════╝
     const screenX_frac = 0.5;   // X — fraction across lid width  (0…1)
-    const screenY_frac = 0.5;   // Y — fraction up lid height      (0…1)
-    const screenZ_off  = 0.2;   // Z — inches in front of lid face (+ = toward player)
+    const screenY_frac = 0.525;   // Y — fraction up lid height      (0…1)
+    const screenZ_off  = -0.19;   // Z — inches in front of lid face (+ = toward player)
 
     // ── end tweakable knobs ─────────────────────────────────────────
 
@@ -8565,7 +8569,7 @@ function _setFpCamMode(mode){
 // When on, scores are stored under a *separate* localStorage key and the
 // shared API is bypassed, so the production leaderboard is untouched and
 // reappears the moment _TEST_MODE is flipped back to false.
-const _TEST_MODE=true;
+const _TEST_MODE=false;
 const _LB_STORE_KEY=_TEST_MODE
   ? 'diy_air_purifier_leaderboard_TEST_v1'
   : 'diy_air_purifier_leaderboard_v1';
