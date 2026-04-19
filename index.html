@@ -9073,6 +9073,11 @@ function _setFpPaused(paused){
 // shared API is bypassed, so the production leaderboard is untouched and
 // reappears the moment _TEST_MODE is flipped back to false.
 const _TEST_MODE=false;
+// QUICK COIN MODE: spawn only the Switch-stack coin for fast test runs, but
+// keep the real shared leaderboard wired up so finished runs push live. Use
+// this when iterating on HUD/leaderboard/finish-dialog behavior. Leave
+// _TEST_MODE=false so production API + store key stay active.
+const _QUICK_COIN_MODE=true;
 const _LB_STORE_KEY=_TEST_MODE
   ? 'diy_air_purifier_leaderboard_TEST_v1'
   : 'diy_air_purifier_leaderboard_v1';
@@ -10226,9 +10231,10 @@ const _coins=[];
 const _coinPickR=4.6;
 const _coinCamTmp=new THREE.Vector3();
 // Quick test mode: keep only the Switch game-stack coin so full runs are fast.
-// Driven by the global _TEST_MODE flag so one toggle controls both the coin
-// layout and the isolated-leaderboard behavior.
-const _coinQuickTestMode=(typeof _TEST_MODE!=='undefined')?!!_TEST_MODE:false;
+// Driven by either _TEST_MODE (isolated leaderboard) or _QUICK_COIN_MODE
+// (1-coin layout + live shared leaderboard).
+const _coinQuickTestMode=(typeof _TEST_MODE!=='undefined' && !!_TEST_MODE)
+  || (typeof _QUICK_COIN_MODE!=='undefined' && !!_QUICK_COIN_MODE);
 let _coinScore=0;
 let _coinSecretScore=0;
 let _coinTotal=0;
