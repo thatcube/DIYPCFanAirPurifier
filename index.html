@@ -8622,6 +8622,14 @@ _nameDialogStyle.textContent=`
   #nameDialogBody{font-size:12px;opacity:0.85;margin-top:6px}
   #nameDialogInput{width:100%;margin-top:10px;box-sizing:border-box;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:10px;color:#fff;padding:8px 10px;font-size:14px;outline:none}
   #nameDialogInput:focus{border-color:rgba(159,227,255,0.8);box-shadow:0 0 0 2px rgba(159,227,255,0.2)}
+  /* Character counter — hidden by default, only appears when nearing the
+     limit (>= 75% of maxlength). Sits in the bottom-right corner of the
+     input wrapper so it doesn't take up layout space. */
+  #nameDialogInputWrap{position:relative}
+  #nameDialogCount{position:absolute;right:10px;bottom:8px;font-family:'SF Mono',Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;font-size:10px;font-weight:700;letter-spacing:0.3px;color:#9fc7e4;opacity:0;transition:opacity 0.18s,color 0.18s;pointer-events:none;background:rgba(9,13,20,0.75);padding:2px 6px;border-radius:6px}
+  #nameDialogCount.on{opacity:0.85}
+  #nameDialogCount.warn{color:#ffd873}
+  #nameDialogCount.max{color:#ff9aa0}
   #nameDialogHint{font-size:10px;opacity:0.6;margin-top:6px}
   #nameDialogActions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
   .nameDlgBtn{border:none;border-radius:10px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer}
@@ -8639,7 +8647,10 @@ _nameDialog.innerHTML=`
     <form id="nameDialogForm" autocomplete="off" data-bwignore="true">
       <input type="text" name="ghost_user" autocomplete="username" data-bwignore="true" tabindex="-1" aria-hidden="true" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;opacity:0;pointer-events:none" />
       <input type="password" name="ghost_pass" autocomplete="new-password" data-bwignore="true" tabindex="-1" aria-hidden="true" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;opacity:0;pointer-events:none" />
-      <input id="nameDialogInput" type="text" name="run_tag_manual_entry" maxlength="24" inputmode="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" data-bwignore="true" data-lpignore="true" data-1p-ignore="true" data-form-type="other" placeholder="Type cat name" />
+      <div id="nameDialogInputWrap">
+        <input id="nameDialogInput" type="text" name="run_tag_manual_entry" maxlength="24" inputmode="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" data-bwignore="true" data-lpignore="true" data-1p-ignore="true" data-form-type="other" placeholder="Type cat name" />
+        <span id="nameDialogCount" aria-hidden="true">0/24</span>
+      </div>
       <div id="nameDialogHint">Press Enter to save, or Esc to cancel.</div>
       <div id="nameDialogActions">
         <button type="button" class="nameDlgBtn cancel" id="nameDialogCancel">Cancel</button>
@@ -9553,6 +9564,7 @@ function _openNameDialog(force,onAfterClose){
       } else if(!_nameDialogManualTyped){
         input.value='';
       }
+      _updateNameDialogCount();
     }, 30);
   }
 }
@@ -9614,7 +9626,24 @@ document.getElementById('nameDialogInput').addEventListener('input',e=>{
   if(!_nameDialogManualTyped){
     e.target.value='';
   }
+  _updateNameDialogCount();
 });
+// Updates the "N/max" counter. Only visible when the name is >= 75% of the
+// limit so short names don't show an unnecessary constraint indicator;
+// amber at >= 90%, red at the exact max.
+function _updateNameDialogCount(){
+  const input=document.getElementById('nameDialogInput');
+  const counter=document.getElementById('nameDialogCount');
+  if(!input || !counter) return;
+  const max=Number(input.getAttribute('maxlength'))||24;
+  const len=(input.value||'').length;
+  counter.textContent=`${len}/${max}`;
+  const threshold=Math.ceil(max*0.75);
+  const on=len>=threshold;
+  counter.classList.toggle('on', on);
+  counter.classList.toggle('warn', on && len>=Math.ceil(max*0.9) && len<max);
+  counter.classList.toggle('max', len>=max);
+}
 document.getElementById('fpShareBtn').addEventListener('click',async(e)=>{
   e.preventDefault();
   e.stopPropagation();
