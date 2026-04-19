@@ -1185,12 +1185,13 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
       _catTmpColorA.getHSL(_catTmpHSL);
       _catTmpColorB.setHex(colorCfg.coat);
       _catTmpColorB.getHSL(_catTmpHSLB);
-      let tint=Math.max(0.15,Math.min(0.98,colorCfg.tint));
-      if(_catTmpHSL.s<0.06) tint=Math.max(tint,0.88);
-      // Keep luminance detail from the source texture while strongly shifting coat hue.
-      const sat=Math.max(0.12,Math.min(1,(_catTmpHSLB.s*0.92)+(_catTmpHSL.s*0.24)));
-      const lit=Math.max(0.08,Math.min(0.94,(_catTmpHSL.l*(1-(tint*0.34)))+(_catTmpHSLB.l*(tint*0.34))));
-      m.color.setHSL(_catTmpHSLB.h,sat,lit);
+      // Replace the fur color almost entirely: take the target coat's hue
+      // and saturation, but keep the original luminance detail so light/shadow
+      // from the baked texture still reads. This is the only way to make the
+      // fur color actually look like the preset without the original baked
+      // color bleeding through and desaturating/shifting it.
+      const lit=Math.max(0.08,Math.min(0.94, _catTmpHSL.l*0.7 + _catTmpHSLB.l*0.3));
+      m.color.setHSL(_catTmpHSLB.h, _catTmpHSLB.s*0.92, lit);
       m.roughness=Math.min(1,Math.max(0.55,baseRough*hairCfg.rough));
       m.bumpMap=_getCatFurNoiseTexture();
       m.bumpScale=Math.max(0.001,(Math.abs(baseBump)*0.35)+hairCfg.bump);
@@ -1204,7 +1205,7 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
       m.userData._catFurAmount=hairCfg.furRim;
       m.userData._catFurTintHex=_catFurTintColor.getHex();
       m.userData._catCoatTintHex=_catTmpColorC.getHex();
-      m.userData._catCoatAmount=Math.max(0,Math.min(0.95,Number(colorCfg.coatMix)||0.8));
+      m.userData._catCoatAmount=Math.max(0,Math.min(0.98,Number(colorCfg.coatMix)||0.9));
       if(m.userData._catFurShader){
         m.userData._catFurShader.uniforms.uCatFurAmount.value=hairCfg.furRim;
         m.userData._catFurShader.uniforms.uCatFurTint.value.copy(_catFurTintColor);
