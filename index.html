@@ -2785,12 +2785,14 @@ function makeFanPanel(flip, nFans, edgeProfile=topEdgeProfile){
     const fanBlades=[];
     allFanMats.push(null); // placeholder at [i+3], replaced below with blade[0]
     for(let b=0;b<bladeCount;b++){
-      // FrontSide (was DoubleSide) halves fragment-shader work for every
-      // blade pixel on screen. Panels face outward so the blade back is
-      // hidden by the housing. Steps dropped 14→28 — the sickle curve
-      // is still smooth at this density, and it roughly halves the
-      // triangle count per blade.
-      const bladeMat=stdMat({color:0xf0ece8,shininess:30,side:THREE.FrontSide,transparent:true,opacity:0.65,depthWrite:false});
+      // FrontSide + OPAQUE blades (was transparent:true, opacity:0.65). The
+      // translucent look was visually lost once blades spin anyway — motion
+      // blurs them into a solid disc. Going opaque lets the GPU's depth
+      // prepass + early-Z kill every overlapping blade pixel behind the
+      // frontmost blade, turning a catastrophic overdraw case into O(1)
+      // per pixel. Also drops blade-to-blade alpha sorting out of the
+      // transparent pass entirely.
+      const bladeMat=stdMat({color:0xf0ece8,shininess:30,side:THREE.FrontSide});
       fanBlades.push(bladeMat);
       const baseAngle=b/bladeCount*Math.PI*2;
       const bladeShape=new THREE.Shape();
@@ -2826,6 +2828,12 @@ function makeFanPanel(flip, nFans, edgeProfile=topEdgeProfile){
       // mousemove when the cursor drifts near the purifier. Huge win on
       // high-refresh mice where mousemove fires ~1 kHz.
       bladeMesh.raycast=function(){};
+      // Skip shadow casting too — blade silhouettes through the grill
+      // would be invisible regardless, and keeping them out of the
+      // shadow pass avoids redrawing 40+ ExtrudeGeometry meshes into
+      // the shadow map every time it re-bakes.
+      bladeMesh.castShadow=false;
+      bladeMesh.receiveShadow=false;
       rotor.add(bladeMesh);
     }
     allFanMats[allFanMats.length-1]=fanBlades[0]; // slot blade[0] into the placeholder
@@ -3012,8 +3020,8 @@ function makeAltTopPanel(nFans){
     const fanBlades2=[];
     allFanMats.push(null); // placeholder for blade[0]
     for(let b=0;b<bladeCount;b++){
-      // See fan-panel blades: FrontSide + 8 steps for cheaper fill rate.
-      const bladeMat=stdMat({color:0xf0ece8,shininess:30,side:THREE.FrontSide,transparent:true,opacity:0.65,depthWrite:false});
+      // See fan-panel blades: FrontSide + opaque + 8 steps.
+      const bladeMat=stdMat({color:0xf0ece8,shininess:30,side:THREE.FrontSide});
       fanBlades2.push(bladeMat);
       const baseAngle=b/bladeCount*Math.PI*2;
       const bladeShape=new THREE.Shape();
@@ -3042,6 +3050,8 @@ function makeAltTopPanel(nFans){
       bladeGeo.translate(0,0,-fanDepth*0.325);
       const bladeMesh=new THREE.Mesh(bladeGeo,bladeMat);
       bladeMesh.raycast=function(){};
+      bladeMesh.castShadow=false;
+      bladeMesh.receiveShadow=false;
       rotor.add(bladeMesh);
     }
     allFanMats[allFanMats.length-1]=fanBlades2[0];
@@ -5686,11 +5696,16 @@ function applyBladeStyle(){
   for(const blades of allBladeMatsPerFan){
     for(const blade of blades){
       if(fansRGB){
+        // Blades stay OPAQUE even in RGB mode. Spinning blades blur into
+        // a solid disc visually, so the "frosted translucent" look was
+        // imperceptible at runtime but wildly expensive (see opaque-blade
+        // commit). Keeping transparent=false + depthWrite=true preserves
+        // early-Z rejection next to the rest of the purifier.
         blade.color.setHex(BLADE_FROSTED.color);
-        blade.transparent=true;
-        blade.opacity=BLADE_FROSTED.opacity;
+        blade.transparent=false;
+        blade.opacity=1.0;
         blade.shininess=BLADE_FROSTED.shininess;
-        blade.depthWrite=false;
+        blade.depthWrite=true;
       } else {
         blade.color.setHex(c.blade);
         blade.transparent=false;
