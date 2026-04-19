@@ -4166,8 +4166,7 @@ function handleClickObject(obj){
     ceilLightOn=!ceilLightOn;
     ceilSpot.intensity=ceilLightOn?0.95:0;
     domeMat.emissiveIntensity=ceilLightOn?0.8:0;
-    if(ceilGlow) ceilGlow.intensity=ceilLightOn?0.35:0;
-    if(ceilUp) ceilUp.intensity=ceilLightOn?1.1:0;
+    if(ceilGlow) ceilGlow.intensity=ceilLightOn?0.5:0;
     if(typeof _spawnSecretPowerBICoins==='function') _spawnSecretPowerBICoins();
     return;
   }
@@ -5621,15 +5620,11 @@ function applyTimeOfDay(minuteOfDay){
   bounce.position.set(ROOM_LIGHT_BASE.bounce.x, ROOM_LIGHT_BASE.bounce.y, ROOM_LIGHT_BASE.bounce.z);
 
   // Other lights
-  hemiLight.intensity=mix(0.05, 0.24, sun) + (ceilLightOn?mix(0.30, 0.10, sun):0); // broader daylight fill; ceiling-on lifts ALL surfaces (ceiling, TV wall, etc.) via ambient — fake radiosity
+  hemiLight.intensity=mix(0.05, 0.24, sun) + (ceilLightOn?mix(0.12, 0.04, sun):0); // ceiling-on adds gentle ambient lift
   {
-    // At night with only the ceiling light on, the sun-driven sky color
-    // is cold (0x334466). That would make the hemi "lift" look blue,
-    // which reads wrong — a warm fixture should warm the room. Shift
-    // sky color toward warm tungsten proportional to ceiling-on weight.
     const sky=lerpHex(0x334466, 0x8899bb, sun);
     if(ceilLightOn){
-      const warmMix=(1-sun)*0.7; // strong warm at night, weak in daytime
+      const warmMix=(1-sun)*0.5; // warm tint at night so the lift doesn't read cold blue
       sky.lerp(new THREE.Color(0xfff0d0), warmMix);
     }
     hemiLight.color.copy(sky);
@@ -5640,8 +5635,7 @@ function applyTimeOfDay(minuteOfDay){
   bounce.intensity=mix(0.0, 0.06, sun);  // soft floor bounce in daytime
   ceilSpot.intensity=ceilLightOn?mix(1.1, 0.4, sun):0; // keep visibly lit in daytime, warmer/stronger at night
   domeMat.emissiveIntensity=ceilLightOn?mix(0.9, 0.45, sun):0;
-  if(ceilGlow) ceilGlow.intensity=ceilLightOn?mix(0.35, 0.15, sun):0;
-  if(ceilUp) ceilUp.intensity=ceilLightOn?mix(1.1, 0.5, sun):0;
+  if(ceilGlow) ceilGlow.intensity=ceilLightOn?mix(0.6, 0.25, sun):0;
 
   // Outdoor backdrop brightness (sun through window)
   outdoor.material.color.setScalar(mix(0.08, 1.4, sun)+warm*0.25);
@@ -5730,7 +5724,6 @@ function applyIsolate(on){
     bounce.intensity=0.1;
     ceilSpot.intensity=0;
     if(ceilGlow) ceilGlow.intensity=0;
-    if(ceilUp) ceilUp.intensity=0;
     // Expose purifier shadows onto nothing (disable shadow receiving on hidden floor)
     renderer.toneMappingExposure=1.3;
   } else {
@@ -5995,7 +5988,7 @@ const ceilingMat = new THREE.MeshStandardMaterial({color:0xe0ddd6, roughness:0.9
 const ceiling = new THREE.Mesh(ceilingGeo, ceilingMat);
 ceiling.rotation.x = Math.PI/2;
 ceiling.position.y = floorY+80;
-ceiling.castShadow = true;
+ceiling.castShadow = false; // NEVER let the ceiling cast directional-light shadows — it's a 200×200 plane that shadows the upper portions of every wall and itself, making them permanently dark
 ceiling.receiveShadow = true;
 ceiling._isRoom = true;
 scene.add(ceiling);
@@ -6334,7 +6327,6 @@ let lampLight, lampShade, lampOn=true;
 let lampBulb=null;
 let ceilLightOn=true; // ceiling fixture togglable by clicking
 let ceilGlow=null;
-let ceilUp=null; // upward wash that lights the ceiling plane itself
 {
   const lampX=tblX+tblW/2-6; // 6" from the extrusion-side edge
   const lampZ=tblZ+tblD/2-6; // 6" from the back edge (avoid wall clip)
@@ -6980,20 +6972,14 @@ ceilSpot.shadow.bias=-0.0005;
 ceilSpot.shadow.radius=5; ceilSpot.shadow.blurSamples=12;
 ceilSpot.shadow.camera.near=10;
 ceilSpot.shadow.camera.far=95;
-// Single omni glow with very low decay so intensity is nearly uniform
-// across the whole room. This is the ONLY way to light the ceiling,
-// near walls, and the TV wall (74" away) at similar brightness
-// without blowing out near surfaces:
-//   near wall  (10") → 0.35 / 10^0.35 ≈ 0.156
-//   TV wall   (74") → 0.35 / 74^0.35 ≈ 0.073
-// That's a ~2x ratio — the far wall reads as lit, the near wall isn't
-// blown out. Real rooms feel this way because of radiosity bounce,
-// which we can't afford at 300fps; constant-ish point light fakes it.
-ceilGlow=new THREE.PointLight(0xfff3df,0.35,0,0.35);
+// Omni glow for the ceiling fixture. With the ceiling plane no longer
+// casting false shadows, the key directional light now reaches ALL
+// walls. ceilGlow adds a warm wash on top. Moderate intensity with
+// low decay so it reads on both near and far walls.
+ceilGlow=new THREE.PointLight(0xfff3df,0.6,0,0.5);
 ceilGlow.position.set(ceilLightX,ceilY-2,ceilLightZ);
 ceilGlow.castShadow=false;
 scene.add(ceilGlow);
-// ceilUp is unused now — kept as null so the wiring below is a no-op.
 
 // Curtains — simple draped fabric panels on each side of the window
 const curtainH=winH+12, curtainW=14, curtainD=1.5;
@@ -10987,8 +10973,7 @@ function _resetCoins(){
     ceilLightOn=true;
     if(typeof ceilSpot!=='undefined' && ceilSpot) ceilSpot.intensity=0.95;
     if(typeof domeMat!=='undefined' && domeMat) domeMat.emissiveIntensity=0.8;
-    if(typeof ceilGlow!=='undefined' && ceilGlow) ceilGlow.intensity=0.35;
-    if(typeof ceilUp!=='undefined' && ceilUp) ceilUp.intensity=1.1;
+    if(typeof ceilGlow!=='undefined' && ceilGlow) ceilGlow.intensity=0.5;
   }
   // Randomize which drawer hides the coin this session.
   const drawerCoin=_coins.find(c=>c.inDrawer);
