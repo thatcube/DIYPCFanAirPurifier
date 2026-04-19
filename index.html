@@ -5143,8 +5143,8 @@ function makeGameSpineTexture(title,platform){
   const spineFontStack='-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   const isSw2=platform==='switch2';
   const isGray=platform==='special-gray';
-  const bg=isGray?'#bbbbbb':(isSw2?'#c4000f':'#c4000f');
-  const rail=isGray?'#a1a1a1':(isSw2?'#c4000f':'#c4000f');
+  const bg=isGray?'#bbbbbb':(isSw2?'#9b0a12':'#9b0a12');
+  const rail=isGray?'#a1a1a1':(isSw2?'#9b0a12':'#9b0a12');
   const txt=isGray?'#262626':'#ffffff';
   const badgeStroke=isGray?'#505050':'#f6d7d8';
   const textStroke=isGray?'rgba(255,255,255,0.55)':'rgba(0,0,0,0.35)';
@@ -5359,7 +5359,7 @@ function makeSwitch2PokopiaCoverTexture(){
     const isSw2=game.platform==='switch2';
     const isGray=game.platform==='special-gray';
     const isPokopiaSwitch2=isSw2 && /pokopia/i.test(String(game.title||''));
-    const sideCol=isGray?0xb7b7b7:0xc4000f;
+    const sideCol=isGray?0xb7b7b7:0x9b0a12;
     const bodyMat=stdMat({color:sideCol, roughness:0.72, metalness:0.02});
     const spineMap=makeGameSpineTexture(game.title, game.platform);
     const spineMat=new THREE.MeshStandardMaterial({
