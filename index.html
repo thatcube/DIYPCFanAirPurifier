@@ -1074,7 +1074,11 @@ function _ensureCatFurShader(mat){
         'float catTexSat = (catTexMax - catTexMin) / max(0.0001, catTexMax);',
         'float catFurMask = smoothstep(0.12,0.62,catTexLuma) * (1.0 - smoothstep(0.9,1.0,catTexLuma));',
         'catFurMask *= mix(0.42,1.0,smoothstep(0.08,0.34,catTexSat));',
-        'vec3 catTinted = outgoingLight * (uCatCoatTint * 1.45);',
+        // Extract the lighting intensity from outgoingLight, then recolor
+        // with the coat tint at that same intensity. This REPLACES the hue
+        // instead of multiplying (which desaturates).
+        'float catLightLuma = dot( outgoingLight, vec3(0.2126,0.7152,0.0722) );',
+        'vec3 catTinted = uCatCoatTint * max(0.15, catLightLuma * 1.6);',
         'vec3 catColorized = mix( outgoingLight, catTinted, uCatCoatAmount * (0.38 + (0.62 * catFurMask)) );',
         'float catFuzz = mix(1.0, mix(0.76,1.28,catNoise), min(1.0, uCatFurAmount * 0.95) * catFurMask);',
         'vec3 catFurGlow = uCatFurTint * (catFurRim * uCatFurAmount * catFurMask);',
@@ -1082,7 +1086,7 @@ function _ensureCatFurShader(mat){
       ].join('\n'));
     mat.userData._catFurShader=shader;
   };
-  mat.customProgramCacheKey=()=> 'catFurShaderV5';
+  mat.customProgramCacheKey=()=> 'catFurShaderV6';
   mat.needsUpdate=true;
 }
 function _applyCatHairToBones(model,hairCfg){
