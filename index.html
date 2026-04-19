@@ -8165,10 +8165,11 @@ function animate(ts){
       const mbZ=_macbookRoot.matrixWorld.elements[14];
       const dx=_fpPos.x-mbX, dy=_fpPos.y-mbY, dz=_fpPos.z-mbZ;
       const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
-      // Full volume only within 3", drops off sharply then levels out faint
-      const near=3, far=140;
-      const t=Math.max(0, Math.min(1, (dist-near)/(far-near)));
-      const vol=Math.max(0.08, 1-t*t*t); // cubic falloff — steep initial drop
+      // No full-volume zone — starts dropping immediately. Inverse-distance
+      // style: very close = loud, drops fast in the first few feet, then
+      // tapers gently to the 8% floor at distance.
+      const refDist=8; // distance at which volume is ~50%
+      const vol=Math.max(0.08, refDist/(refDist+dist));
       if(_mbMusicGain && _coinAC){
         _mbMusicGain.gain.setTargetAtTime(0.18*vol, _coinAC.currentTime, 0.06);
       }
