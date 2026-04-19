@@ -8155,6 +8155,27 @@ function animate(ts){
       -Math.cos(_fpYaw)*Math.cos(_fpPitch)
     );
     _stepCatMixer(ts,horizSpd);
+    // ── Proximity-based MacBook music volume ──
+    // Fade music based on distance to the laptop so it sounds like it's
+    // actually coming from the MacBook speaker, not a global jukebox.
+    if(_mbOn && _macbookRoot){
+      _macbookRoot.updateWorldMatrix(true,false);
+      const mbX=_macbookRoot.matrixWorld.elements[12];
+      const mbY=_macbookRoot.matrixWorld.elements[13];
+      const mbZ=_macbookRoot.matrixWorld.elements[14];
+      const dx=_fpPos.x-mbX, dy=_fpPos.y-mbY, dz=_fpPos.z-mbZ;
+      const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
+      // Full volume within 15", fades to ~10% at 80", silent beyond 120"
+      const near=15, far=120;
+      const t=Math.max(0, Math.min(1, (dist-near)/(far-near)));
+      const vol=Math.max(0, 1-t*t); // quadratic falloff
+      if(_mbMusicGain && _coinAC){
+        _mbMusicGain.gain.setTargetAtTime(0.18*vol, _coinAC.currentTime, 0.06);
+      }
+      if(_mbCurrentAudio){
+        _mbCurrentAudio.volume=Math.max(0, Math.min(1, (_mbCurrentSong&&_mbCurrentSong.volume!==undefined?_mbCurrentSong.volume:0.6)*vol));
+      }
+    }
     if(_fpCamMode==='first'){
       // True first-person camera: eye at player head, no cat mesh.
       camera.position.set(_fpPos.x, _fpPos.y+bobY, _fpPos.z);
@@ -10391,6 +10412,9 @@ function toggleFirstPerson(){
     if(document.exitPointerLock && document.pointerLockElement) document.exitPointerLock();
     _setCoinsVisible(false);
     _setFpControlsOpen(false);
+    // Restore MacBook music to full volume (proximity fade only applies in game mode)
+    if(_mbMusicGain && _coinAC) _mbMusicGain.gain.setTargetAtTime(0.18, _coinAC.currentTime, 0.06);
+    if(_mbCurrentAudio) _mbCurrentAudio.volume=(_mbCurrentSong&&_mbCurrentSong.volume!==undefined)?_mbCurrentSong.volume:0.6;
     // Clear pause state so re-entering play mode doesn't immediately pause.
     if(_fpPaused){
       _fpPaused=false;
