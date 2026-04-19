@@ -8345,19 +8345,26 @@ function _fpGetBoxes(){
   const yTopInner=H/2;            // underside of top plywood (interior ceiling)
   const yBotInner=-H/2;           // top face of bottom plywood (interior floor)
   const yBotPanel=-H/2-ply;       // bottom face of bottom plywood
+  // The cabinet stands on bun feet (currentFeetH), so there's a gap between
+  // yBotPanel and the actual floor. We seal that gap for collision only so
+  // the player can't crawl under the purifier through the feet (it's a solid
+  // cabinet on short legs — you wouldn't fit between real bun feet either).
+  const yBotFootprint=yBotPanel-currentFeetH;
   const fHalf=ft/2;               // filter half-thickness
   const fLx=filterL.position.x;   // live local X of left filter
   const fRx=filterR.position.x;   // live local X of right filter
   const localBoxes=[
     // Top plywood cap — stand on top; interior passes freely underneath (yBottom).
     {xMin:-hwOuter, xMax:hwOuter, zMin:-hdOuter, zMax:hdOuter, yTop:yTopPanel, yBottom:yTopInner},
-    // Bottom plywood cap — stand on top (=interior floor). Acts as a 1.28" step-up
-    // when entering through a filter opening.
-    {xMin:-hwOuter, xMax:hwOuter, zMin:-hdOuter, zMax:hdOuter, yTop:yBotInner, yBottom:yBotPanel},
+    // Bottom plywood cap — stand on top (=interior floor). Extends down to
+    // cover the bun-foot gap so the player can't crawl under the cabinet.
+    // yTop is still yBotInner (step-up into interior through a filter
+    // opening); yBottom reaches past the feet.
+    {xMin:-hwOuter, xMax:hwOuter, zMin:-hdOuter, zMax:hdOuter, yTop:yBotInner, yBottom:yBotFootprint},
     // Front plywood wall (-Z face) — ALWAYS solid, full cabinet height.
-    {xMin:-hwOuter, xMax:hwOuter, zMin:-hdOuter, zMax:-D/2, yTop:yTopPanel, yBottom:yBotPanel},
+    {xMin:-hwOuter, xMax:hwOuter, zMin:-hdOuter, zMax:-D/2, yTop:yTopPanel, yBottom:yBotFootprint},
     // Back plywood wall (+Z face) — ALWAYS solid, full cabinet height.
-    {xMin:-hwOuter, xMax:hwOuter, zMin:D/2, zMax:hdOuter, yTop:yTopPanel, yBottom:yBotPanel},
+    {xMin:-hwOuter, xMax:hwOuter, zMin:D/2, zMax:hdOuter, yTop:yTopPanel, yBottom:yBotFootprint},
     // Left filter — tracks filterL.position.x. When slid out, it moves outside
     // the cabinet footprint and the -X opening becomes walk-through.
     {xMin:fLx-fHalf, xMax:fLx+fHalf, zMin:-D/2, zMax:D/2, yTop:yTopInner, yBottom:yBotInner},
