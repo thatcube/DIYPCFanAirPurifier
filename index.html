@@ -819,7 +819,7 @@ function syncPlayModeUI(){
 }
 const _PLAY_PATH_AUTO_OPEN = /^\/play\/?$/.test(location.pathname);
 const _catColorPresets={
-  ginger:{coat:0xe87720,tint:0.99,coatMix:0.94},
+  ginger:{coat:0xF59E36,tint:0.99,coatMix:0.94},
   tuxedo:{coat:0x3a4050,tint:0.99,coatMix:0.96},
   cream:{coat:0xddd0aa,tint:0.98,coatMix:0.9},
   midnight:{coat:0x1e2636,tint:0.995,coatMix:0.98}
@@ -1189,19 +1189,18 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
       _catTmpColorA.getHSL(_catTmpHSL);
       _catTmpColorB.setHex(colorCfg.coat);
       _catTmpColorB.getHSL(_catTmpHSLB);
-      // Replace fur color: use preset's hue, full saturation, and mostly
-      // the preset's luminance. Only a small amount of baked luminance is
-      // kept for light/shadow detail — too much washes the color out.
-      const lit=Math.max(0.08,Math.min(0.94, _catTmpHSL.l*0.35 + _catTmpHSLB.l*0.65));
-      m.color.setHSL(_catTmpHSLB.h, _catTmpHSLB.s, lit);
+      // Set m.color to white so the baked texture drives diffuseColor
+      // without any color multiplication (which was desaturating everything).
+      // ALL recoloring happens in the fragment shader via uCatCoatTint.
+      m.color.setRGB(1,1,1);
       m.roughness=Math.min(1,Math.max(0.55,baseRough*hairCfg.rough));
       m.bumpMap=_getCatFurNoiseTexture();
       m.bumpScale=Math.max(0.001,(Math.abs(baseBump)*0.35)+hairCfg.bump);
       _catFurTintColor.setHex(colorCfg.coat).offsetHSL(0,0,0.14);
-      _catTmpColorC.setHex(colorCfg.coat).offsetHSL(0,0,0.02);
+      _catTmpColorC.setHex(colorCfg.coat); // exact coat color — no offset
       if(m.emissive&&m.emissive.isColor){
-        m.emissive.copy(baseEmi).lerp(_catTmpColorC,0.24 + (0.35*(Number(colorCfg.coatMix)||0.8)));
-        m.emissiveIntensity=Math.max(baseEmiI,0.18 + (hairCfg.boneMode==='long'?0.18:0.05));
+        m.emissive.setHex(colorCfg.coat);
+        m.emissiveIntensity=Math.max(baseEmiI,0.25 + (hairCfg.boneMode==='long'?0.18:0.05));
       }
       _ensureCatFurShader(m);
       m.userData._catFurAmount=hairCfg.furRim;
