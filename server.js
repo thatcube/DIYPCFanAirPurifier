@@ -80,7 +80,8 @@ function normalizeLeaderboard(rows) {
     const catColor = sanitizeCatColor(row.catColor);
     const catHair = sanitizeCatHair(row.catHair);
     const catModel = sanitizeCatModel(row.catModel);
-    clean.push({ id, name, timeMs, at: safeAt, catColor, catHair, catModel, playerId });
+    const isTest = row.isTest === true || row.isTest === 1 || row.is_test === 1 ? true : false;
+    clean.push({ id, name, timeMs, at: safeAt, catColor, catHair, catModel, playerId, isTest });
   }
   clean.sort((a, b) => a.timeMs - b.timeMs || a.at - b.at);
 
@@ -281,6 +282,7 @@ app.post('/api/run/finish', (req, res) => {
   const catColor = sanitizeCatColor(req.body?.catColor || '');
   const catHair = sanitizeCatHair(req.body?.catHair || '');
   const catModel = sanitizeCatModel(req.body?.catModel || '');
+  const isTest = req.body?.isTest === true || req.body?.isTest === 1 ? true : false;
   if (!runId) return apiError(res, 400, 'bad_request', 'runId is required');
 
   const run = activeRuns.get(runId);
@@ -294,7 +296,7 @@ app.post('/api/run/finish', (req, res) => {
   }
   if (run.finished) return apiError(res, 409, 'run_finished', 'Run already finished');
 
-  if (run.coins.size !== COIN_IDS.length) {
+  if (!isTest && run.coins.size !== COIN_IDS.length) {
     return apiError(res, 400, 'incomplete_run', 'Not all coins were claimed on the server');
   }
 
@@ -315,6 +317,7 @@ app.post('/api/run/finish', (req, res) => {
     catHair,
     catModel,
     playerId,
+    isTest,
   };
 
   leaderboard = normalizeLeaderboard(leaderboard.concat(entry));
@@ -363,6 +366,15 @@ app.post('/api/admin/delete', requireAdmin, (req, res) => {
   leaderboard = normalizeLeaderboard(leaderboard);
   saveLeaderboard(leaderboard);
   return res.json({ ok: true, deletedId: id, leaderboardSize: leaderboard.length });
+});
+
+app.post('/api/admin/delete-tests', requireAdmin, (_req, res) => {
+  const before = leaderboard.length;
+  leaderboard = leaderboard.filter((row) => !row.isTest);
+  const deletedCount = before - leaderboard.length;
+  leaderboard = normalizeLeaderboard(leaderboard);
+  saveLeaderboard(leaderboard);
+  return res.json({ ok: true, deletedCount, leaderboardSize: leaderboard.length });
 });
 
 app.post('/api/admin/reset', requireAdmin, (req, res) => {

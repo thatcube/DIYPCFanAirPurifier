@@ -111,6 +111,15 @@
       font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
       background: rgba(128, 197, 243, 0.12); border: 1px solid var(--edge); color: var(--accent);
     }
+    .pill.test {
+      background: rgba(255, 201, 107, 0.15);
+      border-color: rgba(255, 201, 107, 0.5);
+      color: var(--warn);
+    }
+    tr.test td { background: rgba(255, 201, 107, 0.04); }
+    tr.test td:first-child { border-left: 2px solid rgba(255, 201, 107, 0.6); }
+    label.check { display:inline-flex; align-items:center; gap:6px; font-size:12px; color: var(--muted); cursor: pointer; }
+    label.check input { accent-color: #9fe3ff; }
     .toggle {
       display: inline-flex; align-items: center; gap: 10px;
       padding: 10px 12px; border-radius: 10px;
@@ -191,7 +200,9 @@
         <h2>Leaderboard entries</h2>
         <p class="sub" id="lbCount">—</p>
         <div class="right">
+          <label class="check"><input type="checkbox" id="hideTestsToggle" /> Hide test runs</label>
           <button id="refreshBtn" class="btn">Refresh</button>
+          <button id="deleteTestsBtn" class="btn warn">Delete all test runs</button>
           <button id="resetBtn" class="btn danger">Reset entire board…</button>
         </div>
       </div>
@@ -334,6 +345,10 @@
   const lbCount = $('lbCount');
   const refreshBtn = $('refreshBtn');
   const resetBtn = $('resetBtn');
+  const deleteTestsBtn = $('deleteTestsBtn');
+  const hideTestsToggle = $('hideTestsToggle');
+  let _lastEntries = [];
+  let _lastMeta = null;
 
   function fmtTime(ms) {
     const n = Number(ms) || 0;
@@ -355,12 +370,16 @@
 
   function renderRows(entries) {
     lbBody.innerHTML = '';
-    entries.forEach((e, i) => {
+    const hideTests = !!hideTestsToggle.checked;
+    const visible = hideTests ? entries.filter((e) => !e.isTest) : entries;
+    visible.forEach((e, i) => {
       const tr = document.createElement('tr');
+      if (e.isTest) tr.classList.add('test');
       const cat = [e.catModel, e.catColor, e.catHair].filter(Boolean).join(' · ');
+      const testBadge = e.isTest ? '<span class="pill test" style="margin-right:6px;">TEST</span>' : '';
       tr.innerHTML = `
         <td class="t">${i + 1}</td>
-        <td>${escapeHtml(e.name)}</td>
+        <td>${testBadge}${escapeHtml(e.name)}</td>
         <td class="t">${fmtTime(e.timeMs)}</td>
         <td class="sub" style="color:var(--muted);">${escapeHtml(fmtAt(e.at))}</td>
         <td><span class="pill">${escapeHtml(cat || '—')}</span></td>
@@ -380,8 +399,13 @@
     try {
       const data = await apiGet('/api/admin/leaderboard');
       const entries = Array.isArray(data.leaderboard) ? data.leaderboard : [];
+      _lastEntries = entries;
+      _lastMeta = data;
       renderRows(entries);
-      lbCount.textContent = `${entries.length} entries · cap ${data.maxEntries} · per-player ${data.perPlayer} · coins ${data.requiredCoinCount}`;
+      const testCount = entries.filter((e) => e.isTest).length;
+      const testNote = testCount ? ` · ${testCount} test` : '';
+      lbCount.textContent = `${entries.length} entries${testNote} · cap ${data.maxEntries} · per-player ${data.perPlayer} · coins ${data.requiredCoinCount}`;
+      deleteTestsBtn.disabled = testCount === 0;
       lbStatus.textContent = '';
     } catch (err) {
       lbStatus.textContent = err.message || 'Failed to load';
@@ -427,6 +451,23 @@
 
   refreshBtn.addEventListener('click', refreshLeaderboard);
   resetBtn.addEventListener('click', resetAll);
+  hideTestsToggle.addEventListener('change', () => renderRows(_lastEntries));
+  deleteTestsBtn.addEventListener('click', async () => {
+    const testCount = _lastEntries.filter((e) => e.isTest).length;
+    if (!testCount) return;
+    if (!confirm(`Delete all ${testCount} test run${testCount === 1 ? '' : 's'} from the leaderboard?`)) return;
+    deleteTestsBtn.disabled = true;
+    try {
+      const data = await apiPost('/api/admin/delete-tests', {});
+      lbStatus.textContent = `Deleted ${data.deletedCount || 0} test run${(data.deletedCount || 0) === 1 ? '' : 's'}`;
+      lbStatus.className = 'status ok';
+      await refreshLeaderboard();
+    } catch (err) {
+      lbStatus.textContent = err.message || 'Delete failed';
+      lbStatus.className = 'status err';
+      deleteTestsBtn.disabled = false;
+    }
+  });
 
   // Auto-unlock on load if token is already in sessionStorage.
   (async function init() {

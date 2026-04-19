@@ -7,7 +7,8 @@ const SCHEMA_STATEMENTS = [
     cat_color TEXT NOT NULL DEFAULT 'ginger',
     cat_hair TEXT NOT NULL DEFAULT 'short',
     cat_model TEXT NOT NULL DEFAULT 'classic',
-    player_id TEXT NOT NULL DEFAULT ''
+    player_id TEXT NOT NULL DEFAULT '',
+    is_test INTEGER NOT NULL DEFAULT 0
   )`,
   `CREATE INDEX IF NOT EXISTS idx_lb_time ON leaderboard_entries(time_ms ASC, at_ms ASC)`,
   `CREATE INDEX IF NOT EXISTS idx_lb_name ON leaderboard_entries(name, time_ms ASC, at_ms ASC)`,
@@ -95,6 +96,10 @@ export default {
         return withCors(await handleAdminDelete(request, env, cfg));
       }
 
+      if (url.pathname === '/api/admin/delete-tests' && request.method === 'POST') {
+        return withCors(await handleAdminDeleteTests(request, env, cfg));
+      }
+
       if (url.pathname === '/api/admin/reset' && request.method === 'POST') {
         return withCors(await handleAdminReset(request, env));
       }
@@ -137,6 +142,9 @@ async function ensureLeaderboardAppearanceColumns(db) {
   }
   if (!existing.has('player_id')) {
     alters.push(db.prepare(`ALTER TABLE leaderboard_entries ADD COLUMN player_id TEXT NOT NULL DEFAULT ''`).bind());
+  }
+  if (!existing.has('is_test')) {
+    alters.push(db.prepare(`ALTER TABLE leaderboard_entries ADD COLUMN is_test INTEGER NOT NULL DEFAULT 0`).bind());
   }
   if (alters.length) await db.batch(alters);
 }
@@ -276,6 +284,7 @@ async function handleRunFinish(request, env, cfg) {
   const catHair = sanitizeCatHair(body?.catHair);
   const catModel = sanitizeCatModel(body?.catModel);
   const playerId = sanitizePlayerId(body?.playerId);
+  const isTest = body?.isTest === true || body?.isTest === 1 ? 1 : 0;
   if (!runId) return apiError(400, 'bad_request', 'runId is required');
 
   const run = await env.LB_DB.prepare(
@@ -295,7 +304,9 @@ async function handleRunFinish(request, env, cfg) {
   if (Number(run.finished) === 1) return apiError(409, 'run_finished', 'Run already finished');
 
   const coinCount = await getRunCoinCount(env.LB_DB, runId);
-  if (coinCount !== cfg.COIN_IDS.length) {
+  // Test runs (Quick Coin Mode etc.) are allowed to submit without claiming
+  // the full coin set — they're flagged so admins can purge them at will.
+  if (!isTest && coinCount !== cfg.COIN_IDS.length) {
     return apiError(400, 'incomplete_run', 'Not all coins were claimed on the server');
   }
 
@@ -307,7 +318,7 @@ async function handleRunFinish(request, env, cfg) {
   const entryId = await makeEntryId(finalName, Math.floor(elapsed), now);
 
   await env.LB_DB.prepare(
-    `INSERT INTO leaderboard_entries (id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO leaderboard_entries (id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, is_test) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     entryId,
     finalName,
@@ -316,7 +327,8 @@ async function handleRunFinish(request, env, cfg) {
     catColor,
     catHair,
     catModel,
-    playerId
+    playerId,
+    isTest
   ).run();
 
   await deleteRun(env.LB_DB, runId);
@@ -377,6 +389,16 @@ async function handleAdminDelete(request, env, cfg) {
   return jsonResponse(200, { ok: true, deletedId: id, leaderboardSize: leaderboard.length });
 }
 
+async function handleAdminDeleteTests(request, env, cfg) {
+  const auth = await requireAdmin(request, env);
+  if (auth) return auth;
+
+  const result = await env.LB_DB.prepare(`DELETE FROM leaderboard_entries WHERE is_test = 1`).run();
+  const deleted = Number(result.meta?.changes || 0);
+  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg);
+  return jsonResponse(200, { ok: true, deletedCount: deleted, leaderboardSize: leaderboard.length });
+}
+
 async function handleAdminReset(request, env) {
   const auth = await requireAdmin(request, env);
   if (auth) return auth;
@@ -434,7 +456,7 @@ async function getNormalizedLeaderboard(db, cfg) {
   const scanLimit = Math.max(cfg.LB_MAX * cfg.LB_PER_PLAYER * 6, 200);
   const rows = await db
     .prepare(
-      `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id
+      `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, is_test
        FROM leaderboard_entries ORDER BY time_ms ASC, at_ms ASC LIMIT ?`
     )
     .bind(scanLimit)
@@ -480,7 +502,8 @@ function normalizeLeaderboard(rows, maxEntries, perPlayer) {
     const catHair = sanitizeCatHair(row.cat_hair ?? row.catHair);
     const catModel = sanitizeCatModel(row.cat_model ?? row.catModel);
     const playerId = sanitizePlayerId(row.player_id ?? row.playerId);
-    clean.push({ id, name, timeMs, at: safeAt, catColor, catHair, catModel, playerId });
+    const isTest = Number(row.is_test ?? row.isTest ?? 0) ? true : false;
+    clean.push({ id, name, timeMs, at: safeAt, catColor, catHair, catModel, playerId, isTest });
   }
 
   clean.sort((a, b) => a.timeMs - b.timeMs || a.at - b.at);

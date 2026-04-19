@@ -10013,7 +10013,8 @@ function _recordRun(timeMs){
         playerId:_lbPlayerId,
         catColor:_sanitizeCatColorKey(_catColorKey),
         catHair:_sanitizeCatHairKey(_catHairKey),
-        catModel:_sanitizeCatModelKey(_catModelKey)
+        catModel:_sanitizeCatModelKey(_catModelKey),
+        isTest:!!_QUICK_COIN_MODE
       });
       _lbSharedRunId='';
       _lbClaimedCoinIds.clear();
@@ -10050,7 +10051,8 @@ function _recordRun(timeMs){
             playerId:_lbPlayerId,
             catColor:_sanitizeCatColorKey(_catColorKey),
             catHair:_sanitizeCatHairKey(_catHairKey),
-            catModel:_sanitizeCatModelKey(_catModelKey)
+            catModel:_sanitizeCatModelKey(_catModelKey),
+            isTest:!!_QUICK_COIN_MODE
           });
           _lbSharedRunId='';
           _lbClaimedCoinIds.clear();
