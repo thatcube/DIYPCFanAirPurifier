@@ -830,7 +830,7 @@ const _catHairPresets={
 };
 const _catModelPresets={
   classic:{label:'Classic Cat',sources:['assets/cat.glb'],colorable:true,previewLift:0.0,gameLift:0.0,previewCamY:1.7,previewCamZ:4.7,previewTargetY:1.0,animSpeed:1.0,idleLoopPause:0,groundPinOffset:0.0,sprintAnimMult:1.0},
-  toon:{label:'Toon Cat',sources:['assets/tooncat.glb','assets/toon-cat.glb'],colorable:true,previewLift:0.0,gameLift:0.0,previewCamY:1.85,previewCamZ:5.15,previewTargetY:1.1,animSpeed:1.0,idleLoopPause:0,groundPinOffset:-2.1,sprintAnimMult:2,gameModelZ:-1.2},
+  toon:{label:'Toon Cat',sources:['assets/tooncat.glb','assets/toon-cat.glb'],colorable:true,previewLift:0.0,gameLift:0.0,previewCamY:1.85,previewCamZ:5.15,previewTargetY:1.1,animSpeed:1.0,idleLoopPause:0,groundPinOffset:-1.25,gameGroundPinOffset:-2.1,sprintAnimMult:2,gameModelZ:-1.2},
   bababooey:{label:'Bababooey Cat',sources:['assets/bababooey_cat.glb'],colorable:false,previewLift:0.0,gameLift:0.0,previewCamY:1.9,previewCamZ:5.35,previewTargetY:1.15,animSpeed:0.7,idleLoopPause:2.2,groundPinOffset:0.0,sprintAnimMult:1.4}
 };
 let _playLauncherOpen=false;
@@ -977,7 +977,7 @@ function _centerAndGroundModel(model,extraDrop){
   if(Number.isFinite(minFootY)) model.position.y-=minFootY;
   if(Number.isFinite(extraDrop)) model.position.y+=extraDrop;
 }
-function _pinModelToGround(model,baseLocalPos){
+function _pinModelToGround(model,baseLocalPos,offsetOverride){
   if(!model || !baseLocalPos) return;
   const box=new THREE.Box3().setFromObject(model);
   if(!Number.isFinite(box.min.y)) return;
@@ -987,7 +987,13 @@ function _pinModelToGround(model,baseLocalPos){
   // Convert world-space min Y to parent-local Y so grounding is stable when
   // the avatar moves up/down onto furniture.
   const localMinY=box.min.y-_catGroundTmpParentPos.y;
-  const pinOffset=Number(_getSelectedCatModelPreset().groundPinOffset)||0;
+  // Callers can pass a per-context override (e.g. game uses a deeper
+  // ground pin than the preview to hug the floor). When omitted we fall
+  // back to the preset's default groundPinOffset so the preview — which
+  // uses this same helper — keeps using its calibrated value.
+  const pinOffset=Number.isFinite(offsetOverride)
+    ? offsetOverride
+    : (Number(_getSelectedCatModelPreset().groundPinOffset)||0);
   const targetLocalMinY=baseLocalPos.y+pinOffset+0.002;
   const delta=targetLocalMinY-localMinY;
   model.position.y+=delta;
@@ -1577,7 +1583,11 @@ function _stepCatMixer(ts,moveSpeed){
     catModel.position.copy(_catBaseLocalPos);
     catModel.quaternion.copy(_catBaseLocalQuat);
     if(_catModelKey!=='classic'){
-      _pinModelToGround(catModel,_catBaseLocalPos);
+      // Game-side pin prefers gameGroundPinOffset when defined so the floor
+      // hugging tuned for gameplay doesn't leak into the preview scene.
+      const gp=_getSelectedCatModelPreset();
+      const off=Number.isFinite(gp.gameGroundPinOffset)?gp.gameGroundPinOffset:gp.groundPinOffset;
+      _pinModelToGround(catModel,_catBaseLocalPos,off);
     }
     // Jump squash-and-stretch for all cats:
     // - Holding space (charging) → compress down like a spring
@@ -1623,7 +1633,9 @@ function _stepCatMixer(ts,moveSpeed){
         // Re-pin to ground after the leg-shrink so feet stay ON the floor
         // rather than poking through it. The leg shortening brings the
         // hips/belly down naturally, giving the sploot look.
-        _pinModelToGround(catModel,_catBaseLocalPos);
+        const gp2=_getSelectedCatModelPreset();
+        const off2=Number.isFinite(gp2.gameGroundPinOffset)?gp2.gameGroundPinOffset:gp2.groundPinOffset;
+        _pinModelToGround(catModel,_catBaseLocalPos,off2);
       }
     }
   }
