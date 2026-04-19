@@ -1132,6 +1132,7 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
       const isDetail=/(eye|pupil|nose|mouth|tongue|tooth|teeth|whisker|inner|ear)/.test(meshName+' '+matName);
       if(isDetail){
         m.color.copy(baseCol);
+        if(m.userData._catOrigMap && !m.map){ m.map=m.userData._catOrigMap; }
         m.roughness=baseRough;
         m.bumpScale=baseBump;
         if(m.emissive&&m.emissive.isColor){
@@ -1149,6 +1150,7 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
       }
       if(!isColorable){
         m.color.copy(baseCol);
+        if(m.userData._catOrigMap && !m.map){ m.map=m.userData._catOrigMap; }
         m.roughness=baseRough;
         m.bumpScale=baseBump;
         if(m.emissive&&m.emissive.isColor){
@@ -1187,11 +1189,16 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
       }
       _catTmpColorA.copy(baseCol);
       _catTmpColorB.setHex(colorCfg.coat);
-      // Set m.color directly to the coat color. Three.js does
-      // diffuseColor = m.color × texture. The shader coat tint is
-      // disabled (coatAmount=0) — all recoloring comes from m.color.
-      // This is the simplest path and avoids every desaturation bug.
+      // Remove the baked texture map from fur materials. Three.js does
+      // diffuseColor = m.color × texture, and the baked texture's own
+      // colors were multiplying with our coat color, desaturating it
+      // catastrophically. Without the map, diffuseColor = m.color = pure
+      // coat hex. The bump/normal map still provides surface detail.
       m.color.setHex(colorCfg.coat);
+      if(m.map) {
+        if(!m.userData._catOrigMap) m.userData._catOrigMap=m.map;
+        m.map=null;
+      }
       m.roughness=Math.min(1,Math.max(0.55,baseRough*hairCfg.rough));
       m.bumpMap=_getCatFurNoiseTexture();
       m.bumpScale=Math.max(0.001,(Math.abs(baseBump)*0.35)+hairCfg.bump);
