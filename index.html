@@ -1029,6 +1029,56 @@ function _loadCatAssetWithFallback(loader,onLoad,onError,sourcesOverride){
   };
   tryLoad(0,null);
 }
+// Recolor a texture's fur pixels: find warm/orange pixels in the source
+// texture, replace their hue+saturation with the target coat color while
+// preserving the original luminance. Returns a new CanvasTexture.
+// Cache keyed by texture UUID + coat hex to avoid re-processing every frame.
+const _recoloredTexCache=new Map();
+function _recolorFurTexture(srcTex, coatHex){
+  if(!srcTex || !srcTex.image) return srcTex;
+  const key=(srcTex.uuid||'')+'_'+coatHex;
+  if(_recoloredTexCache.has(key)) return _recoloredTexCache.get(key);
+  const img=srcTex.image;
+  const w=img.width||img.naturalWidth||256;
+  const h=img.height||img.naturalHeight||256;
+  const cvs=document.createElement('canvas');
+  cvs.width=w; cvs.height=h;
+  const ctx=cvs.getContext('2d');
+  ctx.drawImage(img,0,0,w,h);
+  const id=ctx.getImageData(0,0,w,h);
+  const d=id.data;
+  // Target coat color in HSL
+  const tc=new THREE.Color(coatHex);
+  const tHSL={h:0,s:0,l:0}; tc.getHSL(tHSL);
+  const tmpC=new THREE.Color();
+  const tmpHSL={h:0,s:0,l:0};
+  for(let i=0;i<d.length;i+=4){
+    const r=d[i]/255, g=d[i+1]/255, b=d[i+2]/255;
+    tmpC.setRGB(r,g,b);
+    tmpC.getHSL(tmpHSL);
+    // Fur detection: warm hue (orange/yellow range 0.02-0.14), decent
+    // saturation (>0.15), mid luminance (0.15-0.85). This catches the
+    // ginger fur and avoids eyes, nose, dark outlines, and white areas.
+    const isFur = (tmpHSL.s > 0.12) && (tmpHSL.l > 0.12 && tmpHSL.l < 0.88);
+    if(isFur){
+      // Replace hue+sat, keep luminance
+      tmpC.setHSL(tHSL.h, tHSL.s * 0.85, tmpHSL.l);
+      d[i]  =Math.round(tmpC.r*255);
+      d[i+1]=Math.round(tmpC.g*255);
+      d[i+2]=Math.round(tmpC.b*255);
+    }
+  }
+  ctx.putImageData(id,0,0);
+  const tex=new THREE.CanvasTexture(cvs);
+  tex.flipY=srcTex.flipY;
+  tex.wrapS=srcTex.wrapS; tex.wrapT=srcTex.wrapT;
+  tex.magFilter=srcTex.magFilter; tex.minFilter=srcTex.minFilter;
+  tex.generateMipmaps=true;
+  tex.needsUpdate=true;
+  _recoloredTexCache.set(key,tex);
+  return tex;
+}
+
 function _getCatFurNoiseTexture(){
   if(_catFurNoiseTexture) return _catFurNoiseTexture;
   const size=128;
@@ -1189,15 +1239,18 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
       }
       _catTmpColorA.copy(baseCol);
       _catTmpColorB.setHex(colorCfg.coat);
-      // Restore the texture map — removing it makes the cat flat/uniform.
-      // Instead, set m.color to the coat color. Three.js r128 does
-      // diffuseColor = m.color × texture, which tints the texture.
-      if(m.userData._catOrigMap && !m.map){ m.map=m.userData._catOrigMap; }
-      m.color.setHex(colorCfg.coat);
-      // Emissive in the coat color adds saturation that survives ACES.
+      // Recolor the fur pixels in the baked texture itself — replaces
+      // hue+saturation of fur-colored pixels while preserving luminance.
+      // m.color stays white so it doesn't tint the whole model.
+      if(!m.userData._catOrigMap && m.map) m.userData._catOrigMap=m.map;
+      const origMap=m.userData._catOrigMap;
+      if(origMap && origMap.image){
+        m.map=_recolorFurTexture(origMap, colorCfg.coat);
+      }
+      m.color.setRGB(1,1,1); // no overall tint
       if(m.emissive&&m.emissive.isColor){
-        m.emissive.setHex(colorCfg.coat);
-        m.emissiveIntensity=0.35;
+        m.emissive.copy(baseEmi);
+        m.emissiveIntensity=baseEmiI;
       }
       m.roughness=Math.min(1,Math.max(0.55,baseRough*hairCfg.rough));
       m.bumpMap=_getCatFurNoiseTexture();
