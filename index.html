@@ -1056,13 +1056,14 @@ function _recolorFurTexture(srcTex, coatHex){
     const r=d[i]/255, g=d[i+1]/255, b=d[i+2]/255;
     tmpC.setRGB(r,g,b);
     tmpC.getHSL(tmpHSL);
-    // Fur detection: warm hue (orange/yellow range 0.02-0.14), decent
-    // saturation (>0.15), mid luminance (0.15-0.85). This catches the
-    // ginger fur and avoids eyes, nose, dark outlines, and white areas.
-    const isFur = (tmpHSL.s > 0.12) && (tmpHSL.l > 0.12 && tmpHSL.l < 0.88);
-    if(isFur){
-      // Replace hue+sat, keep luminance
-      tmpC.setHSL(tHSL.h, tHSL.s * 0.85, tmpHSL.l);
+    // Recolor ALL pixels: replace hue+saturation with the target coat
+    // color, keep original luminance for light/shadow detail. The
+    // isDetail mesh-name filter earlier in the pipeline already skips
+    // eye/nose/whisker meshes, so this texture is ONLY the body fur.
+    // Only skip near-black (outlines, shadows < 0.05) and near-white
+    // (specular highlights > 0.97) to preserve those details.
+    if(tmpHSL.l > 0.05 && tmpHSL.l < 0.97){
+      tmpC.setHSL(tHSL.h, tHSL.s, tmpHSL.l);
       d[i]  =Math.round(tmpC.r*255);
       d[i+1]=Math.round(tmpC.g*255);
       d[i+2]=Math.round(tmpC.b*255);
