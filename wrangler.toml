@@ -5,7 +5,7 @@ workers_dev = true
 
 [vars]
 LB_MAX = "25"
-LB_PER_PLAYER = "3"
+LB_PER_PLAYER = "25"
 COIN_COUNT = "16"
 MIN_RUN_MS = "12000"
 MAX_RUN_MS = "1200000"

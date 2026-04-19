@@ -9182,7 +9182,9 @@ if(!_lbPlayerId){
 const _LB_MAX=25;
 // TEST MODE: allow up to 20 runs per player while looping fast test runs.
 // Production should stay tight (3) to keep the board diverse.
-const _LB_PER_PLAYER=_TEST_MODE?20:3;
+// Per-player cap. Set equal to _LB_MAX so a single player can fill the
+// board with as many runs as they earn — no artificial 3-per-player cut.
+const _LB_PER_PLAYER=_TEST_MODE?20:25;
 const _LB_API_BASE=''; // same-origin API
 const _LB_SHARED_ENABLED=!_TEST_MODE;
 // Temporary testing toggle: clear saved player identity so completion asks again.
@@ -9211,6 +9213,9 @@ let _fpIgnorePointerUnlock=false;
 let _nameDialogOpen=false;
 let _nameDialogAfterClose=null;
 let _nameDialogManualTyped=false;
+// Wall-clock ms when the name dialog opened. Used to swallow WASD keystrokes
+// the player was still holding from the run that just finished.
+let _nameDialogOpenedAt=0;
 let _lbPlayerName='';
 let _leaderboard=[];
 let _lbSharedOnline=false;
@@ -9529,13 +9534,22 @@ function _openNameDialog(force,onAfterClose){
     input.name=`run_tag_manual_${Math.random().toString(36).slice(2,10)}`;
     input.value='';
     input.setAttribute('readonly','readonly');
+    // Keystroke grace window: the player's fingers are likely still on WASD
+    // from the run that just finished. If those keys reach the freshly
+    // focused input they wipe the prefilled name (old behavior selected
+    // all of it) or append junk chars. We swallow keydown on the input
+    // for ~300 ms after opening.
+    _nameDialogOpenedAt=(typeof performance!=='undefined' && performance.now)?performance.now():Date.now();
     setTimeout(()=>{
       input.removeAttribute('readonly');
       input.focus();
       if(prefill){
         input.value=prefill;
         _nameDialogManualTyped=true; // prefilled value counts as accepted
-        try{ input.setSelectionRange(0, prefill.length); }catch(e){}
+        // Cursor at END (not select-all). Select-all meant the first
+        // stray keystroke replaced the whole prefilled name — a real
+        // problem when the player still had a finger on W.
+        try{ input.setSelectionRange(prefill.length, prefill.length); }catch(e){}
       } else if(!_nameDialogManualTyped){
         input.value='';
       }
@@ -9559,6 +9573,21 @@ document.getElementById('nameDialogForm').addEventListener('submit',e=>{
   _closeNameDialog();
 });
 document.getElementById('nameDialogInput').addEventListener('keydown',e=>{
+  // Swallow any keydown that fires within ~300 ms of the dialog opening.
+  // The player's fingers are often still on WASD from the run that just
+  // finished, and those keystrokes would otherwise reach the focused
+  // input and clobber/append to the prefilled name before the user can
+  // react. Enter/Escape/Tab are still allowed through so submit/cancel
+  // work normally.
+  const now=(typeof performance!=='undefined' && performance.now)?performance.now():Date.now();
+  const inGrace=_nameDialogOpenedAt && (now-_nameDialogOpenedAt)<300;
+  const isControl=(e.key==='Enter' || e.key==='Escape' || e.key==='Tab');
+  if(inGrace && !isControl){
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    return;
+  }
   if((e.key && e.key.length===1) || e.key==='Backspace' || e.key==='Delete'){
     _nameDialogManualTyped=true;
   }
@@ -9570,6 +9599,13 @@ document.getElementById('nameDialogInput').addEventListener('keydown',e=>{
 });
 document.getElementById('nameDialogInput').addEventListener('beforeinput',e=>{
   if(!e.isTrusted) return;
+  // Block inserted text during the open-grace window too — covers IME
+  // composition and paste-on-open edge cases where keydown alone misses.
+  const now=(typeof performance!=='undefined' && performance.now)?performance.now():Date.now();
+  if(_nameDialogOpenedAt && (now-_nameDialogOpenedAt)<300){
+    e.preventDefault();
+    return;
+  }
   if(e.inputType==='insertText' || e.inputType==='deleteContentBackward' || e.inputType==='deleteContentForward'){
     _nameDialogManualTyped=true;
   }
@@ -9678,7 +9714,11 @@ function _renderLeaderboard(){
     }).join('');
   }
   const mode=_lbSharedOnline?'Shared':'Local';
-  meta.textContent=`${mode} | Fastest first | Top ${_LB_MAX} | Max ${_LB_PER_PLAYER} per player${_lbStatusNote?` | ${_lbStatusNote}`:''}`;
+  // Only mention the per-player cap when it's actually limiting (< LB_MAX).
+  // When per-player = LB_MAX there's effectively no cap and the message
+  // just adds noise.
+  const capNote=(_LB_PER_PLAYER<_LB_MAX)?` | Max ${_LB_PER_PLAYER} per player`:'';
+  meta.textContent=`${mode} | Fastest first | Top ${_LB_MAX}${capNote}${_lbStatusNote?` | ${_lbStatusNote}`:''}`;
 }
 function _updateTimerHud(nowMs){
   const txt=document.getElementById('runTimerText');

@@ -11,7 +11,7 @@ const ADMIN_TOKEN = String(process.env.ADMIN_TOKEN || '');
 
 const MAX_NAME_LEN = 24;
 const LB_MAX = Number(process.env.LB_MAX || 25);
-const LB_PER_PLAYER = Number(process.env.LB_PER_PLAYER || 3);
+const LB_PER_PLAYER = Number(process.env.LB_PER_PLAYER || 25);
 const RUN_TTL_MS = Number(process.env.RUN_TTL_MS || 15 * 60 * 1000);
 const MIN_RUN_MS = Number(process.env.MIN_RUN_MS || 12000);
 const MAX_RUN_MS = Number(process.env.MAX_RUN_MS || 20 * 60 * 1000);
