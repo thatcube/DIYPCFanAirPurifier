@@ -122,7 +122,12 @@ async function ensureDbInitialized(env) {
     dbInitPromise = (async () => {
       await env.LB_DB.batch(SCHEMA_STATEMENTS.map((sql) => env.LB_DB.prepare(sql).bind()));
       await ensureLeaderboardAppearanceColumns(env.LB_DB);
-    })();
+    })().catch((err) => {
+      // Don't cache a rejected promise — next request should retry the
+      // migration instead of being permanently poisoned.
+      dbInitPromise = null;
+      throw err;
+    });
   }
   await dbInitPromise;
 }
