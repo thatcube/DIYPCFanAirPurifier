@@ -7879,7 +7879,12 @@ function animate(ts){
     //   the box's yBottom. The bonk SFX/intensity only fires when
     //   actively rising (_fpVy>0) so grazing the ceiling at the peak of
     //   a jump is silent but still smoothly clamped.
-    const eyeH=4; // eye height
+    const eyeH=4; // eye height — camera sits this far above feet (unchanged)
+    // Extra inches of head ABOVE the camera. Used only for ceiling/overhang
+    // collision so the player can't walk under things that are just barely
+    // taller than the camera's eye line (e.g. the air-purifier cabinet in
+    // 'tv' placement). Camera position itself is untouched.
+    const headExtra=2.5;
     let groundY=_fpFloorY-placementOffset.y; // floor moves with room Y offset
     const _curBoxes=_fpGetBoxes();
     for(const box of _curBoxes){
@@ -7890,26 +7895,24 @@ function animate(ts){
         // Feet heights for prev/new positions.
         const prevFeet=_fpPos.y-eyeH;
         const newFeet=newY-eyeH;
-        const newHead=newY; // camera at head/eye
+        const newHeadTop=newY+headExtra; // top of head for ceiling tests
         // Standing on top: require the player was ALREADY at/above the box
         // top and is descending (or touching). Prevents jumping from below
         // and snapping on top, which was the shelf/mini-split pass-through.
         const onTopPrev=prevFeet>=box.yTop-0.25;
         if(onTopPrev && newFeet>=box.yTop-0.5){
           groundY=Math.max(groundY, box.yTop+eyeH);
-        } else if(box.yBottom!==undefined && newHead<=box.yBottom-0.2){
+        } else if(box.yBottom!==undefined && newHeadTop<=box.yBottom-0.2){
           // Player fully beneath this box (walking under the bed/mini split).
-        } else if(box.yBottom!==undefined && newFeet<box.yBottom-0.2){
-          // Head-only intrusion: body walks under, but head would cross
-          // into the box's underside. Clamp the head instead of pushing
-          // horizontally (which would yank the camera sideways and feel
-          // like the cursor moving). Covers both rising (_fpVy>0) and
-          // the peak/falling arc of a jump.
-          if(_fpVy>0){
-            _bonkedThisFrame=true;
-            _bonkIntensity=Math.max(_bonkIntensity, _fpVy*1.2);
-          }
-          newY=box.yBottom-0.2;
+        } else if(box.yBottom!==undefined && newFeet<box.yBottom-0.2 && _fpVy>0.05){
+          // AIRBORNE head intrusion — rising into a ceiling while jumping.
+          // Clamp the camera instead of pushing horizontally (which would
+          // yank the view sideways and feel like the cursor moved). Only
+          // taken when genuinely moving up; grounded collisions with short
+          // overhangs fall through to the XZ push-out below.
+          _bonkedThisFrame=true;
+          _bonkIntensity=Math.max(_bonkIntensity, _fpVy*1.2);
+          newY=box.yBottom-0.2-headExtra;
           if(_fpVy>0) _fpVy=0;
         } else {
           // Push out of box on smallest XZ penetration axis.
