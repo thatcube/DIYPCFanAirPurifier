@@ -8165,10 +8165,10 @@ function animate(ts){
       const mbZ=_macbookRoot.matrixWorld.elements[14];
       const dx=_fpPos.x-mbX, dy=_fpPos.y-mbY, dz=_fpPos.z-mbZ;
       const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
-      // Full volume only within 5" (basically on top of it), fades to 8% at max
-      const near=5, far=140;
+      // Full volume only within 3", drops off sharply then levels out faint
+      const near=3, far=140;
       const t=Math.max(0, Math.min(1, (dist-near)/(far-near)));
-      const vol=Math.max(0.08, 1-t*t); // quadratic falloff, floor at 8%
+      const vol=Math.max(0.08, 1-t*t*t); // cubic falloff — steep initial drop
       if(_mbMusicGain && _coinAC){
         _mbMusicGain.gain.setTargetAtTime(0.18*vol, _coinAC.currentTime, 0.06);
       }
