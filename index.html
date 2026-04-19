@@ -8826,12 +8826,41 @@ function _openFinishDialog(data){
   _finishDialogData=data||null;
   _finishDialogOpen=true;
   // Release pointer lock so the user can actually click the buttons.
+  // This is defensive: on slow first runs, the name dialog's afterClose
+  // chain, the async /run/finish fetch, and pointer-lock state can
+  // race — leaving the cursor trapped behind the dialog. Set the guard
+  // flag, force-exit the lock, and retry a few times in case the browser
+  // was mid-transition. Also pause FP physics so the run doesn't keep
+  // ticking underneath the dialog (a separate source of bugs reported
+  // when the first run finished with the cursor still captive).
   _fpIgnorePointerUnlock=true;
-  if(document.exitPointerLock && document.pointerLockElement) document.exitPointerLock();
+  const _forceUnlock=()=>{
+    try{
+      if(document.exitPointerLock && document.pointerLockElement){
+        document.exitPointerLock();
+      }
+    }catch(e){}
+  };
+  _forceUnlock();
+  // Retry a couple of frames later — requestPointerLock requests queued
+  // just before this point can otherwise win the race.
+  setTimeout(_forceUnlock, 30);
+  setTimeout(_forceUnlock, 120);
+  setTimeout(_forceUnlock, 260);
   _clearPlayInputState();
   _setFinishDialogPage('results');
   _renderFinishDialog();
   _finishDialog.style.display='flex';
+  // Belt-and-braces: if we're in FP mode, make sure the physics loop is
+  // frozen while the dialog is up. _setFpPaused is a no-op if already
+  // paused, and the pause overlay stays hidden because the finish dialog
+  // takes precedence visually.
+  if(_fpMode && typeof _setFpPaused==='function' && !_fpPaused){
+    _setFpPaused(true);
+    // Hide the pause overlay — the finish dialog IS the current modal.
+    const ov=document.getElementById('fpPauseOverlay');
+    if(ov) ov.style.display='none';
+  }
 }
 function _closeFinishDialog(resumeLock){
   if(!_finishDialogOpen) return;
@@ -8840,6 +8869,12 @@ function _closeFinishDialog(resumeLock){
   _finishDialogData=null;
   _setFinishCopyLabel('Copy result');
   _clearPlayInputState();
+  // Clear any pause state we set when the dialog opened. Without this the
+  // next run would start paused (which is exactly the bug the user hit
+  // when they hit Esc to escape a stuck cursor).
+  if(_fpMode && _fpPaused && typeof _setFpPaused==='function'){
+    _setFpPaused(false);
+  }
   if(resumeLock && _fpMode && !_isMobile && canvas.requestPointerLock){
     canvas.requestPointerLock();
     setTimeout(()=>{ _fpIgnorePointerUnlock=false; }, 180);
@@ -9419,11 +9454,16 @@ function _closeNameDialog(){
   const afterClose=_nameDialogAfterClose;
   _nameDialogAfterClose=null;
   _clearPlayInputState();
-  if(_fpMode && !_isMobile && canvas.requestPointerLock){
-    canvas.requestPointerLock();
-    setTimeout(()=>{ _fpIgnorePointerUnlock=false; }, 180);
-  } else {
-    _fpIgnorePointerUnlock=false;
+  // If an afterClose callback is queued (e.g. commitRun → openFinishDialog),
+  // the callback decides pointer-lock state — re-locking here races against
+  // a follow-up dialog that needs the cursor free, so we stay hands-off.
+  if(!afterClose){
+    if(_fpMode && !_isMobile && canvas.requestPointerLock){
+      canvas.requestPointerLock();
+      setTimeout(()=>{ _fpIgnorePointerUnlock=false; }, 180);
+    } else {
+      _fpIgnorePointerUnlock=false;
+    }
   }
   if(afterClose) afterClose();
 }
