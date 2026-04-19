@@ -7885,7 +7885,7 @@ function animate(ts){
     // taller than the camera's eye line (e.g. the air-purifier cabinet in
     // 'tv' placement). Camera position itself is untouched. Must stay
     // BELOW bedClearance (6.5") so the bed frame remains walk-under-able.
-    const headExtra=2.0;
+    const headExtra=1.0;
     let groundY=_fpFloorY-placementOffset.y; // floor moves with room Y offset
     const _curBoxes=_fpGetBoxes();
     for(const box of _curBoxes){
