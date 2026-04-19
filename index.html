@@ -4166,7 +4166,8 @@ function handleClickObject(obj){
     ceilLightOn=!ceilLightOn;
     ceilSpot.intensity=ceilLightOn?0.95:0;
     domeMat.emissiveIntensity=ceilLightOn?0.8:0;
-    if(ceilGlow) ceilGlow.intensity=ceilLightOn?0.8:0;
+    if(ceilGlow) ceilGlow.intensity=ceilLightOn?0.35:0;
+    if(ceilUp) ceilUp.intensity=ceilLightOn?1.1:0;
     if(typeof _spawnSecretPowerBICoins==='function') _spawnSecretPowerBICoins();
     return;
   }
@@ -5620,7 +5621,7 @@ function applyTimeOfDay(minuteOfDay){
   bounce.position.set(ROOM_LIGHT_BASE.bounce.x, ROOM_LIGHT_BASE.bounce.y, ROOM_LIGHT_BASE.bounce.z);
 
   // Other lights
-  hemiLight.intensity=mix(0.05, 0.24, sun); // broader daylight fill so room reads naturally lit
+  hemiLight.intensity=mix(0.05, 0.24, sun) + (ceilLightOn?mix(0.12, 0.04, sun):0); // broader daylight fill; ceiling-on adds a warm ambient lift so distant walls/ceiling don't read dead
   hemiLight.color.copy(lerpHex(0x334466, 0x8899bb, sun)); // sky shifts blue→grey at night
   hemiLight.groundColor.copy(lerpHex(0x221100, 0xffeedd, sun)); // warm ground bounce
   fill.intensity=mix(0.01, 0.14, sun);   // gentle global fill to reduce hard spotlight look
@@ -5628,7 +5629,8 @@ function applyTimeOfDay(minuteOfDay){
   bounce.intensity=mix(0.0, 0.06, sun);  // soft floor bounce in daytime
   ceilSpot.intensity=ceilLightOn?mix(1.1, 0.4, sun):0; // keep visibly lit in daytime, warmer/stronger at night
   domeMat.emissiveIntensity=ceilLightOn?mix(0.9, 0.45, sun):0;
-  if(ceilGlow) ceilGlow.intensity=ceilLightOn?mix(0.9, 0.35, sun):0;
+  if(ceilGlow) ceilGlow.intensity=ceilLightOn?mix(0.35, 0.15, sun):0;
+  if(ceilUp) ceilUp.intensity=ceilLightOn?mix(1.1, 0.5, sun):0;
 
   // Outdoor backdrop brightness (sun through window)
   outdoor.material.color.setScalar(mix(0.08, 1.4, sun)+warm*0.25);
@@ -5717,6 +5719,7 @@ function applyIsolate(on){
     bounce.intensity=0.1;
     ceilSpot.intensity=0;
     if(ceilGlow) ceilGlow.intensity=0;
+    if(ceilUp) ceilUp.intensity=0;
     // Expose purifier shadows onto nothing (disable shadow receiving on hidden floor)
     renderer.toneMappingExposure=1.3;
   } else {
@@ -6320,6 +6323,7 @@ let lampLight, lampShade, lampOn=true;
 let lampBulb=null;
 let ceilLightOn=true; // ceiling fixture togglable by clicking
 let ceilGlow=null;
+let ceilUp=null; // upward wash that lights the ceiling plane itself
 {
   const lampX=tblX+tblW/2-6; // 6" from the extrusion-side edge
   const lampZ=tblZ+tblD/2-6; // 6" from the back edge (avoid wall clip)
@@ -6965,17 +6969,29 @@ ceilSpot.shadow.bias=-0.0005;
 ceilSpot.shadow.radius=5; ceilSpot.shadow.blurSamples=12;
 ceilSpot.shadow.camera.near=10;
 ceilSpot.shadow.camera.far=95;
-// Omni glow that washes the ceiling around the fixture + upper walls.
-// Tucked right under the dome lip. distance=0 (no hard cutoff) and a
-// square-root decay (0.5) so the falloff from the 2" ceiling to the
-// ~45" far wall is only ~4.7x instead of 22x under linear decay. This
-// keeps near walls from blowing out while the TV wall still gets a
-// visible warm tint. Intensity kept modest since low decay makes it
-// reach further on its own.
-ceilGlow=new THREE.PointLight(0xfff3df,0.9,0,0.5);
-ceilGlow.position.set(ceilLightX,ceilY-0.4,ceilLightZ);
+// A single omni PointLight can't solve this: making it bright enough to
+// reach the ceiling and the TV wall inevitably blows out the nearby
+// walls on the same sphere. So we split the job:
+//   1) A small, tight PointLight right under the dome — just enough to
+//      make the immediate fixture area feel "lit" without shouting.
+//   2) An upward-facing SpotLight that throws a wide cone at the
+//      ceiling plane itself, so the ceiling disc around the fixture
+//      actually shows light (which was the main missing cue).
+//   3) A slightly warmer hemisphere boost when the light is on, which
+//      lifts ALL remote surfaces (including the TV wall) without any
+//      single direction being dominant — this is the cheap stand-in
+//      for the global bounce a real room would have.
+ceilGlow=new THREE.PointLight(0xfff3df,0.35,30,1.2);
+ceilGlow.position.set(ceilLightX,ceilY-0.8,ceilLightZ);
 ceilGlow.castShadow=false;
 scene.add(ceilGlow);
+// Upward ceiling-wash spot. Cone opens wide so the ceiling disc is
+// illuminated in a soft circle around the fixture, fading with distance.
+ceilUp=new THREE.SpotLight(0xfff3df,1.1,0,Math.PI*0.48,0.85,0.8);
+ceilUp.position.set(ceilLightX,ceilY-0.3,ceilLightZ);
+ceilUp.target.position.set(ceilLightX,ceilY+5,ceilLightZ); // straight up
+scene.add(ceilUp); scene.add(ceilUp.target);
+ceilUp.castShadow=false;
 
 // Curtains — simple draped fabric panels on each side of the window
 const curtainH=winH+12, curtainW=14, curtainD=1.5;
@@ -10969,7 +10985,8 @@ function _resetCoins(){
     ceilLightOn=true;
     if(typeof ceilSpot!=='undefined' && ceilSpot) ceilSpot.intensity=0.95;
     if(typeof domeMat!=='undefined' && domeMat) domeMat.emissiveIntensity=0.8;
-    if(typeof ceilGlow!=='undefined' && ceilGlow) ceilGlow.intensity=0.5;
+    if(typeof ceilGlow!=='undefined' && ceilGlow) ceilGlow.intensity=0.35;
+    if(typeof ceilUp!=='undefined' && ceilUp) ceilUp.intensity=1.1;
   }
   // Randomize which drawer hides the coin this session.
   const drawerCoin=_coins.find(c=>c.inDrawer);
