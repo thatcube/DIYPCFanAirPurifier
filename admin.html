@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>DIY Air Purifier — Admin</title>
+  <style>
+    :root {
+      --bg0: #07121d;
+      --bg1: #122637;
+      --card: rgba(6, 14, 24, 0.82);
+      --edge: rgba(128, 197, 243, 0.35);
+      --text: #e6f3ff;
+      --muted: #a8c0d6;
+      --accent: #9fe3ff;
+      --danger: #ff7b7b;
+      --dangerEdge: rgba(255, 123, 123, 0.5);
+      --warn: #ffc96b;
+      --ok: #7dffb3;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 700px at 18% -12%, #244868 0%, transparent 58%),
+                  radial-gradient(900px 560px at 110% 10%, #1f3e56 0%, transparent 65%),
+                  linear-gradient(180deg, var(--bg1), var(--bg0));
+      padding: 18px;
+    }
+    .wrap {
+      width: min(1040px, 100%);
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--edge);
+      border-radius: 16px;
+      box-shadow: 0 20px 44px rgba(0, 0, 0, 0.42);
+      backdrop-filter: blur(12px);
+      overflow: hidden;
+    }
+    .head {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(18px, 2.2vw, 26px);
+      letter-spacing: 0.3px;
+      color: var(--accent);
+    }
+    h2 {
+      margin: 0;
+      font-size: 15px;
+      color: var(--accent);
+      letter-spacing: 0.3px;
+    }
+    .sub {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .right { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .btn {
+      border: 1px solid var(--edge);
+      background: rgba(13, 34, 48, 0.72);
+      color: #d9f5ff;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn:hover { background: rgba(22, 50, 70, 0.9); }
+    .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+    .btn.danger { border-color: var(--dangerEdge); color: var(--danger); }
+    .btn.danger:hover { background: rgba(80, 20, 20, 0.6); }
+    .btn.warn { border-color: rgba(255, 201, 107, 0.5); color: var(--warn); }
+    .btn.primary { border-color: rgba(125, 255, 179, 0.5); color: var(--ok); }
+    input[type=password], input[type=text] {
+      background: rgba(10, 22, 34, 0.85);
+      border: 1px solid var(--edge);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 13px;
+      min-width: 260px;
+      font-family: ui-monospace, Menlo, monospace;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; }
+    td.t { font-variant-numeric: tabular-nums; font-family: ui-monospace, Menlo, monospace; }
+    td.id { color: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+    tr:hover td { background: rgba(128, 197, 243, 0.05); }
+    .pill {
+      display: inline-block; padding: 2px 7px; border-radius: 999px;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
+      background: rgba(128, 197, 243, 0.12); border: 1px solid var(--edge); color: var(--accent);
+    }
+    .toggle {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 10px;
+      border: 1px solid var(--edge); background: rgba(13, 34, 48, 0.55);
+    }
+    .switch { position: relative; width: 42px; height: 24px; }
+    .switch input { display: none; }
+    .switch span {
+      position: absolute; inset: 0; background: rgba(50, 70, 90, 0.8);
+      border-radius: 999px; cursor: pointer; transition: background 0.15s;
+    }
+    .switch span::after {
+      content: ''; position: absolute; top: 3px; left: 3px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #e6f3ff; transition: transform 0.15s;
+    }
+    .switch input:checked + span { background: #2f8f5e; }
+    .switch input:checked + span::after { transform: translateX(18px); }
+    .status { font-size: 12px; color: var(--muted); min-height: 16px; }
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--danger); }
+    .hidden { display: none !important; }
+    .note {
+      font-size: 11px; color: var(--muted); line-height: 1.5;
+      background: rgba(255, 201, 107, 0.06);
+      border: 1px solid rgba(255, 201, 107, 0.25);
+      border-radius: 8px; padding: 8px 10px;
+    }
+    .scroll { max-height: 60vh; overflow: auto; }
+    code { font-family: ui-monospace, Menlo, monospace; color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="head">
+        <h1>Admin</h1>
+        <p class="sub">DIY Air Purifier leaderboard + dev toggles</p>
+        <div class="right">
+          <a class="btn" href="/play">← Back to game</a>
+          <a class="btn" href="/leaderboard">Public board</a>
+        </div>
+      </div>
+      <div class="body">
+        <div id="authRow" class="row">
+          <input id="tok" type="password" placeholder="Admin token (from ADMIN_TOKEN env)" autocomplete="off" />
+          <button id="unlockBtn" class="btn primary">Unlock</button>
+          <button id="lockBtn" class="btn warn hidden">Lock</button>
+          <span id="authStatus" class="status"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="head">
+        <h2>Client toggles</h2>
+        <p class="sub">Saved in <code>localStorage</code> on this browser — no deploy needed.</p>
+      </div>
+      <div class="body">
+        <label class="toggle">
+          <label class="switch">
+            <input type="checkbox" id="qcmToggle" />
+            <span></span>
+          </label>
+          <div>
+            <div style="font-weight:700;">Quick Coin Mode</div>
+            <div class="sub">Spawns just the Switch-stack coin for fast leaderboard test runs. Reload <a class="btn" style="padding:2px 6px; font-size:10px;" href="/play">/play</a> after changing.</div>
+          </div>
+        </label>
+        <div class="note">
+          This flag is read by <code>index.html</code> from <code>localStorage['diy_air_purifier_quick_coin_mode']</code>. Per-browser only — set it on each device you want to test with.
+        </div>
+      </div>
+    </div>
+
+    <div id="adminSection" class="card hidden">
+      <div class="head">
+        <h2>Leaderboard entries</h2>
+        <p class="sub" id="lbCount">—</p>
+        <div class="right">
+          <button id="refreshBtn" class="btn">Refresh</button>
+          <button id="resetBtn" class="btn danger">Reset entire board…</button>
+        </div>
+      </div>
+      <div class="body">
+        <div id="lbStatus" class="status"></div>
+        <div class="scroll">
+          <table id="lbTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Time</th>
+                <th>When</th>
+                <th>Cat</th>
+                <th>ID</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="lbBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="head"><h2>Setup</h2></div>
+      <div class="body">
+        <div class="note">
+          Set the admin token on the <strong>Cloudflare Worker</strong>:<br>
+          <code>npx wrangler secret put ADMIN_TOKEN --name diy-air-purifier-leaderboard</code><br>
+          Or, for local dev (<code>server.js</code>): <code>ADMIN_TOKEN=yourtoken node server.js</code>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const SESSION_TOKEN_KEY = 'diy_air_purifier_admin_token_v1';
+  const QCM_KEY = 'diy_air_purifier_quick_coin_mode';
+
+  const $ = (id) => document.getElementById(id);
+
+  // ─── Quick Coin Mode toggle (localStorage) ──────────────────────────
+  const qcm = $('qcmToggle');
+  try { qcm.checked = localStorage.getItem(QCM_KEY) === '1'; } catch(e) {}
+  qcm.addEventListener('change', () => {
+    try {
+      if (qcm.checked) localStorage.setItem(QCM_KEY, '1');
+      else localStorage.removeItem(QCM_KEY);
+    } catch(e) {}
+  });
+
+  // ─── Auth ─────────────────────────────────────────────────────────────
+  const tokInput = $('tok');
+  const unlockBtn = $('unlockBtn');
+  const lockBtn = $('lockBtn');
+  const authStatus = $('authStatus');
+  const adminSection = $('adminSection');
+
+  function getToken() {
+    try { return sessionStorage.getItem(SESSION_TOKEN_KEY) || ''; } catch(e) { return ''; }
+  }
+  function setToken(v) {
+    try {
+      if (v) sessionStorage.setItem(SESSION_TOKEN_KEY, v);
+      else sessionStorage.removeItem(SESSION_TOKEN_KEY);
+    } catch(e) {}
+  }
+  function setAuthStatus(text, kind) {
+    authStatus.textContent = text || '';
+    authStatus.className = 'status' + (kind ? ' ' + kind : '');
+  }
+  function setLocked(locked) {
+    if (locked) {
+      adminSection.classList.add('hidden');
+      tokInput.classList.remove('hidden');
+      unlockBtn.classList.remove('hidden');
+      lockBtn.classList.add('hidden');
+    } else {
+      adminSection.classList.remove('hidden');
+      tokInput.classList.add('hidden');
+      unlockBtn.classList.add('hidden');
+      lockBtn.classList.remove('hidden');
+    }
+  }
+
+  async function apiGet(path) {
+    const r = await fetch(path, {
+      method: 'GET',
+      headers: { 'authorization': 'Bearer ' + getToken() },
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok) throw Object.assign(new Error(data.message || ('HTTP ' + r.status)), { code: data.code, status: r.status });
+    return data;
+  }
+  async function apiPost(path, body) {
+    const r = await fetch(path, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'authorization': 'Bearer ' + getToken(),
+      },
+      body: JSON.stringify(body || {}),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok) throw Object.assign(new Error(data.message || ('HTTP ' + r.status)), { code: data.code, status: r.status });
+    return data;
+  }
+
+  async function tryUnlock() {
+    const tok = tokInput.value.trim();
+    if (!tok) { setAuthStatus('Token required', 'err'); return; }
+    setToken(tok);
+    setAuthStatus('Checking…');
+    try {
+      await apiGet('/api/admin/leaderboard');
+      setAuthStatus('Unlocked', 'ok');
+      tokInput.value = '';
+      setLocked(false);
+      await refreshLeaderboard();
+    } catch (err) {
+      setToken('');
+      setAuthStatus(err.message || 'Auth failed', 'err');
+    }
+  }
+  function lock() {
+    setToken('');
+    setAuthStatus('Locked', '');
+    setLocked(true);
+  }
+
+  unlockBtn.addEventListener('click', tryUnlock);
+  tokInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
+  lockBtn.addEventListener('click', lock);
+
+  // ─── Leaderboard table ───────────────────────────────────────────────
+  const lbBody = $('lbBody');
+  const lbStatus = $('lbStatus');
+  const lbCount = $('lbCount');
+  const refreshBtn = $('refreshBtn');
+  const resetBtn = $('resetBtn');
+
+  function fmtTime(ms) {
+    const n = Number(ms) || 0;
+    const total = Math.max(0, Math.floor(n));
+    const mins = Math.floor(total / 60000);
+    const secs = Math.floor((total % 60000) / 1000);
+    const hund = Math.floor((total % 1000) / 10);
+    return (mins ? mins + ':' + String(secs).padStart(2, '0') : String(secs)) + '.' + String(hund).padStart(2, '0');
+  }
+  function fmtAt(atMs) {
+    try { return new Date(Number(atMs) || 0).toLocaleString(); }
+    catch(e) { return ''; }
+  }
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  function renderRows(entries) {
+    lbBody.innerHTML = '';
+    entries.forEach((e, i) => {
+      const tr = document.createElement('tr');
+      const cat = [e.catModel, e.catColor, e.catHair].filter(Boolean).join(' · ');
+      tr.innerHTML = `
+        <td class="t">${i + 1}</td>
+        <td>${escapeHtml(e.name)}</td>
+        <td class="t">${fmtTime(e.timeMs)}</td>
+        <td class="sub" style="color:var(--muted);">${escapeHtml(fmtAt(e.at))}</td>
+        <td><span class="pill">${escapeHtml(cat || '—')}</span></td>
+        <td class="id">${escapeHtml(e.id)}</td>
+        <td style="text-align:right;"><button class="btn danger" data-id="${escapeHtml(e.id)}">Delete</button></td>
+      `;
+      lbBody.appendChild(tr);
+    });
+    lbBody.querySelectorAll('button[data-id]').forEach((b) => {
+      b.addEventListener('click', () => deleteEntry(b.getAttribute('data-id'), b));
+    });
+  }
+
+  async function refreshLeaderboard() {
+    lbStatus.textContent = 'Loading…';
+    lbStatus.className = 'status';
+    try {
+      const data = await apiGet('/api/admin/leaderboard');
+      const entries = Array.isArray(data.leaderboard) ? data.leaderboard : [];
+      renderRows(entries);
+      lbCount.textContent = `${entries.length} entries · cap ${data.maxEntries} · per-player ${data.perPlayer} · coins ${data.requiredCoinCount}`;
+      lbStatus.textContent = '';
+    } catch (err) {
+      lbStatus.textContent = err.message || 'Failed to load';
+      lbStatus.className = 'status err';
+      if (err.status === 401) { lock(); setAuthStatus('Token rejected — unlock again', 'err'); }
+    }
+  }
+
+  async function deleteEntry(id, btn) {
+    if (!id) return;
+    if (!confirm(`Delete this entry?\n\n${id}`)) return;
+    btn.disabled = true;
+    try {
+      await apiPost('/api/admin/delete', { id });
+      btn.closest('tr').remove();
+      lbStatus.textContent = 'Deleted ' + id;
+      lbStatus.className = 'status ok';
+      // Refresh to rebalance numbering.
+      setTimeout(refreshLeaderboard, 250);
+    } catch (err) {
+      btn.disabled = false;
+      lbStatus.textContent = err.message || 'Delete failed';
+      lbStatus.className = 'status err';
+    }
+  }
+
+  async function resetAll() {
+    const word = prompt('This WIPES the whole leaderboard.\n\nType RESET to confirm.');
+    if (word !== 'RESET') { lbStatus.textContent = 'Reset cancelled'; lbStatus.className = 'status'; return; }
+    resetBtn.disabled = true;
+    try {
+      await apiPost('/api/admin/reset', { confirm: 'RESET_LEADERBOARD' });
+      lbStatus.textContent = 'Leaderboard cleared';
+      lbStatus.className = 'status ok';
+      await refreshLeaderboard();
+    } catch (err) {
+      lbStatus.textContent = err.message || 'Reset failed';
+      lbStatus.className = 'status err';
+    } finally {
+      resetBtn.disabled = false;
+    }
+  }
+
+  refreshBtn.addEventListener('click', refreshLeaderboard);
+  resetBtn.addEventListener('click', resetAll);
+
+  // Auto-unlock on load if token is already in sessionStorage.
+  (async function init() {
+    if (getToken()) {
+      try {
+        await apiGet('/api/admin/leaderboard');
+        setAuthStatus('Unlocked', 'ok');
+        setLocked(false);
+        await refreshLeaderboard();
+        return;
+      } catch (err) {
+        setToken('');
+        setAuthStatus('Stored token rejected — re-enter', 'err');
+      }
+    }
+    setLocked(true);
+  })();
+})();
+</script>
+</body>
+</html>

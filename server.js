@@ -386,6 +386,10 @@ setInterval(() => {
 
 app.use(express.static(__dirname));
 
+app.get('/admin', (_req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
+app.get('/play', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/leaderboard', (_req, res) => res.sendFile(path.join(__dirname, 'leaderboard.html')));
+
 app.get('/healthz', (_req, res) => {
   res.json({ ok: true, activeRuns: activeRuns.size, leaderboardSize: leaderboard.length });
 });
