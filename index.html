@@ -2815,7 +2815,13 @@ function makeFanPanel(flip, nFans, edgeProfile=topEdgeProfile){
       bladeShape.lineTo(pts[0][0],pts[0][1]);
       const bladeGeo=new THREE.ExtrudeGeometry(bladeShape,{depth:fanDepth*0.65,bevelEnabled:false});
       bladeGeo.translate(0,0,-fanDepth*0.325);
-      rotor.add(new THREE.Mesh(bladeGeo,bladeMat));
+      const bladeMesh=new THREE.Mesh(bladeGeo,bladeMat);
+      // Fan blades are decorative + spinning — skip raycast tests so the
+      // hover picker doesn't iterate 14+ ExtrudeGeometry blades every
+      // mousemove when the cursor drifts near the purifier. Huge win on
+      // high-refresh mice where mousemove fires ~1 kHz.
+      bladeMesh.raycast=function(){};
+      rotor.add(bladeMesh);
     }
     allFanMats[allFanMats.length-1]=fanBlades[0]; // slot blade[0] into the placeholder
     allBladeMatsPerFan.push(fanBlades);
@@ -3028,7 +3034,9 @@ function makeAltTopPanel(nFans){
       bladeShape.lineTo(pts[0][0],pts[0][1]);
       const bladeGeo=new THREE.ExtrudeGeometry(bladeShape,{depth:fanDepth*0.65,bevelEnabled:false});
       bladeGeo.translate(0,0,-fanDepth*0.325);
-      rotor.add(new THREE.Mesh(bladeGeo,bladeMat));
+      const bladeMesh=new THREE.Mesh(bladeGeo,bladeMat);
+      bladeMesh.raycast=function(){};
+      rotor.add(bladeMesh);
     }
     allFanMats[allFanMats.length-1]=fanBlades2[0];
     allBladeMatsPerFan.push(fanBlades2);
@@ -3858,6 +3866,7 @@ window.addEventListener('touchend',e=>{
 let _pendingFilterDrag=false;
 let _hoverInteractive=false;
 let _hoverCheckTimer=0;
+let _lastHoverRaycastMs=0;
 
 function getInteractiveTarget(obj){
   let p=obj;
@@ -3887,9 +3896,13 @@ canvas.addEventListener('mousemove',e=>{
     handleDragMove(e.clientX);
     return;
   }
-  // Hover cursor check + tooltip — throttled
-  _hoverCheckTimer++;
-  if(!drag && _hoverCheckTimer%3===0){
+  // Hover cursor check + tooltip — time-throttled (was every-3-events,
+  // which still fired hundreds of raycasts/sec on 1 kHz polling mice and
+  // tanked FPS when the cursor drifted near the air purifier's spinning
+  // fan blades). 50 ms = 20 Hz, plenty for hover feedback.
+  const _nowHover=(typeof performance!=='undefined' && performance.now)?performance.now():Date.now();
+  if(!drag && _nowHover-_lastHoverRaycastMs>=50){
+    _lastHoverRaycastMs=_nowHover;
     const rect=canvas.getBoundingClientRect();
     _mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
     _mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
