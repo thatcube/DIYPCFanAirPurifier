@@ -7513,7 +7513,7 @@ function _mbPlayChiptune(song){
   if(ac.state==='suspended' && ac.resume) ac.resume();
   _mbMusicGain=ac.createGain();
   _mbMusicGain.gain.value=0;
-  _mbMusicGain.gain.linearRampToValueAtTime(0.18, ac.currentTime+0.08);
+  _mbMusicGain.gain.linearRampToValueAtTime(0.16, ac.currentTime+0.08);
   _mbMusicGain.connect(ac.destination);
   const step=60/(song.bpm||120)/2; // 8th-note grid
   const bass=song.bass||[], lead=song.lead||[];
@@ -7550,7 +7550,7 @@ function _mbPlayChiptune(song){
 function _mbPlayAudio(song){
   try{
     const a=new Audio(song.src);
-    a.volume=Math.max(0, Math.min(1, (song.volume!==undefined)?song.volume:0.6));
+    a.volume=Math.max(0, Math.min(1, (song.volume!==undefined)?song.volume:0.3));
     a.preload='auto';
     a.loop=false;
     _mbCurrentAudio=a;
@@ -8171,10 +8171,10 @@ function animate(ts){
       const refDist=14; // distance at which volume is ~50%
       const vol=Math.max(0.08, refDist/(refDist+dist));
       if(_mbMusicGain && _coinAC){
-        _mbMusicGain.gain.setTargetAtTime(0.18*vol, _coinAC.currentTime, 0.06);
+        _mbMusicGain.gain.setTargetAtTime(0.16*vol, _coinAC.currentTime, 0.06);
       }
       if(_mbCurrentAudio){
-        _mbCurrentAudio.volume=Math.max(0, Math.min(1, (_mbCurrentSong&&_mbCurrentSong.volume!==undefined?_mbCurrentSong.volume:0.6)*vol));
+        _mbCurrentAudio.volume=Math.max(0, Math.min(1, (_mbCurrentSong&&_mbCurrentSong.volume!==undefined?_mbCurrentSong.volume:0.3)*vol));
       }
     }
     if(_fpCamMode==='first'){
@@ -10414,8 +10414,8 @@ function toggleFirstPerson(){
     _setCoinsVisible(false);
     _setFpControlsOpen(false);
     // Restore MacBook music to full volume (proximity fade only applies in game mode)
-    if(_mbMusicGain && _coinAC) _mbMusicGain.gain.setTargetAtTime(0.18, _coinAC.currentTime, 0.06);
-    if(_mbCurrentAudio) _mbCurrentAudio.volume=(_mbCurrentSong&&_mbCurrentSong.volume!==undefined)?_mbCurrentSong.volume:0.6;
+    if(_mbMusicGain && _coinAC) _mbMusicGain.gain.setTargetAtTime(0.16, _coinAC.currentTime, 0.06);
+    if(_mbCurrentAudio) _mbCurrentAudio.volume=(_mbCurrentSong&&_mbCurrentSong.volume!==undefined)?_mbCurrentSong.volume:0.3;
     // Clear pause state so re-entering play mode doesn't immediately pause.
     if(_fpPaused){
       _fpPaused=false;
