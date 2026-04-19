@@ -5621,8 +5621,19 @@ function applyTimeOfDay(minuteOfDay){
   bounce.position.set(ROOM_LIGHT_BASE.bounce.x, ROOM_LIGHT_BASE.bounce.y, ROOM_LIGHT_BASE.bounce.z);
 
   // Other lights
-  hemiLight.intensity=mix(0.05, 0.24, sun) + (ceilLightOn?mix(0.12, 0.04, sun):0); // broader daylight fill; ceiling-on adds a warm ambient lift so distant walls/ceiling don't read dead
-  hemiLight.color.copy(lerpHex(0x334466, 0x8899bb, sun)); // sky shifts blue→grey at night
+  hemiLight.intensity=mix(0.05, 0.24, sun) + (ceilLightOn?mix(0.30, 0.10, sun):0); // broader daylight fill; ceiling-on lifts ALL surfaces (ceiling, TV wall, etc.) via ambient — fake radiosity
+  {
+    // At night with only the ceiling light on, the sun-driven sky color
+    // is cold (0x334466). That would make the hemi "lift" look blue,
+    // which reads wrong — a warm fixture should warm the room. Shift
+    // sky color toward warm tungsten proportional to ceiling-on weight.
+    const sky=lerpHex(0x334466, 0x8899bb, sun);
+    if(ceilLightOn){
+      const warmMix=(1-sun)*0.7; // strong warm at night, weak in daytime
+      sky.lerp(new THREE.Color(0xfff0d0), warmMix);
+    }
+    hemiLight.color.copy(sky);
+  }
   hemiLight.groundColor.copy(lerpHex(0x221100, 0xffeedd, sun)); // warm ground bounce
   fill.intensity=mix(0.01, 0.14, sun);   // gentle global fill to reduce hard spotlight look
   rim.intensity=mix(0.01, 0.08, sun);    // subtle side lift for wall/door shading
@@ -6969,29 +6980,20 @@ ceilSpot.shadow.bias=-0.0005;
 ceilSpot.shadow.radius=5; ceilSpot.shadow.blurSamples=12;
 ceilSpot.shadow.camera.near=10;
 ceilSpot.shadow.camera.far=95;
-// A single omni PointLight can't solve this: making it bright enough to
-// reach the ceiling and the TV wall inevitably blows out the nearby
-// walls on the same sphere. So we split the job:
-//   1) A small, tight PointLight right under the dome — just enough to
-//      make the immediate fixture area feel "lit" without shouting.
-//   2) An upward-facing SpotLight that throws a wide cone at the
-//      ceiling plane itself, so the ceiling disc around the fixture
-//      actually shows light (which was the main missing cue).
-//   3) A slightly warmer hemisphere boost when the light is on, which
-//      lifts ALL remote surfaces (including the TV wall) without any
-//      single direction being dominant — this is the cheap stand-in
-//      for the global bounce a real room would have.
-ceilGlow=new THREE.PointLight(0xfff3df,0.35,30,1.2);
-ceilGlow.position.set(ceilLightX,ceilY-0.8,ceilLightZ);
+// Single omni glow with very low decay so intensity is nearly uniform
+// across the whole room. This is the ONLY way to light the ceiling,
+// near walls, and the TV wall (74" away) at similar brightness
+// without blowing out near surfaces:
+//   near wall  (10") → 0.35 / 10^0.35 ≈ 0.156
+//   TV wall   (74") → 0.35 / 74^0.35 ≈ 0.073
+// That's a ~2x ratio — the far wall reads as lit, the near wall isn't
+// blown out. Real rooms feel this way because of radiosity bounce,
+// which we can't afford at 300fps; constant-ish point light fakes it.
+ceilGlow=new THREE.PointLight(0xfff3df,0.35,0,0.35);
+ceilGlow.position.set(ceilLightX,ceilY-2,ceilLightZ);
 ceilGlow.castShadow=false;
 scene.add(ceilGlow);
-// Upward ceiling-wash spot. Cone opens wide so the ceiling disc is
-// illuminated in a soft circle around the fixture, fading with distance.
-ceilUp=new THREE.SpotLight(0xfff3df,1.1,0,Math.PI*0.48,0.85,0.8);
-ceilUp.position.set(ceilLightX,ceilY-0.3,ceilLightZ);
-ceilUp.target.position.set(ceilLightX,ceilY+5,ceilLightZ); // straight up
-scene.add(ceilUp); scene.add(ceilUp.target);
-ceilUp.castShadow=false;
+// ceilUp is unused now — kept as null so the wiring below is a no-op.
 
 // Curtains — simple draped fabric panels on each side of the window
 const curtainH=winH+12, curtainW=14, curtainD=1.5;
