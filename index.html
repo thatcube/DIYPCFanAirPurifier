@@ -9359,6 +9359,9 @@ function _setFpPaused(paused){
   _fpPaused=next;
   const ov=document.getElementById('fpPauseOverlay');
   if(ov) ov.style.display=_fpPaused?'flex':'none';
+  // Show leaderboard only when paused (hidden during active gameplay to reduce distraction)
+  const lb=document.getElementById('fpLeaderboard');
+  if(lb) lb.style.display=_fpPaused?'':'none';
   if(_fpPaused){
     // Drop any held keys so we don't drift on resume, release pointer lock,
     // and hide the crosshair (can't interact while paused).
@@ -10311,6 +10314,9 @@ function toggleFirstPerson(){
   _markShadowsDirty();
 
   if(_fpMode){
+    // Hide leaderboard during active gameplay (shown when paused or run finished)
+    const lb=document.getElementById('fpLeaderboard');
+    if(lb) lb.style.display='none';
     _fpSavedFov=camera.fov;
     camera.fov=75; // wider FOV for first person
     camera.near=0.05;
