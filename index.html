@@ -2242,10 +2242,10 @@ scene.add(hemiLight);
 const key=new THREE.DirectionalLight(0xffe0a0,1.4); key.position.set(95,38,0); // from outside the window (flipped)
 key.castShadow=true; key.shadow.mapSize.set(_isMobile?1024:2048, _isMobile?1024:2048);
 key.shadow.bias=-0.0005; key.shadow.normalBias=0.04;
-key.shadow.radius=_isMobile?6:12; key.shadow.blurSamples=_isMobile?16:36;
-key.shadow.camera.near=1; key.shadow.camera.far=240;
-key.shadow.camera.left=-90; key.shadow.camera.right=90;
-key.shadow.camera.top=70; key.shadow.camera.bottom=-70;
+key.shadow.radius=_isMobile?6:12; key.shadow.blurSamples=_isMobile?8:20;
+key.shadow.camera.near=1; key.shadow.camera.far=200;
+key.shadow.camera.left=-75; key.shadow.camera.right=75;
+key.shadow.camera.top=58; key.shadow.camera.bottom=-58;
 key.shadow.camera.updateProjectionMatrix();
 scene.add(key);
 const windowSun=new THREE.SpotLight(0xffe0a0,0,260,Math.PI*0.60,0.72,1.0);
@@ -4334,8 +4334,8 @@ function setFanSpeed(val){
   if(spinning) spinTarget=SPIN_MAX*(fanSpeedPct/100);
 }
 
-const PARTICLE_COUNT=400;
-const PARTICLE_TIER_COUNTS=[400,340,260,180];
+const PARTICLE_COUNT=350;
+const PARTICLE_TIER_COUNTS=[350,280,200,140];
 let activeParticleCount=PARTICLE_COUNT;
 const particleGeo=new THREE.BufferGeometry();
 const particlePositions=new Float32Array(PARTICLE_COUNT*3);
@@ -5827,7 +5827,11 @@ function setRGB(color){
   }
   if(color==='rainbow'){
     const dist=RGB_BASE_DIST*(0.5+rgbBrightness*1.5);
-    for(const gl of allFanGlows){ gl.intensity=(0.9*rgbBrightness+0.05); gl.distance=dist; }
+    for(const gl of allFanGlows){
+      gl.intensity=(0.9*rgbBrightness+0.05);
+      gl.distance=dist;
+      gl.visible=rgbBrightness>0.001;
+    }
     return;
   }
   setRGBColor(color==='off'?0x000000:customRGBHex);
@@ -5841,6 +5845,10 @@ function setRGBColor(hex){
     gl.color.setHex(hex);
     gl.intensity=intensity*br;
     gl.distance=dist;
+    // When the LEDs are off we set intensity to 0, but Three.js still
+    // uploads the light to the uniform array and every lit fragment pays
+    // the distance falloff cost. Hiding them drops the count completely.
+    gl.visible=!isOff && br>0.001;
   }
   const emissiveHex=isOff?0x000000:hex;
   const emissiveIntensity=isOff?0:6.0*br;
@@ -7764,6 +7772,7 @@ function animate(ts){
       hueColor.setHSL(midHue,1,0.5);
       allFanGlows[gi].color.copy(hueColor);
       allFanGlows[gi].intensity=0.9*rb+0.05;
+      allFanGlows[gi].visible=rb>0.001;
       fanIdx+=nf;
     }
 
@@ -8329,7 +8338,7 @@ const _fpKeys={w:false,a:false,s:false,d:false,space:false,shift:false};
 let _fpLookDX=0, _fpLookDY=0;
 let _fpHoverTarget=null;
 let _fpNextRaycastTs=0;
-const _fpRaycastIntervalMs=24;
+const _fpRaycastIntervalMs=32;
 const _fpInteractRange=220;
 let _fpSavedFov=42;
 let _fpSpaceHeld=0; // frames space is held for charged jump
