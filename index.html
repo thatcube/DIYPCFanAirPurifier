@@ -2248,9 +2248,12 @@ const key=new THREE.DirectionalLight(0xffe0a0,1.4); key.position.set(95,38,0); /
 key.castShadow=true; key.shadow.mapSize.set(_isMobile?1024:2048, _isMobile?1024:2048);
 key.shadow.bias=-0.0005; key.shadow.normalBias=0.04;
 key.shadow.radius=_isMobile?6:12; key.shadow.blurSamples=_isMobile?8:20;
-key.shadow.camera.near=1; key.shadow.camera.far=200;
-key.shadow.camera.left=-75; key.shadow.camera.right=75;
-key.shadow.camera.top=58; key.shadow.camera.bottom=-58;
+// Ortho frustum bounds need to cover the whole room — tightening these
+// doesn't save GPU time (shadow cost scales with map size + blur samples),
+// it just clips the shadow and leaves bright uncovered halves on far walls.
+key.shadow.camera.near=1; key.shadow.camera.far=240;
+key.shadow.camera.left=-90; key.shadow.camera.right=90;
+key.shadow.camera.top=70; key.shadow.camera.bottom=-70;
 key.shadow.camera.updateProjectionMatrix();
 scene.add(key);
 const windowSun=new THREE.SpotLight(0xffe0a0,0,260,Math.PI*0.60,0.72,1.0);
