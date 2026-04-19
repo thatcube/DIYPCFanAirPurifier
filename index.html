@@ -8165,10 +8165,10 @@ function animate(ts){
       const mbZ=_macbookRoot.matrixWorld.elements[14];
       const dx=_fpPos.x-mbX, dy=_fpPos.y-mbY, dz=_fpPos.z-mbZ;
       const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
-      // Full volume within 15", fades to ~10% at 80", silent beyond 120"
-      const near=15, far=120;
+      // Full volume within 15", fades to ~8% at max distance, never silent
+      const near=15, far=140;
       const t=Math.max(0, Math.min(1, (dist-near)/(far-near)));
-      const vol=Math.max(0, 1-t*t); // quadratic falloff
+      const vol=Math.max(0.08, 1-t*t); // quadratic falloff, floor at 8%
       if(_mbMusicGain && _coinAC){
         _mbMusicGain.gain.setTargetAtTime(0.18*vol, _coinAC.currentTime, 0.06);
       }
