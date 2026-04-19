@@ -9994,8 +9994,9 @@ function _renderLeaderboard(){
   // When per-player = LB_MAX there's effectively no cap and the message
   // just adds noise.
   const capNote=(_LB_PER_PLAYER<_LB_MAX)?` | Max ${_LB_PER_PLAYER} per player`:'';
-  meta.textContent=`${mode} | Fastest first | Top ${_LB_MAX}${capNote}${_lbStatusNote?` | ${_lbStatusNote}`:''}`;
-}
+  // Don't repeat "Local fallback" when we're already showing mode as "Local"
+  const statusSuffix=(_lbStatusNote && !(_lbStatusNote==='Local fallback' && !_lbSharedOnline))?` | ${_lbStatusNote}`:'';
+  meta.textContent=`${mode} | Fastest first | Top ${_LB_MAX}${capNote}${statusSuffix}`;}
 function _updateTimerHud(nowMs){
   const txt=document.getElementById('runTimerText');
   const st=document.getElementById('runTimerState');
