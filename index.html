@@ -7883,8 +7883,9 @@ function animate(ts){
     // Extra inches of head ABOVE the camera. Used only for ceiling/overhang
     // collision so the player can't walk under things that are just barely
     // taller than the camera's eye line (e.g. the air-purifier cabinet in
-    // 'tv' placement). Camera position itself is untouched.
-    const headExtra=2.5;
+    // 'tv' placement). Camera position itself is untouched. Must stay
+    // BELOW bedClearance (6.5") so the bed frame remains walk-under-able.
+    const headExtra=2.0;
     let groundY=_fpFloorY-placementOffset.y; // floor moves with room Y offset
     const _curBoxes=_fpGetBoxes();
     for(const box of _curBoxes){
