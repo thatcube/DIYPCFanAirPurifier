@@ -4166,7 +4166,7 @@ function handleClickObject(obj){
     ceilLightOn=!ceilLightOn;
     ceilSpot.intensity=ceilLightOn?0.95:0;
     domeMat.emissiveIntensity=ceilLightOn?0.8:0;
-    if(ceilGlow) ceilGlow.intensity=ceilLightOn?0.5:0;
+    if(ceilGlow) ceilGlow.intensity=ceilLightOn?6.0:0;
     if(typeof _spawnSecretPowerBICoins==='function') _spawnSecretPowerBICoins();
     return;
   }
@@ -5635,7 +5635,7 @@ function applyTimeOfDay(minuteOfDay){
   bounce.intensity=mix(0.0, 0.06, sun);  // soft floor bounce in daytime
   ceilSpot.intensity=ceilLightOn?mix(1.1, 0.4, sun):0; // keep visibly lit in daytime, warmer/stronger at night
   domeMat.emissiveIntensity=ceilLightOn?mix(0.9, 0.45, sun):0;
-  if(ceilGlow) ceilGlow.intensity=ceilLightOn?mix(0.6, 0.25, sun):0;
+  if(ceilGlow) ceilGlow.intensity=ceilLightOn?mix(8.0, 3.0, sun):0;
 
   // Outdoor backdrop brightness (sun through window)
   outdoor.material.color.setScalar(mix(0.08, 1.4, sun)+warm*0.25);
@@ -6972,11 +6972,17 @@ ceilSpot.shadow.bias=-0.0005;
 ceilSpot.shadow.radius=5; ceilSpot.shadow.blurSamples=12;
 ceilSpot.shadow.camera.near=10;
 ceilSpot.shadow.camera.far=95;
-// Omni glow for the ceiling fixture. With the ceiling plane no longer
-// casting false shadows, the key directional light now reaches ALL
-// walls. ceilGlow adds a warm wash on top. Moderate intensity with
-// low decay so it reads on both near and far walls.
-ceilGlow=new THREE.PointLight(0xfff3df,0.6,0,0.5);
+// Omni glow for the ceiling fixture. The key directional light comes
+// almost straight along -X (window→room), so any surface whose normal
+// is perpendicular to X (TV wall ±Z, ceiling ±Y, back wall ±Z) gets
+// ZERO diffuse from it. ceilGlow is therefore the ONLY light that can
+// illuminate those surfaces. It needs to be bright enough that ACES
+// filmic tone mapping doesn't crush it to invisible at 74" (TV wall).
+// intensity=8.0 with decay=1.0 gives:
+//   ceiling (2.5"): 3.2  — bright halo, ACES compresses gracefully
+//   near wall (15"): 0.53 — warm visible wash
+//   TV wall  (74"): 0.108 — clearly visible after tone mapping
+ceilGlow=new THREE.PointLight(0xfff3df,8.0,0,1.0);
 ceilGlow.position.set(ceilLightX,ceilY-2,ceilLightZ);
 ceilGlow.castShadow=false;
 scene.add(ceilGlow);
@@ -10973,7 +10979,7 @@ function _resetCoins(){
     ceilLightOn=true;
     if(typeof ceilSpot!=='undefined' && ceilSpot) ceilSpot.intensity=0.95;
     if(typeof domeMat!=='undefined' && domeMat) domeMat.emissiveIntensity=0.8;
-    if(typeof ceilGlow!=='undefined' && ceilGlow) ceilGlow.intensity=0.5;
+    if(typeof ceilGlow!=='undefined' && ceilGlow) ceilGlow.intensity=6.0;
   }
   // Randomize which drawer hides the coin this session.
   const drawerCoin=_coins.find(c=>c.inDrawer);
