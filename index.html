@@ -7880,12 +7880,15 @@ function animate(ts){
     //   actively rising (_fpVy>0) so grazing the ceiling at the peak of
     //   a jump is silent but still smoothly clamped.
     const eyeH=4; // eye height — camera sits this far above feet (unchanged)
-    // Extra inches of head ABOVE the camera. Used only for ceiling/overhang
-    // collision so the player can't walk under things that are just barely
-    // taller than the camera's eye line (e.g. the air-purifier cabinet in
-    // 'tv' placement). Camera position itself is untouched. Must stay
-    // BELOW bedClearance (6.5") so the bed frame remains walk-under-able.
-    const headExtra=1.0;
+    // Head-top extends this far ABOVE the camera for ceiling/overhang
+    // tests. Kept at 0 so the collision height exactly matches the cat
+    // model (_catTargetHeight = 4", and eyeH is also 4" — the camera IS
+    // the top of the cat's head). Anything with >0 floor clearance will
+    // still be walk-under-able; objects flat on the floor (purifier in
+    // 'tv' placement) will still block because their yBottom sits at/below
+    // the floor while the player's feet are also at the floor, so the
+    // "fully beneath" check fails and falls through to XZ push-out.
+    const headExtra=0;
     let groundY=_fpFloorY-placementOffset.y; // floor moves with room Y offset
     const _curBoxes=_fpGetBoxes();
     for(const box of _curBoxes){
