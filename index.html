@@ -4166,7 +4166,7 @@ function handleClickObject(obj){
     ceilLightOn=!ceilLightOn;
     ceilSpot.intensity=ceilLightOn?0.95:0;
     domeMat.emissiveIntensity=ceilLightOn?0.8:0;
-    if(ceilGlow) ceilGlow.intensity=ceilLightOn?1.2:0;
+    if(ceilGlow) ceilGlow.intensity=ceilLightOn?0.8:0;
     if(typeof _spawnSecretPowerBICoins==='function') _spawnSecretPowerBICoins();
     return;
   }
@@ -5628,7 +5628,7 @@ function applyTimeOfDay(minuteOfDay){
   bounce.intensity=mix(0.0, 0.06, sun);  // soft floor bounce in daytime
   ceilSpot.intensity=ceilLightOn?mix(1.1, 0.4, sun):0; // keep visibly lit in daytime, warmer/stronger at night
   domeMat.emissiveIntensity=ceilLightOn?mix(0.9, 0.45, sun):0;
-  if(ceilGlow) ceilGlow.intensity=ceilLightOn?mix(1.4, 0.55, sun):0;
+  if(ceilGlow) ceilGlow.intensity=ceilLightOn?mix(0.9, 0.35, sun):0;
 
   // Outdoor backdrop brightness (sun through window)
   outdoor.material.color.setScalar(mix(0.08, 1.4, sun)+warm*0.25);
@@ -6967,12 +6967,13 @@ ceilSpot.shadow.camera.near=10;
 ceilSpot.shadow.camera.far=95;
 // Omni glow that washes the ceiling around the fixture + upper walls.
 // Tucked right under the dome lip. distance=0 (no hard cutoff) and a
-// gentle decay of 1.0 so the ceiling disc (~0.2" away) is strongly lit
-// and the far walls (~45" away) still receive a visible warm tint
-// without needing absurd source intensity. This is what sells "the
-// light is on" — real dome fixtures throw a lot up and sideways.
-ceilGlow=new THREE.PointLight(0xfff3df,1.4,0,1.0);
-ceilGlow.position.set(ceilLightX,ceilY-0.6,ceilLightZ);
+// square-root decay (0.5) so the falloff from the 2" ceiling to the
+// ~45" far wall is only ~4.7x instead of 22x under linear decay. This
+// keeps near walls from blowing out while the TV wall still gets a
+// visible warm tint. Intensity kept modest since low decay makes it
+// reach further on its own.
+ceilGlow=new THREE.PointLight(0xfff3df,0.9,0,0.5);
+ceilGlow.position.set(ceilLightX,ceilY-0.4,ceilLightZ);
 ceilGlow.castShadow=false;
 scene.add(ceilGlow);
 
