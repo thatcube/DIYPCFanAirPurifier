@@ -8502,9 +8502,9 @@ const _fpBoxesBase=[
   // Mini split — uses msX, msW, msH, msY, msZ, msD (X-mirrored: negate X).
   // yBottom lets you walk underneath the wall-mounted unit.
   {xMin:-(msX+msW/2), xMax:-(msX-msW/2), zMin:oppWallZ, zMax:msZ+msD/2+1, yTop:msY+msH/2, yBottom:msY-msH/2, room:true},
-  // Pillows (X-mirrored)
-  {xMin:-(bedX-13+pillowW/2), xMax:-(bedX-13-pillowW/2), zMin:pillowBaseZ-pillowD/2, zMax:pillowBaseZ+pillowD/2, yTop:pillowY+pillowH+1.5, room:true},
-  {xMin:-(bedX+13+pillowW/2), xMax:-(bedX+13-pillowW/2), zMin:pillowBaseZ-pillowD/2, zMax:pillowBaseZ+pillowD/2, yTop:pillowY+pillowH+1.5, room:true},
+  // Pillows (X-mirrored) — yBottom matches bed clearance so the cat can walk under the bed
+  {xMin:-(bedX-13+pillowW/2), xMax:-(bedX-13-pillowW/2), zMin:pillowBaseZ-pillowD/2, zMax:pillowBaseZ+pillowD/2, yTop:pillowY+pillowH+1.5, yBottom:floorY+bedClearance, room:true},
+  {xMin:-(bedX+13+pillowW/2), xMax:-(bedX+13-pillowW/2), zMin:pillowBaseZ-pillowD/2, zMax:pillowBaseZ+pillowD/2, yTop:pillowY+pillowH+1.5, yBottom:floorY+bedClearance, room:true},
   // Headboard (X-mirrored)
   {xMin:-(bedX+hbW/2), xMax:-(bedX-hbW/2), zMin:bedZ+bedL/2-hbThick, zMax:bedZ+bedL/2, yTop:floorY+bedClearance+hbH, room:true},
 ];
