@@ -10524,6 +10524,57 @@ function _addCoin(parent, localPos, opts){
     // and pushed toward the back of the tray so it's more hidden.
     const dTrayD=drawers[0]?._drawerTrayD||10;
     _addCoin(drawers[0], new THREE.Vector3(0, -drawers[0]._drawerH/2+3.2, 0.4+dTrayD-2.2), {inDrawer:true});
+
+    // ─── Secret coins (blue, excluded from the HUD total) ────────────────
+    // These are hidden easter eggs. Like the MacBook-click secret, they
+    // don't count toward the Play Mode objective, but they DO persist in
+    // the player's secretCoins total across the leaderboard.
+    //
+    // 1) MICROSOFT WINK — on top of the Xbox Series X, which sits on the
+    //    purifier in "Under TV" placement. A nod to Microsoft hardware;
+    //    tucked away so you only see it if you actually look up while
+    //    standing near the purifier.
+    //    Xbox local-to-purifier: center (0, topY + xbH/2, 8), topY = H/2+ply,
+    //    xbH = 11.85. Coin 2.2" above the top face.
+    _addCoin(
+      purifierGroup,
+      new THREE.Vector3(0, (H/2+ply) + 11.85 + 2.2, 8),
+      {insidePurifier:true, consoleProp:true, secret:true}
+    );
+
+    // 2) POWER BI BAR CHART — three ascending coins inside the back corner
+    //    of the closet, visually forming a small 3-bar "rising chart" like
+    //    the Power BI logo. You have to step into the walk-in closet and
+    //    look at the back-right corner to spot them.
+    //    Corner: x = -(sideWallX+2.5) (a few inches off the back wall),
+    //    z sequence steps toward -Z; y ascends so it reads left-to-right as
+    //    a bar chart when viewed from the closet opening.
+    {
+      const pbX=-(sideWallX+2.5);
+      const pbZBase=_closetZ-_closetInteriorW/2+3.5;
+      const pbStep=3.2;
+      _addCoin(_coinGroup, new THREE.Vector3(pbX, floorY+6,  pbZBase),             {secret:true});
+      _addCoin(_coinGroup, new THREE.Vector3(pbX, floorY+14, pbZBase+pbStep),      {secret:true});
+      _addCoin(_coinGroup, new THREE.Vector3(pbX, floorY+22, pbZBase+pbStep*2),    {secret:true});
+    }
+
+    // 3) LAMP SHADE CROWN — balanced right on top of the lamp's shade ring,
+    //    directly above the "inside the lamp shade" regular coin. Looks
+    //    like a tiny crown on the lamp.
+    _addCoin(
+      _coinGroup,
+      new THREE.Vector3(-(tblX+tblW/2-6), floorY+tblH+28.5, tblZ+tblD/2-6),
+      {secret:true}
+    );
+
+    // 4) FOOT OF THE BED — under the bed at the opposite end from the
+    //    existing "under the bed" coin (which sits near the foot). This one
+    //    hides back near the headboard end, forcing a proper crawl.
+    _addCoin(
+      _coinGroup,
+      new THREE.Vector3(-bedX, floorY+bedClearance-1.8, bedZ+bedL/2-8),
+      {secret:true}
+    );
   }
 }
 function _setCoinsVisible(show){
