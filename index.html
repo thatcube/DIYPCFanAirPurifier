@@ -841,7 +841,7 @@ let _catHairKey='short';
 const _catBaseScale=new THREE.Vector3(1,1,1);
 const _catPreviewBaseScale=new THREE.Vector3(1,1,1);
 const _catMatBaseColorMap=new WeakMap();
-const _catMatBaseRoughnessMap=new WeakMap();
+const _catMatBaseRoughnessMap=new WeakMap();9
 const _catBoneBaseScaleMap=new WeakMap();
 const _catMatBaseBumpScaleMap=new WeakMap();
 const _catMatBaseEmissiveMap=new WeakMap();
@@ -7879,7 +7879,7 @@ function animate(ts){
     //   the box's yBottom. The bonk SFX/intensity only fires when
     //   actively rising (_fpVy>0) so grazing the ceiling at the peak of
     //   a jump is silent but still smoothly clamped.
-    const eyeH=4; // eye height
+    const eyeH=_fpPlayerHeight; // camera/head height above feet (collider height)
     let groundY=_fpFloorY-placementOffset.y; // floor moves with room Y offset
     const _curBoxes=_fpGetBoxes();
     for(const box of _curBoxes){
@@ -8029,7 +8029,7 @@ function animate(ts){
       catGroup.visible=true;
       // World-space yaw rig: keep cat parallel to floor and anchored to the
       // collision center.
-      catGroup.position.set(_fpPos.x, _fpPos.y - 4.0, _fpPos.z);
+      catGroup.position.set(_fpPos.x, _fpPos.y - _fpPlayerHeight, _fpPos.z);
       // Face movement direction for natural locomotion (no moonwalk while
       // turning/backing/strafe). If nearly stationary, keep facing heading.
       const moveLenSq=_fpVelX*_fpVelX + _fpVelZ*_fpVelZ;
@@ -8183,6 +8183,12 @@ const _fpInteractRange=220;
 let _fpSavedFov=42;
 let _fpSpaceHeld=0; // frames space is held for charged jump
 const _fpBodyR=2.2; // body radius tuned to cat footprint (more realistic)
+// Collision capsule height from feet → head (camera). Was 4 — bumped to
+// 5.5 so the player can't slip under short overhangs like the air-purifier
+// base in 'tv' placement. Cat MODEL size is unchanged (that's driven by
+// _catTargetHeight); this only grows the invisible vertical collider so
+// head-bonks on low furniture feel right.
+const _fpPlayerHeight=5.5;
 // Solid furniture AABBs derived from actual object variables
 // room=true means box moves with room (shifted by -placementOffset); false means stays at origin
 // X values are negated for room objects because the room gets X-mirrored after construction
@@ -10536,10 +10542,10 @@ function _updateCoins(ts,frameScale){
   // Keep _coinGroup aligned with the room (room objects are shifted by -placementOffset).
   _coinGroup.position.set(-placementOffset.x, -placementOffset.y, -placementOffset.z);
   const t=ts*0.001;
-  // Pickup sphere center is the cat's mid-body (feet + half cat height),
-  // not the player's eye position. _fpPos.y is eye height (~4" above feet);
-  // the cat is ~4" tall so its center sits ~_fpPos.y - 2.
-  const camPos=_coinCamTmp.set(_fpPos.x, _fpPos.y-2, _fpPos.z);
+  // Pickup sphere center is the cat's mid-body (feet + half player height),
+  // not the player's eye position. _fpPos.y is head/camera; subtract half
+  // the collider height so vertical reach is symmetric around the cat body.
+  const camPos=_coinCamTmp.set(_fpPos.x, _fpPos.y - _fpPlayerHeight*0.5, _fpPos.z);
   const fs=Number.isFinite(frameScale)?frameScale:1;
   for(const c of _coins){
     if(c.collected) continue;
