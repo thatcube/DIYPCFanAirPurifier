@@ -2785,12 +2785,17 @@ function makeFanPanel(flip, nFans, edgeProfile=topEdgeProfile){
     const fanBlades=[];
     allFanMats.push(null); // placeholder at [i+3], replaced below with blade[0]
     for(let b=0;b<bladeCount;b++){
-      const bladeMat=stdMat({color:0xf0ece8,shininess:30,side:THREE.DoubleSide,transparent:true,opacity:0.65,depthWrite:false});
+      // FrontSide (was DoubleSide) halves fragment-shader work for every
+      // blade pixel on screen. Panels face outward so the blade back is
+      // hidden by the housing. Steps dropped 14→28 — the sickle curve
+      // is still smooth at this density, and it roughly halves the
+      // triangle count per blade.
+      const bladeMat=stdMat({color:0xf0ece8,shininess:30,side:THREE.FrontSide,transparent:true,opacity:0.65,depthWrite:false});
       fanBlades.push(bladeMat);
       const baseAngle=b/bladeCount*Math.PI*2;
       const bladeShape=new THREE.Shape();
       const innerR=hubR*1.05, outerR=impellerR*0.96;
-      const sweep=0.52, steps=14;
+      const sweep=0.52, steps=8;
       // Leading edge: sickle curve from hub to tip
       const pts=[], trailPts=[];
       for(let st=0;st<=steps;st++){
@@ -3007,12 +3012,13 @@ function makeAltTopPanel(nFans){
     const fanBlades2=[];
     allFanMats.push(null); // placeholder for blade[0]
     for(let b=0;b<bladeCount;b++){
-      const bladeMat=stdMat({color:0xf0ece8,shininess:30,side:THREE.DoubleSide,transparent:true,opacity:0.65,depthWrite:false});
+      // See fan-panel blades: FrontSide + 8 steps for cheaper fill rate.
+      const bladeMat=stdMat({color:0xf0ece8,shininess:30,side:THREE.FrontSide,transparent:true,opacity:0.65,depthWrite:false});
       fanBlades2.push(bladeMat);
       const baseAngle=b/bladeCount*Math.PI*2;
       const bladeShape=new THREE.Shape();
       const innerR=hubR*1.05, outerR=impellerR*0.96;
-      const sweep=0.52, steps=14;
+      const sweep=0.52, steps=8;
       const pts=[], trailPts=[];
       for(let st=0;st<=steps;st++){
         const t=st/steps;
