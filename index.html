@@ -7880,15 +7880,15 @@ function animate(ts){
     //   actively rising (_fpVy>0) so grazing the ceiling at the peak of
     //   a jump is silent but still smoothly clamped.
     const eyeH=4; // eye height — camera sits this far above feet (unchanged)
-    // Head-top extends this far ABOVE the camera for ceiling/overhang
-    // tests. Kept at 0 so the collision height exactly matches the cat
-    // model (_catTargetHeight = 4", and eyeH is also 4" — the camera IS
-    // the top of the cat's head). Anything with >0 floor clearance will
-    // still be walk-under-able; objects flat on the floor (purifier in
-    // 'tv' placement) will still block because their yBottom sits at/below
-    // the floor while the player's feet are also at the floor, so the
-    // "fully beneath" check fails and falls through to XZ push-out.
-    const headExtra=0;
+    // Head-top Y used for ceiling/overhang tests, expressed as an offset
+    // from the CAMERA. Negative values keep the collision head BELOW the
+    // camera so the view stays high (good third-person feel) while the
+    // head you're actually ducking with is only ~2" above the floor —
+    // roughly half the camera height, matching the cat's real body
+    // profile (the camera sits at ear height; the body is lower).
+    // This is what makes head-bonks on low overhangs feel natural
+    // instead of firing at eye line.
+    const headExtra=-2.0;
     let groundY=_fpFloorY-placementOffset.y; // floor moves with room Y offset
     const _curBoxes=_fpGetBoxes();
     for(const box of _curBoxes){
