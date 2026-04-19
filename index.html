@@ -8168,7 +8168,7 @@ function animate(ts){
       // No full-volume zone — starts dropping immediately. Inverse-distance
       // style: very close = loud, drops fast in the first few feet, then
       // tapers gently to the 8% floor at distance.
-      const refDist=8; // distance at which volume is ~50%
+      const refDist=14; // distance at which volume is ~50%
       const vol=Math.max(0.08, refDist/(refDist+dist));
       if(_mbMusicGain && _coinAC){
         _mbMusicGain.gain.setTargetAtTime(0.18*vol, _coinAC.currentTime, 0.06);
