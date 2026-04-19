@@ -8080,6 +8080,7 @@ function animate(ts){
     const headExtra=-2.0;
     let groundY=_fpFloorY-placementOffset.y; // floor moves with room Y offset
     const _curBoxes=_fpGetBoxes();
+    let _dbgBlockBox=null; // debug: which box pushed us this frame
     for(const box of _curBoxes){
       // Check XZ overlap
       const xOverlap=nx+r>box.xMin && nx-r<box.xMax;
@@ -8109,6 +8110,7 @@ function animate(ts){
           if(_fpVy>0) _fpVy=0;
         } else {
           // Push out of box on smallest XZ penetration axis.
+          _dbgBlockBox=box;
           const pushXL=box.xMax+r-nx;
           const pushXR=nx+r-box.xMin;
           const pushZF=box.zMax+r-nz;
@@ -8124,6 +8126,7 @@ function animate(ts){
     _fpPos.x=nx;
     _fpPos.z=nz;
     _fpPos.y=newY;
+    window._dbgBlockBox=_dbgBlockBox; // expose for coord display
     if(_fpPos.y<groundY){ _fpPos.y=groundY; _fpVy=0; }
     // Ceiling collision — can't go above ceiling height
     const ceilMax=(floorY+80-placementOffset.y)-0.5; // half inch below ceiling
@@ -8350,6 +8353,10 @@ function animate(ts){
       if(_fpMode && _showCoords){
         const p=_fpPos;
         txt+=' | x:'+p.x.toFixed(1)+' y:'+p.y.toFixed(1)+' z:'+p.z.toFixed(1);
+        if(window._dbgBlockBox){
+          const b=window._dbgBlockBox;
+          txt+=' BLOCKED x['+b.xMin.toFixed(0)+','+b.xMax.toFixed(0)+'] z['+b.zMin.toFixed(0)+','+b.zMax.toFixed(0)+'] yB:'+(b.yBottom!==undefined?b.yBottom.toFixed(0):'none');
+        }
       }
       fpsMini.textContent=txt;
     }
