@@ -4166,7 +4166,7 @@ function handleClickObject(obj){
     ceilLightOn=!ceilLightOn;
     ceilSpot.intensity=ceilLightOn?0.95:0;
     domeMat.emissiveIntensity=ceilLightOn?0.8:0;
-    if(ceilGlow) ceilGlow.intensity=ceilLightOn?0.5:0;
+    if(ceilGlow) ceilGlow.intensity=ceilLightOn?1.2:0;
     if(typeof _spawnSecretPowerBICoins==='function') _spawnSecretPowerBICoins();
     return;
   }
@@ -5628,7 +5628,7 @@ function applyTimeOfDay(minuteOfDay){
   bounce.intensity=mix(0.0, 0.06, sun);  // soft floor bounce in daytime
   ceilSpot.intensity=ceilLightOn?mix(1.1, 0.4, sun):0; // keep visibly lit in daytime, warmer/stronger at night
   domeMat.emissiveIntensity=ceilLightOn?mix(0.9, 0.45, sun):0;
-  if(ceilGlow) ceilGlow.intensity=ceilLightOn?mix(0.55, 0.2, sun):0;
+  if(ceilGlow) ceilGlow.intensity=ceilLightOn?mix(1.4, 0.55, sun):0;
 
   // Outdoor backdrop brightness (sun through window)
   outdoor.material.color.setScalar(mix(0.08, 1.4, sun)+warm*0.25);
@@ -6952,11 +6952,9 @@ const dome=new THREE.Mesh(new THREE.SphereGeometry(3.5,16,8,0,Math.PI*2,0,Math.P
 dome.rotation.x=Math.PI; // flip dome to hang down
 dome.position.set(ceilLightX,ceilY-0.2,ceilLightZ);
 dome._isRoom=true; dome._isCeilLight=true; scene.add(dome);
-// SpotLight pointing down — wide angle, soft edge.
-// decay is tuned to architectural, not physical: a real ceiling fixture
-// ~80" above the floor would be 1/80^2 ≈ 0.0002 of its source intensity
-// at the floor under physical falloff, i.e. invisible. decay=0.9 gives a
-// believable warm pool below without needing absurd intensity numbers.
+// Downward spot lights the floor (main pool). Ceiling + upper walls need
+// their own source since a spot only throws inside its cone, and the room
+// has no global ambient bounce. We split those two jobs on purpose.
 const ceilSpot=new THREE.SpotLight(0xfff0dd,1.1,0,Math.PI*0.42,0.6,0.9);
 ceilSpot.position.set(ceilLightX,ceilY-1,ceilLightZ);
 ceilSpot.target.position.set(ceilLightX,floorY,ceilLightZ);
@@ -6967,11 +6965,14 @@ ceilSpot.shadow.bias=-0.0005;
 ceilSpot.shadow.radius=5; ceilSpot.shadow.blurSamples=12;
 ceilSpot.shadow.camera.near=10;
 ceilSpot.shadow.camera.far=95;
-// Extra local glow near the fixture so the dome visibly "emits" — washes
-// the ceiling disc around the dome and upper walls. Low decay so it
-// reaches a few feet out instead of dying immediately.
-ceilGlow=new THREE.PointLight(0xfff3df,0.7,55,1.1);
-ceilGlow.position.set(ceilLightX,ceilY-1.2,ceilLightZ);
+// Omni glow that washes the ceiling around the fixture + upper walls.
+// Tucked right under the dome lip. distance=0 (no hard cutoff) and a
+// gentle decay of 1.0 so the ceiling disc (~0.2" away) is strongly lit
+// and the far walls (~45" away) still receive a visible warm tint
+// without needing absurd source intensity. This is what sells "the
+// light is on" — real dome fixtures throw a lot up and sideways.
+ceilGlow=new THREE.PointLight(0xfff3df,1.4,0,1.0);
+ceilGlow.position.set(ceilLightX,ceilY-0.6,ceilLightZ);
 ceilGlow.castShadow=false;
 scene.add(ceilGlow);
 
