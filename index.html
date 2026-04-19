@@ -7373,62 +7373,71 @@ function _setMacbookScreenOn(on){
 }
 
 // ─── MacBook music (fun chiptune loop) ─────────────────────────────
-// When the laptop turns on we schedule a short, looping bass+lead
-// pattern using WebAudio oscillators. Schedules ~2 bars ahead so the
-// loop stays tight; a setTimeout re-schedules as the playhead advances.
-// Stopping tears down the scheduler and ramps the master gain down.
-let _mbMusicTimer=null;
-let _mbMusicGain=null;
-let _mbMusicStart=0;
-let _mbMusicStep=0;
-const _MB_BPM=120;
-const _MB_STEP=60/_MB_BPM/2; // 8th-note grid
-// Happy major-key groove (C major): bass roots + lead melody, 16 steps.
-const _MB_BASS=[48,48,55,48, 53,53,60,53, 50,50,57,50, 55,55,50,47]; // MIDI
-const _MB_LEAD=[72,76,79,76, 77,81,84,81, 74,77,81,77, 79,76,72,71];
+// ─── MacBook music — playlist system ──────────────────────────────
+// When the laptop turns on we play ONE song at a time from a shuffled
+// playlist. Each song plays ONCE end-to-end (chiptunes loop their
+// pattern `loops` times; audio files play to their native end) and
+// then automatically advances to the next entry in the queue. When the
+// queue is exhausted the playlist is re-shuffled (avoiding immediately
+// repeating the last-played song) and playback continues indefinitely.
+//
+// Songs can be either:
+//   { kind:'chiptune', name, bpm, loops, bass:[midi…], lead:[midi…], bassOct?, leadGain?, leadDur? }
+//   { kind:'audio',    name, src, volume? }
+//
+// To add a song: drop the audio file into assets/music/ and push a new
+// entry onto _MB_PLAYLIST. A missing audio file silently skips to the
+// next song (useful so the repo works even before the file is added).
+const _MB_PLAYLIST=[
+  // Default procedural chiptune — always available as a fallback so
+  // the laptop is never silent even if audio files are missing.
+  { kind:'chiptune', name:'Sunny Groove', bpm:120, loops:2,
+    bass:[48,48,55,48, 53,53,60,53, 50,50,57,50, 55,55,50,47],
+    lead:[72,76,79,76, 77,81,84,81, 74,77,81,77, 79,76,72,71] },
+  // Add audio tracks here as you drop them into assets/music/.
+  // The game silently skips any entry whose file fails to load, so
+  // it's safe to list them before the files exist.
+  { kind:'audio', name:'Octodad Theme',         src:'assets/music/octodad.mp3',        volume:0.55 },
+  { kind:'audio', name:'Escape from the City',  src:'assets/music/escape-from-the-city.mp3', volume:0.55 },
+];
+
+// Playback state — separated from the playlist data.
+let _mbQueue=[];          // shuffled order of _MB_PLAYLIST to play through
+let _mbQueueIdx=0;        // next index to play in _mbQueue
+let _mbLastPlayed=null;   // song.name of the most recently STARTED song (for reshuffle anti-repeat)
+let _mbCurrentAudio=null; // HTMLAudioElement of the currently-playing audio song (if any)
+let _mbChiptuneTimer=null;// setTimeout handle for the chiptune scheduler
+let _mbAdvanceTimer=null; // setTimeout that triggers _mbPlayNext after the last chiptune note
+let _mbMusicGain=null;    // WebAudio master gain for the current chiptune (null for audio songs)
+let _mbMusicStart=0;      // AudioContext time when the current chiptune started
+let _mbMusicStep=0;       // next scheduler step index for the current chiptune
+let _mbCurrentSong=null;  // reference to the song object currently playing (or about to play)
+
 function _mtof(m){ return 440*Math.pow(2,(m-69)/12); }
-function _scheduleMacbookBeat(ac, t, midi, type, dur, gain){
-  const o=ac.createOscillator(), g=ac.createGain();
-  o.type=type; o.frequency.value=_mtof(midi);
-  g.gain.setValueAtTime(0, t);
-  g.gain.linearRampToValueAtTime(gain, t+0.01);
-  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
-  o.connect(g).connect(_mbMusicGain);
-  o.start(t); o.stop(t+dur+0.02);
+
+function _mbFisherYates(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
 }
-function _startMacbookMusic(){
-  try{
-    const ac=_coinAC||(window.AudioContext||window.webkitAudioContext) && new (window.AudioContext||window.webkitAudioContext)();
-    if(!ac) return;
-    _coinAC=ac;
-    if(ac.state==='suspended' && ac.resume) ac.resume();
-    // Already playing — don't stack.
-    if(_mbMusicTimer) return;
-    _mbMusicGain=ac.createGain();
-    _mbMusicGain.gain.value=0;
-    _mbMusicGain.gain.linearRampToValueAtTime(0.18, ac.currentTime+0.08);
-    _mbMusicGain.connect(ac.destination);
-    _mbMusicStart=ac.currentTime+0.05;
-    _mbMusicStep=0;
-    const tick=()=>{
-      if(!_mbMusicGain) return;
-      // Schedule ~8 steps ahead so we always have buffered audio.
-      const now=ac.currentTime;
-      const aheadSteps=8;
-      while(_mbMusicStart + _mbMusicStep*_MB_STEP < now + aheadSteps*_MB_STEP){
-        const stepIdx=_mbMusicStep % _MB_BASS.length;
-        const t=_mbMusicStart + _mbMusicStep*_MB_STEP;
-        _scheduleMacbookBeat(ac, t, _MB_BASS[stepIdx]-12, 'triangle', _MB_STEP*1.6, 0.45);
-        _scheduleMacbookBeat(ac, t, _MB_LEAD[stepIdx],    'square',   _MB_STEP*0.9, 0.18);
-        _mbMusicStep++;
-      }
-      _mbMusicTimer=setTimeout(tick, _MB_STEP*1000*2);
-    };
-    tick();
-  }catch(e){ console.warn('[macbook] music start failed', e); }
+function _mbBuildQueue(){
+  const pool=_MB_PLAYLIST.filter(s=>s.enabled!==false);
+  if(pool.length===0) return [];
+  const arr=_mbFisherYates(pool.slice());
+  // Avoid immediately replaying the last song we played when reshuffling,
+  // unless the playlist only has one song.
+  if(arr.length>1 && _mbLastPlayed && arr[0].name===_mbLastPlayed){
+    const swap=1+Math.floor(Math.random()*(arr.length-1));
+    [arr[0],arr[swap]]=[arr[swap],arr[0]];
+  }
+  return arr;
 }
-function _stopMacbookMusic(){
-  if(_mbMusicTimer){ clearTimeout(_mbMusicTimer); _mbMusicTimer=null; }
+function _mbStopCurrentSong(){
+  // Tear down any in-progress chiptune scheduler.
+  if(_mbChiptuneTimer){ clearTimeout(_mbChiptuneTimer); _mbChiptuneTimer=null; }
+  if(_mbAdvanceTimer){ clearTimeout(_mbAdvanceTimer); _mbAdvanceTimer=null; }
   if(_mbMusicGain && _coinAC){
     const g=_mbMusicGain, ac=_coinAC;
     try{
@@ -7439,6 +7448,136 @@ function _stopMacbookMusic(){
     }catch(_){}
   }
   _mbMusicGain=null;
+  // Stop any playing audio element.
+  if(_mbCurrentAudio){
+    try{
+      _mbCurrentAudio.pause();
+      _mbCurrentAudio.onended=null;
+      _mbCurrentAudio.onerror=null;
+      _mbCurrentAudio.src='';
+    }catch(_){}
+    _mbCurrentAudio=null;
+  }
+  _mbCurrentSong=null;
+}
+function _scheduleMacbookBeat(ac, t, midi, type, dur, gain){
+  if(!_mbMusicGain) return;
+  const o=ac.createOscillator(), g=ac.createGain();
+  o.type=type; o.frequency.value=_mtof(midi);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain, t+0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.connect(g).connect(_mbMusicGain);
+  o.start(t); o.stop(t+dur+0.02);
+}
+function _mbPlayChiptune(song){
+  const ac=_coinAC||(window.AudioContext||window.webkitAudioContext) && new (window.AudioContext||window.webkitAudioContext)();
+  if(!ac){ _mbPlayNext(); return; }
+  _coinAC=ac;
+  if(ac.state==='suspended' && ac.resume) ac.resume();
+  _mbMusicGain=ac.createGain();
+  _mbMusicGain.gain.value=0;
+  _mbMusicGain.gain.linearRampToValueAtTime(0.18, ac.currentTime+0.08);
+  _mbMusicGain.connect(ac.destination);
+  const step=60/(song.bpm||120)/2; // 8th-note grid
+  const bass=song.bass||[], lead=song.lead||[];
+  const patLen=Math.max(bass.length, lead.length, 1);
+  const loops=Math.max(1, song.loops||1);
+  const endStep=patLen*loops;
+  const bassOct=(song.bassOct!==undefined)?song.bassOct:-12;
+  const leadDur=song.leadDur||(step*0.9);
+  const leadGain=song.leadGain||0.18;
+  _mbMusicStart=ac.currentTime+0.05;
+  _mbMusicStep=0;
+  const tick=()=>{
+    if(!_mbMusicGain) return;
+    const now=ac.currentTime;
+    const aheadSteps=8;
+    while(_mbMusicStep<endStep && _mbMusicStart + _mbMusicStep*step < now + aheadSteps*step){
+      const t=_mbMusicStart + _mbMusicStep*step;
+      const i=_mbMusicStep % patLen;
+      if(bass[i]!==undefined) _scheduleMacbookBeat(ac, t, bass[i]+bassOct, 'triangle', step*1.6, 0.45);
+      if(lead[i]!==undefined) _scheduleMacbookBeat(ac, t, lead[i],         'square',   leadDur, leadGain);
+      _mbMusicStep++;
+    }
+    if(_mbMusicStep>=endStep){
+      // Last beat already scheduled — wait for its tail to finish, then advance.
+      const endTime=_mbMusicStart + endStep*step + step*1.7;
+      const waitMs=Math.max(0,(endTime-ac.currentTime)*1000);
+      _mbAdvanceTimer=setTimeout(()=>{ _mbAdvanceTimer=null; _mbPlayNext(); }, waitMs);
+      return;
+    }
+    _mbChiptuneTimer=setTimeout(tick, step*1000*2);
+  };
+  tick();
+}
+function _mbPlayAudio(song){
+  try{
+    const a=new Audio(song.src);
+    a.volume=Math.max(0, Math.min(1, (song.volume!==undefined)?song.volume:0.6));
+    a.preload='auto';
+    a.loop=false;
+    _mbCurrentAudio=a;
+    const advance=()=>{
+      if(_mbCurrentAudio!==a) return; // already stopped/replaced
+      _mbCurrentAudio=null;
+      _mbPlayNext();
+    };
+    a.addEventListener('ended', advance);
+    a.addEventListener('error', ()=>{
+      console.warn('[macbook] audio failed, skipping:', song.src);
+      advance();
+    });
+    const p=a.play();
+    if(p && typeof p.catch==='function'){
+      p.catch(err=>{
+        console.warn('[macbook] audio play() rejected:', song.src, err);
+        advance();
+      });
+    }
+  }catch(e){
+    console.warn('[macbook] audio error:', e);
+    _mbPlayNext();
+  }
+}
+function _mbPlayNext(){
+  _mbStopCurrentSong();
+  if(!_mbOn) return; // laptop was turned off while a song was ending
+  if(!_mbQueue.length || _mbQueueIdx>=_mbQueue.length){
+    _mbQueue=_mbBuildQueue();
+    _mbQueueIdx=0;
+    if(!_mbQueue.length) return;
+  }
+  const song=_mbQueue[_mbQueueIdx++];
+  if(!song) return;
+  _mbCurrentSong=song;
+  _mbLastPlayed=song.name;
+  if(song.kind==='audio') _mbPlayAudio(song);
+  else _mbPlayChiptune(song);
+}
+let _mbOn=false; // tracks whether the MacBook music system is currently ON
+function _startMacbookMusic(){
+  try{
+    // Warm up AudioContext (chiptune path needs it; audio path doesn't).
+    const ac=_coinAC||(window.AudioContext||window.webkitAudioContext) && new (window.AudioContext||window.webkitAudioContext)();
+    if(ac){
+      _coinAC=ac;
+      if(ac.state==='suspended' && ac.resume) ac.resume();
+    }
+    if(_mbOn) return; // already playing — don't stack
+    _mbOn=true;
+    // Fresh shuffle each time the laptop is turned on. Respects the
+    // anti-repeat rule via _mbLastPlayed from the previous session.
+    _mbQueue=_mbBuildQueue();
+    _mbQueueIdx=0;
+    _mbPlayNext();
+  }catch(e){ console.warn('[macbook] music start failed', e); }
+}
+function _stopMacbookMusic(){
+  _mbOn=false;
+  _mbStopCurrentSong();
+  _mbQueue=[];
+  _mbQueueIdx=0;
 }
 function _triggerMacbookClick(){
   console.log('[macbook] click fired. screen=', _macbookScreen, 'on=', _macbookOn);
@@ -7453,6 +7592,9 @@ function _triggerMacbookClick(){
     const local=worldPos.clone().sub(_coinGroup.position);
     local.y+=9;
     _addCoin(_coinGroup, local, {secret:true});
+    // Tag so _resetCoins can clean it up on run reset.
+    const added=_coins[_coins.length-1];
+    if(added) added.isDynamic=true;
     // Refresh visibility so the new coin shows immediately in Play Mode.
     if(typeof _setCoinsVisible==='function') _setCoinsVisible(_coinGroup.visible);
   }
@@ -10543,7 +10685,11 @@ const _secretTriggered=Object.create(null);
 function _spawnSecretIfUntriggered(triggerId, spawnFn){
   if(_secretTriggered[triggerId]) return;
   _secretTriggered[triggerId]=true;
+  const before=_coins.length;
   try{ spawnFn(); }catch(e){ console.warn('[secret-coin] spawn failed', triggerId, e); }
+  // Tag every coin added by this call so _resetCoins can clean them up
+  // when the player resets the run.
+  for(let i=before;i<_coins.length;i++) _coins[i].isDynamic=true;
   // Flush visibility so the new coin shows immediately while in Play Mode.
   if(typeof _setCoinsVisible==='function') _setCoinsVisible(_coinGroup.visible);
 }
@@ -10756,6 +10902,35 @@ function _resetCoins(){
   if(secHud) secHud.style.display='none';
   _startRunTimer();
   void _startSharedRun();
+  // Remove any dynamically-spawned secret coins (fan/lamp/ceiling/drawer
+  // triggers + MacBook click). They'll respawn on the next interaction.
+  for(let i=_coins.length-1;i>=0;i--){
+    const c=_coins[i];
+    if(c.isDynamic){
+      if(c.mesh && c.mesh.parent) c.mesh.parent.remove(c.mesh);
+      _coins.splice(i,1);
+    }
+  }
+  // Clear the trigger-dedupe map so every secret can be re-spawned this run.
+  for(const k of Object.keys(_secretTriggered)) delete _secretTriggered[k];
+  // Close the MacBook (which also stops music) and reset its coin flag.
+  if(typeof _macbookOn!=='undefined' && _macbookOn && typeof _setMacbookScreenOn==='function'){
+    _setMacbookScreenOn(false);
+  }
+  if(typeof _macbookCoinSpawned!=='undefined') _macbookCoinSpawned=false;
+  // Restore default light state (both lamp and ceiling light start ON).
+  if(typeof lampOn!=='undefined' && !lampOn){
+    lampOn=true;
+    if(typeof lampLight!=='undefined' && lampLight) lampLight.intensity=1.2;
+    if(typeof lampShade!=='undefined' && lampShade && lampShade.material) lampShade.material.emissiveIntensity=0.4;
+    if(typeof lampBulb!=='undefined' && lampBulb && lampBulb.material) lampBulb.material.emissiveIntensity=1.2;
+  }
+  if(typeof ceilLightOn!=='undefined' && !ceilLightOn){
+    ceilLightOn=true;
+    if(typeof ceilSpot!=='undefined' && ceilSpot) ceilSpot.intensity=0.95;
+    if(typeof domeMat!=='undefined' && domeMat) domeMat.emissiveIntensity=0.8;
+    if(typeof ceilGlow!=='undefined' && ceilGlow) ceilGlow.intensity=0.5;
+  }
   // Randomize which drawer hides the coin this session.
   const drawerCoin=_coins.find(c=>c.inDrawer);
   if(drawerCoin && drawers.length){
