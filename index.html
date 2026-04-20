@@ -475,10 +475,10 @@
         <div id="catColorPanel">
           <div class="play-launcher-sub">Choose cat color</div>
           <div class="play-launcher-colors">
-            <button class="play-launcher-color on" id="catColorBtnGinger" onclick="setCatColorPreset('ginger')"><span class="play-launcher-dot" style="background:#c67f45"></span><span>Ginger</span></button>
-            <button class="play-launcher-color" id="catColorBtnTuxedo" onclick="setCatColorPreset('tuxedo')"><span class="play-launcher-dot" style="background:#5f6772"></span><span>Tuxedo</span></button>
+            <button class="play-launcher-color on" id="catColorBtnCharcoal" onclick="setCatColorPreset('charcoal')"><span class="play-launcher-dot" style="background:#3a3a42"></span><span>Charcoal</span></button>
             <button class="play-launcher-color" id="catColorBtnCream" onclick="setCatColorPreset('cream')"><span class="play-launcher-dot" style="background:#d7ccb1"></span><span>Cream</span></button>
-            <button class="play-launcher-color" id="catColorBtnMidnight" onclick="setCatColorPreset('midnight')"><span class="play-launcher-dot" style="background:#41495a"></span><span>Midnight</span></button>
+            <button class="play-launcher-color" id="catColorBtnMidnight" onclick="setCatColorPreset('midnight')"><span class="play-launcher-dot" style="background:#1a2030"></span><span>Midnight</span></button>
+            <button class="play-launcher-color" id="catColorBtnSnow" onclick="setCatColorPreset('snow')"><span class="play-launcher-dot" style="background:#e8e8e8"></span><span>Snow</span></button>
           </div>
         </div>
         <div class="play-launcher-preview" id="catColorHint" style="display:none">This cat keeps its original baked colors.</div>
@@ -819,10 +819,10 @@ function syncPlayModeUI(){
 }
 const _PLAY_PATH_AUTO_OPEN = /^\/play\/?$/.test(location.pathname);
 const _catColorPresets={
-  ginger:{coat:0xA52500,tint:0.99,coatMix:0.94},
-  tuxedo:{coat:0x0a0a12,tint:0.99,coatMix:0.96},
+  charcoal:{coat:0x0a0a12,tint:0.99,coatMix:0.96},
   cream:{coat:0xB08030,tint:0.98,coatMix:0.9},
-  midnight:{coat:0x040818,tint:0.995,coatMix:0.98}
+  midnight:{coat:0x040818,tint:0.995,coatMix:0.98},
+  snow:{coat:0xd8d8d8,tint:0.98,coatMix:0.9}
 };
 const _catHairPresets={
   short:{sx:1.0,sy:1.0,sz:1.0,rough:0.9,furRim:0.05,bump:0.004,boneMode:'short'},
@@ -830,13 +830,13 @@ const _catHairPresets={
 };
 const _catModelPresets={
   classic:{label:'Classic Cat',sources:['assets/cat.glb'],colorable:true,previewLift:0.0,gameLift:0.0,previewCamY:1.7,previewCamZ:4.7,previewTargetY:1.0,animSpeed:1.0,idleLoopPause:0,groundPinOffset:0.0,sprintAnimMult:1.0},
-  toon:{label:'Toon Cat',sources:['assets/tooncat.glb','assets/toon-cat.glb'],colorable:true,previewLift:0.0,gameLift:0.0,previewCamY:1.85,previewCamZ:5.15,previewTargetY:1.1,animSpeed:1.0,idleLoopPause:0,groundPinOffset:-1.25,gameGroundPinOffset:-2.1,sprintAnimMult:2,gameModelZ:-1.2},
+  toon:{label:'Toon Cat',sources:['assets/tooncat.glb','assets/toon-cat.glb'],colorable:false,previewLift:0.0,gameLift:0.0,previewCamY:1.85,previewCamZ:5.15,previewTargetY:1.1,animSpeed:1.0,idleLoopPause:0,groundPinOffset:-1.25,gameGroundPinOffset:-2.1,sprintAnimMult:2,gameModelZ:-1.2},
   bababooey:{label:'Bababooey Cat',sources:['assets/bababooey_cat.glb'],colorable:false,previewLift:0.0,gameLift:0.0,previewCamY:1.9,previewCamZ:5.35,previewTargetY:1.15,animSpeed:0.7,idleLoopPause:2.2,groundPinOffset:0.0,sprintAnimMult:1.4}
 };
 let _playLauncherOpen=false;
 let _launcherCatPreview=false;
 let _catModelKey='classic';
-let _catColorKey='ginger';
+let _catColorKey='charcoal';
 let _catHairKey='short';
 const _catBaseScale=new THREE.Vector3(1,1,1);
 const _catPreviewBaseScale=new THREE.Vector3(1,1,1);
@@ -870,7 +870,7 @@ const _catPreviewBaseLocalQuat=new THREE.Quaternion();
 const _catGroundTmpParentPos=new THREE.Vector3();
 function _sanitizeCatColorKey(key){
   const k=String(key||'').trim().toLowerCase();
-  return _catColorPresets[k]?k:'ginger';
+  return _catColorPresets[k]?k:'charcoal';
 }
 function _sanitizeCatModelKey(key){
   const k=String(key||'').trim().toLowerCase();
@@ -1382,6 +1382,7 @@ function setCatModelPreset(key){
   _catModelKey=k;
   _catHairKey='short';
   _setCatModelButtons();
+  _setCatColorButtons();
   _setCatHairButtons();
   _updateCatCustomizationUi();
   if(!_isColorableCatModelKey(_catModelKey)){
@@ -9189,7 +9190,8 @@ _pauseOverlay.innerHTML=`
       <button type="button" class="fpPauseBtn danger" id="fpPauseExit">Exit play mode</button>
     </div>
     <div id="fpPauseToggles">
-      <label class="fpPauseToggle"><input type="checkbox" id="fpPauseMute"><span>Mute sounds</span></label>
+      <label class="fpPauseToggle"><input type="checkbox" id="fpPauseMute"><span>Mute SFX (M)</span></label>
+      <label class="fpPauseToggle"><input type="checkbox" id="fpPauseMuteMusic"><span>Mute Music (,)</span></label>
       <button type="button" class="fpPauseBtn" id="fpPauseReset" style="padding:6px 12px;font-size:12px;border-radius:999px">Reset run</button>
       <button type="button" class="fpPauseBtn" id="fpPauseRename" style="padding:6px 12px;font-size:12px;border-radius:999px">Rename</button>
     </div>
@@ -9572,21 +9574,29 @@ function _setFpCamMode(mode){
 // ─── Pause + audio mute ───────────────────────────────────────────────────
 let _fpPaused=false;
 const _LB_MUTE_KEY='diy_air_purifier_muted_v1';
+const _MUSIC_MUTE_KEY='diy_air_purifier_music_muted_v1';
 let _sfxMuted=false;
+let _musicMuted=false;
 try{ _sfxMuted=localStorage.getItem(_LB_MUTE_KEY)==='1'; }catch(e){}
+try{ _musicMuted=localStorage.getItem(_MUSIC_MUTE_KEY)==='1'; }catch(e){}
 function _applyAudioMute(){
-  // Suspend/resume the shared AudioContext so every sound path (coin chime,
-  // bonk, MacBook chiptune) goes silent with a single switch. Also ramps the
-  // macbook music gain to zero to avoid a click when suspending mid-note.
-  try{
-    if(typeof _mbMusicGain!=='undefined' && _mbMusicGain && _coinAC){
-      _mbMusicGain.gain.setTargetAtTime(_sfxMuted?0:0.06, _coinAC.currentTime, 0.08);
-    }
-  }catch(e){}
+  // SFX: suspend/resume AudioContext for coin chime + bonk sounds.
+  // Music uses a separate mute path so they're independent.
   try{
     if(_coinAC){
       if(_sfxMuted && _coinAC.state==='running' && _coinAC.suspend) _coinAC.suspend();
       else if(!_sfxMuted && _coinAC.state==='suspended' && _coinAC.resume) _coinAC.resume();
+    }
+  }catch(e){}
+  _applyMusicMute();
+}
+function _applyMusicMute(){
+  try{
+    if(typeof _mbMusicGain!=='undefined' && _mbMusicGain && _coinAC){
+      _mbMusicGain.gain.setTargetAtTime(_musicMuted?0:0.16, _coinAC.currentTime, 0.08);
+    }
+    if(typeof _mbCurrentAudio!=='undefined' && _mbCurrentAudio){
+      _mbCurrentAudio.muted=_musicMuted;
     }
   }catch(e){}
 }
@@ -9596,6 +9606,13 @@ function _setSfxMuted(muted){
   _applyAudioMute();
   const cb=document.getElementById('fpPauseMute');
   if(cb) cb.checked=_sfxMuted;
+}
+function _setMusicMuted(muted){
+  _musicMuted=!!muted;
+  try{ localStorage.setItem(_MUSIC_MUTE_KEY, _musicMuted?'1':'0'); }catch(e){}
+  _applyMusicMute();
+  const cb=document.getElementById('fpPauseMuteMusic');
+  if(cb) cb.checked=_musicMuted;
 }
 function _setFpPaused(paused){
   if(!_fpMode) return;
@@ -9623,6 +9640,8 @@ function _setFpPaused(paused){
     // Sync mute toggle state on open.
     const cb=document.getElementById('fpPauseMute');
     if(cb) cb.checked=_sfxMuted;
+    const cbm=document.getElementById('fpPauseMuteMusic');
+    if(cbm) cbm.checked=_musicMuted;
   } else {
     const ch=document.getElementById('fpCrosshair');
     if(ch) ch.style.opacity='';
@@ -9790,7 +9809,7 @@ function _makeShareUrl(entryId){
 }
 // Color emoji for each coat preset — used in the share text so the pasted
 // summary visually echoes the leaderboard badge (model emoji + color dot).
-const _CAT_COLOR_EMOJI={ginger:'🟠',tuxedo:'⚫',cream:'🟡',midnight:'🔵'};
+const _CAT_COLOR_EMOJI={charcoal:'⚫',cream:'🟡',midnight:'🔵',snow:'⚪'};
 function _buildShareText(data){
   const row=data||{};
   const rankTxt=row.rank&&row.rank>0?`#${row.rank}`:'Unranked';
@@ -10682,7 +10701,14 @@ document.addEventListener('keydown',e=>{
   }
   if(e.key==='m'||e.key==='M'){
     _setSfxMuted(!_sfxMuted);
-    _showFpResetIndicator(_sfxMuted?'MUTED':'UNMUTED');
+    _showFpResetIndicator(_sfxMuted?'SFX MUTED':'SFX ON');
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
+  if(e.key===','){
+    _setMusicMuted(!_musicMuted);
+    _showFpResetIndicator(_musicMuted?'MUSIC MUTED':'MUSIC ON');
     e.preventDefault();
     e.stopImmediatePropagation();
     return;
@@ -10796,6 +10822,7 @@ document.getElementById('fpPauseExit').addEventListener('click',()=>{
   if(_fpMode) toggleFirstPerson();
 });
 document.getElementById('fpPauseMute').addEventListener('change',e=>_setSfxMuted(!!e.target.checked));
+document.getElementById('fpPauseMuteMusic').addEventListener('change',e=>_setMusicMuted(!!e.target.checked));
 document.getElementById('fpPauseReset').addEventListener('click',()=>{
   _setFpPaused(false);
   _resetFpRun();
@@ -10999,8 +11026,8 @@ function _addCoin(parent, localPos, opts){
     _addCoin(purifierGroup, new THREE.Vector3(0, getPurifierFloorLocalY()-0.03+_tvGameStackH+2.3, -(D/2+ply+_tvGameCaseD/2+8.0)), {insidePurifier:true, consoleProp:true});
     // Coin on top of Nintendo Switch tablet docked on purifier.
     _addCoin(purifierGroup, new THREE.Vector3(0, (H/2+ply)+10.0, -6), {insidePurifier:true, consoleProp:true});
-    // Coin inside lamp shade, above the bulb (reachable by dropping through top opening).
-    _addCoin(_coinGroup, new THREE.Vector3(-(tblX+tblW/2-6), floorY+tblH+22.4, tblZ+tblD/2-6));
+    // Coin on top of lamp shade (outside, visible from the room).
+    _addCoin(_coinGroup, new THREE.Vector3(-(tblX+tblW/2-6), floorY+tblH+28.5, tblZ+tblD/2-6));
     // Coin INSIDE the air purifier — rides with purifierGroup, at origin.
     _addCoin(purifierGroup, new THREE.Vector3(0, 0, 0), {insidePurifier:true});
     // Coin HIDDEN in a random dresser drawer. Parented to a placeholder group
@@ -11042,12 +11069,13 @@ function _spawnSecretXboxCoin(){
     );
   });
 }
-// 2) LAMP CLICK → lamp-shade crown coin, balanced on the shade ring.
+// 2) LAMP CLICK → secret coin INSIDE the lamp shade (above the bulb, reachable by
+//    dropping through the top opening).
 function _spawnSecretLampCoin(){
   _spawnSecretIfUntriggered('lamp', ()=>{
     _addCoin(
       _coinGroup,
-      new THREE.Vector3(-(tblX+tblW/2-6), floorY+tblH+28.5, tblZ+tblD/2-6),
+      new THREE.Vector3(-(tblX+tblW/2-6), floorY+tblH+22.4, tblZ+tblD/2-6),
       {secret:true}
     );
   });
