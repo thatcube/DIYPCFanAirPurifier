@@ -114,6 +114,7 @@ export function createLights(isMobile) {
   key.shadow.camera.bottom = -95;
   key.shadow.camera.updateProjectionMatrix();
   scene.add(key);
+  scene.add(key.target);
 
   // Window sun spot (sweeping beam, no shadow)
   windowSun = new THREE.SpotLight(0xffe0a0, 0, 260, Math.PI * 0.60, 0.72, 1.0);
