@@ -249,12 +249,89 @@ window._toggleAirflow = () => {
 // FPS toggle
 window._toggleFps = () => {
   const fpsEl = document.getElementById('fps');
+  const tog = document.getElementById('togFps');
   if (fpsEl) fpsEl.style.display = fpsEl.style.display === 'none' ? '' : 'none';
+  if (tog) tog.classList.toggle('on');
 };
 
 // Mobile jump
 window._mobileJump = (down) => {
   gameFp.fpKeys.space = !!down;
+};
+
+// ── Purifier control bridges ────────────────────────────────────────
+
+window._toggleExplode = () => purifierRefs.toggleExplode();
+window._toggleFilter = () => purifierRefs.toggleFilter();
+window._toggleGrills = () => purifierRefs.toggleGrills();
+window._setGrillColor = (c) => purifierRefs.setGrillColor(c);
+window._toggleDims = () => purifierRefs.toggleDimensions();
+
+window._setStain = (mode) => {
+  purifierRefs.setStain(mode);
+  document.querySelectorAll('#btnStainRaw,#btnStainOil,#btnStainWalnut').forEach(b => b.classList.remove('on'));
+  const id = mode === 'raw' ? 'btnStainRaw' : mode === 'oil' ? 'btnStainOil' : 'btnStainWalnut';
+  const btn = document.getElementById(id);
+  if (btn) btn.classList.add('on');
+};
+
+window._setLayout = (mode) => {
+  purifierRefs.setLayout(mode);
+  document.querySelectorAll('#btnLayoutFB,#btnLayoutFT').forEach(b => b.classList.remove('on'));
+  const btn = document.getElementById(mode === 'fb' ? 'btnLayoutFB' : 'btnLayoutFT');
+  if (btn) btn.classList.add('on');
+};
+
+window._setFanCount = (n) => {
+  purifierRefs.setFanCount(n);
+  document.querySelectorAll('#btnFan3,#btnFan4').forEach(b => b.classList.remove('on'));
+  const btn = document.getElementById(n === 4 ? 'btnFan4' : 'btnFan3');
+  if (btn) btn.classList.add('on');
+};
+
+window._setEdge = (mode) => {
+  purifierRefs.setEdgeProfile(mode);
+  document.querySelectorAll('#btnEdgeFlat,#btnEdgeCurved').forEach(b => b.classList.remove('on'));
+  const btn = document.getElementById(mode === 'flat' ? 'btnEdgeFlat' : 'btnEdgeCurved');
+  if (btn) btn.classList.add('on');
+};
+
+window._setFeet = (style) => {
+  purifierRefs.setFeetStyle(style);
+  document.querySelectorAll('#btnFeetPeg,#btnFeetBun,#btnFeetRubber,#btnFeetNone').forEach(b => b.classList.remove('on'));
+  const id = style === 'peg' ? 'btnFeetPeg' : style === 'bun' ? 'btnFeetBun' : style === 'rubber' ? 'btnFeetRubber' : 'btnFeetNone';
+  const btn = document.getElementById(id);
+  if (btn) btn.classList.add('on');
+};
+
+window._setFanColor = (mode) => {
+  purifierRefs.setFanColor(mode);
+  document.querySelectorAll('#btnFanWhite,#btnFanBlack').forEach(b => b.classList.remove('on'));
+  const btn = document.getElementById(mode === 'white' ? 'btnFanWhite' : 'btnFanBlack');
+  if (btn) btn.classList.add('on');
+};
+
+window._toggleRGB = () => {
+  purifierRefs.toggleFanRGB();
+  const tog = document.getElementById('togRGB');
+  if (tog) tog.classList.toggle('on');
+};
+
+window._toggleIsolate = () => {
+  const tog = document.getElementById('togIsolate');
+  const isOn = tog ? tog.classList.toggle('on') : false;
+  // Toggle room visibility
+  scene.traverse(obj => {
+    if (obj._isRoom) obj.visible = !isOn;
+  });
+  // Adjust fog/background
+  if (isOn) {
+    scene.fog.density = 0;
+    renderer.setClearColor(0x0a0e14, 1);
+  } else {
+    lighting.applyTimeOfDay(parseInt(document.getElementById('todSlider')?.value || '870', 10), todRefs);
+  }
+  markShadowsDirty();
 };
 
 // ── Render loop ─────────────────────────────────────────────────────
@@ -284,6 +361,10 @@ function animate(ts) {
     const prevScore = coins.coinScore;
     coins.updateCoins(ts, gameFp.fpPos);
     if (coins.coinScore > prevScore) coinBump();
+    // Timer tick
+    leaderboard.tickTimer(ts);
+    const timerEl = document.getElementById('runTimerText');
+    if (timerEl) timerEl.textContent = leaderboard.formatRunTime(leaderboard.getElapsed());
   }
 
   // Cat animation mixer + walk/idle blend

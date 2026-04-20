@@ -16,6 +16,7 @@ import {
 } from './spatial.js';
 import { getBounds, acquireBox, resetBoxPool, easeAlpha, BODY_R, EYE_H, HEAD_EXTRA } from './game-collision.js';
 import * as coins from './coins.js';
+import * as leaderboard from './leaderboard.js';
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -291,9 +292,10 @@ export function toggleFirstPerson() {
     // Reset position
     _respawn();
 
-    // Reset coins
+    // Reset coins + timer
     coins.resetScores();
     coins.setCoinsVisible(true);
+    leaderboard.startTimer();
 
     // Show cat in third-person
     if (_catGroup) {
@@ -319,8 +321,9 @@ export function toggleFirstPerson() {
     // Exit pointer lock
     if (document.pointerLockElement) document.exitPointerLock();
 
-    // Hide coins + cat
+    // Hide coins + cat, stop timer
     coins.setCoinsVisible(false);
+    leaderboard.stopTimer();
     if (_catGroup) _catGroup.visible = false;
 
     if (_markShadowsDirty) _markShadowsDirty();
@@ -651,4 +654,92 @@ function _bindInputs() {
     if (fpMode) return;
     if (e.code === 'KeyG') toggleFirstPerson();
   });
+
+  // ── Mobile joystick ─────────────────────────────────────────────
+  const joystick = document.getElementById('mobileJoystick');
+  const knob = document.getElementById('mobileJoyKnob');
+  if (joystick && knob) {
+    let joyActive = false;
+    let joyOriginX = 0, joyOriginY = 0, joyR = 0;
+
+    const updateJoy = (cx, cy) => {
+      const dx = cx - joyOriginX, dy = cy - joyOriginY;
+      const dist = Math.min(Math.sqrt(dx * dx + dy * dy), joyR);
+      const angle = Math.atan2(dx, -dy); // angle from top
+      const nx = dist > 8 ? Math.sin(angle) * (dist / joyR) : 0;
+      const ny = dist > 8 ? -Math.cos(angle) * (dist / joyR) : 0;
+
+      // Map to keys
+      fpKeys.w = ny < -0.3;
+      fpKeys.s = ny > 0.3;
+      fpKeys.a = nx < -0.3;
+      fpKeys.d = nx > 0.3;
+
+      // Move knob visual
+      const visualDist = Math.min(dist, joyR);
+      const vx = dist > 0 ? (dx / Math.sqrt(dx * dx + dy * dy)) * visualDist : 0;
+      const vy = dist > 0 ? (dy / Math.sqrt(dx * dx + dy * dy)) * visualDist : 0;
+      knob.style.transform = `translate(calc(-50% + ${vx}px), calc(-50% + ${vy}px))`;
+    };
+
+    const resetJoy = () => {
+      joyActive = false;
+      fpKeys.w = false; fpKeys.s = false; fpKeys.a = false; fpKeys.d = false;
+      knob.style.transform = 'translate(-50%, -50%)';
+    };
+
+    joystick.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      joyActive = true;
+      const rect = joystick.getBoundingClientRect();
+      joyOriginX = rect.left + rect.width / 2;
+      joyOriginY = rect.top + rect.height / 2;
+      joyR = rect.width / 2 - 20;
+      joystick.setPointerCapture(e.pointerId);
+      updateJoy(e.clientX, e.clientY);
+    });
+    joystick.addEventListener('pointermove', e => {
+      if (!joyActive) return;
+      e.preventDefault();
+      updateJoy(e.clientX, e.clientY);
+    });
+    joystick.addEventListener('pointerup', resetJoy);
+    joystick.addEventListener('pointercancel', resetJoy);
+
+    // Mobile look — touch on the right half of screen
+    let lookTouchId = null;
+    let lookLastX = 0, lookLastY = 0;
+    _canvas.addEventListener('touchstart', e => {
+      if (!fpMode) return;
+      for (const t of e.changedTouches) {
+        if (t.clientX > window.innerWidth * 0.4) {
+          lookTouchId = t.identifier;
+          lookLastX = t.clientX;
+          lookLastY = t.clientY;
+          break;
+        }
+      }
+    }, { passive: true });
+    _canvas.addEventListener('touchmove', e => {
+      if (!fpMode || lookTouchId === null) return;
+      for (const t of e.changedTouches) {
+        if (t.identifier === lookTouchId) {
+          const dx = t.clientX - lookLastX;
+          const dy = t.clientY - lookLastY;
+          fpLookDX += dx * 1.5;
+          fpLookDY += dy * 1.5;
+          lookLastX = t.clientX;
+          lookLastY = t.clientY;
+          break;
+        }
+      }
+    }, { passive: true });
+    const clearLook = (e) => {
+      for (const t of e.changedTouches) {
+        if (t.identifier === lookTouchId) { lookTouchId = null; break; }
+      }
+    };
+    _canvas.addEventListener('touchend', clearLook, { passive: true });
+    _canvas.addEventListener('touchcancel', clearLook, { passive: true });
+  }
 }

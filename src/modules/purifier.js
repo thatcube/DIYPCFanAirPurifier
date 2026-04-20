@@ -3150,6 +3150,43 @@ export function createPurifier(scene) {
     }
   }
 
+  // ─── Fan color & RGB functions ──────────────────────────────────
+  function applyBladeStyle() {
+    const c = fansWhite ? FAN_WHITE : FAN_BLACK;
+    for (const blades of allBladeMatsPerFan) {
+      for (const blade of blades) {
+        if (fansRGB) {
+          blade.color.setHex(BLADE_FROSTED.color);
+          blade.transparent = false; blade.opacity = 1.0;
+          blade.shininess = BLADE_FROSTED.shininess; blade.depthWrite = true;
+        } else {
+          blade.color.setHex(c.blade);
+          blade.transparent = false; blade.opacity = 1.0;
+          blade.shininess = 20; blade.depthWrite = true;
+        }
+        blade.needsUpdate = true;
+      }
+    }
+  }
+  function applyFanColorTheme() {
+    const c = fansWhite ? FAN_WHITE : FAN_BLACK;
+    for (let i = 0; i < allFanMats.length; i += 4) {
+      allFanMats[i].color.setHex(c.frame);
+      allFanMats[i + 1].color.setHex(c.hub);
+      allFanMats[i + 2].color.setHex(c.cap);
+    }
+    for (const m of allBraceMats) m.color.setHex(c.frame);
+    applyBladeStyle();
+  }
+  function setFanColor(mode) {
+    fansWhite = (mode === 'white');
+    applyFanColorTheme();
+  }
+  function toggleFanRGB() {
+    fansRGB = !fansRGB;
+    applyBladeStyle();
+  }
+
   // Return purifier refs
   return {
     update,
@@ -3158,5 +3195,19 @@ export function createPurifier(scene) {
     spinning,
     setSpinning(s) { spinning = s; spinTarget = s ? SPIN_MAX * (fanSpeedPct / 100) : 0; },
     setFanSpeed(pct) { fanSpeedPct = pct; if (spinning) spinTarget = SPIN_MAX * (pct / 100); },
+    toggleExplode,
+    collapseView,
+    toggleFilter,
+    toggleGrills,
+    setGrillColor,
+    setStain,
+    setEdgeProfile,
+    setLayout,
+    setFanCount,
+    setFeetStyle,
+    toggleDimensions,
+    setFanColor,
+    toggleFanRGB,
+    showWallBracket,
   };
 }
