@@ -1095,19 +1095,21 @@ function _recolorFurTexture(srcTex, coatHex, coat2Hex, pattern){
     if(tmpHSL.l > 0.05 && tmpHSL.l < 0.97){
       let useHSL=tHSL;
       if(isCow && tc2){
-        // Cow pattern: sharp dark/white patches using stepped noise.
-        // Use multiple noise octaves and hard-step the result.
-        const vertBias=py/h;
-        const n1=_cowNoise(px,py);
-        const n2=_cowNoise(px+500,py+500); // second independent sample
-        // Combine noise + vertical bias. Bottom (belly) → white, top (back) → dark
-        const combined = n1*0.4 + n2*0.3 + vertBias*0.3;
-        // Hard step at 0.5 — no gradual blending, cow patches have sharp edges
-        const isWhite = combined > 0.48;
+        // Cow pattern: use large-scale position in texture for patches.
+        // Divide texture into a coarse grid and use noise per cell.
+        const cellW=Math.max(1, Math.floor(w/6));
+        const cellH=Math.max(1, Math.floor(h/6));
+        const cellX=Math.floor(px/cellW);
+        const cellY=Math.floor(py/cellH);
+        // Hash the cell index to get a stable random 0-1
+        const cellHash=Math.abs(Math.sin(cellX*127.1+cellY*311.7)*43758.5453)%1;
+        // Bottom rows bias white (belly), top rows bias dark (back)
+        const vertBias=(cellY/(h/cellH))*0.3;
+        const isWhite=(cellHash+vertBias) > 0.5;
         if(isWhite){
-          d[i]=240; d[i+1]=240; d[i+2]=240;
+          d[i]=235; d[i+1]=235; d[i+2]=235;
         } else {
-          d[i]=50; d[i+1]=50; d[i+2]=55;
+          d[i]=45; d[i+1]=45; d[i+2]=50;
         }
         continue;
       }
@@ -1207,13 +1209,7 @@ function _ensureCatFurShader(mat){
         'float catFuzz = mix(1.0, mix(0.76,1.28,catNoise), min(1.0, uCatFurAmount * 0.95) * catFurMask);',
         'vec3 catFurGlow = uCatFurTint * (catFurRim * uCatFurAmount * catFurMask);',
         'vec3 catFinal = (catColorized * catFuzz) + catFurGlow;',
-        // Cow pattern: blend between two colors based on UV-space noise
-        'if(uCatCowAmount > 0.01){',
-        '  float cp = cowPattern(vUv);',
-        '  vec3 cowCol = mix(uCatCowColor1, uCatCowColor2, cp);',
-        '  float cowLuma = max(0.15, catLightLuma * 1.4);',
-        '  catFinal = cowCol * cowLuma;',
-        '}',
+        // Cow pattern disabled in shader — handled via texture recoloring
         'gl_FragColor = vec4( catFinal, diffuseColor.a );'
       ].join('\n'));
     mat.userData._catFurShader=shader;
