@@ -822,7 +822,7 @@ const _catColorPresets={
   ginger:{coat:0xA52500,tint:0.99,coatMix:0.94},
   tuxedo:{coat:0x3a4050,tint:0.99,coatMix:0.96},
   cream:{coat:0xddd0aa,tint:0.98,coatMix:0.9},
-  cow:{coat:0x484848,coat2:0xF0F0F0,pattern:'cow',tint:0.99,coatMix:0.96}
+  cow:{coat:0x484848,coat2:0xF0F0F0,pattern:'cow',tint:0.99,coatMix:0.96,cowColor1:0xFF00FF,cowColor2:0x00FF00}
 };
 const _catHairPresets={
   short:{sx:1.0,sy:1.0,sz:1.0,rough:0.9,furRim:0.05,bump:0.004,boneMode:'short'},
@@ -1207,7 +1207,7 @@ function _ensureCatFurShader(mat){
       ].join('\n'));
     mat.userData._catFurShader=shader;
   };
-  mat.customProgramCacheKey=()=> 'catFurShaderV8';
+  mat.customProgramCacheKey=()=> 'catFurShaderV8_cow'+(mat.userData._catCowAmount>0?'1':'0');
   mat.needsUpdate=true;
 }
 function _applyCatHairToBones(model,hairCfg){
@@ -1340,8 +1340,8 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
       // Cow pattern via shader
       const isCowPreset=colorCfg.pattern==='cow';
       m.userData._catCowAmount=isCowPreset?1.0:0;
-      m.userData._catCowColor1=colorCfg.coat||0x333333;
-      m.userData._catCowColor2=colorCfg.coat2||0xeeeeee;
+      m.userData._catCowColor1=colorCfg.cowColor1||colorCfg.coat||0x333333;
+      m.userData._catCowColor2=colorCfg.cowColor2||colorCfg.coat2||0xeeeeee;
       if(m.userData._catFurShader){
         m.userData._catFurShader.uniforms.uCatFurAmount.value=hairCfg.furRim;
         m.userData._catFurShader.uniforms.uCatFurTint.value.copy(_catFurTintColor);
