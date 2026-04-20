@@ -241,6 +241,7 @@ export function toggleFirstPerson() {
 
     // Reset coins
     coins.resetScores();
+    coins.setCoinsVisible(true);
 
     // Show cat in third-person
     if (_catGroup) {
@@ -266,7 +267,8 @@ export function toggleFirstPerson() {
     // Exit pointer lock
     if (document.pointerLockElement) document.exitPointerLock();
 
-    // Hide cat (orbit mode doesn't need it)
+    // Hide coins + cat
+    coins.setCoinsVisible(false);
     if (_catGroup) _catGroup.visible = false;
 
     if (_markShadowsDirty) _markShadowsDirty();

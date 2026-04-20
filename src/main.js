@@ -116,10 +116,6 @@ const todRefs = {
 
 // Apply initial time-of-day — default to 2:30 PM (matches monolith default)
 lighting.applyTimeOfDay(870, todRefs);
-console.log('[main] TOD applied. Key light:', lighting.key.intensity.toFixed(2),
-  'pos:', lighting.key.position.x.toFixed(1), lighting.key.position.y.toFixed(1), lighting.key.position.z.toFixed(1),
-  'target:', lighting.key.target.position.x.toFixed(1), lighting.key.target.position.y.toFixed(1), lighting.key.target.position.z.toFixed(1),
-  'windowSun visible:', lighting.windowSun.visible, 'intensity:', lighting.windowSun.intensity.toFixed(2));
 
 // Force shadow update after TOD repositions lights
 _shadowDirtyOneShot = true;
@@ -128,12 +124,17 @@ _shadowDirtyOneShot = true;
 
 music.setToastFn(showToast);
 coins.setToastFn(showToast);
+
+// Create coin group + spawn room coins
+const coinGroup = coins.createCoinGroup(scene);
+coins.spawnRoomCoins(roomRefs);
+
 secrets.setRefs({
   addCoin: coins.addCoin,
-  coinGroup: null,
+  coinGroup,
   purifierGroup: null,
   coins: coins.coins,
-  setCoinsVisible: null,
+  setCoinsVisible: coins.setCoinsVisible,
   showToast
 });
 
@@ -194,10 +195,18 @@ function animate(ts) {
   // Game mode physics
   gameFp.updatePhysics(ts, dtSec, animFrameScale);
 
+  // Coins (spin/bob/pickup) — only active in game mode
+  if (gameFp.fpMode) {
+    coins.updateCoins(ts, gameFp.fpPos);
+  }
+
   // Cat animation mixer
   if (catAnimation.catMixer) {
     catAnimation.catMixer.update(dtSec);
   }
+
+  // Purifier animations (fan spin, explode lerp, filter/drawer/bifold)
+  purifierRefs.update(dtSec, animFrameScale);
 
   // Particles
   particles.updateSpinSpeed(animFrameScale);
