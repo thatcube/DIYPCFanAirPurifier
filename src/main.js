@@ -24,6 +24,7 @@ import * as spatial from './modules/spatial.js';
 import * as gameFp from './modules/game-fp.js';
 import { createRoom } from './modules/room.js';
 import { createPurifier } from './modules/purifier.js';
+import { initInteractions, coinBump } from './modules/ui-interactions.js';
 import {
   SHADOW_UPDATE_INTERVAL_MS, IDLE_FRAME_MS
 } from './modules/constants.js';
@@ -32,7 +33,8 @@ import {
 
 // Toast notifications
 const _toast = document.createElement('div');
-_toast.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-8px);opacity:0;pointer-events:none;z-index:10001;background:rgba(8,12,18,0.86);color:#d9f3ff;border:1px solid rgba(145,222,255,0.48);border-radius:12px;padding:7px 12px;font-family:system-ui;font-size:12px;font-weight:700;letter-spacing:0.6px;backdrop-filter:blur(10px);box-shadow:0 8px 20px rgba(0,0,0,0.35);transition:opacity 0.2s,transform 0.2s';
+_toast.className = 'toast';
+_toast.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-12px);opacity:0;pointer-events:none;z-index:10001;background:rgba(8,12,18,0.88);color:#d9f3ff;border:1px solid rgba(145,222,255,0.35);border-radius:14px;padding:9px 16px;font-family:system-ui;font-size:12px;font-weight:700;letter-spacing:0.4px;backdrop-filter:blur(16px);box-shadow:0 12px 32px rgba(0,0,0,0.35);transition:opacity 0.3s cubic-bezier(0.16,1,0.3,1),transform 0.4s cubic-bezier(0.34,1.56,0.64,1)';
 document.body.appendChild(_toast);
 let _toastTimer = null;
 
@@ -225,18 +227,34 @@ window._setPlacement = (mode) => {
   placementOffset.set(offsets.x, offsets.y, offsets.z);
   purifierGroup.position.copy(placementOffset);
   purifierGroup.rotation.y = mode === 'tv' ? Math.PI / 2 : 0;
-  // Update turntable slider
   const ts = document.getElementById('turntableSlider');
   const tl = document.getElementById('turntableLabel');
   const deg = Math.round(purifierGroup.rotation.y * 180 / Math.PI);
   if (ts) ts.value = deg;
   if (tl) tl.textContent = deg + '°';
-  // Update button states
   document.querySelectorAll('#btnPlaceFloor,#btnPlaceTv,#btnPlaceWall').forEach(b => b.classList.remove('on'));
   const btnId = mode === 'tv' ? 'btnPlaceTv' : mode === 'wall' ? 'btnPlaceWall' : 'btnPlaceFloor';
   const btn = document.getElementById(btnId);
   if (btn) btn.classList.add('on');
   markShadowsDirty();
+};
+
+// Airflow toggle
+window._toggleAirflow = () => {
+  const tog = document.getElementById('togAirflow');
+  if (tog) tog.classList.toggle('on');
+  particles.toggleAirflow();
+};
+
+// FPS toggle
+window._toggleFps = () => {
+  const fpsEl = document.getElementById('fps');
+  if (fpsEl) fpsEl.style.display = fpsEl.style.display === 'none' ? '' : 'none';
+};
+
+// Mobile jump
+window._mobileJump = (down) => {
+  gameFp.fpKeys.space = !!down;
 };
 
 // ── Render loop ─────────────────────────────────────────────────────
@@ -263,7 +281,9 @@ function animate(ts) {
 
   // Coins (spin/bob/pickup) — only active in game mode
   if (gameFp.fpMode) {
+    const prevScore = coins.coinScore;
     coins.updateCoins(ts, gameFp.fpPos);
+    if (coins.coinScore > prevScore) coinBump();
   }
 
   // Cat animation mixer + walk/idle blend
@@ -293,12 +313,6 @@ function animate(ts) {
     _shadowDirtyOneShot = false;
     _lastShadowUpdateTs = ts;
   }
-
-  // FP HUD elements visibility
-  const fpControlsEl = document.getElementById('fpControls');
-  const fpChargeBar = document.getElementById('fpChargeBar');
-  if (fpControlsEl) fpControlsEl.style.display = gameFp.fpMode ? 'block' : 'none';
-  if (fpChargeBar) fpChargeBar.style.display = gameFp.fpMode ? 'block' : 'none';
 
   // Render
   renderer.render(scene, camera);
@@ -330,5 +344,8 @@ onResize();
 // ── Start ───────────────────────────────────────────────────────────
 
 animate(performance.now());
+
+// Init UI micro-interactions (bouncy buttons, press effects)
+initInteractions();
 
 console.log('[main] Render loop started');
