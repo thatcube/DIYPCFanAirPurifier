@@ -1212,7 +1212,7 @@ export function createPurifier(scene) {
   const pegGeo=new THREE.CylinderGeometry(legR,legR*0.85,legH,16);
   
   // Round wooden foot — 2.5" tall, 0.55" radius, rounded cylinder
-  const bunFootH=2.5, bunFootR=0.55;
+  // bunFootH, bunFootR declared in header from state
   const bunInset=0.68; // inset from panel edges for round feet
   function makeBunGeo(radius, height){
     const h=height||bunFootH;
@@ -3057,6 +3057,8 @@ export function createPurifier(scene) {
   }
   scene.add(wallBracketGroup);
   function showWallBracket(show){
+    wallBracketGroup.visible=show;
+  }
 
   // Return purifier refs
   return { }; // TODO: populate with mesh refs
