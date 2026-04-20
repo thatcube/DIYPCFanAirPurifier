@@ -5,10 +5,9 @@ export default defineConfig({
   publicDir: 'public',
   build: {
     outDir: 'dist',
-    // Keep asset filenames predictable for Netlify
     rollupOptions: {
       input: {
-        main: 'index.html',
+        main: 'vite-index.html',
         admin: 'admin.html',
         leaderboard: 'leaderboard/index.html'
       }
@@ -16,7 +15,7 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    // Proxy API calls to the express server during dev
+    open: '/vite-index.html',
     proxy: {
       '/api': 'http://localhost:3001'
     }
