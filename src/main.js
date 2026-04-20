@@ -53,6 +53,25 @@ lighting.createLights(state.isMobile);
 // Add catGroup to scene
 scene.add(catAnimation.catGroup);
 
+// Hide loading overlay
+const loadingEl = document.getElementById('loading');
+if (loadingEl) loadingEl.style.display = 'none';
+
+// Add a simple floor plane so the scene isn't blank during migration
+const _tempFloor = new THREE.Mesh(
+  new THREE.PlaneGeometry(200, 200),
+  new THREE.MeshStandardMaterial({ color: 0xb0a898, roughness: 0.9 })
+);
+_tempFloor.rotation.x = -Math.PI / 2;
+_tempFloor.position.y = spatial.getFloorY();
+_tempFloor.receiveShadow = true;
+scene.add(_tempFloor);
+
+// Position camera to see something
+camera.position.set(45, 15, 45);
+controls.target.set(0, 5, 0);
+controls.update();
+
 // Wire module cross-references
 music.setToastFn(showToast);
 secrets.setRefs({
