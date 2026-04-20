@@ -108,9 +108,9 @@ const placementOffset = new THREE.Vector3(45, 0, -68);
 purifierGroup.position.copy(placementOffset);
 purifierGroup.rotation.y = 90 * Math.PI / 180;
 
-// Position camera
-camera.position.set(45, 35, 65);
-controls.target.set(0, 5, 0);
+// Position camera — orbit around the purifier (Under TV position)
+camera.position.set(placementOffset.x + 25, 20, placementOffset.z + 35);
+controls.target.set(placementOffset.x, 8, placementOffset.z);
 controls.update();
 
 // ── Wire time-of-day lighting ───────────────────────────────────────
@@ -236,6 +236,10 @@ window._setPlacement = (mode) => {
   const btnId = mode === 'tv' ? 'btnPlaceTv' : mode === 'wall' ? 'btnPlaceWall' : 'btnPlaceFloor';
   const btn = document.getElementById(btnId);
   if (btn) btn.classList.add('on');
+  // Re-aim camera at the purifier
+  controls.target.set(placementOffset.x, placementOffset.y + 8, placementOffset.z);
+  camera.position.set(placementOffset.x + 25, placementOffset.y + 20, placementOffset.z + 35);
+  controls.update();
   markShadowsDirty();
 };
 
