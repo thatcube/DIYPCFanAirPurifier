@@ -478,7 +478,7 @@
             <button class="play-launcher-color on" id="catColorBtnGinger" onclick="setCatColorPreset('ginger')"><span class="play-launcher-dot" style="background:#c67f45"></span><span>Ginger</span></button>
             <button class="play-launcher-color" id="catColorBtnTuxedo" onclick="setCatColorPreset('tuxedo')"><span class="play-launcher-dot" style="background:#5f6772"></span><span>Tuxedo</span></button>
             <button class="play-launcher-color" id="catColorBtnCream" onclick="setCatColorPreset('cream')"><span class="play-launcher-dot" style="background:#d7ccb1"></span><span>Cream</span></button>
-            <button class="play-launcher-color" id="catColorBtnCow" onclick="setCatColorPreset('cow')"><span class="play-launcher-dot" style="background:linear-gradient(135deg,#555 40%,#fff 40%)"></span><span>Cow</span></button>
+            <button class="play-launcher-color" id="catColorBtnMidnight" onclick="setCatColorPreset('midnight')"><span class="play-launcher-dot" style="background:#41495a"></span><span>Midnight</span></button>
           </div>
         </div>
         <div class="play-launcher-preview" id="catColorHint" style="display:none">This cat keeps its original baked colors.</div>
@@ -822,7 +822,7 @@ const _catColorPresets={
   ginger:{coat:0xA52500,tint:0.99,coatMix:0.94},
   tuxedo:{coat:0x3a4050,tint:0.99,coatMix:0.96},
   cream:{coat:0xddd0aa,tint:0.98,coatMix:0.9},
-  cow:{coat:0x484848,coat2:0xF0F0F0,pattern:'cow',tint:0.99,coatMix:0.96,cowColor1:0xFF00FF,cowColor2:0x00FF00}
+  midnight:{coat:0x1e2636,tint:0.995,coatMix:0.98}
 };
 const _catHairPresets={
   short:{sx:1.0,sy:1.0,sz:1.0,rough:0.9,furRim:0.05,bump:0.004,boneMode:'short'},
@@ -1310,47 +1310,14 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
       // m.color stays white so it doesn't tint the whole model.
       if(!m.userData._catOrigMap && m.map) m.userData._catOrigMap=m.map;
       const origMap=m.userData._catOrigMap;
-      const isCowPreset=colorCfg.pattern==='cow';
-      if(isCowPreset){
-        // Cow pattern: assign dark or white based on mesh bounding box Y.
-        // No shader, no texture pixel manipulation — just m.color per mesh.
-        // Restore original map if we removed it
-        if(origMap && !m.map) m.map=origMap;
-        const bb=new THREE.Box3().setFromObject(o);
-        const meshCenterY=bb.isEmpty()?0:(bb.min.y+bb.max.y)/2;
-        // Get full model bounds for relative positioning
-        if(!model.userData._catBBComputed){
-          model.userData._catBB=new THREE.Box3().setFromObject(model);
-          model.userData._catBBComputed=true;
-        }
-        const modelBB=model.userData._catBB;
-        const modelH=modelBB.max.y-modelBB.min.y;
-        const relY=(meshCenterY-modelBB.min.y)/(modelH||1); // 0=bottom, 1=top
-        // Use mesh name hash for some randomness in which meshes are dark vs white
-        let nameHash=0;
-        for(let ci=0;ci<meshName.length;ci++) nameHash=(nameHash*31+meshName.charCodeAt(ci))|0;
-        const hashBit=((nameHash>>>0)%100)/100;
-        // Bottom 40% → white, top 30% → dark, middle → random by name hash
-        const isWhite = relY < 0.4 ? true : relY > 0.7 ? false : hashBit > 0.5;
-        if(isWhite){
-          m.color.setHex(0xF0F0F0);
-        } else {
-          m.color.setHex(0x353540);
-        }
-        if(m.emissive&&m.emissive.isColor){
-          m.emissive.setHex(isWhite?0xdddddd:0x252530);
-          m.emissiveIntensity=0.15;
-        }
-      } else {
-        // Non-cow: recolor texture pixels
-        if(origMap && origMap.image){
-          m.map=_recolorFurTexture(origMap, colorCfg.coat, colorCfg.coat2, colorCfg.pattern);
-        }
-        m.color.setRGB(1,1,1);
-        if(m.emissive&&m.emissive.isColor){
-          m.emissive.copy(baseEmi);
-          m.emissiveIntensity=baseEmiI;
-        }
+      // Recolor the fur pixels in the baked texture
+      if(origMap && origMap.image){
+        m.map=_recolorFurTexture(origMap, colorCfg.coat);
+      }
+      m.color.setRGB(1,1,1);
+      if(m.emissive&&m.emissive.isColor){
+        m.emissive.copy(baseEmi);
+        m.emissiveIntensity=baseEmiI;
       }
       m.roughness=Math.min(1,Math.max(0.55,baseRough*hairCfg.rough));
       m.bumpMap=_getCatFurNoiseTexture();
@@ -1362,10 +1329,6 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
       m.userData._catFurTintHex=_catFurTintColor.getHex();
       m.userData._catCoatTintHex=colorCfg.coat;
       m.userData._catCoatAmount=0;
-      m.userData._catCowAmount=isCowPreset?1.0:0;
-      m.userData._catCowColor1=colorCfg.cowColor1||colorCfg.coat||0x333333;
-      m.userData._catCowColor2=colorCfg.cowColor2||colorCfg.coat2||0xeeeeee;
-      // Force shader recompile by marking material dirty
       m.needsUpdate=true;
       _ensureCatFurShader(m);
       if(m.userData._catFurShader){
@@ -1373,9 +1336,6 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
         m.userData._catFurShader.uniforms.uCatFurTint.value.copy(_catFurTintColor);
         m.userData._catFurShader.uniforms.uCatCoatTint.value.setHex(colorCfg.coat);
         m.userData._catFurShader.uniforms.uCatCoatAmount.value=0;
-        m.userData._catFurShader.uniforms.uCatCowAmount.value=isCowPreset?1.0:0;
-        m.userData._catFurShader.uniforms.uCatCowColor1.value.setHex(colorCfg.coat||0x333333);
-        m.userData._catFurShader.uniforms.uCatCowColor2.value.setHex(colorCfg.coat2||0xeeeeee);
       }
       m.needsUpdate=true;
     }
@@ -9733,7 +9693,7 @@ function _makeShareUrl(entryId){
 }
 // Color emoji for each coat preset — used in the share text so the pasted
 // summary visually echoes the leaderboard badge (model emoji + color dot).
-const _CAT_COLOR_EMOJI={ginger:'🟠',tuxedo:'⚫',cream:'🟡',cow:'🐄'};
+const _CAT_COLOR_EMOJI={ginger:'🟠',tuxedo:'⚫',cream:'🟡',midnight:'🔵'};
 function _buildShareText(data){
   const row=data||{};
   const rankTxt=row.rank&&row.rank>0?`#${row.rank}`:'Unranked';
