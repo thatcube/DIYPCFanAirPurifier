@@ -5795,6 +5795,8 @@ function applyTimeOfDay(minuteOfDay){
   // Outdoor backdrop brightness — night scene needs to stay visible through
   // the window, so the floor is 0.35 (not 0.08 which made it invisible).
   outdoor.material.color.setScalar(mix(0.35, 1.4, sun)+warm*0.25);
+  // Moonlight glow through window — ramps up as sun goes down
+  if(typeof moonGlow!=='undefined' && moonGlow) moonGlow.intensity=mix(0.5, 0, sun);
 
   // Room surfaces
   const wallCol=lerpHex(NIGHT_WALL, DAY_WALL, sun);
@@ -6677,10 +6679,10 @@ new THREE.TextureLoader().load(
 );
 
 // Small bottom-center power nub (trapezoid pod + tiny center button).
-// TV ambient glow — faint colored light that washes the floor/wall nearby.
-// Always on (the TV screen has emissive from the pokopia image).
-const tvGlow=new THREE.PointLight(0x6688cc,0.25,50,1.2);
-tvGlow.position.set(tvCenterX, tvCenterY-5, tvZ+tvD/2+4);
+// TV ambient glow — washes the bed and floor in front of the TV.
+// Positioned well in front of the screen so it reaches the bed area.
+const tvGlow=new THREE.PointLight(0x6688cc,0.6,80,0.9);
+tvGlow.position.set(tvCenterX, tvCenterY, tvZ+tvD/2+12);
 tvGlow.castShadow=false;
 tvGlow._isRoom=true;
 scene.add(tvGlow);
@@ -7161,6 +7163,14 @@ const outdoor=new THREE.Mesh(outdoorGeo, outdoorMat);
 outdoor.rotation.y=Math.PI/2;
 outdoor.position.set(leftWallX-4, winCenterY+5, winCenterZ);
 outdoor._isRoom=true; outdoor._isWindow=true; scene.add(outdoor);
+
+// Moonlight glow through the window — subtle blue-white light that's
+// controlled by time-of-day (bright at night, off during day).
+const moonGlow=new THREE.PointLight(0x8899bb,0,60,1.0);
+moonGlow.position.set(leftWallX+3, winCenterY, winCenterZ);
+moonGlow.castShadow=false;
+moonGlow._isRoom=true;
+scene.add(moonGlow);
 
 // Ceiling light fixture — flush-mount dome with warm SpotLight
 const ceilY=floorY+79.5; // just below ceiling
