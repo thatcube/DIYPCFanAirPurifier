@@ -3070,6 +3070,93 @@ export function createPurifier(scene) {
     wallBracketGroup.visible=show;
   }
 
+  // ─── Per-frame update function ────────────────────────────────────
+  const SPIN_MAX = 0.25;
+  let fanSpeedPct = 50;
+  let spinning = true;
+  let spinTarget = SPIN_MAX * (fanSpeedPct / 100);
+
+  function update(dtSec, animFrameScale) {
+    // Fan rotor spinning
+    const globalTarget = spinning ? SPIN_MAX * (fanSpeedPct / 100) : 0;
+    const aFan = 1 - Math.exp(-1.83 * dtSec);
+    for (const rotor of allRotors) {
+      const target = rotor.userData.spinning ? globalTarget : 0;
+      rotor.userData.spinSpeed += (target - rotor.userData.spinSpeed) * aFan;
+      const spd = rotor.userData.spinSpeed;
+      if (Math.abs(spd) > 0.0001) {
+        const axis = rotor.userData.axis || 'z';
+        rotor.rotation[axis] += spd * animFrameScale;
+      }
+    }
+
+    // Explode lerp
+    if (explodeLerping) {
+      const aExplode = 1 - Math.exp(-6.32 * dtSec);
+      let allDone = true;
+      for (const k in explodeV) {
+        if (!parts[k]) continue;
+        parts[k].position.lerp(targets[k], aExplode);
+        if (parts[k].position.distanceToSquared(targets[k]) > 0.001) allDone = false;
+      }
+      if (allDone) explodeLerping = false;
+    }
+
+    // Filter slide lerp
+    if (_filterLerps.length > 0) {
+      const aFilter = 1 - Math.exp(-7.67 * dtSec);
+      for (let i = _filterLerps.length - 1; i >= 0; i--) {
+        const fl = _filterLerps[i];
+        fl.obj.position.lerp(fl.target, aFilter);
+        if (fl.obj.position.distanceToSquared(fl.target) < 0.001) {
+          fl.obj.position.copy(fl.target);
+          _filterLerps.splice(i, 1);
+        }
+      }
+    }
+
+    // Drawer slide lerp
+    if (_drawerLerps.length > 0) {
+      const aDrawer = 1 - Math.exp(-9.76 * dtSec);
+      for (let i = _drawerLerps.length - 1; i >= 0; i--) {
+        const dl = _drawerLerps[i];
+        dl.obj.matrixAutoUpdate = true;
+        dl.obj.position.z += (dl.targetZ - dl.obj.position.z) * aDrawer;
+        dl.obj.updateMatrixWorld(true);
+        if (Math.abs(dl.obj.position.z - dl.targetZ) < 0.01) {
+          dl.obj.position.z = dl.targetZ;
+          _drawerLerps.splice(i, 1);
+        }
+      }
+    }
+
+    // Bifold door lerp
+    if (_bifoldLerps.length > 0) {
+      const aBifold = 1 - Math.exp(-9.76 * dtSec);
+      for (let i = _bifoldLerps.length - 1; i >= 0; i--) {
+        const bl = _bifoldLerps[i];
+        const leaf = bl.leaf;
+        leaf._leafAngle += (leaf._leafTarget - leaf._leafAngle) * aBifold;
+        const sign = leaf._leafSide === 'L' ? 1 : -1;
+        leaf.rotation.y = sign * leaf._leafAngle;
+        if (leaf._innerGroup) leaf._innerGroup.rotation.y = -2 * sign * leaf._leafAngle;
+        if (Math.abs(leaf._leafAngle - leaf._leafTarget) < 0.005) {
+          leaf._leafAngle = leaf._leafTarget;
+          leaf.rotation.y = sign * leaf._leafAngle;
+          if (leaf._innerGroup) leaf._innerGroup.rotation.y = -2 * sign * leaf._leafAngle;
+          _bifoldLerps.splice(i, 1);
+        }
+      }
+    }
+  }
+
   // Return purifier refs
-  return { }; // TODO: populate with mesh refs
+  return {
+    update,
+    allRotors,
+    parts, origins, targets,
+    spinning,
+    setSpinning(s) { spinning = s; spinTarget = s ? SPIN_MAX * (fanSpeedPct / 100) : 0; },
+    setFanSpeed(pct) { fanSpeedPct = pct; if (spinning) spinTarget = SPIN_MAX * (pct / 100); },
+  };
 }

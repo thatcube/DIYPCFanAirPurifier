@@ -177,3 +177,99 @@ function _ensureAC() {
   if (audioCtx && audioCtx.state === 'suspended' && audioCtx.resume) audioCtx.resume();
   return audioCtx;
 }
+
+// ── Coin group ──────────────────────────────────────────────────────
+
+let _coinGroup = null;
+
+export function getCoinGroup() { return _coinGroup; }
+
+export function createCoinGroup(scene) {
+  _coinGroup = new THREE.Group();
+  _coinGroup.visible = false;
+  scene.add(_coinGroup);
+  return _coinGroup;
+}
+
+export function setCoinsVisible(vis) {
+  if (_coinGroup) _coinGroup.visible = vis;
+  for (const c of coins) {
+    if (!c.collected) c.mesh.visible = vis;
+  }
+}
+
+// ── Spawn coins in room ─────────────────────────────────────────────
+
+export function spawnRoomCoins(roomRefs) {
+  if (!_coinGroup) return;
+  const fy = roomRefs.floorY;
+
+  // Floor coins around the room
+  const positions = [
+    // Under the bed (center)
+    new THREE.Vector3(-(roomRefs.bedX || 0), fy + 3, roomRefs.bedZ || 0),
+    // Near nightstand
+    new THREE.Vector3(-(roomRefs.tblX || 0) - 8, fy + 3, (roomRefs.tblZ || 0)),
+    // On nightstand top
+    new THREE.Vector3(-(roomRefs.tblX || 0), fy + (roomRefs.tblH || 28) + 2, (roomRefs.tblZ || 0) - 6),
+    // Near window wall
+    new THREE.Vector3(70, fy + 3, 0),
+    // Back corner near door
+    new THREE.Vector3(-20, fy + 3, 40),
+    // Opposite corner
+    new THREE.Vector3(30, fy + 3, -60),
+    // On the bed
+    new THREE.Vector3(-(roomRefs.bedX || 0), fy + (roomRefs.bedH || 25) + 5, (roomRefs.bedZ || 0) - 10),
+    // Center of room
+    new THREE.Vector3(10, fy + 3, -10),
+    // Near TV wall
+    new THREE.Vector3(-(roomRefs.bedX || 0) + 20, fy + 3, -70),
+    // Near closet
+    new THREE.Vector3(-45, fy + 3, 5),
+    // High up — on mini split area
+    new THREE.Vector3(-(roomRefs.bedX || 0) - 10, fy + 55, -72),
+    // Near purifier
+    new THREE.Vector3(0, fy + 3, 20),
+  ];
+
+  for (const pos of positions) {
+    addCoin(_coinGroup, pos, {});
+  }
+}
+
+// ── Per-frame update ────────────────────────────────────────────────
+
+export function updateCoins(ts, playerPos) {
+  if (!_coinGroup || !_coinGroup.visible) return;
+
+  const t = ts * 0.001;
+
+  for (const c of coins) {
+    if (c.collected) continue;
+
+    // Spin + bob
+    c.mesh.rotation.y = t * c.spinSpeed * 60;
+    c.mesh.position.y = c.basePos.y + Math.sin(t * 2 + c.bobPhase) * 0.8;
+
+    // Pickup check
+    if (playerPos) {
+      const dx = c.mesh.position.x - playerPos.x;
+      const dy = (c.mesh.position.y) - (playerPos.y - 2); // mid-body
+      const dz = c.mesh.position.z - playerPos.z;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+      if (dist < PICK_RADIUS) {
+        c.collected = true;
+        c.mesh.visible = false;
+        if (c.secret) {
+          coinSecretScore++;
+          playChime(true);
+          _showToast('Secret coin found!');
+        } else {
+          coinScore++;
+          playChime(false);
+        }
+      }
+    }
+  }
+}
