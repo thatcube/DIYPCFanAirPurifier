@@ -11219,9 +11219,12 @@ function _updateCoins(ts,frameScale){
           el.classList.add('pop');
           setTimeout(()=>el.classList.remove('pop'), 350);
         }
-        // Check if all secrets found
-        const totalSecrets=_coins.filter(c2=>c2.secret).length;
-        if(_coinSecretScore>=totalSecrets && totalSecrets>0){
+        // Check if all secrets found — use hardcoded total since secrets
+        // are spawned dynamically on interaction (counting spawned ones
+        // would say "all found" after the very first pickup).
+        // Total: xbox(1) + lamp(1) + powerbi(3) + window(1) + headboardUnderBed(1) + macbook(1) = 8
+        const _TOTAL_SECRETS=8;
+        if(_coinSecretScore>=_TOTAL_SECRETS){
           setTimeout(()=>_showFpResetIndicator('✨ ALL SECRETS FOUND! ✨'), 400);
         }
       }
