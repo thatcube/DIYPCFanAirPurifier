@@ -4049,7 +4049,7 @@ let _lastHoverRaycastMs=0;
 function getInteractiveTarget(obj){
   let p=obj;
   while(p){
-    if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isMacbook) return p;
+    if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isMacbook||p._isWindow) return p;
     p=p.parent;
   }
   return null;
@@ -4301,6 +4301,26 @@ function handleClickObject(obj){
     domeMat.emissiveIntensity=ceilLightOn?0.8:0;
     if(ceilGlow) ceilGlow.intensity=ceilLightOn?0.3:0;
     if(typeof _spawnSecretPowerBICoins==='function') _spawnSecretPowerBICoins();
+    return;
+  }
+  // Clicked window → toggle day/night + spawn secret moon coin on first click.
+  if(obj._isWindow){
+    _windowIsNight=!_windowIsNight;
+    // Swap outdoor backdrop texture
+    outdoorMat.map=_windowIsNight?_outdoorNightTex:_outdoorDayTex;
+    outdoorMat.color.setHex(_windowIsNight?0x445566:0xfff0d4);
+    outdoorMat.needsUpdate=true;
+    // Apply matching time of day
+    const todSlider=document.getElementById('todSlider');
+    if(_windowIsNight){
+      applyTimeOfDay(1320); // 10 PM
+      if(todSlider) todSlider.value=1320;
+    } else {
+      applyTimeOfDay(870); // 2:30 PM
+      if(todSlider) todSlider.value=870;
+    }
+    _markShadowsDirty();
+    if(typeof _spawnSecretWindowCoin==='function') _spawnSecretWindowCoin();
     return;
   }
   // Clicked a fan → toggle that individual fan's rotor (only if mesh has a _rotor ref) +
@@ -7012,19 +7032,19 @@ const frameMat=stdMat({color:0xf5f5f0,shininess:10});
 const frameT=0.8, frameD=0.6;
 // Top
 const wft=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT, winW+frameT*2), frameMat);
-wft.position.set(leftWallX, winTop+frameT/2, winCenterZ); wft._isRoom=true; scene.add(wft);
+wft.position.set(leftWallX, winTop+frameT/2, winCenterZ); wft._isRoom=true; wft._isWindow=true; scene.add(wft);
 // Bottom
 const wfb=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT, winW+frameT*2), frameMat);
-wfb.position.set(leftWallX, winBottom-frameT/2, winCenterZ); wfb._isRoom=true; scene.add(wfb);
+wfb.position.set(leftWallX, winBottom-frameT/2, winCenterZ); wfb._isRoom=true; wfb._isWindow=true; scene.add(wfb);
 // Left (toward outside)
 const wfl=new THREE.Mesh(new THREE.BoxGeometry(frameD, winH, frameT), frameMat);
-wfl.position.set(leftWallX, winCenterY, winFront-frameT/2); wfl._isRoom=true; scene.add(wfl);
+wfl.position.set(leftWallX, winCenterY, winFront-frameT/2); wfl._isRoom=true; wfl._isWindow=true; scene.add(wfl);
 // Right (toward inside)
 const wfr=new THREE.Mesh(new THREE.BoxGeometry(frameD, winH, frameT), frameMat);
-wfr.position.set(leftWallX, winCenterY, winBack+frameT/2); wfr._isRoom=true; scene.add(wfr);
+wfr.position.set(leftWallX, winCenterY, winBack+frameT/2); wfr._isRoom=true; wfr._isWindow=true; scene.add(wfr);
 // Horizontal mullion (center bar)
 const wfm=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT*0.6, winW), frameMat);
-wfm.position.set(leftWallX, winCenterY, winCenterZ); wfm._isRoom=true; scene.add(wfm);
+wfm.position.set(leftWallX, winCenterY, winCenterZ); wfm._isRoom=true; wfm._isWindow=true; scene.add(wfm);
 
 // Outdoor scene visible through window — canvas-painted backdrop
 const outdoorCvs=document.createElement('canvas');
@@ -7068,13 +7088,69 @@ oCtx.globalAlpha=1.0;
 const outdoorTex=new THREE.CanvasTexture(outdoorCvs);
 outdoorTex.generateMipmaps=false;
 outdoorTex.minFilter=THREE.LinearFilter;
+
+// Night outdoor scene
+const nightOutdoorCvs=document.createElement('canvas');
+nightOutdoorCvs.width=512; nightOutdoorCvs.height=512;
+const nCtx=nightOutdoorCvs.getContext('2d');
+// Night sky gradient
+const nightSky=nCtx.createLinearGradient(0,0,0,300);
+nightSky.addColorStop(0,'#0a0e1a');
+nightSky.addColorStop(0.4,'#111828');
+nightSky.addColorStop(0.7,'#1a2035');
+nCtx.fillStyle=nightSky; nCtx.fillRect(0,0,512,300);
+// Stars
+nCtx.fillStyle='#ffffff';
+for(let i=0;i<80;i++){
+  const sx=Math.random()*512, sy=Math.random()*260;
+  const sr=Math.random()*1.2+0.3;
+  nCtx.globalAlpha=Math.random()*0.6+0.3;
+  nCtx.beginPath(); nCtx.arc(sx,sy,sr,0,Math.PI*2); nCtx.fill();
+}
+nCtx.globalAlpha=1.0;
+// Moon
+nCtx.fillStyle='#e8e4d8';
+nCtx.beginPath(); nCtx.arc(380,70,18,0,Math.PI*2); nCtx.fill();
+nCtx.fillStyle='#d4d0c4'; nCtx.globalAlpha=0.4;
+nCtx.beginPath(); nCtx.arc(374,64,18,0,Math.PI*2); nCtx.fill();
+nCtx.globalAlpha=1.0;
+// Moon glow
+nCtx.fillStyle='rgba(200,195,170,0.08)';
+nCtx.beginPath(); nCtx.arc(380,70,50,0,Math.PI*2); nCtx.fill();
+// Dark hills
+nCtx.fillStyle='#0d1518';
+nCtx.beginPath(); nCtx.moveTo(0,300);
+for(let x=0;x<=512;x+=8) nCtx.lineTo(x,280-Math.sin(x*0.012)*18-Math.sin(x*0.031)*8);
+nCtx.lineTo(512,300); nCtx.fill();
+// Dark tree line
+nCtx.fillStyle='#0a1210';
+nCtx.beginPath(); nCtx.moveTo(0,310);
+for(let x=0;x<=512;x+=4){
+  const base=295-Math.sin(x*0.02)*10;
+  const tree=Math.sin(x*0.08)*12+Math.sin(x*0.15)*6+Math.cos(x*0.05)*8;
+  nCtx.lineTo(x,base-Math.max(tree,0));
+}
+nCtx.lineTo(512,310); nCtx.fill();
+// Dark ground
+const nightGrass=nCtx.createLinearGradient(0,310,0,512);
+nightGrass.addColorStop(0,'#0e1a10');
+nightGrass.addColorStop(1,'#080e08');
+nCtx.fillStyle=nightGrass; nCtx.fillRect(0,305,512,207);
+const nightOutdoorTex=new THREE.CanvasTexture(nightOutdoorCvs);
+nightOutdoorTex.generateMipmaps=false;
+nightOutdoorTex.minFilter=THREE.LinearFilter;
+
+let _windowIsNight=false;
+const _outdoorDayTex=outdoorTex;
+const _outdoorNightTex=nightOutdoorTex;
+
 const outdoorMat=new THREE.MeshBasicMaterial({map:outdoorTex, color:0xfff0d4}); // warm sunlight tint
 outdoorMat.toneMapped=false; // bypass ACES compression — let it be BRIGHT
 const outdoorGeo=new THREE.PlaneGeometry(winW*2.5, winH*2);
 const outdoor=new THREE.Mesh(outdoorGeo, outdoorMat);
 outdoor.rotation.y=Math.PI/2;
 outdoor.position.set(leftWallX-4, winCenterY+5, winCenterZ);
-outdoor._isRoom=true; scene.add(outdoor);
+outdoor._isRoom=true; outdoor._isWindow=true; scene.add(outdoor);
 
 // Ceiling light fixture — flush-mount dome with warm SpotLight
 const ceilY=floorY+79.5; // just below ceiling
@@ -10989,6 +11065,16 @@ function _spawnSecretPowerBICoins(){
     _addCoin(_coinGroup, new THREE.Vector3(pbX, floorY+22, pbZBase+pbStep*2), {secret:true});
   });
 }
+// Window click → moon coin on the window sill
+function _spawnSecretWindowCoin(){
+  _spawnSecretIfUntriggered('window', ()=>{
+    _addCoin(
+      _coinGroup,
+      new THREE.Vector3(-leftWallX-2, winCenterY-winH/2+3, winCenterZ),
+      {secret:true}
+    );
+  });
+}
 // 4) DRAWER OPEN → deep-under-bed secret coin at the headboard end.
 function _spawnSecretHeadboardUnderBedCoin(){
   _spawnSecretIfUntriggered('headboardUnderBed', ()=>{
@@ -11191,6 +11277,18 @@ function _resetCoins(){
     if(typeof ceilSpot!=='undefined' && ceilSpot) ceilSpot.intensity=0.95;
     if(typeof domeMat!=='undefined' && domeMat) domeMat.emissiveIntensity=0.8;
     if(typeof ceilGlow!=='undefined' && ceilGlow) ceilGlow.intensity=0.3;
+  }
+  // Restore day mode if window was toggled to night
+  if(typeof _windowIsNight!=='undefined' && _windowIsNight){
+    _windowIsNight=false;
+    if(typeof outdoorMat!=='undefined' && outdoorMat){
+      outdoorMat.map=_outdoorDayTex;
+      outdoorMat.color.setHex(0xfff0d4);
+      outdoorMat.needsUpdate=true;
+    }
+    applyTimeOfDay(870);
+    const todSlider=document.getElementById('todSlider');
+    if(todSlider) todSlider.value=870;
   }
   // Randomize which drawer hides the coin this session.
   const drawerCoin=_coins.find(c=>c.inDrawer);
