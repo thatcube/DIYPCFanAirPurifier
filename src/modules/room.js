@@ -1185,6 +1185,206 @@ export function createRoom(scene) {
   
   // Slat platform (at 14" from floor)
 
+  const slatY=floorY+bedSlatsFromFloor;
+  roomBox(bedW-2*railThick, 1.0, bedL-hbThick-fbThick, 0x3a3a44,
+    bedX, slatY, bedZ+(hbThick-fbThick)/2, 0,0,0);
+  
+  // Legs — short cylinders at corners (ground clearance = 6.5")
+  const legBedH=bedClearance, legBedR=1.2;
+  for(const [lx,lz] of [
+    [bedX-bedW/2+3, bedZ-bedL/2+3],
+    [bedX+bedW/2-3, bedZ-bedL/2+3],
+    [bedX-bedW/2+3, bedZ+bedL/2-3],
+    [bedX+bedW/2-3, bedZ+bedL/2-3],
+  ]){
+    const lg=new THREE.CylinderGeometry(legBedR,legBedR,legBedH,12);
+    const lm=new THREE.MeshStandardMaterial({color:0x222222,roughness:0.6});
+    const lmesh=new THREE.Mesh(lg,lm);
+    lmesh.position.set(lx, floorY+legBedH/2, lz);
+    lmesh.castShadow=false; lmesh.receiveShadow=true; lmesh._isRoom=true;
+    addRoom(lmesh);
+  }
+  
+  // Mattress (approx 60"×80"×10")
+  const mattW=58, mattL=78, mattH=10;
+  const mattY=slatY+1+mattH/2;
+  const mattCenterZ=bedZ+(hbThick-fbThick)/2;
+  const mattress=roomRoundBox(mattW, mattH, mattL, 3, 0xd4cdc0,
+    bedX, mattY, mattCenterZ, 0,0,0);
+  mattress.material.roughness=0.92;
+  mattress.material.color.set(0xd4cdc0);
+  
+  // Pillow pair — puffy rectangular shapes via vertex-displaced box
+  const pillowW=22, pillowH=4, pillowD=14;
+  const pillowY=mattY+mattH/2-0.8; // sits snug on mattress surface
+  const pillowBaseZ=bedZ+bedL/2-hbThick-pillowD/2-2;
+  const pillows=[];
+  for(const px of [-13, 13]){
+    const pGeo=new THREE.BoxGeometry(pillowW, pillowH, pillowD, 16, 8, 12);
+    const pp=pGeo.attributes.position;
+    for(let i=0;i<pp.count;i++){
+      let x=pp.getX(i), y=pp.getY(i), z=pp.getZ(i);
+      // Normalized coords (-1 to 1)
+      const nx=x/(pillowW/2), ny=y/(pillowH/2), nz=z/(pillowD/2);
+      // Round the edges: pull corners inward using a soft rounding
+      const edgeRound=2.5;
+      const ex=Math.max(0, Math.abs(x)-pillowW/2+edgeRound);
+      const ey=Math.max(0, Math.abs(y)-pillowH/2+edgeRound);
+      const ez=Math.max(0, Math.abs(z)-pillowD/2+edgeRound);
+      const dist=Math.sqrt(ex*ex+ey*ey+ez*ez);
+      if(dist>edgeRound){
+        const scale=edgeRound/dist;
+        if(ex>0) x=Math.sign(x)*(pillowW/2-edgeRound+ex*scale);
+        if(ey>0) y=Math.sign(y)*(pillowH/2-edgeRound+ey*scale);
+        if(ez>0) z=Math.sign(z)*(pillowD/2-edgeRound+ez*scale);
+      }
+      // Puffiness: inflate top center upward
+      const cx=nx*nx, cz=nz*nz;
+      const puff=(1-cx)*(1-cz);
+      if(y>0) y+=puff*1.5;
+      // Flatten bottom slightly
+      if(y<0) y*=0.6;
+      pp.setX(i,x); pp.setY(i,y); pp.setZ(i,z);
+    }
+    pGeo.computeVertexNormals();
+    const pMat=stdMat({color:0xeae6de, roughness:0.92});
+    const pillow=new THREE.Mesh(pGeo, pMat);
+    pillow.position.set(bedX+px, pillowY+pillowH/2, pillowBaseZ);
+    pillow.rotation.set(0, px>0?0.05:-0.05, px>0?-0.03:0.03);
+    pillow.castShadow=true; pillow.receiveShadow=true; pillow._isRoom=true;
+    addRoom(pillow);
+    pillows.push(pillow);
+  }
+  
+  // Duvet / comforter — thin blanket that drapes over mattress edges
+  const duvetH=1.5;
+  const duvetL=mattL-pillowD-4;
+  const duvetZ=mattCenterZ-(mattL/2-duvetL/2)-1.5; // shifted toward foot of bed
+  // Generate a wrinkle normal map
+  const duvetCanvas=document.createElement('canvas');
+  duvetCanvas.width=256; duvetCanvas.height=256;
+  const dctx=duvetCanvas.getContext('2d');
+  dctx.fillStyle='#6b6b72';
+  dctx.fillRect(0,0,256,256);
+  // Dense velvet fiber texture — short fuzzy strokes for fabric feel
+  for(let i=0;i<3000;i++){
+    const fx=Math.random()*256, fy=Math.random()*256;
+    const bright=90+Math.random()*40;
+    dctx.strokeStyle=`rgba(${bright},${bright-2},${bright+4},${0.15+Math.random()*0.2})`;
+    dctx.lineWidth=0.5+Math.random()*1.5;
+    dctx.beginPath();
+    dctx.moveTo(fx, fy);
+    dctx.lineTo(fx+Math.random()*4-2, fy+2+Math.random()*4);
+    dctx.stroke();
+  }
+  // Subtle wrinkle folds on top
+  for(let i=0;i<25;i++){
+    const y=Math.random()*256;
+    dctx.strokeStyle=`rgba(${85+Math.random()*25},${83+Math.random()*22},${90+Math.random()*22},${0.08+Math.random()*0.12})`;
+    dctx.lineWidth=3+Math.random()*5;
+    dctx.beginPath();
+    dctx.moveTo(0, y+Math.random()*10);
+    for(let x=0;x<256;x+=20){
+      dctx.lineTo(x, y+Math.sin(x*0.05)*8+Math.random()*6);
+    }
+    dctx.stroke();
+  }
+  const duvetTex=new THREE.CanvasTexture(duvetCanvas);
+  duvetTex.wrapS=duvetTex.wrapT=THREE.RepeatWrapping;
+  duvetTex.repeat.set(3,4);
+  // Generate a bump map for extra fabric relief
+  const _bumpCanvas=document.createElement('canvas');
+  _bumpCanvas.width=256; _bumpCanvas.height=256;
+  const _bctx=_bumpCanvas.getContext('2d');
+  _bctx.fillStyle='#808080';
+  _bctx.fillRect(0,0,256,256);
+  for(let i=0;i<4000;i++){
+    const bx=Math.random()*256, by=Math.random()*256;
+    const v=Math.random()>0.5?140+Math.random()*50:60+Math.random()*50;
+    _bctx.fillStyle=`rgba(${v},${v},${v},0.3)`;
+    _bctx.fillRect(bx, by, 1+Math.random()*2, 1+Math.random()*3);
+  }
+  const duvetBump=new THREE.CanvasTexture(_bumpCanvas);
+  duvetBump.wrapS=duvetBump.wrapT=THREE.RepeatWrapping;
+  duvetBump.repeat.set(4,6);
+  // Continuous blanket — single mesh with vertex-displaced draped edges (no seams)
+  const _bSideHang=2.5, _bFootHang=3, _bMaxDrape=10;
+  const _bTotW=mattW+_bSideHang*2, _bTotL=duvetL+_bFootHang;
+  const blanketGeo=new THREE.BoxGeometry(_bTotW, duvetH, _bTotL, 28, 1, 36);
+  const _bp=blanketGeo.attributes.position;
+  for(let i=0;i<_bp.count;i++){
+    let x=_bp.getX(i), y=_bp.getY(i), z=_bp.getZ(i);
+    z-=_bFootHang/2; // shift so extra length extends past foot (-Z)
+    // Side drape: vertices past mattress edge drop nearly straight down
+    const sx=Math.max(0,Math.abs(x)-mattW/2);
+    const sideDrop=sx>0 ? _bMaxDrape*(sx/_bSideHang) : 0;
+    if(sx>0) x=Math.sign(x)*(mattW/2+sx*0.25);
+    // Foot drape: vertices past foot edge drop nearly straight down
+    const fz=Math.max(0,-duvetL/2-z);
+    const footDrop=fz>0 ? _bMaxDrape*(fz/_bFootHang) : 0;
+    if(fz>0) z=-duvetL/2-fz*0.25;
+    // Use the larger of the two drops at corners (not the sum) so corner
+    // vertices don't stretch to an unnatural point below the edge drape.
+    const drop=Math.max(sideDrop, footDrop);
+    _bp.setX(i,x); _bp.setY(i,y-drop); _bp.setZ(i,z);
+  }
+  blanketGeo.computeVertexNormals();
+  const duvet=new THREE.Mesh(blanketGeo, stdMat({color:0x6e6e78, roughness:1.0, metalness:0.0, map:duvetTex, bumpMap:duvetBump, bumpScale:0.1}));
+  duvet.position.set(bedX, mattY+mattH/2+duvetH/2, duvetZ);
+  duvet.castShadow=true; duvet.receiveShadow=true; duvet._isRoom=true;
+  addRoom(duvet);
+  
+  // Enable shadows on key furniture (not walls/baseboards/trim — those don't need it)
+  [headboard, lRail, rRail, footboard, mattress, duvet].forEach(m=>{ m.castShadow=true; });
+  
+  // XYZ axis helper — press 'X' to toggle (positioned beside purifier)
+  const axesGroup=new THREE.Group();
+  const axesOrig=new THREE.Vector3(panelW/2+4, -H/2-ply, D/2+ply+4); // front-right of purifier, at foot level
+  axesGroup.position.copy(axesOrig);
+  // Build thick arrow axes that render on top of everything
+  {
+    const axLen=22, shaftR=0.35, coneR=1.2, coneH=3.5;
+    const axes=[
+      {dir:[1,0,0], color:0xff4444, label:'X'},
+      {dir:[0,1,0], color:0x44ff44, label:'Y'},
+      {dir:[0,0,1], color:0x4488ff, label:'Z'},
+    ];
+    axes.forEach(a=>{
+      const mat=new THREE.MeshBasicMaterial({color:a.color, depthTest:false, depthWrite:false, transparent:true, opacity:0.9});
+      // Shaft (cylinder along Y, then rotated)
+      const shaft=new THREE.Mesh(new THREE.CylinderGeometry(shaftR,shaftR,axLen,8),mat);
+      shaft.renderOrder=999;
+      // Arrowhead cone
+      const cone=new THREE.Mesh(new THREE.ConeGeometry(coneR,coneH,12),mat);
+      cone.renderOrder=999;
+      // Position along the correct axis
+      const dx=a.dir[0], dy=a.dir[1], dz=a.dir[2];
+      if(dx){ // X axis
+        shaft.rotation.z=-Math.PI/2;
+        shaft.position.set(axLen/2,0,0);
+        cone.rotation.z=-Math.PI/2;
+        cone.position.set(axLen+coneH/2,0,0);
+      } else if(dy){ // Y axis
+        shaft.position.set(0,axLen/2,0);
+        cone.position.set(0,axLen+coneH/2,0);
+      } else { // Z axis
+        shaft.rotation.x=Math.PI/2;
+        shaft.position.set(0,0,axLen/2);
+        cone.rotation.x=Math.PI/2;
+        cone.position.set(0,0,axLen+coneH/2);
+      }
+      axesGroup.add(shaft);
+      axesGroup.add(cone);
+      // Label
+      const hexStr='#'+a.color.toString(16).padStart(6,'0');
+      const lbl=makeTextSprite(a.label,hexStr);
+      lbl.position.set(dx*(axLen+coneH+3), dy*(axLen+coneH+3), dz*(axLen+coneH+3));
+      lbl.scale.multiplyScalar(2.0);
+      lbl.renderOrder=999;
+      lbl.material.depthTest=false;
+      axesGroup.add(lbl);
+    });
+  }
   // ── X-mirror pass ─────────────────────────────────────────────────
   // The monolith constructs the room in pre-mirror coordinates then
   // flips all _isRoom objects along X. This matches the spatial.js
