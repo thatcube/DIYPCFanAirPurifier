@@ -1185,6 +1185,25 @@ export function createRoom(scene) {
   
   // Slat platform (at 14" from floor)
 
+  // ── X-mirror pass ─────────────────────────────────────────────────
+  // The monolith constructs the room in pre-mirror coordinates then
+  // flips all _isRoom objects along X. This matches the spatial.js
+  // coordinate system documentation.
+  scene.traverse(obj => {
+    if (obj._isRoom) {
+      obj.position.x = -obj.position.x;
+      obj.rotation.y = -obj.rotation.y;
+    }
+  });
+
+  // Freeze world matrices on all static room objects
+  scene.traverse(obj => {
+    if (obj.isMesh && !obj.isPoints && obj._isRoom) {
+      obj.updateMatrixWorld(true);
+      obj.matrixAutoUpdate = false;
+    }
+  });
+
   // Return refs for other modules
   return {
     floorY, floorMat, floor, ceiling,
