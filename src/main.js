@@ -89,6 +89,22 @@ console.log('[main] Room created');
 const purifierRefs = createPurifier(scene);
 console.log('[main] Purifier created');
 
+// Group all purifier meshes and set default "Under TV" placement
+const purifierGroup = new THREE.Group();
+{
+  const toMove = [];
+  scene.children.forEach(c => {
+    if (c.isLight || c.isCamera || c._isRoom || c === catAnimation.catGroup || c.isPoints) return;
+    toMove.push(c);
+  });
+  toMove.forEach(c => purifierGroup.add(c));
+  scene.add(purifierGroup);
+}
+// Default placement: Under TV
+const placementOffset = new THREE.Vector3(45, 0, -68);
+purifierGroup.position.copy(placementOffset);
+purifierGroup.rotation.y = 90 * Math.PI / 180;
+
 // Position camera
 camera.position.set(45, 35, 65);
 controls.target.set(0, 5, 0);
@@ -159,7 +175,7 @@ gameFp.init({
   controls,
   catGroup: catAnimation.catGroup,
   scene,
-  placementOffset: new THREE.Vector3(),
+  placementOffset,
   markShadowsDirty,
   showToast,
   roomRefs

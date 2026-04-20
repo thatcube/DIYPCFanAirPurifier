@@ -9,7 +9,10 @@ import {
   PLAYER_SPAWN_X, PLAYER_SPAWN_Z,
   getPlayerFloorY, getFloorY,
   SIDE_WALL_X, LEFT_WALL_X, OPP_WALL_Z,
-  CLOSET_DEPTH, CLOSET_INTERIOR_W
+  CLOSET_DEPTH, CLOSET_INTERIOR_W, CLOSET_W, CLOSET_Z,
+  BED_X, BED_Z, BED_W, BED_L, BED_H, BED_CLEARANCE, BED_SLATS_FROM_FLOOR,
+  TBL_X, TBL_Z, TBL_W, TBL_D, TBL_H,
+  WALL_HEIGHT, PLACEMENT_OFFSETS
 } from './spatial.js';
 import { getBounds, acquireBox, resetBoxPool, easeAlpha, BODY_R, EYE_H, HEAD_EXTRA } from './game-collision.js';
 import * as coins from './coins.js';
@@ -144,46 +147,100 @@ export function init(refs) {
 // Simplified set — just the major furniture. Full monolith had ~40 AABBs.
 
 function _buildStaticBoxes() {
-  const r = _roomRefs;
-  const fy = r.floorY || getFloorY();
+  const fy = getFloorY();
   _staticBoxes = [];
 
-  // Bed
-  if (r.bedX !== undefined) {
-    const bedTop = fy + (r.bedH || 25) + 2; // approx mattress + duvet
-    _staticBoxes.push({
-      xMin: -(r.bedX + (r.bedW || 60) / 2), xMax: -(r.bedX - (r.bedW || 60) / 2),
-      zMin: r.bedZ - (r.bedL || 80) / 2, zMax: r.bedZ + (r.bedL || 80) / 2,
-      yTop: bedTop, yBottom: fy + (r.bedClearance || 8), room: true
-    });
-  }
+  // Bed — sleeping surface is mattress + duvet top
+  // mattY = floorY + bedSlatsFromFloor + 1 + mattH/2 = fy + 10 + 1 + 5 = fy + 16
+  // bed top = mattY + mattH/2 + duvetH = fy + 16 + 5 + 1.5 = fy + 22.5
+  const bedTop = fy + BED_SLATS_FROM_FLOOR + 1 + 10 + 1.5; // slatY + 1 + mattH + duvetH
+  _staticBoxes.push({
+    xMin: -(BED_X + BED_W / 2), xMax: -(BED_X - BED_W / 2),
+    zMin: BED_Z - BED_L / 2, zMax: BED_Z + BED_L / 2,
+    yTop: bedTop, yBottom: fy + BED_CLEARANCE, room: true
+  });
 
-  // Nightstand
-  if (r.tblX !== undefined) {
-    _staticBoxes.push({
-      xMin: -(r.tblX + (r.tblW || 22) / 2), xMax: -(r.tblX - (r.tblW || 22) / 2),
-      zMin: r.tblZ - (r.tblD || 18) / 2, zMax: r.tblZ + (r.tblD || 18) / 2,
-      yTop: fy + (r.tblH || 28), room: true
-    });
-  }
+  // Nightstand — top slab (drawer holes below are walk-through when open)
+  _staticBoxes.push({
+    xMin: -(TBL_X + TBL_W / 2), xMax: -(TBL_X - TBL_W / 2),
+    zMin: TBL_Z - TBL_D / 2, zMax: TBL_Z + TBL_D / 2,
+    yTop: fy + TBL_H, yBottom: fy + 25, room: true
+  });
+  // Nightstand side pillars
+  _staticBoxes.push({
+    xMin: -(TBL_X + TBL_W / 2), xMax: -(TBL_X + TBL_W / 2 - 0.6),
+    zMin: TBL_Z - TBL_D / 2, zMax: TBL_Z + TBL_D / 2,
+    yTop: fy + TBL_H, room: true
+  });
+  _staticBoxes.push({
+    xMin: -(TBL_X - TBL_W / 2 + 0.6), xMax: -(TBL_X - TBL_W / 2),
+    zMin: TBL_Z - TBL_D / 2, zMax: TBL_Z + TBL_D / 2,
+    yTop: fy + TBL_H, room: true
+  });
 
-  // Right wall solid portions (flanking closet)
+  // Right wall solid portions (flanking closet opening)
   _staticBoxes.push(
-    { xMin: -(SIDE_WALL_X + 0.5), xMax: -SIDE_WALL_X, zMin: OPP_WALL_Z, zMax: -10, yTop: fy + 80, room: true },
-    { xMin: -(SIDE_WALL_X + 0.5), xMax: -SIDE_WALL_X, zMin: 20, zMax: 49, yTop: fy + 80, room: true }
+    { xMin: -(SIDE_WALL_X + 0.5), xMax: -SIDE_WALL_X, zMin: OPP_WALL_Z, zMax: CLOSET_Z - CLOSET_W / 2, yTop: fy + WALL_HEIGHT, room: true },
+    { xMin: -(SIDE_WALL_X + 0.5), xMax: -SIDE_WALL_X, zMin: CLOSET_Z + CLOSET_W / 2, zMax: 49, yTop: fy + WALL_HEIGHT, room: true }
   );
 
   // Closet back wall
   _staticBoxes.push({
     xMin: -(SIDE_WALL_X + CLOSET_DEPTH + 0.25), xMax: -(SIDE_WALL_X + CLOSET_DEPTH - 0.25),
-    zMin: -CLOSET_INTERIOR_W / 2, zMax: CLOSET_INTERIOR_W / 2,
-    yTop: fy + 80, room: true
+    zMin: CLOSET_Z - CLOSET_INTERIOR_W / 2, zMax: CLOSET_Z + CLOSET_INTERIOR_W / 2,
+    yTop: fy + WALL_HEIGHT, room: true
+  });
+  // Closet side walls
+  _staticBoxes.push({
+    xMin: -(SIDE_WALL_X + CLOSET_DEPTH), xMax: -(SIDE_WALL_X + 0.5),
+    zMin: CLOSET_Z + CLOSET_INTERIOR_W / 2 - 0.25, zMax: CLOSET_Z + CLOSET_INTERIOR_W / 2 + 0.25,
+    yTop: fy + WALL_HEIGHT, room: true
+  });
+  _staticBoxes.push({
+    xMin: -(SIDE_WALL_X + CLOSET_DEPTH), xMax: -(SIDE_WALL_X + 0.5),
+    zMin: CLOSET_Z - CLOSET_INTERIOR_W / 2 - 0.25, zMax: CLOSET_Z - CLOSET_INTERIOR_W / 2 + 0.25,
+    yTop: fy + WALL_HEIGHT, room: true
   });
 
   // Opposite wall (TV wall)
   _staticBoxes.push({
-    xMin: -SIDE_WALL_X, xMax: 81, zMin: OPP_WALL_Z - 0.25, zMax: OPP_WALL_Z + 0.25,
-    yTop: fy + 80, room: true
+    xMin: -SIDE_WALL_X, xMax: -LEFT_WALL_X,
+    zMin: OPP_WALL_Z - 0.25, zMax: OPP_WALL_Z + 0.25,
+    yTop: fy + WALL_HEIGHT, room: true
+  });
+
+  // TV (wall-mounted, walkable under)
+  const tvCenterX = BED_X;
+  const tvCenterY = fy + 48;
+  const tvW = 56.7, tvH = 31.9, tvD = 1.0, bezel = 0.3;
+  const tvZ = OPP_WALL_Z + 0.5 + tvD / 2 + 0.1;
+  _staticBoxes.push({
+    xMin: -(tvCenterX + (tvW + bezel * 2) / 2), xMax: -(tvCenterX - (tvW + bezel * 2) / 2),
+    zMin: OPP_WALL_Z, zMax: tvZ + tvD / 2 + 1,
+    yTop: tvCenterY + tvH / 2 + bezel, yBottom: tvCenterY - tvH / 2 - bezel, room: true
+  });
+
+  // Headboard
+  const hbW = BED_W + 2, hbThick = 1.5, hbH = 20;
+  _staticBoxes.push({
+    xMin: -(BED_X + hbW / 2), xMax: -(BED_X - hbW / 2),
+    zMin: BED_Z + BED_L / 2 - hbThick, zMax: BED_Z + BED_L / 2,
+    yTop: fy + BED_CLEARANCE + hbH, room: true
+  });
+
+  // Pillows
+  const pillowW = 18, pillowD = 12, pillowH = 4;
+  const pillowBaseZ = BED_Z + BED_L / 2 - hbThick - pillowD / 2 - 2;
+  const pillowY = bedTop - 1.5 + 0.8; // approximate
+  _staticBoxes.push({
+    xMin: -(BED_X - 13 + pillowW / 2), xMax: -(BED_X - 13 - pillowW / 2),
+    zMin: pillowBaseZ - pillowD / 2, zMax: pillowBaseZ + pillowD / 2,
+    yTop: pillowY + pillowH + 1.5, yBottom: fy + BED_CLEARANCE, room: true
+  });
+  _staticBoxes.push({
+    xMin: -(BED_X + 13 + pillowW / 2), xMax: -(BED_X + 13 - pillowW / 2),
+    zMin: pillowBaseZ - pillowD / 2, zMax: pillowBaseZ + pillowD / 2,
+    yTop: pillowY + pillowH + 1.5, yBottom: fy + BED_CLEARANCE, room: true
   });
 }
 
