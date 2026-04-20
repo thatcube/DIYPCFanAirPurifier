@@ -5774,7 +5774,7 @@ function applyTimeOfDay(minuteOfDay){
   bounce.position.set(ROOM_LIGHT_BASE.bounce.x, ROOM_LIGHT_BASE.bounce.y, ROOM_LIGHT_BASE.bounce.z);
 
   // Other lights
-  hemiLight.intensity=mix(0.05, 0.24, sun) + (ceilLightOn?mix(0.12, 0.04, sun):0); // ceiling-on adds gentle ambient lift
+  hemiLight.intensity=mix(0.10, 0.24, sun) + (ceilLightOn?mix(0.12, 0.04, sun):0); // night floor raised to 0.10 so the room is never pitch black
   {
     const sky=lerpHex(0x334466, 0x8899bb, sun);
     if(ceilLightOn){
@@ -5784,15 +5784,17 @@ function applyTimeOfDay(minuteOfDay){
     hemiLight.color.copy(sky);
   }
   hemiLight.groundColor.copy(lerpHex(0x221100, 0xffeedd, sun)); // warm ground bounce
-  fill.intensity=mix(0.01, 0.14, sun);   // gentle global fill to reduce hard spotlight look
-  rim.intensity=mix(0.01, 0.08, sun);    // subtle side lift for wall/door shading
+  fill.intensity=mix(0.03, 0.14, sun);   // gentle global fill (night floor raised)
+  rim.intensity=mix(0.02, 0.08, sun);    // subtle side lift for wall/door shading
   bounce.intensity=mix(0.0, 0.06, sun);  // soft floor bounce in daytime
   ceilSpot.intensity=ceilLightOn?mix(1.1, 0.4, sun):0; // keep visibly lit in daytime, warmer/stronger at night
   domeMat.emissiveIntensity=ceilLightOn?mix(0.9, 0.45, sun):0;
   if(ceilGlow) ceilGlow.intensity=ceilLightOn?mix(0.35, 0.14, sun):0;
 
   // Outdoor backdrop brightness (sun through window)
-  outdoor.material.color.setScalar(mix(0.08, 1.4, sun)+warm*0.25);
+  // Outdoor backdrop brightness — night scene needs to stay visible through
+  // the window, so the floor is 0.35 (not 0.08 which made it invisible).
+  outdoor.material.color.setScalar(mix(0.35, 1.4, sun)+warm*0.25);
 
   // Room surfaces
   const wallCol=lerpHex(NIGHT_WALL, DAY_WALL, sun);
@@ -6675,6 +6677,13 @@ new THREE.TextureLoader().load(
 );
 
 // Small bottom-center power nub (trapezoid pod + tiny center button).
+// TV ambient glow — faint colored light that washes the floor/wall nearby.
+// Always on (the TV screen has emissive from the pokopia image).
+const tvGlow=new THREE.PointLight(0x6688cc,0.25,50,1.2);
+tvGlow.position.set(tvCenterX, tvCenterY-5, tvZ+tvD/2+4);
+tvGlow.castShadow=false;
+tvGlow._isRoom=true;
+scene.add(tvGlow);
 {
   const nubGroup=new THREE.Group();
   nubGroup.position.set(tvCenterX, tvCenterY-(tvH+bezel*2)/2-0.24, tvZ+tvD/2-0.06);
