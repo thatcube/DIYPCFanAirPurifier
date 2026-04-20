@@ -114,10 +114,12 @@ const todRefs = {
   _markShadowsDirty: markShadowsDirty
 };
 
-// Apply initial time-of-day based on local clock
-const _now = new Date();
-const _minutesNow = _now.getHours() * 60 + _now.getMinutes();
-lighting.applyTimeOfDay(_minutesNow, todRefs);
+// Apply initial time-of-day — default to 2:30 PM (matches monolith default)
+lighting.applyTimeOfDay(870, todRefs);
+console.log('[main] TOD applied. Key light:', lighting.key.intensity.toFixed(2),
+  'pos:', lighting.key.position.x.toFixed(1), lighting.key.position.y.toFixed(1), lighting.key.position.z.toFixed(1),
+  'target:', lighting.key.target.position.x.toFixed(1), lighting.key.target.position.y.toFixed(1), lighting.key.target.position.z.toFixed(1),
+  'windowSun visible:', lighting.windowSun.visible, 'intensity:', lighting.windowSun.intensity.toFixed(2));
 
 // Force shadow update after TOD repositions lights
 _shadowDirtyOneShot = true;
