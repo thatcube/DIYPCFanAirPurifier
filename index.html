@@ -478,7 +478,7 @@
             <button class="play-launcher-color on" id="catColorBtnGinger" onclick="setCatColorPreset('ginger')"><span class="play-launcher-dot" style="background:#c67f45"></span><span>Ginger</span></button>
             <button class="play-launcher-color" id="catColorBtnTuxedo" onclick="setCatColorPreset('tuxedo')"><span class="play-launcher-dot" style="background:#5f6772"></span><span>Tuxedo</span></button>
             <button class="play-launcher-color" id="catColorBtnCream" onclick="setCatColorPreset('cream')"><span class="play-launcher-dot" style="background:#d7ccb1"></span><span>Cream</span></button>
-            <button class="play-launcher-color" id="catColorBtnMidnight" onclick="setCatColorPreset('midnight')"><span class="play-launcher-dot" style="background:#41495a"></span><span>Midnight</span></button>
+            <button class="play-launcher-color" id="catColorBtnCow" onclick="setCatColorPreset('cow')"><span class="play-launcher-dot" style="background:linear-gradient(135deg,#555 40%,#fff 40%)"></span><span>Cow</span></button>
           </div>
         </div>
         <div class="play-launcher-preview" id="catColorHint" style="display:none">This cat keeps its original baked colors.</div>
@@ -822,7 +822,7 @@ const _catColorPresets={
   ginger:{coat:0xA52500,tint:0.99,coatMix:0.94},
   tuxedo:{coat:0x3a4050,tint:0.99,coatMix:0.96},
   cream:{coat:0xddd0aa,tint:0.98,coatMix:0.9},
-  midnight:{coat:0x1e2636,tint:0.995,coatMix:0.98}
+  cow:{coat:0x484848,coat2:0xF0F0F0,pattern:'cow',tint:0.99,coatMix:0.96}
 };
 const _catHairPresets={
   short:{sx:1.0,sy:1.0,sz:1.0,rough:0.9,furRim:0.05,bump:0.004,boneMode:'short'},
@@ -1029,14 +1029,26 @@ function _loadCatAssetWithFallback(loader,onLoad,onError,sourcesOverride){
   };
   tryLoad(0,null);
 }
-// Recolor a texture's fur pixels: find warm/orange pixels in the source
-// texture, replace their hue+saturation with the target coat color while
-// preserving the original luminance. Returns a new CanvasTexture.
-// Cache keyed by texture UUID + coat hex to avoid re-processing every frame.
+// Recolor a texture's fur pixels: replace hue+saturation with the target
+// coat color while preserving luminance. Supports optional cow-like
+// patterns via coat2Hex + pattern='cow'.
+// Cache keyed by texture UUID + coat hex + pattern to avoid re-processing.
 const _recoloredTexCache=new Map();
-function _recolorFurTexture(srcTex, coatHex){
+// Simple hash-based noise for cow patches (no dependency needed)
+function _cowNoise(x,y){
+  // Two layers of hash noise at different scales for organic patches
+  const h1=Math.sin(x*0.031+y*0.017)*43758.5453;
+  const h2=Math.sin(x*0.013-y*0.029+2.7)*22578.1459;
+  const h3=Math.sin(x*0.057+y*0.041-1.3)*31415.9265;
+  const n1=(h1-Math.floor(h1));
+  const n2=(h2-Math.floor(h2));
+  const n3=(h3-Math.floor(h3));
+  // Blend layers: big blobs + medium detail
+  return n1*0.5 + n2*0.3 + n3*0.2;
+}
+function _recolorFurTexture(srcTex, coatHex, coat2Hex, pattern){
   if(!srcTex || !srcTex.image) return srcTex;
-  const key=(srcTex.uuid||'')+'_'+coatHex;
+  const key=(srcTex.uuid||'')+'_'+coatHex+'_'+(coat2Hex||'')+'_'+(pattern||'');
   if(_recoloredTexCache.has(key)) return _recoloredTexCache.get(key);
   const img=srcTex.image;
   const w=img.width||img.naturalWidth||256;
@@ -1047,23 +1059,31 @@ function _recolorFurTexture(srcTex, coatHex){
   ctx.drawImage(img,0,0,w,h);
   const id=ctx.getImageData(0,0,w,h);
   const d=id.data;
-  // Target coat color in HSL
   const tc=new THREE.Color(coatHex);
   const tHSL={h:0,s:0,l:0}; tc.getHSL(tHSL);
+  const tc2=coat2Hex!==undefined?new THREE.Color(coat2Hex):null;
+  const tHSL2={h:0,s:0,l:0}; if(tc2) tc2.getHSL(tHSL2);
+  const isCow=pattern==='cow';
   const tmpC=new THREE.Color();
   const tmpHSL={h:0,s:0,l:0};
   for(let i=0;i<d.length;i+=4){
+    const px=(i/4)%w, py=Math.floor((i/4)/w);
     const r=d[i]/255, g=d[i+1]/255, b=d[i+2]/255;
     tmpC.setRGB(r,g,b);
     tmpC.getHSL(tmpHSL);
-    // Recolor ALL pixels: replace hue+saturation with the target coat
-    // color, keep original luminance for light/shadow detail. The
-    // isDetail mesh-name filter earlier in the pipeline already skips
-    // eye/nose/whisker meshes, so this texture is ONLY the body fur.
-    // Only skip near-black (outlines, shadows < 0.05) and near-white
-    // (specular highlights > 0.97) to preserve those details.
     if(tmpHSL.l > 0.05 && tmpHSL.l < 0.97){
-      tmpC.setHSL(tHSL.h, tHSL.s, tmpHSL.l);
+      let useHSL=tHSL;
+      if(isCow && tc2){
+        // Cow pattern: use noise to decide dark patches vs white areas.
+        // Bottom half of texture (higher py) tends toward white (belly),
+        // top half toward dark (back), with noisy patch boundaries.
+        const vertBias=py/h; // 0=top, 1=bottom
+        const noise=_cowNoise(px,py);
+        // Threshold shifts with vertical position: bottom is mostly white
+        const thresh=0.35 + vertBias*0.35; // top=0.35, bottom=0.70
+        useHSL = noise > thresh ? tHSL2 : tHSL;
+      }
+      tmpC.setHSL(useHSL.h, useHSL.s, tmpHSL.l);
       d[i]  =Math.round(tmpC.r*255);
       d[i+1]=Math.round(tmpC.g*255);
       d[i+2]=Math.round(tmpC.b*255);
@@ -1246,7 +1266,7 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
       if(!m.userData._catOrigMap && m.map) m.userData._catOrigMap=m.map;
       const origMap=m.userData._catOrigMap;
       if(origMap && origMap.image){
-        m.map=_recolorFurTexture(origMap, colorCfg.coat);
+        m.map=_recolorFurTexture(origMap, colorCfg.coat, colorCfg.coat2, colorCfg.pattern);
       }
       m.color.setRGB(1,1,1); // no overall tint
       if(m.emissive&&m.emissive.isColor){
@@ -9624,7 +9644,7 @@ function _makeShareUrl(entryId){
 }
 // Color emoji for each coat preset — used in the share text so the pasted
 // summary visually echoes the leaderboard badge (model emoji + color dot).
-const _CAT_COLOR_EMOJI={ginger:'🟠',tuxedo:'⚫',cream:'🟡',midnight:'🔵'};
+const _CAT_COLOR_EMOJI={ginger:'🟠',tuxedo:'⚫',cream:'🟡',cow:'🐄'};
 function _buildShareText(data){
   const row=data||{};
   const rankTxt=row.rank&&row.rank>0?`#${row.rank}`:'Unranked';
