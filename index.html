@@ -2426,6 +2426,8 @@ const bladeCount=7;
 const holeR=impellerR*1.02;
 const cornerR=0.2;
 const allRotors=[];
+// DEBUG: hide all fan rotors to test if they're the perf bottleneck
+const _DEBUG_HIDE_FANS=true;
 const allFanMats=[]; // all fan plastic materials (frame, hub, cap, blade0)
 const allBladeMatsPerFan=[]; // array of arrays: allBladeMatsPerFan[fanIdx] = [mat0..mat6]
 const allBraceMats=[]; // brace spoke materials (color-switched with frame)
@@ -3005,6 +3007,7 @@ function makeFanPanel(flip, nFans, edgeProfile=topEdgeProfile){
 
     g.add(rotor);
     allRotors.push(rotor);
+    if(_DEBUG_HIDE_FANS) rotor.visible=false;
 
     // Invisible click target for reliable fan clicking
     const clickBox=new THREE.Mesh(
@@ -3064,6 +3067,7 @@ function makeFanPanel(flip, nFans, edgeProfile=topEdgeProfile){
     g.add(grill);
     allGrillMeshes.push(grill);
     grill.traverse(o=>{ if(o.isMesh&&o.material) _allGrillMats.push(o.material); });
+    if(_DEBUG_HIDE_FANS) grill.visible=false;
 
     // (RGB glow handled by single panel-level light below)
   }
@@ -3222,6 +3226,7 @@ function makeAltTopPanel(nFans){
     allBladeMatsPerFan.push(fanBlades2);
     g.add(rotor);
     allRotors.push(rotor);
+    if(_DEBUG_HIDE_FANS) rotor.visible=false;
 
     // Invisible click target for top-mount fan
     const clickBox2=new THREE.Mesh(
@@ -3280,6 +3285,7 @@ function makeAltTopPanel(nFans){
     g.add(grillTop);
     allGrillMeshes.push(grillTop);
     grillTop.traverse(o=>{ if(o.isMesh&&o.material) _allGrillMats.push(o.material); });
+    if(_DEBUG_HIDE_FANS) grillTop.visible=false;
 
     // (RGB glow handled by single panel-level light below)
   }
