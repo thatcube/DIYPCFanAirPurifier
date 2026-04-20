@@ -17,6 +17,7 @@
 // than imported, to avoid circular dependencies with the game module.
 
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { state } from './state.js';
 import {
   getSelectedModelPreset, getModelPreset, getSourcesForModelKey,
@@ -98,10 +99,10 @@ export function triggerNod() {
  * @param {object} refs - { applyCatColorToModel, playLauncherOpen, setLauncherCatPreview }
  */
 export function loadGameplayCat(refs = {}) {
-  if (!THREE.GLTFLoader) { console.warn('GLTFLoader not available'); return; }
+  if (!GLTFLoader) { console.warn('GLTFLoader not available'); return; }
   const nonce = ++gameLoadNonce;
   clearGameplayCat();
-  const loader = new THREE.GLTFLoader();
+  const loader = new GLTFLoader();
   const sources = getSourcesForModelKey(catModelKey);
 
   _loadWithFallback(loader, (gltf, src) => {

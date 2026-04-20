@@ -1,6 +1,7 @@
 // ─── Material helpers ───────────────────────────────────────────────
 
 import * as THREE from 'three';
+import { state } from './state.js';
 
 /**
  * Create a MeshStandardMaterial with PBR defaults.
@@ -18,7 +19,7 @@ export function stdMat(opts = {}) {
   if (!('roughness' in opts)) opts.roughness = 0.5;
   // Only apply env map to metallic/glossy surfaces
   if (opts.metalness > 0.3 || opts.roughness < 0.15) {
-    opts.envMap = window._roomEnvMap;
+    opts.envMap = state.envMap || window._roomEnvMap;
     if (opts.envMapIntensity === undefined) opts.envMapIntensity = 0.6;
   } else {
     if (opts.envMapIntensity === undefined) opts.envMapIntensity = 0;
