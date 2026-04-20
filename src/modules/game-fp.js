@@ -251,18 +251,63 @@ function _getBoxes() {
   resetBoxPool();
   const result = [];
 
-  // In the modular build, the room stays at origin and only the purifier
-  // group moves. Room collision boxes don't need offset shifting.
+  // Room collision boxes (static, no offset needed)
   for (const box of _staticBoxes) {
     const b = acquireBox();
-    b.xMin = box.xMin;
-    b.xMax = box.xMax;
-    b.zMin = box.zMin;
-    b.zMax = box.zMax;
-    b.yTop = box.yTop;
-    b.yBottom = box.yBottom;
+    b.xMin = box.xMin; b.xMax = box.xMax;
+    b.zMin = box.zMin; b.zMax = box.zMax;
+    b.yTop = box.yTop; b.yBottom = box.yBottom;
     result.push(b);
   }
+
+  // ── Purifier collision (dynamic — follows placementOffset + rotation) ──
+  const px = _placementOffset ? _placementOffset.x : 0;
+  const py = _placementOffset ? _placementOffset.y : 0;
+  const pz = _placementOffset ? _placementOffset.z : 0;
+  const { W, H, D, ply, ft, bunFootH } = state;
+  const panelW = W + 2 * ft;
+
+  // Cabinet dimensions in local space
+  const hwOuter = panelW / 2;    // half-width (filter side)
+  const hdOuter = D / 2 + ply;   // half-depth (front/back)
+  const yTopPanel = py + H / 2 + ply;
+  const yBotPanel = py - H / 2 - ply;
+  const yBotFeet = yBotPanel - bunFootH;
+
+  // The purifier rotates 90° in TV/Wall mode. When rotated, local X→world Z and local Z→world -X.
+  // Detect rotation from the placementOffset (TV/Wall = rotated)
+  const rotated = (px === 45 || px === -17); // TV or Wall placement
+
+  // Build 4 wall AABBs (top, bottom, front, back) + 2 filter sides
+  const localBoxes = [
+    // Top panel — standable
+    { lxMin: -hwOuter, lxMax: hwOuter, lzMin: -hdOuter, lzMax: hdOuter, yTop: yTopPanel, yBottom: yTopPanel - ply },
+    // Bottom panel — solid floor, extends through feet
+    { lxMin: -hwOuter, lxMax: hwOuter, lzMin: -hdOuter, lzMax: hdOuter, yTop: yBotPanel + ply, yBottom: yBotFeet },
+    // Front wall (-Z face)
+    { lxMin: -hwOuter, lxMax: hwOuter, lzMin: -hdOuter, lzMax: -D / 2, yTop: yTopPanel, yBottom: yBotFeet },
+    // Back wall (+Z face)
+    { lxMin: -hwOuter, lxMax: hwOuter, lzMin: D / 2, lzMax: hdOuter, yTop: yTopPanel, yBottom: yBotFeet },
+    // Left filter side
+    { lxMin: -hwOuter, lxMax: -hwOuter + ft, lzMin: -D / 2, lzMax: D / 2, yTop: yTopPanel, yBottom: yBotFeet },
+    // Right filter side
+    { lxMin: hwOuter - ft, lxMax: hwOuter, lzMin: -D / 2, lzMax: D / 2, yTop: yTopPanel, yBottom: yBotFeet },
+  ];
+
+  for (const lb of localBoxes) {
+    const b = acquireBox();
+    if (rotated) {
+      // 90° rotation: local X → world Z, local Z → world -X
+      b.xMin = px - lb.lzMax; b.xMax = px - lb.lzMin;
+      b.zMin = pz + lb.lxMin; b.zMax = pz + lb.lxMax;
+    } else {
+      b.xMin = px + lb.lxMin; b.xMax = px + lb.lxMax;
+      b.zMin = pz + lb.lzMin; b.zMax = pz + lb.lzMax;
+    }
+    b.yTop = lb.yTop; b.yBottom = lb.yBottom;
+    result.push(b);
+  }
+
   return result;
 }
 
