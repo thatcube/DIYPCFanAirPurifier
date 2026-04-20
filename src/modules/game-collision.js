@@ -4,15 +4,10 @@
 // large and referenced by both physics and debug display.
 
 import {
-  BED_X, BED_W, BED_L, BED_Z, BED_CLEARANCE, BED_H,
-  TBL_X, TBL_W, TBL_H, TBL_Z, TBL_D,
-  SIDE_WALL_X, LEFT_WALL_X, OPP_WALL_Z, BACK_WALL_Z,
-  CLOSET_W, CLOSET_H, CLOSET_DEPTH, CLOSET_INTERIOR_W, CLOSET_Z,
-  WALL_HEIGHT, WIN_W, WIN_H, WIN_CENTER_Z,
-  PLAYER_BODY_R, PLAYER_EYE_H, PLAYER_HEAD_EXTRA,
-  getFloorY, getWinCenterY, roomAABB
+  SIDE_WALL_X, LEFT_WALL_X, OPP_WALL_Z,
+  CLOSET_DEPTH, CLOSET_INTERIOR_W,
+  PLAYER_BODY_R, PLAYER_EYE_H, PLAYER_HEAD_EXTRA
 } from './spatial.js';
-import { state } from './state.js';
 
 // ── Box pool (reused each frame) ────────────────────────────────────
 

@@ -20,6 +20,9 @@ export const state = {
   // Quality
   qualityTier: 0,
 
+  // Environment map for reflections (set after PMREMGenerator runs)
+  envMap: null,
+
   // Purifier dimensions (inches) — shared across many modules
   W: 5.44,     // filter width
   H: 19.69,    // filter height  
