@@ -22,6 +22,24 @@
       <!-- Structure -->
       <div class="section-group">
         <h4>Structure</h4>
+        <div class="ctrl-row"><label>Fan layout</label>
+          <div class="seg">
+            <button class="on" id="btnLayoutFB" onclick="window._setLayout&&window._setLayout('fb')">Front+Back</button>
+            <button id="btnLayoutFT" onclick="window._setLayout&&window._setLayout('ft')">Front+Top</button>
+          </div>
+        </div>
+        <div class="ctrl-row"><label>Fans per panel</label>
+          <div class="seg">
+            <button id="btnFan3" onclick="window._setFanCount&&window._setFanCount(3)">3</button>
+            <button class="on" id="btnFan4" onclick="window._setFanCount&&window._setFanCount(4)">4</button>
+          </div>
+        </div>
+        <div class="ctrl-row"><label>Edge profile</label>
+          <div class="seg">
+            <button class="on" id="btnEdgeFlat" onclick="window._setEdge&&window._setEdge('flat')">Flat</button>
+            <button id="btnEdgeCurved" onclick="window._setEdge&&window._setEdge('curved')">Curved</button>
+          </div>
+        </div>
         <div class="ctrl-row"><label>Wood stain</label>
           <div class="seg">
             <button class="on" id="btnStainRaw" onclick="window._setStain&&window._setStain('raw')">Raw</button>
@@ -34,7 +52,7 @@
         </div>
       </div>
 
-      <!-- Finish -->
+      <!-- Finish & Feet -->
       <div class="section-group">
         <h4>Finish & Feet</h4>
         <div class="ctrl-row"><label>Show filters</label>
@@ -49,12 +67,30 @@
             <button id="btnGrillSilver" onclick="window._setGrillColor&&window._setGrillColor('silver')">Silver</button>
           </div>
         </div>
-        <div class="ctrl-row"><label>Placement</label>
+        <div class="ctrl-row"><label>Feet style</label>
+          <div class="seg">
+            <button id="btnFeetPeg" onclick="window._setFeet&&window._setFeet('peg')">Peg</button>
+            <button class="on" id="btnFeetBun" onclick="window._setFeet&&window._setFeet('bun')">Bun</button>
+            <button id="btnFeetRubber" onclick="window._setFeet&&window._setFeet('rubber')">Rubber</button>
+            <button id="btnFeetNone" onclick="window._setFeet&&window._setFeet('none')">None</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Placement -->
+      <div class="section-group">
+        <h4>Placement</h4>
+        <div class="ctrl-row"><label>Position</label>
           <div class="seg">
             <button id="btnPlaceFloor" onclick="window._setPlacement&&window._setPlacement('floor')">Floor</button>
-            <button class="on" id="btnPlaceTv" onclick="window._setPlacement&&window._setPlacement('tv')">TV</button>
+            <button class="on" id="btnPlaceTv" onclick="window._setPlacement&&window._setPlacement('tv')">Under TV</button>
             <button id="btnPlaceWall" onclick="window._setPlacement&&window._setPlacement('wall')">Wall</button>
           </div>
+        </div>
+        <div class="slider-row">
+          <label>Turntable</label>
+          <input type="range" min="0" max="360" value="90" id="turntableSlider" oninput="window._setTurntable&&window._setTurntable(this.value);document.getElementById('turntableLabel').textContent=this.value+'°'">
+          <span id="turntableLabel">90°</span>
         </div>
       </div>
 
@@ -69,6 +105,18 @@
           <input type="range" min="0" max="1800" value="900" id="fanSpeedSlider" oninput="window._setFanSpeed&&window._setFanSpeed(this.value);document.getElementById('fanSpeedVal').textContent=this.value+'rpm'">
           <span id="fanSpeedVal">900rpm</span>
         </div>
+        <div class="ctrl-row"><label>Show airflow</label>
+          <div class="toggle-sw" id="togAirflow" onclick="window._toggleAirflow&&window._toggleAirflow()"></div>
+        </div>
+        <div class="ctrl-row"><label>Fan color</label>
+          <div class="seg">
+            <button class="on" id="btnFanWhite" onclick="window._setFanColor&&window._setFanColor('white')">White</button>
+            <button id="btnFanBlack" onclick="window._setFanColor&&window._setFanColor('black')">Black</button>
+          </div>
+        </div>
+        <div class="ctrl-row"><label>RGB Fans</label>
+          <div class="toggle-sw" id="togRGB" onclick="window._toggleRGB&&window._toggleRGB()"></div>
+        </div>
       </div>
 
       <!-- Scene -->
@@ -79,10 +127,14 @@
           <input type="range" min="0" max="1439" value="870" id="todSlider" oninput="window._setTOD&&window._setTOD(this.value)">
           <span id="todLabel">2:30 PM</span>
         </div>
-        <div class="slider-row">
-          <label>Turntable</label>
-          <input type="range" min="0" max="360" value="90" id="turntableSlider" oninput="window._setTurntable&&window._setTurntable(this.value);document.getElementById('turntableLabel').textContent=this.value+'°'">
-          <span id="turntableLabel">90°</span>
+        <div class="ctrl-row"><label>Isolate purifier</label>
+          <div class="toggle-sw" id="togIsolate" onclick="window._toggleIsolate&&window._toggleIsolate()"></div>
+        </div>
+        <div class="ctrl-row"><label>Dimensions</label>
+          <div class="toggle-sw" id="togDims" onclick="window._toggleDims&&window._toggleDims()"></div>
+        </div>
+        <div class="ctrl-row"><label>Show FPS</label>
+          <div class="toggle-sw on" id="togFps" onclick="window._toggleFps&&window._toggleFps()"></div>
         </div>
       </div>
 
@@ -90,18 +142,25 @@
   </div>
 
   <!-- Game mode -->
-  <button id="playDockBtn" onclick="window._toggleFP&&window._toggleFP()">▶ Play Mode <kbd style="opacity:0.5;font-size:10px;margin-left:4px">G</kbd></button>
+  <button id="playDockBtn" onclick="window._toggleFP&&window._toggleFP()">▶ Play Mode <kbd class="key-hint">G</kbd></button>
 
   <!-- FP HUD -->
   <div id="fpHud">
     <div id="coinHud">🪙 <span id="coinCount">0/0</span></div>
+    <div id="runTimerHud"><span id="runTimerText">0:00.0</span> <span id="runTimerState"></span></div>
   </div>
   <div id="fpCrosshair"></div>
-  <div id="fpControls" style="display:none">
-    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move · <kbd>Space</kbd> Jump (hold to charge)<br>
+  <div id="fpControls">
+    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move · <kbd>Space</kbd> Jump (hold)<br>
     <kbd>Shift</kbd> Sprint · <kbd>V</kbd> Camera · <kbd>G</kbd> Exit · <kbd>Esc</kbd> Pause
   </div>
-  <div id="fpChargeBar" style="display:none"><div id="fpChargeFill"></div></div>
+  <div id="fpChargeBar"><div id="fpChargeFill"></div></div>
+
+  <!-- Leaderboard (in-game) -->
+  <div id="fpLeaderboard">
+    <h4>Leaderboard</h4>
+    <ol id="fpLeaderboardList"></ol>
+  </div>
 
   <!-- Pause overlay -->
   <div id="fpPauseOverlay">
@@ -110,6 +169,15 @@
     <button onclick="window._resetFP&&window._resetFP()">Reset Run</button>
     <button onclick="window._exitFP&&window._exitFP()">Exit Game</button>
   </div>
+
+  <!-- Mobile controls -->
+  <div id="mobilePad">
+    <div id="mobileJoystick">
+      <div id="mobileJoyKnob"></div>
+    </div>
+  </div>
+  <button id="mobileJumpBtn" ontouchstart="window._mobileJump&&window._mobileJump(true)" ontouchend="window._mobileJump&&window._mobileJump(false)">⬆</button>
+  <button id="mobileExitBtn" onclick="window._exitFP&&window._exitFP()">✕</button>
 
   <script type="module" src="/src/main.js"></script>
 </body>
