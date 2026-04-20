@@ -1,0 +1,306 @@
+// ─── Lighting module ────────────────────────────────────────────────
+// All light creation, time-of-day curves, and the applyTimeOfDay
+// function that updates every light + surface color each frame.
+
+import * as THREE from 'three';
+import { state } from './state.js';
+import {
+  DAY_CLEAR, NIGHT_CLEAR, DAY_WALL, NIGHT_WALL
+} from './constants.js';
+
+// ── Internal helpers ────────────────────────────────────────────────
+const _c1 = new THREE.Color();
+const _c2 = new THREE.Color();
+const _cmix = new THREE.Color();
+
+export function lerpHex(a, b, t) {
+  _c1.setHex(a);
+  _c2.setHex(b);
+  _cmix.copy(_c1).lerp(_c2, t);
+  return _cmix;
+}
+
+export function mix(a, b, t) {
+  return a + (b - a) * t;
+}
+
+// ── Sun / warmth / beam curves ──────────────────────────────────────
+
+export function sunCurve(minuteOfDay) {
+  const h = minuteOfDay / 60;
+  if (h <= 5.5) return 0;
+  if (h <= 7.5) return (h - 5.5) / 2;
+  if (h <= 12) return 0.7 + 0.3 * ((h - 7.5) / 4.5);
+  if (h <= 14) return 1.0;
+  if (h <= 17) return 1.0 - 0.15 * ((h - 14) / 3);
+  if (h <= 19.5) return 0.85 * (1 - (h - 17) / 2.5);
+  return 0;
+}
+
+export function warmthCurve(minuteOfDay) {
+  const h = minuteOfDay / 60;
+  if (h >= 6 && h <= 8) return 1 - Math.abs(h - 7);
+  if (h >= 17 && h <= 19) return 1 - Math.abs(h - 18);
+  return 0;
+}
+
+export function windowBeamCurve(minuteOfDay) {
+  const h = minuteOfDay / 60;
+  if (h <= 5.5) return 0;
+  if (h < 7.0) return (h - 5.5) / 1.5;
+  if (h < 17.0) return 1;
+  return 0;
+}
+
+// ── Color constants ─────────────────────────────────────────────────
+
+const DAY_BASE    = 0xc0bbb4;
+const NIGHT_BASE  = 0x1e1e28;
+const DAY_CARPET  = 0xb0a898;
+const NIGHT_CARPET= 0x4a4840;
+const GOLDEN_KEY  = 0xffddaa;
+
+// ── Lights ──────────────────────────────────────────────────────────
+// Exported so other modules can reference them (e.g., game mode
+// toggles ceiling light on/off).
+
+export let hemiLight;
+export let key;          // directional shadow-caster (sun through window)
+export let windowSun;    // spot (sweeping sun beam, no shadow)
+export let ceilSpot;     // downward spot from ceiling fixture
+export let ceilGlow;     // point glow near ceiling fixture
+export let lampLight;    // desk lamp point light
+export let tvGlow;       // TV screen glow
+export let moonGlow;     // moonlight through window at night
+
+// Stubs for removed fill/rim/bounce (kept for compat)
+export const fill   = { intensity: 0, position: { set() {} }, visible: false };
+export const rim    = { intensity: 0, position: { set() {} }, visible: false };
+export const bounce = { intensity: 0, position: { set() {} }, visible: false };
+
+export const ROOM_LIGHT_BASE = {
+  fill:   { x: -10, y: 12, z: -12 },
+  rim:    { x: -6,  y: 15, z: -18 },
+  bounce: { x: 0,   y: -10, z: 8 }
+};
+
+export let isNightMode = false;
+
+/**
+ * Create all scene lights. Call once after scene is ready.
+ * @param {boolean} isMobile
+ */
+export function createLights(isMobile) {
+  const { scene } = state;
+
+  // Hemisphere
+  hemiLight = new THREE.HemisphereLight(0x8899bb, 0xffeedd, 0.18);
+  scene.add(hemiLight);
+
+  // Key directional (sun through window)
+  key = new THREE.DirectionalLight(0xffe0a0, 1.4);
+  key.position.set(95, 38, 0);
+  key.castShadow = true;
+  key.shadow.mapSize.set(isMobile ? 1024 : 2048, isMobile ? 1024 : 2048);
+  key.shadow.bias = -0.0005;
+  key.shadow.normalBias = 0.04;
+  key.shadow.radius = isMobile ? 6 : 12;
+  key.shadow.blurSamples = isMobile ? 8 : 20;
+  key.shadow.camera.near = 1;
+  key.shadow.camera.far = 280;
+  key.shadow.camera.left = -120;
+  key.shadow.camera.right = 120;
+  key.shadow.camera.top = 95;
+  key.shadow.camera.bottom = -95;
+  key.shadow.camera.updateProjectionMatrix();
+  scene.add(key);
+
+  // Window sun spot (sweeping beam, no shadow)
+  windowSun = new THREE.SpotLight(0xffe0a0, 0, 260, Math.PI * 0.60, 0.72, 1.0);
+  windowSun.position.set(95, 38, 0);
+  windowSun.castShadow = false;
+  windowSun.shadow.mapSize.set(isMobile ? 1024 : 2048, isMobile ? 1024 : 2048);
+  windowSun.shadow.bias = -0.0002;
+  windowSun.shadow.normalBias = 0.012;
+  windowSun.shadow.radius = isMobile ? 5 : 10;
+  windowSun.shadow.camera.near = 1;
+  windowSun.shadow.camera.far = 260;
+  scene.add(windowSun);
+  scene.add(windowSun.target);
+  windowSun.visible = false;
+}
+
+/**
+ * Create the ceiling fixture lights. Called after the fixture mesh is built.
+ * @param {number} ceilLightX
+ * @param {number} ceilY
+ * @param {number} ceilLightZ
+ * @param {number} floorY
+ */
+export function createCeilingLights(ceilLightX, ceilY, ceilLightZ, floorY) {
+  const { scene } = state;
+
+  ceilSpot = new THREE.SpotLight(0xfff0dd, 1.1, 0, Math.PI * 0.42, 0.6, 0.9);
+  ceilSpot.position.set(ceilLightX, ceilY - 1, ceilLightZ);
+  ceilSpot.target.position.set(ceilLightX, floorY, ceilLightZ);
+  scene.add(ceilSpot);
+  scene.add(ceilSpot.target);
+  ceilSpot.castShadow = false;
+  ceilSpot.shadow.mapSize.set(512, 512);
+  ceilSpot.shadow.bias = -0.0005;
+  ceilSpot.shadow.radius = 5;
+  ceilSpot.shadow.blurSamples = 12;
+  ceilSpot.shadow.camera.near = 10;
+  ceilSpot.shadow.camera.far = 95;
+
+  // ── IMPORTANT: ceiling light fixture vs. light source positioning ──
+  // The fixture MESH is at (ceilLightX, ceilY, ceilLightZ) but the actual
+  // LIGHT SOURCE (ceilGlow) is at (-45, ceilY-8, 51). These are NOT at the
+  // same coordinates. DO NOT move ceilGlow to ceilLightX/ceilLightZ.
+  ceilGlow = new THREE.PointLight(0xfff3df, 0.35, 0, 0.8);
+  ceilGlow.position.set(-45, ceilY - 8, 51);
+  ceilGlow.castShadow = false;
+  scene.add(ceilGlow);
+}
+
+/**
+ * Create the desk lamp light.
+ */
+export function createLampLight(x, y, z) {
+  lampLight = new THREE.PointLight(0xffddaa, 1.2, 80);
+  lampLight.position.set(x, y, z);
+  lampLight.castShadow = false;
+  lampLight._isRoom = true;
+  state.scene.add(lampLight);
+}
+
+/**
+ * Create the TV glow light.
+ */
+export function createTvGlow(tvCenterX, tvCenterY, tvZ, tvD) {
+  tvGlow = new THREE.PointLight(0x6688cc, 0.6, 80, 0.9);
+  tvGlow.position.set(tvCenterX, tvCenterY, tvZ + tvD / 2 + 12);
+  tvGlow.castShadow = false;
+  tvGlow._isRoom = true;
+  state.scene.add(tvGlow);
+}
+
+/**
+ * Create the moonlight glow through the window.
+ */
+export function createMoonGlow(leftWallX, winCenterY, winCenterZ) {
+  moonGlow = new THREE.PointLight(0x8899bb, 0, 60, 1.0);
+  moonGlow.position.set(leftWallX + 3, winCenterY, winCenterZ);
+  moonGlow.castShadow = false;
+  moonGlow._isRoom = true;
+  state.scene.add(moonGlow);
+}
+
+/**
+ * Apply time-of-day lighting. Called every frame or on slider change.
+ *
+ * @param {number} minuteOfDay - 0..1439
+ * @param {object} refs - references to room meshes and state needed by ToD:
+ *   { ceilLightOn, domeMat, outdoor, currentRGB, customRGBHex,
+ *     setRGBColor, mirroredWindowX, winCenterY, winCenterZ, winW,
+ *     winTop, winBottom, winFront, winBack,
+ *     wallMeshes, baseMeshes, floorMat, recessWalls, baseboardRecesses,
+ *     _markShadowsDirty, isolateMode, renderer, scene }
+ */
+export function applyTimeOfDay(minuteOfDay, refs) {
+  const sun  = sunCurve(minuteOfDay);
+  const warm = warmthCurve(minuteOfDay);
+  const beam = windowBeamCurve(minuteOfDay);
+  const h    = minuteOfDay / 60;
+  const dayTravel = Math.max(0, Math.min(1, (h - 6.0) / (17.0 - 6.0)));
+
+  isNightMode = sun < 0.3;
+  document.body.classList.toggle('night-mode', isNightMode);
+
+  const { renderer, scene } = state;
+
+  // Clear color + fog
+  const clearCol = lerpHex(NIGHT_CLEAR, DAY_CLEAR, sun);
+  renderer.setClearColor(clearCol.clone(), 1);
+  scene.fog.color.copy(clearCol);
+  scene.fog.density = mix(0.003, 0.0015, sun);
+  renderer.toneMappingExposure = mix(1.02, 1.34, sun);
+
+  // Key / window sun
+  const keyColor = warm > 0.1
+    ? lerpHex(0xffe0a0, GOLDEN_KEY, warm)
+    : lerpHex(0x6688cc, 0xffe0a0, sun);
+  key.color.copy(keyColor);
+  windowSun.color.copy(keyColor);
+  const baseKeyIntensity = mix(0.14, 0.95, sun) + warm * 0.1;
+  key.intensity = beam > 0 ? Math.max(0.18, baseKeyIntensity * 0.5) * beam : 0;
+  windowSun.visible = beam > 0;
+  windowSun.intensity = beam > 0 ? Math.max(0.15, baseKeyIntensity * 0.5) * beam : 0;
+
+  // Window sun sweep positions
+  const beamSrcY = Math.max(refs.winBottom + 4, Math.min(refs.winTop - 4, mix(refs.winTop + 11, refs.winTop + 1, dayTravel)));
+  const beamSrcZ = Math.max(refs.winFront + 2, Math.min(refs.winBack - 2, refs.winCenterZ + mix(-refs.winW * 0.30, refs.winW * 0.30, dayTravel)));
+  const beamTgtY = mix(refs.winCenterY + 6, refs.winCenterY - 2, dayTravel);
+  const beamTgtZ = refs.winCenterZ + mix(-28, 28, dayTravel);
+
+  windowSun.position.set(refs.mirroredWindowX + 13, beamSrcY, beamSrcZ);
+  windowSun.target.position.set(mix(-22, 14, dayTravel), beamTgtY, beamTgtZ);
+  windowSun.target.updateMatrixWorld();
+
+  key.position.set(refs.mirroredWindowX + 14, refs.winCenterY + 3, refs.winCenterZ);
+  key.target.position.set(0, refs.winCenterY + 1, refs.winCenterZ);
+  key.target.updateMatrixWorld();
+  key.updateMatrixWorld();
+  key.shadow.camera.updateProjectionMatrix();
+
+  // Hemisphere
+  hemiLight.intensity = mix(0.16, 0.32, sun) + (refs.ceilLightOn ? mix(0.12, 0.04, sun) : 0);
+  {
+    const sky = lerpHex(0x334466, 0x8899bb, sun);
+    if (refs.ceilLightOn) {
+      const warmMix = (1 - sun) * 0.5;
+      sky.lerp(new THREE.Color(0xfff0d0), warmMix);
+    }
+    hemiLight.color.copy(sky);
+  }
+  hemiLight.groundColor.copy(lerpHex(0x221100, 0xffeedd, sun));
+
+  // Ceiling lights
+  if (ceilSpot) ceilSpot.intensity = refs.ceilLightOn ? mix(1.1, 0.4, sun) : 0;
+  if (refs.domeMat) refs.domeMat.emissiveIntensity = refs.ceilLightOn ? mix(0.9, 0.45, sun) : 0;
+  if (ceilGlow) ceilGlow.intensity = refs.ceilLightOn ? mix(0.35, 0.14, sun) : 0;
+
+  // Outdoor backdrop
+  if (refs.outdoor) {
+    refs.outdoor.material.color.setScalar(mix(0.35, 1.4, sun) + warm * 0.25);
+  }
+
+  // Moonlight
+  if (moonGlow) moonGlow.intensity = mix(0.5, 0, sun);
+
+  // Room surfaces
+  if (refs.wallMeshes) {
+    const wallCol = lerpHex(NIGHT_WALL, DAY_WALL, sun);
+    refs.wallMeshes.forEach(m => m.material.color.copy(wallCol));
+  }
+  if (refs.baseMeshes) {
+    const baseCol = lerpHex(NIGHT_BASE, DAY_BASE, sun);
+    refs.baseMeshes.forEach(m => m.material.color.copy(baseCol));
+  }
+  if (refs.floorMat) {
+    refs.floorMat.color.copy(lerpHex(NIGHT_CARPET, DAY_CARPET, sun));
+  }
+
+  // Shadow refresh
+  if (refs._markShadowsDirty) refs._markShadowsDirty();
+}
+
+// ── Time formatting ─────────────────────────────────────────────────
+
+export function formatTime(minutes) {
+  const h24 = Math.floor(minutes / 60) % 24;
+  const mn  = Math.floor(minutes % 60);
+  const ampm = h24 >= 12 ? 'PM' : 'AM';
+  const h12  = h24 % 12 || 12;
+  return h12 + ':' + (mn < 10 ? '0' : '') + mn + ' ' + ampm;
+}
