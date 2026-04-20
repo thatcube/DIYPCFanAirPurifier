@@ -3006,6 +3006,10 @@ export function createPurifier(scene) {
     );
   }
   updateTvGameStackPlacement();
+
+  // Add console groups to scene so they get scooped into purifierGroup by main.js
+  scene.add(consoleProps);
+  scene.add(tvGameStackProps);
   
   // Add to purifierGroup so it moves/rotates with the purifier
   function showConsoleProps(show){
