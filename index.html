@@ -1358,7 +1358,6 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
       _catFurTintColor.setHex(colorCfg.coat).offsetHSL(0,0,0.14);
       // Set ALL userData BEFORE _ensureCatFurShader so customProgramCacheKey
       // reads the correct cow state when deciding whether to recompile.
-      const isCowPreset=colorCfg.pattern==='cow';
       m.userData._catFurAmount=hairCfg.furRim;
       m.userData._catFurTintHex=_catFurTintColor.getHex();
       m.userData._catCoatTintHex=colorCfg.coat;
