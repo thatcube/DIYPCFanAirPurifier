@@ -1,13 +1,10 @@
-// ─── Room construction (bridge) ─────────────────────────────────────
-// This module will eventually contain all room geometry construction.
-// For now it exports a createRoom() that returns placeholder refs.
-// The actual construction code remains in index.html during migration.
+// ─── Room construction ──────────────────────────────────────────────
+// All room geometry: floor, ceiling, walls, bed, nightstand, closet,
+// door, TV, mini-split, window, outdoor backdrop, curtains, ceiling light.
 //
-// When the migration is complete, the full room construction will
-// live here and index.html will be deleted.
+// Migrated from the monolith index.html (lines 6115-7260).
 
 import * as THREE from 'three';
-import { state } from './state.js';
 import { stdMat } from './materials.js';
 import {
   LEFT_WALL_X, SIDE_WALL_X, OPP_WALL_Z, BACK_WALL_Z,
@@ -15,118 +12,1191 @@ import {
   BED_CLEARANCE, BED_SLATS_FROM_FLOOR,
   TBL_X, TBL_Z, TBL_W, TBL_D, TBL_H,
   CEIL_LIGHT_X, CEIL_LIGHT_Z,
-  CLOSET_W, CLOSET_H, CLOSET_DEPTH, CLOSET_INTERIOR_W, CLOSET_Z,
   WIN_W, WIN_H, WIN_CENTER_Z,
   getFloorY, getCeilingY, getWinCenterY
 } from './spatial.js';
+import { state } from './state.js';
 
-/**
- * Room construction output — references to meshes/materials that
- * other modules need (lighting, collision, game mode, etc.).
- */
-export class RoomRefs {
-  constructor() {
-    // Walls
-    this.wallMeshL = null;
-    this.returnWallL = null;
-    this.oppWall = null;
-    this.rightWall = null;
-    this.leftWallBelow = null;
-    this.leftWallAbove = null;
-    this.leftWallFront = null;
-    this.leftWallBack = null;
-
-    // Baseboards
-    this.baseboardMeshL = null;
-    this.baseboardRetL = null;
-    this.oppBaseboard = null;
-    this.sideBaseboard1 = null;
-    this.sideBaseboard2 = null;
-    this.leftBaseboard = null;
-    this.recessWallL = null;
-    this.recessWallR = null;
-    this.baseboardRecessL = null;
-    this.baseboardRecessR = null;
-
-    // Floor + ceiling
-    this.floor = null;
-    this.floorMat = null;
-    this.ceiling = null;
-
-    // Outdoor backdrop
-    this.outdoor = null;
-    this.outdoorMat = null;
-
-    // Ceiling light
-    this.ceilY = 0;
-    this.domeMat = null;
-
-    // Bed
-    this.mattY = 0;
-    this.mattH = 0;
-    this.mattW = 0;
-    this.mattL = 0;
-    this.mattCenterZ = 0;
-    this.duvetH = 0;
-    this.headboard = null;
-    this.footboard = null;
-
-    // Nightstand + lamp
-    this.lampLight = null;
-    this.lampShade = null;
-    this.lampBulb = null;
-    this.lampOn = true;
-
-    // TV
-    this.tvCenterX = 0;
-    this.tvCenterY = 0;
-    this.tvZ = 0;
-    this.tvW = 0;
-    this.tvH = 0;
-    this.tvD = 0;
-
-    // Drawers
-    this.drawers = [];
-
-    // Closet
-    this.bifoldLeaves = [];
-
-    // Fading walls list
-    this.fadingWalls = [];
-
-    // Window
-    this.winCenterY = 0;
-    this.winCenterZ = 0;
-    this.winTop = 0;
-    this.winBottom = 0;
-    this.winFront = 0;
-    this.winBack = 0;
-    this.mirroredWindowX = 0;
-
-    // Night textures
-    this.nightOutdoorTex = null;
-    this.dayOutdoorTex = null;
-    this.windowIsNight = false;
-
-    // Misc
-    this.sceneFloor = null;
-    this.consoleProps = null;
-    this.tvGameStackProps = null;
-    this.wallBracketGroup = null;
-  }
-}
-
-/**
- * Create the complete room environment.
- * Returns a RoomRefs object with all mesh references.
- *
- * During migration, this is a stub. The actual room construction
- * remains in index.html. Once fully migrated, this function will
- * contain all the mesh creation code.
- */
 export function createRoom(scene) {
-  const refs = new RoomRefs();
-  // Stub — actual construction will be migrated from index.html
-  console.log('[room] createRoom stub — room construction pending migration');
-  return refs;
+  const floorY = getFloorY();
+  const { H, W, D, ply, ft, bunFootH } = state;
+  const panelW = W + 2 * ft;
+  const leftWallX = LEFT_WALL_X;
+  const sideWallX = SIDE_WALL_X;
+  const oppWallZ = OPP_WALL_Z;
+  const wallHeight = WALL_HEIGHT;
+  const wallDepth = 127;
+  const bedL = BED_L, bedW = BED_W, bedH = BED_H;
+  const bedClearance = BED_CLEARANCE, bedSlatsFromFloor = BED_SLATS_FROM_FLOOR;
+  const bedX = BED_X, bedZ = BED_Z;
+  const tblW = TBL_W, tblD = TBL_D, tblH = TBL_H;
+  const tblX = TBL_X, tblZ = TBL_Z;
+  const winW = WIN_W, winH = WIN_H;
+  const winCenterZ = WIN_CENTER_Z;
+  const winCenterY = getWinCenterY();
+  const ceilLightX = CEIL_LIGHT_X, ceilLightZ = CEIL_LIGHT_Z;
+
+  // Alias scene.add for _isRoom tagging
+  function addRoom(mesh) { mesh._isRoom = true; scene.add(mesh); return mesh; }
+
+  // Floor
+  const floorGeo = new THREE.PlaneGeometry(200, 200);
+  const carpetCanvas = document.createElement('canvas');
+  carpetCanvas.width = 256; carpetCanvas.height = 256;
+  const cctx = carpetCanvas.getContext('2d');
+  cctx.fillStyle = '#8a8578';
+  cctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 12000; i++) {
+    const x = Math.random() * 256, y = Math.random() * 256;
+    const shade = 120 + Math.random() * 40;
+    cctx.fillStyle = `rgb(${shade},${shade-8},${shade-16})`;
+    cctx.fillRect(x, y, 1 + Math.random(), 1 + Math.random() * 2);
+  }
+  const carpetTex = new THREE.CanvasTexture(carpetCanvas);
+  carpetTex.wrapS = carpetTex.wrapT = THREE.RepeatWrapping;
+  carpetTex.repeat.set(20, 20);
+  const floorMat = new THREE.MeshStandardMaterial({map:carpetTex, roughness:0.95, metalness:0.0, color:0xb0a898});
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI/2;
+  floor.position.y = floorY;
+  floor.receiveShadow = true;
+  floor._isRoom = true;
+  floor._isFloor = true;
+  addRoom(floor);
+  
+  // updatePowerCordGeometry — handled by purifier module
+  
+  // Ceiling — flat plane at top of walls
+  const ceilingGeo = new THREE.PlaneGeometry(200, 200);
+  const ceilingMat = new THREE.MeshStandardMaterial({color:0xe0ddd6, roughness:0.9, metalness:0.0, side:THREE.DoubleSide});
+  const ceiling = new THREE.Mesh(ceilingGeo, ceilingMat);
+  ceiling.rotation.x = Math.PI/2;
+  ceiling.position.y = floorY+80;
+  ceiling.castShadow = false; // NEVER let the ceiling cast directional-light shadows — it's a 200×200 plane that shadows the upper portions of every wall and itself, making them permanently dark
+  ceiling.receiveShadow = true;
+  ceiling._isRoom = true;
+  addRoom(ceiling);
+  
+  // Helper: simple box with shadow
+  function roomBox(w,h,d,color,x,y,z,rx,ry,rz){
+    const g=new THREE.BoxGeometry(w,h,d);
+    const m=new THREE.MeshStandardMaterial({color,roughness:0.7,metalness:0.05});
+    const mesh=new THREE.Mesh(g,m);
+    mesh.position.set(x,y,z);
+    if(rx) mesh.rotation.x=rx;
+    if(ry) mesh.rotation.y=ry;
+    if(rz) mesh.rotation.z=rz;
+    mesh.castShadow=true;
+    mesh.receiveShadow=true;
+    mesh._isRoom=true;
+    addRoom(mesh);
+    return mesh;
+  }
+  
+  // Rounded box helper — uses ExtrudeGeometry with a rounded rect profile
+  function roomRoundBox(w,h,d,radius,color,x,y,z,rx,ry,rz){
+    const r=Math.min(radius,w/2,h/2);
+    const shape=new THREE.Shape();
+    shape.moveTo(-w/2+r,-h/2);
+    shape.lineTo(w/2-r,-h/2);
+    shape.quadraticCurveTo(w/2,-h/2,w/2,-h/2+r);
+    shape.lineTo(w/2,h/2-r);
+    shape.quadraticCurveTo(w/2,h/2,w/2-r,h/2);
+    shape.lineTo(-w/2+r,h/2);
+    shape.quadraticCurveTo(-w/2,h/2,-w/2,h/2-r);
+    shape.lineTo(-w/2,-h/2+r);
+    shape.quadraticCurveTo(-w/2,-h/2,-w/2+r,-h/2);
+    const extrudeSettings={depth:d,bevelEnabled:false};
+    const g=new THREE.ExtrudeGeometry(shape,extrudeSettings);
+    g.translate(0,0,-d/2); // center along Z
+    const m=new THREE.MeshStandardMaterial({color,roughness:0.7,metalness:0.05});
+    const mesh=new THREE.Mesh(g,m);
+    mesh.position.set(x,y,z);
+    if(rx) mesh.rotation.x=rx;
+    if(ry) mesh.rotation.y=ry;
+    if(rz) mesh.rotation.z=rz;
+    mesh.castShadow=true;
+    mesh.receiveShadow=true;
+    mesh._isRoom=true;
+    addRoom(mesh);
+    return mesh;
+  }
+  
+  // ─── Zinus Queen Piper Upholstered Platform Bed ───
+  // 82.3"L × 60.3"W × 42"H, 6.5" ground clearance, slats at 14" from floor
+  const bedL=82.3, bedW=60.3, bedH=42, bedClearance=6.5, bedSlatsFromFloor=10;
+  const bedX=-81+2+bedW/2, bedZ=48.5-bedL/2; // bed left edge 2" from left wall, headboard flush against back wall
+  
+  // Nightstand — 27"H × 24"W × 14"D, black body, dark oak top, 3 drawers, curved front
+  const tblW=24, tblH=27, tblD=14;
+  const tblX=bedX+bedW/2+tblW/2+3, tblZ=48.5-tblD/2-2;
+  const tblBlack=0x1a1a1a;
+  const tblOak=0x5a3f2a;
+  const drawers=[]; // populated in nightstand block below; used by click/collision/coin systems
+  {
+    const bodyH=tblH-1;
+    const curveBulge=1.5; // how far the front curves outward
+    const segs=12; // curve smoothness
+  
+    // Helper: create a curved-front box (top-down profile extruded along Y)
+    function curvedFrontBox(w, h, d, bulge){
+      const shape=new THREE.Shape();
+      // Start at back-left, go clockwise (in pre-flip coords)
+      shape.moveTo(-w/2, -d/2); // back-left
+      shape.lineTo(w/2, -d/2);  // back-right
+      shape.lineTo(w/2, d/2);   // front-right
+      // Curved front: bulges in +Z (which becomes the visible front after X flip)
+      shape.quadraticCurveTo(0, d/2+bulge, -w/2, d/2);
+      shape.lineTo(-w/2, -d/2);
+      const geo=new THREE.ExtrudeGeometry(shape, {depth:h, bevelEnabled:false});
+      geo.translate(0,0,-h/2);
+      geo.rotateX(-Math.PI/2); // extrude along Y
+      return geo;
+    }
+  
+    // Main body — a solid rectangular block (tblW × bodyH × tblD) with three
+    // rectangular holes cut through it, front-to-back, where each drawer slots
+    // in. Built by extruding a front-facing silhouette-with-holes along Z.
+    // (The dark-oak top cap below keeps the curved silhouette on top.)
+    const bodyMat=new THREE.MeshStandardMaterial({color:tblBlack,roughness:0.4,metalness:0.05});
+    const drawerGap=0.8;
+    const drawerH=(bodyH-drawerGap*4)/3;
+    const drawerW=tblW-1.5;
+    const drawerFrontZ=tblZ-tblD/2;   // drawer face sits flush with the body front
+    const trayD=tblD-0.5;              // tray runs nearly the full dresser depth
+    {
+      // Front silhouette: full body rectangle in XY.
+      const faceShape=new THREE.Shape();
+      faceShape.moveTo(-tblW/2, -bodyH/2);
+      faceShape.lineTo( tblW/2, -bodyH/2);
+      faceShape.lineTo( tblW/2,  bodyH/2);
+      faceShape.lineTo(-tblW/2,  bodyH/2);
+      faceShape.lineTo(-tblW/2, -bodyH/2);
+      // Three rectangular drawer-sized holes, one per drawer row.
+      const holeW=drawerW+0.3;           // slightly wider than drawer face for clearance
+      const holeH=drawerH-0.3;           // slightly shorter so face rests against rails
+      for(let d=0;d<3;d++){
+        const dyCenter=drawerGap*(d+1)+drawerH*(d+0.5)-bodyH/2; // body-local Y
+        const hole=new THREE.Path();
+        hole.moveTo(-holeW/2, dyCenter-holeH/2);
+        hole.lineTo( holeW/2, dyCenter-holeH/2);
+        hole.lineTo( holeW/2, dyCenter+holeH/2);
+        hole.lineTo(-holeW/2, dyCenter+holeH/2);
+        hole.lineTo(-holeW/2, dyCenter-holeH/2);
+        faceShape.holes.push(hole);
+      }
+      // Extrude along +Z through the full body depth. Final mesh origin at its
+      // geometric center (bodyH/2, tblD/2 in-shape).
+      const bodyGeo=new THREE.ExtrudeGeometry(faceShape, {depth:tblD, bevelEnabled:false});
+      bodyGeo.translate(0, 0, -tblD/2);   // center on Z
+      const body=new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.set(tblX, floorY+bodyH/2, tblZ);
+      body.castShadow=true; body.receiveShadow=true; body._isRoom=true;
+      addRoom(body);
+    }
+  
+    // Dark oak top — also curved front, with overhang
+    const topOverhang=1;
+    const topW=tblW+topOverhang*2;
+    const topD=tblD+topOverhang;
+    const topThick=1;
+    const topGeo=curvedFrontBox(topW, topThick, topD, curveBulge+0.5);
+    const topMat=new THREE.MeshStandardMaterial({color:tblOak,roughness:0.6,metalness:0.05});
+    const topMesh=new THREE.Mesh(topGeo, topMat);
+    topMesh.position.set(tblX, floorY+tblH-topThick/2, tblZ-topOverhang/2);
+    topMesh.castShadow=true; topMesh._isRoom=true; addRoom(topMesh);
+  
+    // 3 drawers — curved front face + hollow tray (left/right/back walls + floor).
+    // Each drawer is a THREE.Group positioned at (tblX, dy, drawerFrontZ). The
+    // group slides along local Z (toward -Z = out) when opened. Marked _isRoom
+    // so it mirrors with the rest of the room; children are in local coords.
+    // (drawerGap, drawerH, drawerW, drawerFrontZ, trayD declared above for the
+    // body-cavity math and reused here.)
+    const drawerFaceMat=new THREE.MeshStandardMaterial({color:0x222222,roughness:0.5});
+    const drawerTrayMat=new THREE.MeshStandardMaterial({color:0x151515,roughness:0.85,metalness:0.02});
+    const trayWall=0.5;              // thickness of tray walls
+    const drawerSlideMax=8;          // how far the drawer pulls out
+    for(let d=0;d<3;d++){
+      const dy=floorY+drawerGap*(d+1)+drawerH*(d+0.5);
+      const grp=new THREE.Group();
+      grp.position.set(tblX, dy, drawerFrontZ);
+      grp._drawerBaseZ=drawerFrontZ;
+      grp._isRoom=true;
+      grp._isDrawer=true;
+      grp._drawerIdx=d;
+      grp._drawerOpen=false;
+      grp._drawerSlide=0;              // current slide amount (0..slideMax)
+      grp._drawerSlideMax=drawerSlideMax;
+      grp._drawerW=drawerW;
+      grp._drawerH=drawerH;
+      grp._drawerTrayD=trayD;
+      grp._drawerTrayWall=trayWall;
+      // Curved front face — same as before, centered at group origin.
+      const faceGeo=curvedFrontBox(drawerW, drawerH-0.5, 0.8, curveBulge*0.8);
+      const face=new THREE.Mesh(faceGeo, drawerFaceMat);
+      face._isDrawer=true; face._drawerIdx=d;
+      grp.add(face);
+      // Tray: open-top box extending behind the face in +Z (into the body).
+      // Tray interior runs from z=0.4 (behind face) to z=trayD.
+      const trayBottom=new THREE.Mesh(
+        new THREE.BoxGeometry(drawerW-trayWall*2, trayWall, trayD),
+        drawerTrayMat
+      );
+      trayBottom.position.set(0, -drawerH/2+trayWall/2, trayD/2+0.4);
+      trayBottom._isDrawer=true; trayBottom._drawerIdx=d;
+      grp.add(trayBottom);
+      const trayLeft=new THREE.Mesh(
+        new THREE.BoxGeometry(trayWall, drawerH-0.5, trayD),
+        drawerTrayMat
+      );
+      trayLeft.position.set(-drawerW/2+trayWall/2, 0, trayD/2+0.4);
+      trayLeft._isDrawer=true; trayLeft._drawerIdx=d;
+      grp.add(trayLeft);
+      const trayRight=trayLeft.clone();
+      trayRight.position.x=drawerW/2-trayWall/2;
+      grp.add(trayRight);
+      const trayBack=new THREE.Mesh(
+        new THREE.BoxGeometry(drawerW-trayWall*2, drawerH-0.5, trayWall),
+        drawerTrayMat
+      );
+      trayBack.position.set(0, 0, trayD+0.4-trayWall/2);
+      trayBack._isDrawer=true; trayBack._drawerIdx=d;
+      grp.add(trayBack);
+      // 2 round handles per drawer — live on the face, so they travel with it.
+      const handleMat=new THREE.MeshStandardMaterial({color:0x888888,roughness:0.3,metalness:0.6});
+      for(let h of[-1,1]){
+        const handle=new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), handleMat);
+        handle.position.set(h*4, 0, -0.8);
+        handle._isDrawer=true; handle._drawerIdx=d;
+        grp.add(handle);
+        const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,0.5,6), handleMat);
+        stem.rotation.x=Math.PI/2;
+        stem.position.set(h*4, 0, -0.5);
+        stem._isDrawer=true; stem._drawerIdx=d;
+        grp.add(stem);
+      }
+      addRoom(grp);
+      drawers.push(grp);
+    }
+  }
+  
+  // Coffee mug on nightstand — ceramic with handle
+  {
+    const mugX=tblX-3, mugZ=tblZ-5, mugY=floorY+tblH;
+    const mugR=1.4, mugH=3.5, mugThick=0.15;
+    const mugMat=new THREE.MeshStandardMaterial({color:0xf5f5f0,roughness:0.3,metalness:0.05});
+    const mugGroup=new THREE.Group();
+    // Outer cylinder
+    const mugOuter=new THREE.Mesh(new THREE.CylinderGeometry(mugR,mugR*0.95,mugH,16),mugMat);
+    mugOuter.position.set(0, mugH/2, 0);
+    mugGroup.add(mugOuter);
+    // Inner dark cavity (coffee)
+    const coffeeMat=new THREE.MeshStandardMaterial({color:0x2a1a0a,roughness:0.8});
+    const coffee=new THREE.Mesh(new THREE.CircleGeometry(mugR-mugThick,16),coffeeMat);
+    coffee.rotation.x=-Math.PI/2;
+    coffee.position.set(0, mugH-0.1, 0);
+    mugGroup.add(coffee);
+    // Handle — torus arc attached to mug side
+    const handleGeo=new THREE.TorusGeometry(0.65, 0.15, 8, 12, Math.PI);
+    const handle=new THREE.Mesh(handleGeo, mugMat);
+    handle.rotation.z=Math.PI/2;
+    handle.rotation.y=Math.PI/2;
+    handle.position.set(0, mugH*0.5, -mugR);
+    mugGroup.add(handle);
+    // Position and rotate the whole mug
+    mugGroup.position.set(mugX, mugY, mugZ);
+    mugGroup.rotation.y=60*Math.PI/180; // 60° rotation
+    // Only mark the GROUP as room — not the children. Marking children caused
+    // applyRoomDelta to double-shift them (once for group, once per child) each
+    // time the room was nudged, which is why the mug drifted outside the room.
+    mugGroup._isRoom=true;
+    addRoom(mugGroup);
+  }
+  
+  // Qingping Air Quality Monitor — white wedge with tilted screen
+  {
+    const aqX=tblX-8, aqZ=tblZ+2, aqY=floorY+tblH;
+    const aqW=3.5, aqH=4.0, aqD=2.8; // taller to include chin
+    const chinH=0.8; // chin height below screen
+    const tilt=15*Math.PI/180;
+    const wedgeMat=new THREE.MeshStandardMaterial({color:0xeeeee8,roughness:0.35,metalness:0.05});
+  
+    // Screen panel — rounded edges like a tablet
+    const panelR=0.4; // corner radius
+    const panelShape=new THREE.Shape();
+    panelShape.moveTo(-aqW/2+panelR, -aqH/2);
+    panelShape.lineTo(aqW/2-panelR, -aqH/2);
+    panelShape.quadraticCurveTo(aqW/2, -aqH/2, aqW/2, -aqH/2+panelR);
+    panelShape.lineTo(aqW/2, aqH/2-panelR);
+    panelShape.quadraticCurveTo(aqW/2, aqH/2, aqW/2-panelR, aqH/2);
+    panelShape.lineTo(-aqW/2+panelR, aqH/2);
+    panelShape.quadraticCurveTo(-aqW/2, aqH/2, -aqW/2, aqH/2-panelR);
+    panelShape.lineTo(-aqW/2, -aqH/2+panelR);
+    panelShape.quadraticCurveTo(-aqW/2, -aqH/2, -aqW/2+panelR, -aqH/2);
+    const panelGeo=new THREE.ExtrudeGeometry(panelShape, {depth:0.3, bevelEnabled:true, bevelSize:0.08, bevelThickness:0.08, bevelSegments:3});
+    panelGeo.translate(0,0,-0.15);
+    const screenPanel=new THREE.Mesh(panelGeo, wedgeMat);
+    screenPanel.rotation.x=tilt;
+    screenPanel.position.set(aqX, aqY+aqH/2+0.3, aqZ-0.3);
+    screenPanel._isRoom=true; addRoom(screenPanel);
+  
+    // Base/stand — thicker
+    const baseMesh=new THREE.Mesh(new THREE.BoxGeometry(aqW, 1.2, aqD*0.8), wedgeMat);
+    baseMesh.position.set(aqX, aqY+0.6, aqZ+0.3);
+    baseMesh._isRoom=true; addRoom(baseMesh);
+  
+    // Chin slit — horizontal dark line in the chin area
+    const slitMat=new THREE.MeshStandardMaterial({color:0x888888,roughness:0.5});
+    const slit=new THREE.Mesh(new THREE.BoxGeometry(aqW*0.7, 0.08, 0.05), slitMat);
+    slit.rotation.x=tilt;
+    // Position at bottom of panel face, in the chin area
+    slit.position.set(aqX, aqY+chinH*0.5+0.45, aqZ-0.3-0.8);
+    slit._isRoom=true; addRoom(slit);
+  
+    // Screen content — canvas texture with AQI data
+    const screenH=aqH-chinH-0.4; // screen area = panel minus chin minus bezel
+    const aqiCvs=document.createElement('canvas');
+    aqiCvs.width=512; aqiCvs.height=512;
+    const actx=aqiCvs.getContext('2d');
+    actx.fillStyle='#0a0a0a';
+    actx.fillRect(0,0,512,512);
+  
+    // Header — centered
+    actx.fillStyle='#cccccc';
+    actx.font='bold 52px -apple-system,sans-serif';
+    actx.textAlign='center'; actx.textBaseline='middle';
+    actx.fillText('AIR QUALITY',256,120);
+    actx.fillText('MONITOR',256,180);
+  
+    // Divider line
+    actx.strokeStyle='#333333';
+    actx.lineWidth=1;
+    actx.beginPath(); actx.moveTo(30,250); actx.lineTo(482,250); actx.stroke();
+  
+    // Bottom grid — 2×3 layout with larger text
+    const gx=[128,384];
+    const gy=[295,370,445];
+    const gridData=[
+      ['36','Noise dB','#00cc44'],    ['187','PM 10 µg/m³','#ffaa00'],
+      ['631','CO₂ ppm','#ffaa00'],    ['27','eTVOC index','#00cc44'],
+      ['25.5','Temp °C','#00cc44'],   ['55.5','RH %','#00cc44'],
+    ];
+    for(let i=0;i<gridData.length;i++){
+      const col=i%2, row=Math.floor(i/2);
+      const x=gx[col], y=gy[row];
+      actx.fillStyle=gridData[i][2];
+      actx.font='bold 42px -apple-system,sans-serif';
+      actx.textAlign='center';
+      actx.fillText(gridData[i][0],x,y-6);
+      actx.fillStyle='#555555';
+      actx.font='18px -apple-system,sans-serif';
+      actx.fillText(gridData[i][1],x,y+22);
+    }
+  
+    const aqiTex=new THREE.CanvasTexture(aqiCvs);
+    const screenW2=aqW*0.85;
+    const scrMesh=new THREE.Mesh(
+      new THREE.PlaneGeometry(screenW2, screenH),
+      new THREE.MeshBasicMaterial({map:aqiTex})
+    );
+    scrMesh.rotation.x=tilt;
+    scrMesh.rotation.y=Math.PI;
+    // Screen sits above the chin, centered in the upper portion of the panel
+    scrMesh.position.set(aqX, aqY+chinH+screenH/2+0.4, aqZ-0.3-0.25);
+    scrMesh._isRoom=true; addRoom(scrMesh);
+  }
+  
+  // Lamp on nightstand — near the corner closest to the door extrusion
+  let lampLight, lampShade, lampOn=true;
+  let lampBulb=null;
+  let ceilLightOn=true; // ceiling fixture togglable by clicking
+  let ceilGlow=null;
+  {
+    const lampX=tblX+tblW/2-6; // 6" from the extrusion-side edge
+    const lampZ=tblZ+tblD/2-6; // 6" from the back edge (avoid wall clip)
+    const lampBaseY=floorY+tblH;
+    // Base — dark metal disc (larger)
+    const baseMat=new THREE.MeshStandardMaterial({color:0x222222,roughness:0.4,metalness:0.6});
+    const base=new THREE.Mesh(new THREE.CylinderGeometry(3.5, 4, 0.8, 16), baseMat);
+    base.position.set(lampX, lampBaseY+0.4, lampZ);
+    base._isRoom=true; base._isLamp=true; addRoom(base);
+    // Stem — thin metal rod (taller)
+    const stemH=16;
+    const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, stemH, 8), baseMat);
+    stem.position.set(lampX, lampBaseY+0.8+stemH/2, lampZ);
+    stem._isRoom=true; stem._isLamp=true; addRoom(stem);
+    // Shade — fabric cylinder, slightly tapered (larger)
+    const shadeR1=5, shadeR2=6.5, shadeH=10;
+    const shadeMat=new THREE.MeshStandardMaterial({
+      color:0xd8d0c0, roughness:0.9, metalness:0, side:THREE.DoubleSide,
+      transparent:true, opacity:0.85,
+      emissive:0xffeedd, emissiveIntensity:0.4
+    });
+    lampShade=new THREE.Mesh(new THREE.CylinderGeometry(shadeR1, shadeR2, shadeH, 24, 1, true), shadeMat);
+    lampShade.position.set(lampX, lampBaseY+0.8+stemH+shadeH/2-1, lampZ);
+    lampShade._isRoom=true; lampShade._isLamp=true; addRoom(lampShade);
+    // Top ring with a center opening so the player can drop into the shade.
+    const topCap=new THREE.Mesh(new THREE.RingGeometry(4.2, shadeR1, 24), shadeMat);
+    topCap.rotation.x=-Math.PI/2;
+    topCap.position.set(lampX, lampBaseY+0.8+stemH+shadeH-1, lampZ);
+    topCap._isRoom=true; topCap._isLamp=true; addRoom(topCap);
+    // Warm glow light — strong enough to visibly illuminate surroundings
+    lampLight=new THREE.PointLight(0xffddaa, 1.2, 80);
+    lampLight.position.set(lampX, lampBaseY+0.8+stemH+shadeH/2-1, lampZ);
+    lampLight.castShadow=false;
+    lampLight._isRoom=true; addRoom(lampLight);
+    // Bulb visible inside shade
+    const bulbMat=new THREE.MeshStandardMaterial({color:0xffffcc,emissive:0xffeedd,emissiveIntensity:1.2,roughness:0.3});
+    lampBulb=new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), bulbMat);
+    lampBulb.position.set(lampX, lampBaseY+0.8+stemH+3, lampZ);
+    lampBulb._isRoom=true; lampBulb._isLamp=true; addRoom(lampBulb);
+  }
+  
+  // Wall section — back wall with door extrusion bumping INTO the room (-Z direction)
+  const recessDepth=30; // 2.5 feet into room
+  const extrusionW=40; // door (32") + 4" each side
+  const extRight=51; // flush with right/side wall
+  const extLeft=extRight-extrusionW; // 11
+  const extCenterX=extLeft+extrusionW/2; // 31
+  const recessZ=49-recessDepth; // front face of extrusion at Z=19
+  
+  // Back wall — full width behind extrusion
+  const backWallFullW=81+51;
+  const wallMeshL=roomBox(backWallFullW, 80, 0.5, 0xd8d4ce, -15, floorY+40, 49, 0,0,0);
+  
+  // Extrusion side walls (going from back wall into room)
+  const returnWallL=roomBox(0.5, 80, recessDepth, 0xd8d4ce, extLeft, floorY+40, 49-recessDepth/2, 0,0,0);
+  // Right side wall omitted — flush with side wall, would clip
+  // Top of extrusion
+  roomBox(extrusionW, 0.5, recessDepth, 0xd8d4ce, extCenterX, floorY+80, 49-recessDepth/2, 0,0,0);
+  
+  // Front face of extrusion — has the door opening
+  const doorW=32, doorH=80;
+  const doorCenterX=extCenterX;
+  const doorLeft=doorCenterX-doorW/2;
+  const doorRight=doorCenterX+doorW/2;
+  
+  // Wall left of door
+  const recessWallLeftW=doorLeft-extLeft;
+  if(recessWallLeftW>0.5) var recessWallL=roomBox(recessWallLeftW, 80, 0.5, 0xd8d4ce, extLeft+recessWallLeftW/2, floorY+40, recessZ, 0,0,0);
+  // Wall right of door
+  const recessWallRightW=extRight-doorRight;
+  if(recessWallRightW>0.5) var recessWallR=roomBox(recessWallRightW, 80, 0.5, 0xd8d4ce, doorRight+recessWallRightW/2, floorY+40, recessZ, 0,0,0);
+  
+  // Baseboards
+  const baseboardMeshL=roomBox(backWallFullW, 3, 0.6, 0xc0bbb4, -15, floorY+1.5, 48.5, 0,0,0);
+  const baseboardRetL=roomBox(0.6, 3, recessDepth, 0xc0bbb4, extLeft+0.5, floorY+1.5, 49-recessDepth/2, 0,0,0);
+  // Right extrusion baseboard omitted — flush with side wall
+  const baseboardRecessL=recessWallLeftW>0.5?roomBox(recessWallLeftW, 3, 0.6, 0xc0bbb4, extLeft+recessWallLeftW/2, floorY+1.5, recessZ+0.5, 0,0,0):null;
+  const baseboardRecessR=recessWallRightW>0.5?roomBox(recessWallRightW, 3, 0.6, 0xc0bbb4, doorRight+recessWallRightW/2, floorY+1.5, recessZ+0.5, 0,0,0):null;
+  
+  // ─── Door ───
+  const doorThick=1.5, doorFrameW=2.5, doorFrameD=recessDepth>4?4:recessDepth;
+  const doorColor=0xf0ebe4; // warm off-white painted door
+  const doorFrameColor=0xf5f5f0;
+  
+  // Door panel — on room-facing side of extrusion front wall
+  const doorPanelZ=recessZ-doorThick/2;
+  const doorPanel=roomBox(doorW-1, doorH-0.5, doorThick, doorColor,
+    doorCenterX, floorY+doorH/2, doorPanelZ, 0,0,0);
+  doorPanel.material.roughness=0.5;
+  doorPanel.castShadow=true;
+  
+  // Six-panel door detail — raised panels (room-facing side)
+  const dpInset=0.3, dpW=doorW*0.35, dpH1=doorH*0.22, dpH2=doorH*0.30;
+  const dpY=[floorY+doorH*0.14, floorY+doorH*0.42, floorY+doorH*0.74]; // centers of 3 rows
+  const dpHArr=[dpH1, dpH2, dpH1];
+  const dpMat=new THREE.MeshStandardMaterial({color:0xe8e3dc,roughness:0.45,metalness:0.02});
+  [-1,1].forEach(side=>{
+    dpHArr.forEach((ph,ri)=>{
+      const pg=new THREE.BoxGeometry(dpW, ph, dpInset);
+      const pm=new THREE.Mesh(pg, dpMat);
+      pm.position.set(doorCenterX+side*(doorW*0.2), dpY[ri], doorPanelZ-doorThick/2-dpInset/2-0.01);
+      pm.castShadow=false; pm._isRoom=true; addRoom(pm);
+    });
+  });
+  
+  // Door frame (trim around opening — spans from recessed wall into room)
+  const dfMat=new THREE.MeshStandardMaterial({color:doorFrameColor,roughness:0.35,metalness:0.05});
+  const frameZ=recessZ-doorFrameD/2;
+  // Left jamb
+  const dfl=new THREE.Mesh(new THREE.BoxGeometry(doorFrameW, doorH, doorFrameD), dfMat);
+  dfl.position.set(doorLeft-doorFrameW/2+0.5, floorY+doorH/2, frameZ);
+  dfl.castShadow=false; dfl._isRoom=true; addRoom(dfl);
+  // Right jamb
+  const dfr=new THREE.Mesh(new THREE.BoxGeometry(doorFrameW, doorH, doorFrameD), dfMat);
+  dfr.position.set(doorRight+doorFrameW/2-0.5, floorY+doorH/2, frameZ);
+  dfr.castShadow=false; dfr._isRoom=true; addRoom(dfr);
+  // Header
+  const dfh=new THREE.Mesh(new THREE.BoxGeometry(doorW+doorFrameW*2-1, doorFrameW, doorFrameD), dfMat);
+  dfh.position.set(doorCenterX, floorY+doorH+doorFrameW/2-0.5, frameZ);
+  dfh.castShadow=false; dfh._isRoom=true; addRoom(dfh);
+  
+  // Door knob (round, brushed nickel — room-facing side)
+  const knobMat=new THREE.MeshStandardMaterial({color:0xaaaaaa,roughness:0.25,metalness:0.8});
+  const knobGeo=new THREE.SphereGeometry(1.2, 16, 12);
+  const knob=new THREE.Mesh(knobGeo, knobMat);
+  knob.position.set(doorCenterX+doorW*0.35, floorY+36, doorPanelZ-doorThick/2-1.2);
+  knob.castShadow=false; knob._isRoom=true; addRoom(knob);
+  // Knob base plate
+  const plateMat=new THREE.MeshStandardMaterial({color:0xbbbbbb,roughness:0.3,metalness:0.7});
+  const plateGeo=new THREE.CylinderGeometry(1.8, 1.8, 0.3, 16);
+  plateGeo.rotateX(Math.PI/2);
+  const plate=new THREE.Mesh(plateGeo, plateMat);
+  plate.position.set(doorCenterX+doorW*0.35, floorY+36, doorPanelZ-doorThick/2-0.2);
+  plate.castShadow=false; plate._isRoom=true; addRoom(plate);
+  
+  // Collect all back wall + recess meshes for fading
+  const backWallParts=[wallMeshL,returnWallL,
+    baseboardMeshL,baseboardRetL];
+  if(recessWallL) backWallParts.push(recessWallL);
+  if(recessWallR) backWallParts.push(recessWallR);
+  if(baseboardRecessL) backWallParts.push(baseboardRecessL);
+  if(baseboardRecessR) backWallParts.push(baseboardRecessR);
+  
+  // Book stack — between mug and lamp
+  roomBox(5, 1.2, 7, 0x8b4513, tblX-1, floorY+tblH+0.6, tblZ+2, 0, 0.1, 0);
+  roomBox(4.5, 0.8, 6.5, 0x2d5a27, tblX-1, floorY+tblH+1.6, tblZ+2, 0, -0.05, 0);
+  
+  // ─── Opposite wall + 65" OLED TV ───
+  const oppWallZ=-78;
+  const oppWall=roomBox(132, 80, 0.5, 0xd8d4ce, -15, floorY+40, oppWallZ, 0,0,0);
+  const oppBaseboard=roomBox(132, 3, 0.6, 0xc0bbb4, -15, floorY+1.5, oppWallZ+0.5, 0,0,0);
+  
+  // 65" OLED: diagonal=65", 16:9 → ~56.7"W × 31.9"H, bezel ~0.3", depth ~1"
+  const tvW=56.7, tvH=31.9, tvD=1.0, bezel=0.3;
+  const tvCenterX=bedX; // centered on the bed
+  const tvCenterY=floorY+48; // center of screen ~48" from floor
+  const tvZ=oppWallZ+0.5+tvD/2+0.1;
+  
+  // Thin black bezel frame
+  const tvFrame=roomRoundBox(tvW+bezel*2, tvH+bezel*2, tvD, 0.4, 0x111111,
+    tvCenterX, tvCenterY, tvZ, 0,0,0);
+  tvFrame.material.roughness=0.3;
+  tvFrame.material.metalness=0.6;
+  
+  // Screen — dark glossy panel, optionally displays an image (pokopia.jpg if present).
+  const screenGeo=new THREE.PlaneGeometry(tvW, tvH);
+  const screenMat=stdMat({color:0x0a0a0a,roughness:0.05,metalness:0.0,envMapIntensity:1.5});
+  screenMat.polygonOffset=true;
+  screenMat.polygonOffsetFactor=-2;
+  screenMat.polygonOffsetUnits=-2;
+  screenMat.depthWrite=false;
+  const screen=new THREE.Mesh(screenGeo, screenMat);
+  screen.position.set(tvCenterX, tvCenterY, tvZ+tvD/2+0.08);
+  screen._isRoom=true;
+  addRoom(screen);
+  // Load TV screen image — falls back silently to dark glass if file is missing.
+  new THREE.TextureLoader().load(
+    'img/pokopia.jpg',
+    (tex)=>{
+      tex.colorSpace=THREE.SRGBColorSpace||tex.colorSpace;
+      tex.anisotropy=Math.min(8, renderer.capabilities.getMaxAnisotropy());
+      screen.material.map=tex;
+      screen.material.emissiveMap=tex;
+      screen.material.emissive=new THREE.Color(0xffffff);
+      screen.material.emissiveIntensity=0.85;
+      screen.material.color=new THREE.Color(0x000000);
+      screen.material.roughness=0.4;
+      screen.material.needsUpdate=true;
+    },
+    undefined,
+    ()=>{ /* no-op if missing */ }
+  );
+  
+  // Small bottom-center power nub (trapezoid pod + tiny center button).
+  // TV ambient glow — washes the bed and floor in front of the TV.
+  // Positioned well in front of the screen so it reaches the bed area.
+  const tvGlow=new THREE.PointLight(0x6688cc,0.6,80,0.9);
+  tvGlow.position.set(tvCenterX, tvCenterY, tvZ+tvD/2+12);
+  tvGlow.castShadow=false;
+  tvGlow._isRoom=true;
+  addRoom(tvGlow);
+  {
+    const nubGroup=new THREE.Group();
+    nubGroup.position.set(tvCenterX, tvCenterY-(tvH+bezel*2)/2-0.24, tvZ+tvD/2-0.06);
+    nubGroup._isRoom=true;
+  
+    const nubWTop=2.25;
+    const nubWBot=1.55;
+    const nubH=0.4;
+    const nubD=0.12;
+    const nubShape=new THREE.Shape();
+    nubShape.moveTo(-nubWTop/2, nubH/2);
+    nubShape.lineTo(nubWTop/2, nubH/2);
+    nubShape.lineTo(nubWBot/2, -nubH/2);
+    nubShape.lineTo(-nubWBot/2, -nubH/2);
+    nubShape.lineTo(-nubWTop/2, nubH/2);
+    const nubGeo=new THREE.ExtrudeGeometry(nubShape,{depth:nubD,bevelEnabled:false});
+    nubGeo.translate(0,0,-nubD/2);
+    const nubMat=stdMat({color:0xaeb4bd,roughness:0.28,metalness:0.55});
+    const nubMesh=new THREE.Mesh(nubGeo,nubMat);
+    nubMesh.castShadow=false;
+    nubMesh.receiveShadow=true;
+    nubGroup.add(nubMesh);
+  
+    const btnMat=stdMat({color:0x8c929b,roughness:0.3,metalness:0.4});
+    const btn=new THREE.Mesh(new THREE.CylinderGeometry(0.105,0.105,0.045,18),btnMat);
+    btn.rotation.x=Math.PI/2;
+    btn.position.set(0,-0.02,nubD/2+0.01);
+    nubGroup.add(btn);
+  
+    const btnDot=new THREE.Mesh(
+      new THREE.CircleGeometry(0.03,16),
+      new THREE.MeshBasicMaterial({color:0xdadada,transparent:true,opacity:0.85})
+    );
+    btnDot.position.set(0,-0.02,nubD/2+0.028);
+    nubGroup.add(btnDot);
+  
+    addRoom(nubGroup);
+  }
+  
+  // ─── Mini split indoor unit (on TV wall, near closet wall, 1ft from ceiling) ───
+  const msW=32, msH=11, msD=8; // typical wall-mount unit dimensions
+  const msX=51-18-msW/2; // 1.5 feet gap from closet wall to edge of unit (before flip)
+  const msY=floorY+80-12-msH/2; // 1 foot from ceiling
+  const msZ=oppWallZ+0.5+msD/2; // flush against TV wall
+  {
+    const msMat=new THREE.MeshStandardMaterial({color:0xf0f0f0,roughness:0.3,metalness:0.05});
+    // Main body — rounded rectangle
+    const msBody=roomRoundBox(msW, msH, msD, 2, 0xf0f0f0, msX, msY, msZ, 0,0,0);
+    msBody.material.roughness=0.3;
+    msBody.material.metalness=0.05;
+    // Bottom air vent — darker slit
+    const ventMat=new THREE.MeshStandardMaterial({color:0x333333,roughness:0.5});
+    const vent=new THREE.Mesh(new THREE.BoxGeometry(msW-4, 1.5, 0.3), ventMat);
+    vent.position.set(msX, msY-msH/2+2, msZ+msD/2+0.16);
+    vent._isRoom=true; addRoom(vent);
+    // Horizontal louver lines on the vent
+    for(let i=0;i<3;i++){
+      const louver=new THREE.Mesh(new THREE.BoxGeometry(msW-6, 0.15, 0.4), msMat);
+      louver.position.set(msX, msY-msH/2+1.2+i*0.5, msZ+msD/2+0.2);
+      louver._isRoom=true; addRoom(louver);
+    }
+    // Small LED indicator dot
+    const ledMat=new THREE.MeshStandardMaterial({color:0x00cc44,emissive:0x00cc44,emissiveIntensity:0.5});
+    const led=new THREE.Mesh(new THREE.SphereGeometry(0.25,8,6), ledMat);
+    led.position.set(msX+msW/2-3, msY-msH/2+3, msZ+msD/2+0.16);
+    led._isRoom=true; addRoom(led);
+    // Brand logo area (subtle lighter rectangle)
+    const logoArea=new THREE.Mesh(new THREE.BoxGeometry(8,2,0.1),
+      new THREE.MeshStandardMaterial({color:0xfafafa,roughness:0.2}));
+    logoArea.position.set(msX, msY+msH/2-3, msZ+msD/2+0.06);
+    logoArea._isRoom=true; addRoom(logoArea);
+  }
+  
+  // ─── Right side wall (with a cut-out for the bifold closet) ───
+  const sideWallX=51;
+  const wallDepth=127; // Z span from oppWallZ to 49
+  const wallHeight=80;
+  // Closet opening geometry — must match the bifold block below exactly.
+  // Opening width (closetW) is the doorway. Interior width is wider so the
+  // walk-in feels like a real walk-in. Because the interior can extend past
+  // the rightWall's Z span, we add extra wall panels on the main wall plane
+  // (x=sideWallX) to close off the gap.
+  // _closetH is the door *opening* height (and matches the bifold door height).
+  // The walk-in interior still uses the full room wallHeight for its ceiling,
+  // so _closetInteriorH is kept separate.
+  const _closetW=48, _closetH=66, _closetInteriorH=wallHeight, _closetDepth=36, _closetInteriorW=78;
+  const _closetZ=oppWallZ+_closetW/2+4;
+  const rightWall=(()=>{
+    // Build the wall as an extruded rectangle with a rectangular hole at the
+    // closet opening. Shape lives in Y-Z (the wall's face plane); extrudes along
+    // +X, then positioned so the inward face sits at sideWallX.
+    const wallMat=new THREE.MeshStandardMaterial({color:0xd8d4ce,roughness:0.7,metalness:0.05});
+    const zCenter=-15;
+    const wallShape=new THREE.Shape();
+    const zMin=zCenter-wallDepth/2, zMax=zCenter+wallDepth/2;
+    const yMin=0, yMax=wallHeight;
+    wallShape.moveTo(zMin, yMin);
+    wallShape.lineTo(zMax, yMin);
+    wallShape.lineTo(zMax, yMax);
+    wallShape.lineTo(zMin, yMax);
+    wallShape.lineTo(zMin, yMin);
+    // Rectangular hole for the closet opening. Bottom aligns with the wall
+    // bottom; the threshold z-fighting is addressed by lifting the wall mesh a
+    // hair above the floor and giving the wall material polygonOffset.
+    const hZMin=_closetZ-_closetW/2, hZMax=_closetZ+_closetW/2;
+    const hYMin=0, hYMax=_closetH;
+    const hole=new THREE.Path();
+    hole.moveTo(hZMin, hYMin);
+    hole.lineTo(hZMax, hYMin);
+    hole.lineTo(hZMax, hYMax);
+    hole.lineTo(hZMin, hYMax);
+    hole.lineTo(hZMin, hYMin);
+    wallShape.holes.push(hole);
+    const wallGeo=new THREE.ExtrudeGeometry(wallShape, {depth:0.5, bevelEnabled:false});
+    // After extrude: shape axes are (Z,Y) in the local XY plane. Rotate so
+    // shape's X-coord → world Z, shape's Y-coord → world Y, extrude → world +X.
+    // ExtrudeGeometry extrudes along +Z of its own frame; rotate the whole geo
+    // to map (localX→worldZ, localY→worldY, localZ→worldX).
+    wallGeo.rotateY(-Math.PI/2);
+    const rightWall=new THREE.Mesh(wallGeo, wallMat);
+    rightWall.position.set(sideWallX, floorY-0.5, 0);
+    rightWall.castShadow=true; rightWall.receiveShadow=true; rightWall._isRoom=true;
+    addRoom(rightWall);
+    // Extension panels on the main wall plane where the closet interior extends
+    // past rightWall's Z span. These cover the "gaps" flanking the opening so
+    // the closet doesn't look open to the void.
+    const rwZMin=-15-wallDepth/2, rwZMax=-15+wallDepth/2;
+    const intZMin=_closetZ-_closetInteriorW/2, intZMax=_closetZ+_closetInteriorW/2;
+    if(intZMin<rwZMin){
+      const w=rwZMin-intZMin;
+      const ext=roomBox(0.5, wallHeight, w, 0xd8d4ce, sideWallX, floorY+wallHeight/2, (intZMin+rwZMin)/2, 0,0,0);
+      ext._wallExtMinZ=true;
+    }
+    if(intZMax>rwZMax){
+      const w=intZMax-rwZMax;
+      const ext=roomBox(0.5, wallHeight, w, 0xd8d4ce, sideWallX, floorY+wallHeight/2, (rwZMax+intZMax)/2, 0,0,0);
+      ext._wallExtMaxZ=true;
+    }
+    return rightWall;
+  })();
+  // Baseboard — break into two pieces so it doesn't cross the closet opening.
+  const sideBaseboard1=roomBox(0.6, 3, (_closetZ-_closetW/2) - (-15 - wallDepth/2), 0xc0bbb4,
+    sideWallX-0.5, floorY+1.5, (-15 - wallDepth/2 + (_closetZ-_closetW/2))/2, 0,0,0);
+  const sideBaseboard2=roomBox(0.6, 3, (-15 + wallDepth/2) - (_closetZ+_closetW/2), 0xc0bbb4,
+    sideWallX-0.5, floorY+1.5, (_closetZ+_closetW/2 + (-15 + wallDepth/2))/2, 0,0,0);
+  
+  // ─── Bifold closet doors on right wall (becomes -X after flip) ───
+  {
+    const closetW=_closetW, closetH=_closetH; // share with the wall cut-out
+    const closetX=sideWallX-0.5; // flush against wall
+    const closetZ=_closetZ; // match the wall opening exactly
+    const bifoldColor=0xe0d8cc;
+    const bifoldMat=new THREE.MeshStandardMaterial({color:bifoldColor,roughness:0.72,metalness:0.0});
+    const panelW2=closetW/4; // 4 panels (2 per side)
+    const panelThick=1.2;
+    // Two bifold leaves. Each leaf's pivot sits at its outer jamb (the hinge to
+    // the wall). Inside the leaf, an outer panel is fixed and an inner panel is
+    // attached via a second hinge group (the mid-leaf joint). Clicking a panel
+    // toggles the whole leaf open/closed — we animate leafPivot.rotation.y = θ
+    // and innerGroup.rotation.y = -2θ so the two panels fold into a V whose
+    // endpoint stays along the wall track.
+    const bifoldLeaves=[];
+    window._bifoldLeavesRef=bifoldLeaves; // exposed for first-person collision
+    const handleMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.3,metalness:0.15});
+    for(let leafIdx=0; leafIdx<2; leafIdx++){
+      const leafSide=leafIdx===0?-1:1; // -1 → -Z jamb leaf, +1 → +Z jamb leaf
+      const leafPivot=new THREE.Group();
+      leafPivot.position.set(closetX-panelThick/2, floorY+closetH/2, closetZ+leafSide*closetW/2);
+      leafPivot._isRoom=true;
+      leafPivot._isBifoldLeaf=true;
+      leafPivot._leafOpen=false;
+      leafPivot._leafAngle=0;       // current θ (rad)
+      leafPivot._leafTarget=0;      // target θ (rad)
+      leafPivot._leafSide=leafSide;
+      addRoom(leafPivot);
+      bifoldLeaves.push(leafPivot);
+      // Outer panel — centered panelW2/2 along -leafSide*Z from pivot.
+      function addRaisedDetails(parent, zCenter){
+        const rpH1=closetH*0.35, rpH2=closetH*0.45;
+        const rpW=panelW2*0.7;
+        // Thin boxes proud of the door. Key fix: receiveShadow must match the
+        // door (both true) or the panels look brighter under any shadow.
+        const rp1=new THREE.Mesh(new THREE.BoxGeometry(0.3, rpH1, rpW), bifoldMat);
+        rp1.position.set(panelThick/2+0.16, -closetH*0.26, zCenter);
+        rp1.castShadow=true; rp1.receiveShadow=true;
+        rp1._isBifoldLeaf=true; parent.add(rp1);
+        const rp2=new THREE.Mesh(new THREE.BoxGeometry(0.3, rpH2, rpW), bifoldMat);
+        rp2.position.set(panelThick/2+0.16, closetH*0.18, zCenter);
+        rp2.castShadow=true; rp2.receiveShadow=true;
+        rp2._isBifoldLeaf=true; parent.add(rp2);
+      }
+      const outerPanel=new THREE.Mesh(
+        new THREE.BoxGeometry(panelThick, closetH-1, panelW2-0.3),
+        bifoldMat
+      );
+      outerPanel.position.set(0, 0, -leafSide*panelW2/2);
+      outerPanel.castShadow=true; outerPanel.receiveShadow=true;
+      outerPanel._isBifoldLeaf=true;
+      leafPivot.add(outerPanel);
+      addRaisedDetails(leafPivot, -leafSide*panelW2/2);
+      // Inner-panel hinge group — pivoted at the middle joint (panelW2 along
+      // -leafSide*Z from leaf pivot).
+      const innerGroup=new THREE.Group();
+      innerGroup.position.set(0, 0, -leafSide*panelW2);
+      leafPivot.add(innerGroup);
+      leafPivot._innerGroup=innerGroup;
+      const innerPanel=new THREE.Mesh(
+        new THREE.BoxGeometry(panelThick, closetH-1, panelW2-0.3),
+        bifoldMat
+      );
+      innerPanel.position.set(0, 0, -leafSide*panelW2/2);
+      innerPanel.castShadow=true; innerPanel.receiveShadow=true;
+      innerPanel._isBifoldLeaf=true;
+      innerGroup.add(innerPanel);
+      addRaisedDetails(innerGroup, -leafSide*panelW2/2);
+      // White round handle on the inner panel, near the mid-leaf joint side so
+      // it reads as the "pull" side of the bifold. Sits proud of the room-facing
+      // face by ~0.6".
+      const handle=new THREE.Mesh(new THREE.SphereGeometry(0.75, 14, 10), handleMat);
+      handle.position.set(panelThick/2+0.6, 0, -leafSide*(panelW2*0.22));
+      handle._isBifoldLeaf=true;
+      const handleStem=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,0.55,10), handleMat);
+      handleStem.rotation.z=Math.PI/2;
+      handleStem.position.set(panelThick/2+0.25, 0, -leafSide*(panelW2*0.22));
+      handleStem._isBifoldLeaf=true;
+      innerGroup.add(handle);
+      innerGroup.add(handleStem);
+    }
+    // Moulding / trim around the opening
+    const trimMat=new THREE.MeshStandardMaterial({color:0xe4ddd1,roughness:0.7,metalness:0.0});
+    const trimW=2.5, trimD=1;
+    const headerH=4; // taller top casing for a proper door-header look
+    // Top header
+    const trimTop=new THREE.Mesh(new THREE.BoxGeometry(trimD, headerH, closetW+trimW*2), trimMat);
+    trimTop.position.set(closetX-trimD/2, floorY+closetH+headerH/2, closetZ);
+    trimTop.castShadow=true; trimTop.receiveShadow=true; trimTop._isRoom=true; addRoom(trimTop);
+    // Left jamb
+    const trimL=new THREE.Mesh(new THREE.BoxGeometry(trimD, closetH, trimW), trimMat);
+    trimL.position.set(closetX-trimD/2, floorY+closetH/2, closetZ-closetW/2-trimW/2);
+    trimL.castShadow=true; trimL.receiveShadow=true; trimL._isRoom=true; addRoom(trimL);
+    // Right jamb
+    const trimR=new THREE.Mesh(new THREE.BoxGeometry(trimD, closetH, trimW), trimMat);
+    trimR.position.set(closetX-trimD/2, floorY+closetH/2, closetZ+closetW/2+trimW/2);
+    trimR.castShadow=true; trimR.receiveShadow=true; trimR._isRoom=true; addRoom(trimR);
+  
+    // ─── Walk-in closet interior box (behind the wall opening) ───
+    // The wall sits at x=sideWallX with a hole cut out and thickness 0.5 (so
+    // its back face sits at sideWallX+0.5). Interior side walls and ceiling
+    // start at sideWallX+0.5 to butt cleanly against the wall's back face
+    // (avoiding z-fighting where they cross the solid part of the wall).
+    const closetDepth=_closetDepth;
+    const interiorW=_closetInteriorW;
+    const interiorH=_closetInteriorH; // full room-height interior, independent of door opening
+    const wallBack=0.5; // rightWall thickness
+    const innerDepth=closetDepth-wallBack;
+    const innerCx=sideWallX+wallBack+innerDepth/2;
+    const insideMat=new THREE.MeshStandardMaterial({color:0xe4dcce,roughness:0.85,metalness:0.0});
+    // Back wall
+    const closetBack=new THREE.Mesh(new THREE.BoxGeometry(0.5, interiorH, interiorW), insideMat);
+    closetBack.position.set(sideWallX+closetDepth, floorY+interiorH/2, closetZ);
+    closetBack.castShadow=false; closetBack.receiveShadow=true; closetBack._isRoom=true; addRoom(closetBack);
+    // +Z side wall
+    const closetSideP=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, interiorH, 0.5), insideMat);
+    closetSideP.position.set(innerCx, floorY+interiorH/2, closetZ+interiorW/2);
+    closetSideP.receiveShadow=true; closetSideP._isRoom=true; addRoom(closetSideP);
+    // -Z side wall
+    const closetSideN=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, interiorH, 0.5), insideMat);
+    closetSideN.position.set(innerCx, floorY+interiorH/2, closetZ-interiorW/2);
+    closetSideN.receiveShadow=true; closetSideN._isRoom=true; addRoom(closetSideN);
+    // Ceiling
+    const closetCeil=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, 0.5, interiorW), insideMat);
+    closetCeil.position.set(innerCx, floorY+interiorH, closetZ);
+    closetCeil.receiveShadow=true; closetCeil._isRoom=true; addRoom(closetCeil);
+    // Clothes rod across the closet, ~30" below the ceiling
+    const rodMat=new THREE.MeshStandardMaterial({color:0xb8b8b8,roughness:0.35,metalness:0.6});
+    const rod=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,interiorW-2,14), rodMat);
+    rod.rotation.x=Math.PI/2;
+    rod.position.set(innerCx, floorY+interiorH-30, closetZ);
+    rod.castShadow=true; rod._isRoom=true; addRoom(rod);
+    // Shelf above the rod. Position constants are shared with the shelf
+    // collision AABB and the shelf coin further below. Shelf is shallower
+    // along X than the closet and pushed flush against the back wall.
+    const shelfDrop=24;         // inches below the ceiling
+    const shelfXDepth=14;       // shelf depth along X (room-to-back axis)
+    const shelfBackGap=0.1;     // gap between shelf and back wall (flush)
+    // Back wall inner face is at sideWallX+closetDepth-0.5. Center the shelf
+    // against it with shelfBackGap of clearance.
+    const shelfCenterX=sideWallX+closetDepth-0.5-shelfBackGap-shelfXDepth/2;
+    const shelfY=floorY+interiorH-shelfDrop;
+    const shelfMat=new THREE.MeshStandardMaterial({color:0xdcd2c0,roughness:0.75,metalness:0.0});
+    const shelfLen=interiorW-1;
+    const shelf=new THREE.Mesh(new THREE.BoxGeometry(shelfXDepth, 0.8, shelfLen), shelfMat);
+    shelf.position.set(shelfCenterX, shelfY, closetZ);
+    shelf.castShadow=true; shelf.receiveShadow=true; shelf._isRoom=true; addRoom(shelf);
+    // Three vertical dividers split the shelf into 4 equal sections. Each
+    // divider runs from just above the shelf top up to the closet ceiling.
+    const divThick=0.6;
+    const divTopY=floorY+interiorH-0.5; // just below ceiling panel
+    const divBotY=shelfY+0.4;           // top face of shelf
+    const divH=divTopY-divBotY;
+    const divCenterY=(divTopY+divBotY)/2;
+    const shelfZMin=closetZ-shelfLen/2;
+    for(let i=1;i<=3;i++){
+      const zC=shelfZMin + (shelfLen*i/4);
+      const div=new THREE.Mesh(new THREE.BoxGeometry(shelfXDepth, divH, divThick), shelfMat);
+      div.position.set(shelfCenterX, divCenterY, zC);
+      div.castShadow=true; div.receiveShadow=true; div._isRoom=true;
+      addRoom(div);
+    }
+    // Z-center of the 1st section (between the -Z shelf end and divider #1).
+    const section1Z = shelfZMin + (shelfLen/4)/2; // = shelfZMin + shelfLen/8
+    window._closetShelf1Z = section1Z;
+  }
+  
+  // ─── Left side wall with window (near the bed) ───
+  const leftWallX=-81;
+  const winW=36, winH=50; // window opening size
+  const winCenterY=floorY+48; // center of window
+  const winCenterZ=bedZ; // centered on the bed along Z
+  const winBottom=winCenterY-winH/2;
+  const winTop=winCenterY+winH/2;
+  const winFront=winCenterZ-winW/2;
+  const winBack=winCenterZ+winW/2;
+  
+  // Keep daylight aligned with the mirrored window opening to avoid overhead leakage.
+  const mirroredWindowX=-leftWallX;
+  key.position.set(mirroredWindowX+14, winCenterY+3, winCenterZ);
+  addRoom(key.target);
+  key.target.position.set(0, winCenterY+1, winCenterZ);
+  key.target.updateMatrixWorld();
+  
+  // Wall sections around the window (4 pieces: below, above, front, back)
+  // Below window
+  const belowH=winBottom-floorY;
+  const leftWallBelow=roomBox(0.5, belowH, wallDepth, 0xd8d4ce, leftWallX, floorY+belowH/2, -15, 0,0,0);
+  // Above window
+  const aboveH=floorY+wallHeight-winTop;
+  const leftWallAbove=roomBox(0.5, aboveH, wallDepth, 0xd8d4ce, leftWallX, winTop+aboveH/2, -15, 0,0,0);
+  // Front of window (toward TV wall)
+  const frontZmin=oppWallZ;
+  const frontW=winFront-frontZmin;
+  const leftWallFront=roomBox(0.5, winH, frontW, 0xd8d4ce, leftWallX, winCenterY, frontZmin+frontW/2, 0,0,0);
+  // Back of window (toward Z=+50)
+  const backZmax=49;
+  const backW=backZmax-winBack;
+  const leftWallBack=roomBox(0.5, winH, backW, 0xd8d4ce, leftWallX, winCenterY, winBack+backW/2, 0,0,0);
+  
+  // Baseboard on left wall
+  const leftBaseboard=roomBox(0.6, 3, wallDepth, 0xc0bbb4, leftWallX+0.5, floorY+1.5, -15, 0,0,0);
+  
+  // Window sill
+  roomBox(0.8, 0.5, winW+2, 0xc8c4be, leftWallX+0.4, winBottom-0.25, winCenterZ, 0,0,0);
+  
+  // Window frame (thin white trim)
+  const frameMat=stdMat({color:0xf5f5f0,shininess:10});
+  const frameT=0.8, frameD=0.6;
+  // Top
+  const wft=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT, winW+frameT*2), frameMat);
+  wft.position.set(leftWallX, winTop+frameT/2, winCenterZ); wft._isRoom=true; wft._isWindow=true; addRoom(wft);
+  // Bottom
+  const wfb=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT, winW+frameT*2), frameMat);
+  wfb.position.set(leftWallX, winBottom-frameT/2, winCenterZ); wfb._isRoom=true; wfb._isWindow=true; addRoom(wfb);
+  // Left (toward outside)
+  const wfl=new THREE.Mesh(new THREE.BoxGeometry(frameD, winH, frameT), frameMat);
+  wfl.position.set(leftWallX, winCenterY, winFront-frameT/2); wfl._isRoom=true; wfl._isWindow=true; addRoom(wfl);
+  // Right (toward inside)
+  const wfr=new THREE.Mesh(new THREE.BoxGeometry(frameD, winH, frameT), frameMat);
+  wfr.position.set(leftWallX, winCenterY, winBack+frameT/2); wfr._isRoom=true; wfr._isWindow=true; addRoom(wfr);
+  // Horizontal mullion (center bar)
+  const wfm=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT*0.6, winW), frameMat);
+  wfm.position.set(leftWallX, winCenterY, winCenterZ); wfm._isRoom=true; wfm._isWindow=true; addRoom(wfm);
+  
+  // Outdoor scene visible through window — canvas-painted backdrop
+  const outdoorCvs=document.createElement('canvas');
+  outdoorCvs.width=512; outdoorCvs.height=512;
+  const oCtx=outdoorCvs.getContext('2d');
+  // Sky gradient
+  const skyGrad=oCtx.createLinearGradient(0,0,0,300);
+  skyGrad.addColorStop(0,'#6a99c4');
+  skyGrad.addColorStop(0.35,'#a8c8da');
+  skyGrad.addColorStop(0.55,'#ddd8c8');
+  skyGrad.addColorStop(0.7,'#f0e8d8');
+  oCtx.fillStyle=skyGrad; oCtx.fillRect(0,0,512,300);
+  // Distant hazy hills
+  oCtx.fillStyle='#8aab8a';
+  oCtx.beginPath(); oCtx.moveTo(0,300);
+  for(let x=0;x<=512;x+=8) oCtx.lineTo(x,280-Math.sin(x*0.012)*18-Math.sin(x*0.031)*8);
+  oCtx.lineTo(512,300); oCtx.fill();
+  // Closer tree line
+  oCtx.fillStyle='#4a7a4a';
+  oCtx.beginPath(); oCtx.moveTo(0,310);
+  for(let x=0;x<=512;x+=4){
+    const base=295-Math.sin(x*0.02)*10;
+    const tree=Math.sin(x*0.08)*12+Math.sin(x*0.15)*6+Math.cos(x*0.05)*8;
+    oCtx.lineTo(x,base-Math.max(tree,0));
+  }
+  oCtx.lineTo(512,310); oCtx.fill();
+  // Ground / grass
+  const grassGrad=oCtx.createLinearGradient(0,310,0,512);
+  grassGrad.addColorStop(0,'#5a8a45');
+  grassGrad.addColorStop(0.4,'#4a7a3a');
+  grassGrad.addColorStop(1,'#3a6a2a');
+  oCtx.fillStyle=grassGrad; oCtx.fillRect(0,305,512,207);
+  // Soft clouds
+  oCtx.globalAlpha=0.3;
+  oCtx.fillStyle='#ffffff';
+  [[80,90,60,25],[200,70,80,30],[350,100,55,20],[430,60,70,28]].forEach(([cx,cy,rx,ry])=>{
+    oCtx.beginPath(); oCtx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2); oCtx.fill();
+  });
+  oCtx.globalAlpha=1.0;
+  
+  const outdoorTex=new THREE.CanvasTexture(outdoorCvs);
+  outdoorTex.generateMipmaps=false;
+  outdoorTex.minFilter=THREE.LinearFilter;
+  
+  // Night outdoor scene
+  const nightOutdoorCvs=document.createElement('canvas');
+  nightOutdoorCvs.width=512; nightOutdoorCvs.height=512;
+  const nCtx=nightOutdoorCvs.getContext('2d');
+  // Night sky gradient
+  const nightSky=nCtx.createLinearGradient(0,0,0,300);
+  nightSky.addColorStop(0,'#0a0e1a');
+  nightSky.addColorStop(0.4,'#111828');
+  nightSky.addColorStop(0.7,'#1a2035');
+  nCtx.fillStyle=nightSky; nCtx.fillRect(0,0,512,300);
+  // Stars
+  nCtx.fillStyle='#ffffff';
+  for(let i=0;i<80;i++){
+    const sx=Math.random()*512, sy=Math.random()*260;
+    const sr=Math.random()*1.2+0.3;
+    nCtx.globalAlpha=Math.random()*0.6+0.3;
+    nCtx.beginPath(); nCtx.arc(sx,sy,sr,0,Math.PI*2); nCtx.fill();
+  }
+  nCtx.globalAlpha=1.0;
+  // Moon
+  nCtx.fillStyle='#e8e4d8';
+  nCtx.beginPath(); nCtx.arc(380,70,18,0,Math.PI*2); nCtx.fill();
+  nCtx.fillStyle='#d4d0c4'; nCtx.globalAlpha=0.4;
+  nCtx.beginPath(); nCtx.arc(374,64,18,0,Math.PI*2); nCtx.fill();
+  nCtx.globalAlpha=1.0;
+  // Moon glow
+  nCtx.fillStyle='rgba(200,195,170,0.08)';
+  nCtx.beginPath(); nCtx.arc(380,70,50,0,Math.PI*2); nCtx.fill();
+  // Dark hills
+  nCtx.fillStyle='#0d1518';
+  nCtx.beginPath(); nCtx.moveTo(0,300);
+  for(let x=0;x<=512;x+=8) nCtx.lineTo(x,280-Math.sin(x*0.012)*18-Math.sin(x*0.031)*8);
+  nCtx.lineTo(512,300); nCtx.fill();
+  // Dark tree line
+  nCtx.fillStyle='#0a1210';
+  nCtx.beginPath(); nCtx.moveTo(0,310);
+  for(let x=0;x<=512;x+=4){
+    const base=295-Math.sin(x*0.02)*10;
+    const tree=Math.sin(x*0.08)*12+Math.sin(x*0.15)*6+Math.cos(x*0.05)*8;
+    nCtx.lineTo(x,base-Math.max(tree,0));
+  }
+  nCtx.lineTo(512,310); nCtx.fill();
+  // Dark ground
+  const nightGrass=nCtx.createLinearGradient(0,310,0,512);
+  nightGrass.addColorStop(0,'#0e1a10');
+  nightGrass.addColorStop(1,'#080e08');
+  nCtx.fillStyle=nightGrass; nCtx.fillRect(0,305,512,207);
+  const nightOutdoorTex=new THREE.CanvasTexture(nightOutdoorCvs);
+  nightOutdoorTex.generateMipmaps=false;
+  nightOutdoorTex.minFilter=THREE.LinearFilter;
+  
+  let _windowIsNight=false;
+  const _outdoorDayTex=outdoorTex;
+  const _outdoorNightTex=nightOutdoorTex;
+  
+  const outdoorMat=new THREE.MeshBasicMaterial({map:outdoorTex, color:0xfff0d4}); // warm sunlight tint
+  outdoorMat.toneMapped=false; // bypass ACES compression — let it be BRIGHT
+  const outdoorGeo=new THREE.PlaneGeometry(winW*2.5, winH*2);
+  const outdoor=new THREE.Mesh(outdoorGeo, outdoorMat);
+  outdoor.rotation.y=Math.PI/2;
+  outdoor.position.set(leftWallX-4, winCenterY+5, winCenterZ);
+  outdoor._isRoom=true; outdoor._isWindow=true; addRoom(outdoor);
+  
+  // Moonlight glow through the window — subtle blue-white light that's
+  // controlled by time-of-day (bright at night, off during day).
+  const moonGlow=new THREE.PointLight(0x8899bb,0,60,1.0);
+  moonGlow.position.set(leftWallX+3, winCenterY, winCenterZ);
+  moonGlow.castShadow=false;
+  moonGlow._isRoom=true;
+  addRoom(moonGlow);
+  
+  // Ceiling light fixture — flush-mount dome with warm SpotLight
+  const ceilY=floorY+79.5; // just below ceiling
+  const ceilLightX=0, ceilLightZ=-15; // room center
+  // Fixture base (flush mount disc)
+  const fixBase=new THREE.Mesh(
+    new THREE.CylinderGeometry(4,4,0.4,24),
+    new THREE.MeshStandardMaterial({color:0xd8d4c8,roughness:0.4,metalness:0.1})
+  );
+  fixBase.position.set(ceilLightX,ceilY,ceilLightZ);
+  fixBase._isRoom=true; fixBase._isCeilLight=true; addRoom(fixBase);
+  // Frosted glass dome
+  const domeMat=stdMat({color:0xfff8ee,emissive:0xfff0d0,emissiveIntensity:0.55,transparent:true,opacity:0.85,shininess:60});
+  const dome=new THREE.Mesh(new THREE.SphereGeometry(3.5,16,8,0,Math.PI*2,0,Math.PI/2),domeMat);
+  dome.rotation.x=Math.PI; // flip dome to hang down
+  dome.position.set(ceilLightX,ceilY-0.2,ceilLightZ);
+  dome._isRoom=true; dome._isCeilLight=true; addRoom(dome);
+  // Downward spot lights the floor (main pool). Ceiling + upper walls need
+  // their own source since a spot only throws inside its cone, and the room
+  // has no global ambient bounce. We split those two jobs on purpose.
+  const ceilSpot=new THREE.SpotLight(0xfff0dd,1.1,0,Math.PI*0.42,0.6,0.9);
+  ceilSpot.position.set(ceilLightX,ceilY-1,ceilLightZ);
+  ceilSpot.target.position.set(ceilLightX,floorY,ceilLightZ);
+  addRoom(ceilSpot); addRoom(ceilSpot.target);
+  ceilSpot.castShadow=false;
+  ceilSpot.shadow.mapSize.set(512,512);
+  ceilSpot.shadow.bias=-0.0005;
+  ceilSpot.shadow.radius=5; ceilSpot.shadow.blurSamples=12;
+  ceilSpot.shadow.camera.near=10;
+  ceilSpot.shadow.camera.far=95;
+  // ── IMPORTANT: ceiling light fixture vs. light source positioning ──────────
+  // The fixture MESH (fixBase, dome) is at (ceilLightX=0, ceilY, ceilLightZ=-15)
+  // but the actual LIGHT SOURCE (ceilGlow) is at (-45, ceilY-8, 51). These are
+  // NOT at the same coordinates and never were. An hour of troubleshooting
+  // The light SOURCE should be co-located with the fixture mesh and tagged
+  // _isRoom so it moves with the room when placement changes. Previously
+  // it was at a hardcoded world position that only matched in Under TV mode.
+  ceilGlow=new THREE.PointLight(0xfff3df,0.35,0,0.8);
+  ceilGlow.position.set(ceilLightX,ceilY-8,ceilLightZ);
+  ceilGlow.castShadow=false;
+  ceilGlow._isRoom=true;
+  addRoom(ceilGlow);
+  
+  // Curtains — simple draped fabric panels on each side of the window
+  const curtainH=winH+12, curtainW=14, curtainD=1.5;
+  const curtainMat=new THREE.MeshStandardMaterial({color:0xc5bfb5,roughness:0.95,metalness:0,side:THREE.DoubleSide});
+  // Front curtain (toward Z=-50 side of window)
+  const cL=roomRoundBox(curtainD, curtainH, curtainW, 0.5, 0xc5bfb5,
+    leftWallX+1.2, winCenterY, winFront-curtainW/2-1, 0,0,0);
+  cL.material.roughness=0.95;
+  // Back curtain (toward Z=+50 side of window)
+  const cR=roomRoundBox(curtainD, curtainH, curtainW, 0.5, 0xc5bfb5,
+    leftWallX+1.2, winCenterY, winBack+curtainW/2+1, 0,0,0);
+  cR.material.roughness=0.95;
+  // Curtain rod
+  const rodGeo=new THREE.CylinderGeometry(0.25,0.25,winW+curtainW*2+8,8);
+  rodGeo.rotateX(Math.PI/2);
+  const rodMat=new THREE.MeshStandardMaterial({color:0x444444,roughness:0.3,metalness:0.7});
+  const rod=new THREE.Mesh(rodGeo,rodMat);
+  rod.position.set(leftWallX+1.5, winTop+4, winCenterZ);
+  rod.castShadow=false; rod._isRoom=true; addRoom(rod);
+  
+  // Mark only wall meshes that actually fade as transparent (keeps other room objects in fast opaque pass)
+  // Upholstered headboard (full height, at back of bed)
+  const hbThick=3, hbH=bedH-bedClearance, hbW=bedW;
+  const headboard=roomRoundBox(hbW, hbH, hbThick, 2, 0x4a4a55,
+    bedX, floorY+bedClearance+hbH/2, bedZ+bedL/2-hbThick/2, 0,0,0);
+  // Give headboard a fabric look
+  headboard.material.roughness=0.95;
+  
+  // Side rails — upholstered panels running the length
+  const railH=bedSlatsFromFloor-bedClearance; // height from clearance to slat level = 7.5"
+  const railThick=1.5;
+  const railY=floorY+bedClearance+railH/2;
+  // Left rail
+  const lRail=roomRoundBox(railThick, railH, bedL, 1, 0x4a4a55,
+    bedX-bedW/2+railThick/2, railY, bedZ, 0,0,0);
+  lRail.material.roughness=0.95;
+  // Right rail
+  const rRail=roomRoundBox(railThick, railH, bedL, 1, 0x4a4a55,
+    bedX+bedW/2-railThick/2, railY, bedZ, 0,0,0);
+  rRail.material.roughness=0.95;
+  
+  // Footboard — lower profile
+  const fbH=railH, fbThick=2;
+  const footboard=roomRoundBox(bedW, fbH, fbThick, 1.5, 0x4a4a55,
+    bedX, railY, bedZ-bedL/2+fbThick/2, 0,0,0);
+  footboard.material.roughness=0.95;
+  
+  // Slat platform (at 14" from floor)
+
+  // Return refs for other modules
+  return {
+    floorY, floorMat, floor, ceiling,
+    wallMeshL: typeof wallMeshL !== 'undefined' ? wallMeshL : null,
+    oppWall: typeof oppWall !== 'undefined' ? oppWall : null,
+    rightWall: typeof rightWall !== 'undefined' ? rightWall : null,
+    outdoor: typeof outdoor !== 'undefined' ? outdoor : null,
+    bedX, bedZ, bedL, bedW, bedH, bedClearance,
+    tblX, tblZ, tblW, tblD, tblH,
+    winCenterY, winCenterZ, winW, winH
+  };
 }

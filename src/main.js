@@ -23,6 +23,7 @@ import * as coins from './modules/coins.js';
 import * as leaderboard from './modules/leaderboard.js';
 import * as collision from './modules/game-collision.js';
 import * as spatial from './modules/spatial.js';
+import { createRoom } from './modules/room.js';
 import {
   SHADOW_UPDATE_INTERVAL_MS, IDLE_FRAME_MS
 } from './modules/constants.js';
@@ -58,18 +59,12 @@ catAnimation.catGroup.visible = true;
 const loadingEl = document.getElementById('loading');
 if (loadingEl) loadingEl.style.display = 'none';
 
-// Add a simple floor plane so the scene isn't blank during migration
-const _tempFloor = new THREE.Mesh(
-  new THREE.PlaneGeometry(200, 200),
-  new THREE.MeshStandardMaterial({ color: 0xb0a898, roughness: 0.9 })
-);
-_tempFloor.rotation.x = -Math.PI / 2;
-_tempFloor.position.y = spatial.getFloorY();
-_tempFloor.receiveShadow = true;
-scene.add(_tempFloor);
+// Build the room
+const roomRefs = createRoom(scene);
+console.log('[main] Room created');
 
-// Position camera to see something
-camera.position.set(45, 15, 45);
+// Position camera to see the room
+camera.position.set(45, 35, 65);
 controls.target.set(0, 5, 0);
 controls.update();
 
