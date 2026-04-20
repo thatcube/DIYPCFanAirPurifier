@@ -8493,9 +8493,12 @@ function animate(ts){
       // collision center.
       catGroup.position.set(_fpPos.x, _fpPos.y - 4.0, _fpPos.z);
       // Face movement direction for natural locomotion (no moonwalk while
-      // turning/backing/strafe). If nearly stationary, keep facing heading.
+      // turning/backing/strafe). If nearly stationary, keep last movement
+      // facing so the cat doesn't snap back to camera direction when you
+      // release a key.
       const moveLenSq=_fpVelX*_fpVelX + _fpVelZ*_fpVelZ;
-      const targetYaw=moveLenSq>0.0009 ? Math.atan2(_fpVelX, _fpVelZ) : (_fpYaw+Math.PI);
+      if(moveLenSq>0.0009) _lastCatFacingYaw=Math.atan2(_fpVelX, _fpVelZ);
+      const targetYaw=_lastCatFacingYaw;
       let dYaw=targetYaw-catGroup.rotation.y;
       while(dYaw>Math.PI) dYaw-=Math.PI*2;
       while(dYaw<-Math.PI) dYaw+=Math.PI*2;
@@ -8635,6 +8638,7 @@ let _showCoords=false; // toggle with P key in game mode
 const _fpFloorY=-(H/2+ply+bunFootH)+4; // 4" tall mini dude standing on floor (eye height ~4")
 let _fpPos=new THREE.Vector3(0,_fpFloorY,30); // starting position
 let _fpYaw=0, _fpPitch=0, _fpVy=0;
+let _lastCatFacingYaw=Math.PI; // initial: face toward -Z (same as spawn heading)
 // Horizontal velocity smoothing for a natural walk feel (accel/decel instead
 // of instant start/stop). _fpBobPhase drives a subtle headbob while moving
 // on the ground.
@@ -10619,6 +10623,7 @@ function toggleFirstPerson(){
     // Start near the purifier, on the floor.
     _respawnFpAtStart();
     _fpYaw=0; // face toward purifier (toward -Z)
+    _lastCatFacingYaw=Math.PI; // cat model faces -Z at spawn
     _setFpCamMode('cat'); // default to cat/third-person each time Play Mode starts
     _setFpControlsOpen(false);
     // World-space cat rig: place the cat ahead of spawn heading.
