@@ -124,12 +124,10 @@ export function createRoom(scene) {
   
   // ─── Zinus Queen Piper Upholstered Platform Bed ───
   // 82.3"L × 60.3"W × 42"H, 6.5" ground clearance, slats at 14" from floor
-  const bedL=82.3, bedW=60.3, bedH=42, bedClearance=6.5, bedSlatsFromFloor=10;
-  const bedX=-81+2+bedW/2, bedZ=48.5-bedL/2; // bed left edge 2" from left wall, headboard flush against back wall
+  // (bedL, bedW, bedH, bedClearance, bedSlatsFromFloor, bedX, bedZ declared in header)
   
   // Nightstand — 27"H × 24"W × 14"D, black body, dark oak top, 3 drawers, curved front
-  const tblW=24, tblH=27, tblD=14;
-  const tblX=bedX+bedW/2+tblW/2+3, tblZ=48.5-tblD/2-2;
+  // (tblW, tblH, tblD, tblX, tblZ declared in header)
   const tblBlack=0x1a1a1a;
   const tblOak=0x5a3f2a;
   const drawers=[]; // populated in nightstand block below; used by click/collision/coin systems
@@ -559,7 +557,7 @@ export function createRoom(scene) {
   roomBox(4.5, 0.8, 6.5, 0x2d5a27, tblX-1, floorY+tblH+1.6, tblZ+2, 0, -0.05, 0);
   
   // ─── Opposite wall + 65" OLED TV ───
-  const oppWallZ=-78;
+  // oppWallZ declared in header
   const oppWall=roomBox(132, 80, 0.5, 0xd8d4ce, -15, floorY+40, oppWallZ, 0,0,0);
   const oppBaseboard=roomBox(132, 3, 0.6, 0xc0bbb4, -15, floorY+1.5, oppWallZ+0.5, 0,0,0);
   
@@ -686,9 +684,9 @@ export function createRoom(scene) {
   }
   
   // ─── Right side wall (with a cut-out for the bifold closet) ───
-  const sideWallX=51;
-  const wallDepth=127; // Z span from oppWallZ to 49
-  const wallHeight=80;
+  // sideWallX declared in header
+  // wallDepth declared in header
+  // wallHeight declared in header
   // Closet opening geometry — must match the bifold block below exactly.
   // Opening width (closetW) is the doorway. Interior width is wider so the
   // walk-in feels like a real walk-in. Because the interior can extend past
@@ -927,10 +925,10 @@ export function createRoom(scene) {
   }
   
   // ─── Left side wall with window (near the bed) ───
-  const leftWallX=-81;
-  const winW=36, winH=50; // window opening size
-  const winCenterY=floorY+48; // center of window
-  const winCenterZ=bedZ; // centered on the bed along Z
+  // leftWallX declared in header
+  // winW, winH declared in header
+  // winCenterY declared in header
+  // winCenterZ declared in header
   const winBottom=winCenterY-winH/2;
   const winTop=winCenterY+winH/2;
   const winFront=winCenterZ-winW/2;
@@ -1100,7 +1098,7 @@ export function createRoom(scene) {
   
   // Ceiling light fixture — flush-mount dome with warm SpotLight
   const ceilY=floorY+79.5; // just below ceiling
-  const ceilLightX=0, ceilLightZ=-15; // room center
+  // ceilLightX, ceilLightZ declared in header
   // Fixture base (flush mount disc)
   const fixBase=new THREE.Mesh(
     new THREE.CylinderGeometry(4,4,0.4,24),
