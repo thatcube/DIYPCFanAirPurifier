@@ -1332,16 +1332,19 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
       m.bumpMap=_getCatFurNoiseTexture();
       m.bumpScale=Math.max(0.001,(Math.abs(baseBump)*0.35)+hairCfg.bump);
       _catFurTintColor.setHex(colorCfg.coat).offsetHSL(0,0,0.14);
-      _ensureCatFurShader(m);
+      // Set ALL userData BEFORE _ensureCatFurShader so customProgramCacheKey
+      // reads the correct cow state when deciding whether to recompile.
+      const isCowPreset=colorCfg.pattern==='cow';
       m.userData._catFurAmount=hairCfg.furRim;
       m.userData._catFurTintHex=_catFurTintColor.getHex();
       m.userData._catCoatTintHex=colorCfg.coat;
-      m.userData._catCoatAmount=0; // disabled — m.color does all recoloring
-      // Cow pattern via shader
-      const isCowPreset=colorCfg.pattern==='cow';
+      m.userData._catCoatAmount=0;
       m.userData._catCowAmount=isCowPreset?1.0:0;
       m.userData._catCowColor1=colorCfg.cowColor1||colorCfg.coat||0x333333;
       m.userData._catCowColor2=colorCfg.cowColor2||colorCfg.coat2||0xeeeeee;
+      // Force shader recompile by marking material dirty
+      m.needsUpdate=true;
+      _ensureCatFurShader(m);
       if(m.userData._catFurShader){
         m.userData._catFurShader.uniforms.uCatFurAmount.value=hairCfg.furRim;
         m.userData._catFurShader.uniforms.uCatFurTint.value.copy(_catFurTintColor);
