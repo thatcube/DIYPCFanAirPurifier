@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DIY PC Fan Air Purifier</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #d4dce8; font-family: system-ui, -apple-system, sans-serif; }
+    canvas#c { display: block; width: 100%; height: 100%; }
+    #fps { position: fixed; bottom: 8px; right: 8px; font-size: 11px; font-family: 'SF Mono', Menlo, Consolas, monospace; color: rgba(0,0,0,0.4); pointer-events: none; z-index: 100; }
+    #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #d4dce8; color: #4a5568; font-size: 16px; font-weight: 600; z-index: 1000; transition: opacity 0.5s; }
+  </style>
+</head>
+<body>
+  <div id="loading">Loading...</div>
+  <canvas id="c"></canvas>
+  <div id="fps"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
