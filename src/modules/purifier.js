@@ -9,6 +9,12 @@ import { state } from './state.js';
 import { stdMat } from './materials.js';
 
 export function createPurifier(scene) {
+  const canvas = document.getElementById('c');
+  const camera = state.camera;
+  const renderer = state.renderer;
+  // Safe DOM helper — returns a no-op proxy if element doesn't exist
+  const _nullEl = { classList: { add(){}, remove(){}, toggle(){} }, style: {}, querySelector(){ return _nullEl; }, querySelectorAll(){ return []; }, get value(){ return ''; }, set value(v){}, get textContent(){ return ''; }, set textContent(v){} };
+  const _el = (id) => document.getElementById(id) || _nullEl;
   const { H, W, D, ply, ft, bunFootH, bunFootR, panelW } = state;
   const _boardThickness = ply === 0.75 ? '34' : 'half';
 
@@ -1431,14 +1437,16 @@ export function createPurifier(scene) {
   };
   let exploded=false, explodeLerping=false;
   function setToggle(onId,offId,isOn){
-    document.getElementById(onId).classList.toggle('on',isOn);
-    document.getElementById(offId).classList.toggle('on',!isOn);
+    const onEl=_el(onId);
+    const offEl=_el(offId);
+    if(onEl) onEl.classList.toggle('on',isOn);
+    if(offEl) offEl.classList.toggle('on',!isOn);
   }
   function collapseView(){
     if(!exploded) return;
     exploded=false;
     explodeLerping=true;
-    document.getElementById('togExplode').classList.remove('on');
+    { const el=_el('togExplode'); if(el) el.classList.remove('on'); }
     // Only auto-disable isolate if explode was the one that turned it on
     if(isolateMode && _isolateAutoExplode){ toggleIsolate(); }
     _isolateAutoExplode=false;
@@ -1449,7 +1457,7 @@ export function createPurifier(scene) {
   }
   function toggleExplode(){
     exploded=!exploded;
-    document.getElementById('togExplode').classList.toggle('on',exploded);
+    { const el=_el('togExplode'); if(el) el.classList.toggle('on',exploded); }
     if(exploded){
       // Exploding turns off airflow and dimensions
       if(airflowOn) toggleAirflow();
@@ -1473,18 +1481,18 @@ export function createPurifier(scene) {
     filterOn=!filterOn;
     parts.filterL.visible=filterOn;
     parts.filterR.visible=filterOn;
-    document.getElementById('togFilter').classList.toggle('on',filterOn);
+    { const el=_el('togFilter'); if(el) el.classList.toggle('on',filterOn); }
   }
   function toggleGrills(){
     grillsVisible=!grillsVisible;
-    document.getElementById('togGrill').classList.toggle('on',grillsVisible);
-    document.getElementById('grillColorSection').style.display=grillsVisible?'':'none';
+    { const el=_el('togGrill'); if(el) el.classList.toggle('on',grillsVisible); }
+    { const el=_el('grillColorSection'); if(el) el.style.display=grillsVisible?'':'none'; }
     for(const gm of allGrillMeshes) gm.visible=grillsVisible;
   }
   function setGrillColor(c){
     grillColor=c;
     document.querySelectorAll('#btnGrillBlack,#btnGrillSilver').forEach(b=>b.classList.remove('on'));
-    document.getElementById(c==='black'?'btnGrillBlack':'btnGrillSilver').classList.add('on');
+    { const el=_el(c==='black'?'btnGrillBlack':'btnGrillSilver'); if(el) el.classList.add('on'); }
     updateGrillColors();
   }
   
@@ -1501,6 +1509,10 @@ export function createPurifier(scene) {
   let _pinchStartRadius=radius;
   let _hadMultiTouch=false;
   let _clickStartX=0,_clickStartY=0;
+  let _dragFilter=null; // hoisted — used in event listeners below
+  let _pendingFilterDrag=false;
+  let _hoverInteractive=false;
+  const _isMobile = state.isMobile;
   const _raycaster=new THREE.Raycaster();
   const _mouse=new THREE.Vector2();
   
@@ -1577,7 +1589,7 @@ export function createPurifier(scene) {
       // Crosshair click pulse — a quick, subtle ring tap. Keeps the base
       // dot the same color and just scales/fades a soft halo. Feels like
       // a UI ping rather than a shooter hit-marker.
-      const _ch=document.getElementById('fpCrosshair');
+      const _ch=_el('fpCrosshair');
       if(_ch){
         const hitting=!!window._fpLookTarget;
         // Soft, neutral halo — a hair warmer when hovering an interactable.
@@ -1639,8 +1651,6 @@ export function createPurifier(scene) {
     }
     _pendingFilterDrag=false;
   });
-  let _pendingFilterDrag=false;
-  let _hoverInteractive=false;
   let _hoverCheckTimer=0;
   let _lastHoverRaycastMs=0;
   
@@ -1856,20 +1866,21 @@ export function createPurifier(scene) {
   
   // Hover tooltip logic
   let _hoverTimer=null, _hoverPartId=null;
-  const _tooltip=document.getElementById('partTooltip');
-  const _tipName=document.getElementById('tipName');
-  const _tipDims=document.getElementById('tipDims');
+  const _tooltip=_el('partTooltip');
+  const _tipName=_el('tipName');
+  const _tipDims=_el('tipDims');
   
   function showTooltip(partId, x, y){
     const info=_partInfo[partId];
-    if(!info) return;
-    _tipName.textContent=info.name;
-    _tipDims.textContent=info.dims;
+    if(!info||!_tooltip) return;
+    if(_tipName) _tipName.textContent=info.name;
+    if(_tipDims) _tipDims.textContent=info.dims;
     _tooltip.style.left=x+'px';
     _tooltip.style.top=y+'px';
     _tooltip.classList.add('visible');
   }
   function hideTooltip(){
+    if(!_tooltip) return;
     _tooltip.classList.remove('visible');
     _hoverPartId=null;
     if(_hoverTimer){clearTimeout(_hoverTimer);_hoverTimer=null;}
@@ -1879,7 +1890,6 @@ export function createPurifier(scene) {
   const filterLOrigin=filterL.position.clone();
   const filterROrigin=filterR.position.clone();
   const filterSlideMax=12; // slide up to 12" out from installed position
-  let _dragFilter=null; // {obj, side, origin, startMouse}
   
   function handleClickObject(obj){
     if(!obj) return;
@@ -1909,7 +1919,7 @@ export function createPurifier(scene) {
       outdoorMat.color.setHex(_windowIsNight?0x445566:0xfff0d4);
       outdoorMat.needsUpdate=true;
       // Apply matching time of day
-      const todSlider=document.getElementById('todSlider');
+      const todSlider=_el('todSlider');
       if(_windowIsNight){
         applyTimeOfDay(1320); // 10 PM
         if(todSlider) todSlider.value=1320;
@@ -2069,8 +2079,7 @@ export function createPurifier(scene) {
   
   function resize(){
     const w=canvas.parentElement.clientWidth,h=canvas.parentElement.clientHeight;
-    renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
-    _resizeCatPreview();
+    if(renderer) { renderer.setSize(w,h,false); } if(camera) { camera.aspect=w/h; camera.updateProjectionMatrix(); }
   }
   resize(); window.addEventListener('resize',resize);
   
@@ -2154,7 +2163,7 @@ export function createPurifier(scene) {
   function toggleDimensions(){
     dimVisible=!dimVisible;
     dimGroup.visible=dimVisible;
-    document.getElementById('togDims').classList.toggle('on',dimVisible);
+    _el('togDims').classList.toggle('on',dimVisible);
     // Dimensions require assembled view — collapse if exploded
     if(dimVisible && exploded) collapseView();
   }
@@ -2169,7 +2178,7 @@ export function createPurifier(scene) {
   function setStain(mode){
     stainMode=mode;
     document.querySelectorAll('#btnStainRaw,#btnStainOil,#btnStainWalnut').forEach(b=>b.classList.remove('on'));
-    document.getElementById(mode==='raw'?'btnStainRaw':mode==='oil'?'btnStainOil':'btnStainWalnut').classList.add('on');
+    _el(mode==='raw'?'btnStainRaw':mode==='oil'?'btnStainOil':'btnStainWalnut').classList.add('on');
     applyCurrentStain();
   }
   
@@ -2180,7 +2189,7 @@ export function createPurifier(scene) {
       m.shininess=s.shine;
       m.needsUpdate=true;
     }
-    document.getElementById('legendWood').querySelector('.swatch').style.background=s.swatch;
+    _el('legendWood').querySelector('.swatch').style.background=s.swatch;
   }
   
   function applyXrayToObject(root,on){
@@ -2254,7 +2263,7 @@ export function createPurifier(scene) {
     if(mode===topEdgeProfile) return;
     topEdgeProfile=mode;
     document.querySelectorAll('#btnEdgeFlat,#btnEdgeCurved').forEach(b=>b.classList.remove('on'));
-    document.getElementById(mode==='flat'?'btnEdgeFlat':'btnEdgeCurved').classList.add('on');
+    _el(mode==='flat'?'btnEdgeFlat':'btnEdgeCurved').classList.add('on');
     rebuildTopPanel();
     refreshPanelEdgeProfiles();
   }
@@ -2291,7 +2300,7 @@ export function createPurifier(scene) {
   function setLayout(mode){
     layoutMode=mode;
     document.querySelectorAll('#btnLayoutFB,#btnLayoutFT').forEach(b=>b.classList.remove('on'));
-    document.getElementById(mode==='fb'?'btnLayoutFB':'btnLayoutFT').classList.add('on');
+    _el(mode==='fb'?'btnLayoutFB':'btnLayoutFT').classList.add('on');
     if(exploded) collapseView();
     applyVisibility();
   }
@@ -2299,7 +2308,7 @@ export function createPurifier(scene) {
     if(n===activeFanCount) return;
     activeFanCount=n;
     document.querySelectorAll('#btnFan4,#btnFan3').forEach(b=>b.classList.remove('on'));
-    document.getElementById(n===4?'btnFan4':'btnFan3').classList.add('on');
+    _el(n===4?'btnFan4':'btnFan3').classList.add('on');
     if(exploded) collapseView();
     applyVisibility();
   }
@@ -2311,9 +2320,9 @@ export function createPurifier(scene) {
   function setFootDiameter(d){
     currentFootDiameter=d;
     document.querySelectorAll('#btnFootD1,#btnFootD2,#btnFootD3').forEach(b=>b.classList.remove('on'));
-    if(d===1.1) document.getElementById('btnFootD1').classList.add('on');
-    else if(d===1.0) document.getElementById('btnFootD2').classList.add('on');
-    else document.getElementById('btnFootD3').classList.add('on');
+    if(d===1.1) _el('btnFootD1').classList.add('on');
+    else if(d===1.0) _el('btnFootD2').classList.add('on');
+    else _el('btnFootD3').classList.add('on');
     bunGeo=makeBunGeo(d/2, currentBunH);
     if(feetStyle==='bun'){
       for(const leg of allLegMeshes){
@@ -2326,9 +2335,9 @@ export function createPurifier(scene) {
   }
   function setFootHeight(h){
     document.querySelectorAll('#btnFootH25,#btnFootH35,#btnFootH45').forEach(b=>b.classList.remove('on'));
-    if(h===2.5) document.getElementById('btnFootH25').classList.add('on');
-    else if(h===3.5) document.getElementById('btnFootH35').classList.add('on');
-    else document.getElementById('btnFootH45').classList.add('on');
+    if(h===2.5) _el('btnFootH25').classList.add('on');
+    else if(h===3.5) _el('btnFootH35').classList.add('on');
+    else _el('btnFootH45').classList.add('on');
     const oldH=currentFeetH;
     currentBunH=h;
     FEET_H.bun=h;
@@ -2352,8 +2361,8 @@ export function createPurifier(scene) {
   let _prePlacementFeet='bun'; // remember feet style before wall mode overrides it
   function syncFootSizeRows(){
     const show=(feetStyle==='bun');
-    const dia=document.getElementById('footDiameterRow');
-    const hgt=document.getElementById('footHeightRow');
+    const dia=_el('footDiameterRow');
+    const hgt=_el('footHeightRow');
     if(dia) dia.style.display=show?'':'none';
     if(hgt) hgt.style.display=show?'':'none';
   }
@@ -2369,7 +2378,7 @@ export function createPurifier(scene) {
   
     // Update buttons
     document.querySelectorAll('#btnFeetPeg,#btnFeetBun,#btnFeetRubber,#btnFeetNone').forEach(b=>b.classList.remove('on'));
-    document.getElementById(style==='peg'?'btnFeetPeg':style==='bun'?'btnFeetBun':style==='rubber'?'btnFeetRubber':'btnFeetNone').classList.add('on');
+    _el(style==='peg'?'btnFeetPeg':style==='bun'?'btnFeetBun':style==='rubber'?'btnFeetRubber':'btnFeetNone').classList.add('on');
   
     // Hide legs entirely for 'none'
     legGroup.visible=(style!=='none');
@@ -2410,18 +2419,18 @@ export function createPurifier(scene) {
     currentPlacement=mode;
     placementOffset={...newOff};
     document.querySelectorAll('#btnPlaceFloor,#btnPlaceWall,#btnPlaceTv').forEach(b=>b.classList.remove('on'));
-    document.getElementById(mode==='floor'?'btnPlaceFloor':mode==='tv'?'btnPlaceTv':'btnPlaceWall').classList.add('on');
+    _el(mode==='floor'?'btnPlaceFloor':mode==='tv'?'btnPlaceTv':'btnPlaceWall').classList.add('on');
     // Rotate purifier for Under TV / Wall mode, show/hide console props
     if(mode==='tv'||mode==='wall'){
       purifierGroup.rotation.y=90*Math.PI/180;
-      document.getElementById('turntableSlider').value=90;
-      document.getElementById('turntableLabel').textContent='90°';
+      _el('turntableSlider').value=90;
+      _el('turntableLabel').textContent='90°';
       showConsoleProps(mode==='tv');
       showWallBracket(mode==='wall');
     } else {
       purifierGroup.rotation.y=0;
-      document.getElementById('turntableSlider').value=0;
-      document.getElementById('turntableLabel').textContent='0°';
+      _el('turntableSlider').value=0;
+      _el('turntableLabel').textContent='0°';
       showConsoleProps(false);
       showWallBracket(false);
     }
@@ -2456,7 +2465,7 @@ export function createPurifier(scene) {
         o.matrixAutoUpdate=false;
       }
     });
-    const todEl=document.getElementById('todSlider');
+    const todEl=_el('todSlider');
     if(todEl) applyTimeOfDay(parseInt(todEl.value,10));
     updatePowerCordGeometry();
     _prevCx=0; _prevCz=0;
@@ -2471,7 +2480,7 @@ export function createPurifier(scene) {
     updateNudgeLabel();
   }
   function updateNudgeLabel(){
-    const el=document.getElementById('nudgeLabel');
+    const el=_el('nudgeLabel');
     if(el) el.textContent='X:'+placementOffset.x.toFixed(0)+' Y:'+placementOffset.y.toFixed(0)+' Z:'+placementOffset.z.toFixed(0);
   }
   function getPlacementOffset(mode){
@@ -2819,7 +2828,7 @@ export function createPurifier(scene) {
     tex.generateMipmaps=true;
     tex.minFilter=THREE.LinearMipmapLinearFilter;
     tex.magFilter=THREE.LinearFilter;
-    tex.anisotropy=Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    if(renderer) tex.anisotropy=Math.min(8, renderer.capabilities.getMaxAnisotropy());
     tex.needsUpdate=true;
     return tex;
   }
@@ -2891,7 +2900,7 @@ export function createPurifier(scene) {
     tex.generateMipmaps=true;
     tex.minFilter=THREE.LinearMipmapLinearFilter;
     tex.magFilter=THREE.LinearFilter;
-    tex.anisotropy=Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    if(renderer) tex.anisotropy=Math.min(8, renderer.capabilities.getMaxAnisotropy());
     tex.needsUpdate=true;
   
     const coverImg=new Image();
