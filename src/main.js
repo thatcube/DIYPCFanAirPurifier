@@ -1,9 +1,6 @@
 // ─── Main entry point ───────────────────────────────────────────────
 // Wires all modules together, initializes the scene, and starts the
 // render loop.
-//
-// This file is the orchestrator — it imports from every module and
-// connects them via refs/callbacks. No game logic lives here.
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -23,11 +20,39 @@ import * as coins from './modules/coins.js';
 import * as leaderboard from './modules/leaderboard.js';
 import * as collision from './modules/game-collision.js';
 import * as spatial from './modules/spatial.js';
+import * as gameFp from './modules/game-fp.js';
 import { createRoom } from './modules/room.js';
 import { createPurifier } from './modules/purifier.js';
 import {
   SHADOW_UPDATE_INTERVAL_MS, IDLE_FRAME_MS
 } from './modules/constants.js';
+
+// ── Utilities (must be defined before wiring) ───────────────────────
+
+// Toast notifications
+const _toast = document.createElement('div');
+_toast.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-8px);opacity:0;pointer-events:none;z-index:10001;background:rgba(8,12,18,0.86);color:#d9f3ff;border:1px solid rgba(145,222,255,0.48);border-radius:12px;padding:7px 12px;font-family:system-ui;font-size:12px;font-weight:700;letter-spacing:0.6px;backdrop-filter:blur(10px);box-shadow:0 8px 20px rgba(0,0,0,0.35);transition:opacity 0.2s,transform 0.2s';
+document.body.appendChild(_toast);
+let _toastTimer = null;
+
+function showToast(text) {
+  _toast.textContent = text || '';
+  _toast.style.opacity = '1';
+  _toast.style.transform = 'translateX(-50%) translateY(0)';
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => {
+    _toast.style.opacity = '0';
+    _toast.style.transform = 'translateX(-50%) translateY(-8px)';
+  }, 1800);
+}
+
+// Shadow state
+let _shadowDirtyOneShot = true;
+let _lastShadowUpdateTs = 0;
+
+function markShadowsDirty() {
+  _shadowDirtyOneShot = true;
+}
 
 // ── Initialize ──────────────────────────────────────────────────────
 
@@ -52,64 +77,73 @@ controls.maxPolarAngle = Math.PI * 0.48;
 // Lights
 lighting.createLights(state.isMobile);
 
-// Add catGroup to scene — visible by default for the model viewer
-scene.add(catAnimation.catGroup);
-catAnimation.catGroup.visible = true;
-
 // Hide loading overlay
 const loadingEl = document.getElementById('loading');
 if (loadingEl) loadingEl.style.display = 'none';
 
-// Build the room
+// ── Build scene ─────────────────────────────────────────────────────
+
 const roomRefs = createRoom(scene);
 console.log('[main] Room created');
 
-// Build the purifier
 const purifierRefs = createPurifier(scene);
 console.log('[main] Purifier created');
 
-// Position camera to see the room
+// Position camera
 camera.position.set(45, 35, 65);
 controls.target.set(0, 5, 0);
 controls.update();
 
-// Wire module cross-references
+// ── Wire time-of-day lighting ───────────────────────────────────────
+
+const todRefs = {
+  ceilLightOn: roomRefs.ceilLightOn,
+  domeMat: roomRefs.domeMat,
+  outdoor: roomRefs.outdoor,
+  mirroredWindowX: roomRefs.mirroredWindowX,
+  winCenterY: roomRefs.winCenterY,
+  winCenterZ: roomRefs.winCenterZ,
+  winW: roomRefs.winW,
+  winTop: roomRefs.winTop,
+  winBottom: roomRefs.winBottom,
+  winFront: roomRefs.winFront,
+  winBack: roomRefs.winBack,
+  wallMeshes: roomRefs.wallMeshes,
+  baseMeshes: roomRefs.baseMeshes,
+  floorMat: roomRefs.floorMat,
+  _markShadowsDirty: markShadowsDirty
+};
+
+// Apply initial time-of-day based on local clock
+const _now = new Date();
+const _minutesNow = _now.getHours() * 60 + _now.getMinutes();
+lighting.applyTimeOfDay(_minutesNow, todRefs);
+
+// ── Wire module cross-references ────────────────────────────────────
+
 music.setToastFn(showToast);
+coins.setToastFn(showToast);
 secrets.setRefs({
   addCoin: coins.addCoin,
-  coinGroup: null,  // will be set after coin group is created
-  purifierGroup: null, // will be set after purifier is built
+  coinGroup: null,
+  purifierGroup: null,
   coins: coins.coins,
-  setCoinsVisible: null, // will be set after game mode init
+  setCoinsVisible: null,
   showToast
 });
 
-// ── Toast system ────────────────────────────────────────────────────
+// ── Cat ─────────────────────────────────────────────────────────────
 
-const _toast = document.createElement('div');
-_toast.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-8px);opacity:0;pointer-events:none;z-index:10001;background:rgba(8,12,18,0.86);color:#d9f3ff;border:1px solid rgba(145,222,255,0.48);border-radius:12px;padding:7px 12px;font-family:system-ui;font-size:12px;font-weight:700;letter-spacing:0.6px;backdrop-filter:blur(10px);box-shadow:0 8px 20px rgba(0,0,0,0.35);transition:opacity 0.2s,transform 0.2s';
-document.body.appendChild(_toast);
-let _toastTimer = null;
+scene.add(catAnimation.catGroup);
+catAnimation.catGroup.visible = true;
 
-function showToast(text) {
-  _toast.textContent = text || '';
-  _toast.style.opacity = '1';
-  _toast.style.transform = 'translateX(-50%) translateY(0)';
-  if (_toastTimer) clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => {
-    _toast.style.opacity = '0';
-    _toast.style.transform = 'translateX(-50%) translateY(-8px)';
-  }, 1800);
-}
+catAnimation.loadGameplayCat({
+  applyCatColorToModel: catAnimation.applyColorToAll
+});
 
-// ── Shadow state ────────────────────────────────────────────────────
+// ── Particles ───────────────────────────────────────────────────────
 
-let _shadowDirtyOneShot = true;
-let _lastShadowUpdateTs = 0;
-
-function markShadowsDirty() {
-  _shadowDirtyOneShot = true;
-}
+particles.init();
 
 // ── Render loop ─────────────────────────────────────────────────────
 
@@ -123,11 +157,16 @@ function animate(ts) {
   // Frame timing
   const rawDt = ts - (_lastFrameTs || ts);
   _lastFrameTs = ts;
-  const dtSec = Math.min(rawDt / 1000, 0.1); // cap at 100ms
-  const animFrameScale = dtSec * 60; // normalize to 60fps baseline
+  const dtSec = Math.min(rawDt / 1000, 0.1);
+  const animFrameScale = dtSec * 60;
 
   // Controls
   controls.update();
+
+  // Cat animation mixer
+  if (catAnimation.catMixer) {
+    catAnimation.catMixer.update(dtSec);
+  }
 
   // Particles
   particles.updateSpinSpeed(animFrameScale);
@@ -169,37 +208,6 @@ onResize();
 
 // ── Start ───────────────────────────────────────────────────────────
 
-// Initial time-of-day (auto-detect local time)
-const now = new Date();
-const minutesNow = now.getHours() * 60 + now.getMinutes();
-// lighting.applyTimeOfDay will be called once room refs are available
-
-// Load the cat
-catAnimation.loadGameplayCat({
-  applyCatColorToModel: catAnimation.applyColorToAll
-});
-
-// Start render loop
 animate(performance.now());
 
 console.log('[main] Render loop started');
-
-// ── Expose globals for HTML onclick handlers (bridge) ───────────────
-// During migration, HTML buttons still call global functions. These
-// will be removed once the HTML is also modularized.
-
-window.showToast = showToast;
-window.setCatModelPreset = (key) => {
-  catAppearance.setCatModelKeyRaw(catAppearance.sanitizeModelKey(key));
-  catAnimation.loadGameplayCat({ applyCatColorToModel: catAnimation.applyColorToAll });
-};
-window.setCatColorPreset = (key) => {
-  if (!catAppearance.isColorable()) return;
-  catAppearance.setCatColorKeyRaw(catAppearance.sanitizeColorKey(key));
-  catAnimation.applyColorToAll();
-};
-window.setCatHairPreset = (key) => {
-  if (!catAppearance.isColorable()) return;
-  catAppearance.setCatHairKeyRaw(catAppearance.sanitizeHairKey(key));
-  catAnimation.applyColorToAll();
-};
