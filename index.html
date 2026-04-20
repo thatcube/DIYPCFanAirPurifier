@@ -1902,7 +1902,14 @@ function initMobilePanelDefault(){
   }
 }
 initMobilePanelDefault();
-const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false, powerPreference:'high-performance', stencil:false});
+let renderer;
+try{
+  renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false, powerPreference:'high-performance', stencil:false});
+}catch(e){
+  // WebGL context creation failed — show a user-friendly error
+  document.body.innerHTML='<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0a0e14;color:#e8eef7;font-family:system-ui;padding:32px;text-align:center"><div><h1 style="font-size:28px;margin-bottom:16px">WebGL Not Available</h1><p style="opacity:0.7;max-width:480px;line-height:1.6">Your browser couldn\'t initialize 3D graphics. Try:<br>• Updating your GPU drivers<br>• Enabling hardware acceleration in browser settings<br>• Closing other tabs using 3D graphics<br>• Using a different browser (Chrome/Edge)</p></div></div>';
+  throw e;
+}
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, _isMobile?0.72:0.85));
 renderer.setClearColor(0xd4dce8, 1);
 renderer.shadowMap.enabled=true;
