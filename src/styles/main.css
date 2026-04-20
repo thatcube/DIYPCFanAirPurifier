@@ -1,0 +1,184 @@
+/* ─── Base ────────────────────────────────────────────────────────── */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #d4dce8; font-family: system-ui, -apple-system, sans-serif; }
+canvas#c { display: block; width: 100%; height: 100%; }
+
+/* ─── Loading ────────────────────────────────────────────────────── */
+#loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #d4dce8; color: #4a5568; font-size: 16px; font-weight: 600; z-index: 1000; transition: opacity 0.5s; }
+
+/* ─── FPS counter ────────────────────────────────────────────────── */
+#fps { position: fixed; bottom: 8px; right: 8px; font-size: 11px; font-family: 'SF Mono', Menlo, Consolas, monospace; color: rgba(0,0,0,0.4); pointer-events: none; z-index: 100; }
+
+/* ─── Shared glass surface ───────────────────────────────────────── */
+.glass {
+  background: rgba(8,12,18,0.82);
+  border: 1px solid rgba(145,222,255,0.18);
+  backdrop-filter: blur(40px) saturate(1.6);
+  color: #d9f3ff;
+}
+.glass-light {
+  background: rgba(8,12,18,0.65);
+  border: 1px solid rgba(145,222,255,0.12);
+  backdrop-filter: blur(8px);
+  color: #d9f3ff;
+}
+
+/* ─── Control Panel ──────────────────────────────────────────────── */
+.panel {
+  position: fixed; top: 12px; z-index: 200;
+  background: rgba(8,12,18,0.82);
+  border: 1px solid rgba(145,222,255,0.18);
+  border-radius: 22px; padding: 0;
+  backdrop-filter: blur(40px) saturate(1.6);
+  color: #d9f3ff; font-size: 12px;
+  display: flex; flex-direction: column;
+  max-height: calc(100vh - 24px);
+  transition: transform 0.3s, opacity 0.3s;
+}
+.panel-l { left: 12px; width: 280px; }
+.panel-header {
+  padding: 10px 12px 6px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid rgba(145,222,255,0.1);
+}
+.panel-header h3 { font-size: 13px; font-weight: 700; letter-spacing: 0.5px; }
+.panel-close {
+  width: 28px; height: 28px; border-radius: 10px; border: none;
+  background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5);
+  cursor: pointer; font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+.panel-close:hover { background: rgba(255,255,255,0.12); }
+.panel-scroll { overflow-y: auto; flex: 1; padding: 6px 10px 10px; }
+.panel-scroll::-webkit-scrollbar { width: 4px; }
+.panel-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+.panel-fab {
+  position: fixed; top: 12px; left: 12px; z-index: 199;
+  width: 40px; height: 40px; border-radius: 14px;
+  border: 1px solid rgba(145,222,255,0.2);
+  background: rgba(8,12,18,0.8); color: #91deff;
+  font-size: 18px; cursor: pointer; display: none;
+  backdrop-filter: blur(10px);
+  align-items: center; justify-content: center;
+}
+
+/* ─── Panel controls ─────────────────────────────────────────────── */
+.section-group { margin-bottom: 10px; }
+.section-group h4 {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px;
+  color: rgba(145,222,255,0.5); margin-bottom: 6px;
+  cursor: pointer; user-select: none;
+}
+.ctrl-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px; min-height: 26px;
+}
+.ctrl-row label { font-size: 11px; opacity: 0.75; }
+
+/* Segmented buttons */
+.seg { display: inline-flex; gap: 2px; }
+.seg button {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px; color: rgba(255,255,255,0.6);
+  padding: 4px 10px; font-size: 10px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.seg button.on {
+  background: rgba(145,222,255,0.18);
+  border-color: rgba(145,222,255,0.4);
+  color: #d9f3ff;
+}
+.seg button:hover { background: rgba(255,255,255,0.1); }
+
+/* Toggle switch */
+.toggle-sw {
+  position: relative; width: 36px; height: 20px;
+  background: rgba(255,255,255,0.1); border-radius: 10px;
+  cursor: pointer; transition: background 0.2s;
+}
+.toggle-sw.on { background: rgba(145,222,255,0.35); }
+.toggle-sw::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: rgba(255,255,255,0.5); transition: transform 0.2s;
+}
+.toggle-sw.on::after { transform: translateX(16px); background: #91deff; }
+
+/* Sliders */
+.slider-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.slider-row label { font-size: 10px; opacity: 0.6; min-width: 50px; }
+.slider-row span { font-size: 10px; opacity: 0.6; min-width: 36px; text-align: right; }
+input[type=range] { width: 100%; accent-color: #91deff; height: 4px; }
+
+/* ─── Play Mode button ───────────────────────────────────────────── */
+#playDockBtn {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  z-index: 200;
+  background: rgba(8,12,18,0.86); color: #d9f3ff;
+  border: 1px solid rgba(145,222,255,0.48); border-radius: 12px;
+  padding: 10px 20px; font-family: system-ui; font-size: 14px;
+  font-weight: 700; cursor: pointer;
+  backdrop-filter: blur(10px); transition: all 0.2s; letter-spacing: 0.5px;
+}
+#playDockBtn:hover { background: rgba(20,30,50,0.95); border-color: rgba(145,222,255,0.8); }
+
+/* ─── FP Game HUD ────────────────────────────────────────────────── */
+#fpHud { display: none; position: fixed; top: 0; left: 0; width: 100%; z-index: 300; pointer-events: none; }
+#coinHud {
+  position: fixed; top: 16px; left: 16px;
+  background: rgba(8,12,18,0.75); color: #ffd700;
+  border: 1px solid rgba(255,215,0,0.4); border-radius: 10px;
+  padding: 8px 14px; font-size: 16px; font-weight: 700;
+  backdrop-filter: blur(8px);
+}
+#fpCrosshair {
+  display: none; position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  width: 4px; height: 4px; background: rgba(255,255,255,0.7);
+  border-radius: 50%; z-index: 301; pointer-events: none;
+  box-shadow: 0 0 6px rgba(255,255,255,0.3);
+}
+#fpControls {
+  position: fixed; bottom: 16px; left: 16px;
+  background: rgba(8,12,18,0.65); color: rgba(255,255,255,0.6);
+  border-radius: 8px; padding: 6px 10px; font-size: 11px; line-height: 1.6;
+  backdrop-filter: blur(6px);
+}
+#fpControls kbd {
+  background: rgba(255,255,255,0.12); border-radius: 3px;
+  padding: 1px 5px; font-size: 10px;
+}
+#fpChargeBar {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  width: 120px; height: 6px; background: rgba(255,255,255,0.1);
+  border-radius: 3px; overflow: hidden;
+}
+#fpChargeFill {
+  width: 0%; height: 100%;
+  background: linear-gradient(90deg, #4af, #f4a);
+  border-radius: 3px; transition: width 0.05s;
+}
+
+/* ─── Pause overlay ──────────────────────────────────────────────── */
+#fpPauseOverlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6); z-index: 400;
+  align-items: center; justify-content: center;
+  flex-direction: column; gap: 12px;
+  backdrop-filter: blur(4px);
+}
+#fpPauseOverlay button {
+  background: rgba(255,255,255,0.1); color: #fff;
+  border: 1px solid rgba(255,255,255,0.3); border-radius: 8px;
+  padding: 10px 28px; font-size: 14px; font-weight: 600;
+  cursor: pointer; min-width: 160px;
+}
+#fpPauseOverlay button:hover { background: rgba(255,255,255,0.2); }
+#fpPauseOverlay h2 { color: #fff; font-size: 24px; margin-bottom: 8px; }
+
+/* ─── Play-mode visibility ───────────────────────────────────────── */
+body.play-mode #playDockBtn,
+body.play-mode .panel,
+body.play-mode .panel-fab { display: none !important; }

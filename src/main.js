@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import './styles/main.css';
 
 // ── Module imports ──────────────────────────────────────────────────
 
@@ -185,16 +186,65 @@ gameFp.init({
 window._toggleFP = () => gameFp.toggleFirstPerson();
 window._resumeFP = () => gameFp.setPaused(false);
 window._resetFP = () => {
-  gameFp.toggleFirstPerson(); // exit
-  setTimeout(() => gameFp.toggleFirstPerson(), 100); // re-enter
+  gameFp.toggleFirstPerson();
+  setTimeout(() => gameFp.toggleFirstPerson(), 100);
 };
 window._exitFP = () => { if (gameFp.fpMode) gameFp.toggleFirstPerson(); };
+
+// ── Panel control bridges ───────────────────────────────────────────
+
+// Time-of-day slider
+window._setTOD = (val) => {
+  const m = parseInt(val, 10);
+  lighting.applyTimeOfDay(m, todRefs);
+  const todLabel = document.getElementById('todLabel');
+  if (todLabel) todLabel.textContent = lighting.formatTime(m);
+  markShadowsDirty();
+};
+
+// Turntable
+window._setTurntable = (val) => {
+  purifierGroup.rotation.y = parseFloat(val) * Math.PI / 180;
+};
+
+// Fan speed
+window._setFanSpeed = (val) => {
+  purifierRefs.setFanSpeed(parseInt(val, 10) / 1800 * 100);
+};
+
+// Spin toggle
+window._toggleSpin = () => {
+  const tog = document.getElementById('togSpin');
+  const isOn = tog && tog.classList.toggle('on');
+  purifierRefs.setSpinning(!!isOn);
+};
+
+// Placement
+window._setPlacement = (mode) => {
+  const offsets = spatial.PLACEMENT_OFFSETS[mode] || spatial.PLACEMENT_OFFSETS.floor;
+  placementOffset.set(offsets.x, offsets.y, offsets.z);
+  purifierGroup.position.copy(placementOffset);
+  purifierGroup.rotation.y = mode === 'tv' ? Math.PI / 2 : 0;
+  // Update turntable slider
+  const ts = document.getElementById('turntableSlider');
+  const tl = document.getElementById('turntableLabel');
+  const deg = Math.round(purifierGroup.rotation.y * 180 / Math.PI);
+  if (ts) ts.value = deg;
+  if (tl) tl.textContent = deg + '°';
+  // Update button states
+  document.querySelectorAll('#btnPlaceFloor,#btnPlaceTv,#btnPlaceWall').forEach(b => b.classList.remove('on'));
+  const btnId = mode === 'tv' ? 'btnPlaceTv' : mode === 'wall' ? 'btnPlaceWall' : 'btnPlaceFloor';
+  const btn = document.getElementById(btnId);
+  if (btn) btn.classList.add('on');
+  markShadowsDirty();
+};
 
 // ── Render loop ─────────────────────────────────────────────────────
 
 let _lastFrameTs = 0;
 let _fpsFrames = 0;
 let _fpsLast = performance.now();
+let _lastCatX = 0, _lastCatZ = 0;
 
 function animate(ts) {
   requestAnimationFrame(animate);
@@ -216,9 +266,18 @@ function animate(ts) {
     coins.updateCoins(ts, gameFp.fpPos);
   }
 
-  // Cat animation mixer
+  // Cat animation mixer + walk/idle blend
   if (catAnimation.catMixer) {
     catAnimation.catMixer.update(dtSec);
+    // Blend walk/idle based on movement speed in game mode
+    if (gameFp.fpMode && catAnimation.catWalkAction && catAnimation.catIdleAction) {
+      const vel = Math.hypot(gameFp.fpPos.x - (_lastCatX || gameFp.fpPos.x), gameFp.fpPos.z - (_lastCatZ || gameFp.fpPos.z));
+      const moveBlend = Math.min(1, vel * 8);
+      catAnimation.catWalkAction.weight += (moveBlend - catAnimation.catWalkAction.weight) * Math.min(1, dtSec * 8);
+      catAnimation.catIdleAction.weight += ((1 - moveBlend) - catAnimation.catIdleAction.weight) * Math.min(1, dtSec * 8);
+      _lastCatX = gameFp.fpPos.x;
+      _lastCatZ = gameFp.fpPos.z;
+    }
   }
 
   // Purifier animations (fan spin, explode lerp, filter/drawer/bifold)
