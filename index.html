@@ -1095,22 +1095,19 @@ function _recolorFurTexture(srcTex, coatHex, coat2Hex, pattern){
     if(tmpHSL.l > 0.05 && tmpHSL.l < 0.97){
       let useHSL=tHSL;
       if(isCow && tc2){
-        // Cow pattern: smooth noise picks dark gray vs white patches.
-        // Direct RGB writes — HSL doesn't work for low-saturation colors.
+        // Cow pattern: sharp dark/white patches using stepped noise.
+        // Use multiple noise octaves and hard-step the result.
         const vertBias=py/h;
-        const noise=_cowNoise(px,py);
-        const thresh=0.35 + vertBias*0.35;
-        if(noise > thresh){
-          // White patch — blend with original luminance for detail
-          const lum=tmpHSL.l;
-          d[i]  =Math.round(240*0.7 + d[i]*0.3);
-          d[i+1]=Math.round(240*0.7 + d[i+1]*0.3);
-          d[i+2]=Math.round(240*0.7 + d[i+2]*0.3);
+        const n1=_cowNoise(px,py);
+        const n2=_cowNoise(px+500,py+500); // second independent sample
+        // Combine noise + vertical bias. Bottom (belly) → white, top (back) → dark
+        const combined = n1*0.4 + n2*0.3 + vertBias*0.3;
+        // Hard step at 0.5 — no gradual blending, cow patches have sharp edges
+        const isWhite = combined > 0.48;
+        if(isWhite){
+          d[i]=240; d[i+1]=240; d[i+2]=240;
         } else {
-          // Dark gray patch
-          d[i]  =Math.round(60*0.7 + d[i]*0.3);
-          d[i+1]=Math.round(60*0.7 + d[i+1]*0.3);
-          d[i+2]=Math.round(60*0.7 + d[i+2]*0.3);
+          d[i]=50; d[i+1]=50; d[i+2]=55;
         }
         continue;
       }
@@ -1163,8 +1160,33 @@ function _ensureCatFurShader(mat){
     shader.uniforms.uCatFurTint={value:new THREE.Color(Number(mat.userData._catFurTintHex)||0xffffff)};
     shader.uniforms.uCatCoatTint={value:new THREE.Color(Number(mat.userData._catCoatTintHex)||0xffffff)};
     shader.uniforms.uCatCoatAmount={value:Number(mat.userData._catCoatAmount)||0};
+    shader.uniforms.uCatCowAmount={value:Number(mat.userData._catCowAmount)||0};
+    shader.uniforms.uCatCowColor1={value:new THREE.Color(Number(mat.userData._catCowColor1)||0x333333)};
+    shader.uniforms.uCatCowColor2={value:new THREE.Color(Number(mat.userData._catCowColor2)||0xeeeeee)};
     shader.fragmentShader=shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uCatFurAmount;\nuniform vec3 uCatFurTint;\nuniform vec3 uCatCoatTint;\nuniform float uCatCoatAmount;')
+      .replace('#include <common>', [
+        '#include <common>',
+        'uniform float uCatFurAmount;',
+        'uniform vec3 uCatFurTint;',
+        'uniform vec3 uCatCoatTint;',
+        'uniform float uCatCoatAmount;',
+        'uniform float uCatCowAmount;',
+        'uniform vec3 uCatCowColor1;',
+        'uniform vec3 uCatCowColor2;',
+        // Smooth noise function for cow patches in UV space
+        'float cowHash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }',
+        'float cowNoise(vec2 p){',
+        '  vec2 i=floor(p), f=fract(p);',
+        '  f=f*f*(3.0-2.0*f);',
+        '  float a=cowHash(i), b=cowHash(i+vec2(1,0)),',
+        '        c=cowHash(i+vec2(0,1)), d=cowHash(i+vec2(1,1));',
+        '  return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);',
+        '}',
+        'float cowPattern(vec2 uv){',
+        '  float n=cowNoise(uv*3.0)*0.5 + cowNoise(uv*6.0+vec2(5.3,2.7))*0.3 + cowNoise(uv*12.0+vec2(9.1,4.3))*0.2;',
+        '  return step(0.48, n + (1.0-uv.y)*0.15);',
+        '}'
+      ].join('\n'))
       .replace('#include <output_fragment>', [
         'float catViewDot = saturate( abs( dot( normal, normalize( vViewPosition ) ) ) );',
         'float catRim = pow( 1.0 - catViewDot, 2.0 );',
@@ -1184,11 +1206,19 @@ function _ensureCatFurShader(mat){
         'vec3 catColorized = mix( outgoingLight, catTinted, uCatCoatAmount * (0.38 + (0.62 * catFurMask)) );',
         'float catFuzz = mix(1.0, mix(0.76,1.28,catNoise), min(1.0, uCatFurAmount * 0.95) * catFurMask);',
         'vec3 catFurGlow = uCatFurTint * (catFurRim * uCatFurAmount * catFurMask);',
-        'gl_FragColor = vec4( (catColorized * catFuzz) + catFurGlow, diffuseColor.a );'
+        'vec3 catFinal = (catColorized * catFuzz) + catFurGlow;',
+        // Cow pattern: blend between two colors based on UV-space noise
+        'if(uCatCowAmount > 0.01){',
+        '  float cp = cowPattern(vUv);',
+        '  vec3 cowCol = mix(uCatCowColor1, uCatCowColor2, cp);',
+        '  float cowLuma = max(0.15, catLightLuma * 1.4);',
+        '  catFinal = cowCol * cowLuma;',
+        '}',
+        'gl_FragColor = vec4( catFinal, diffuseColor.a );'
       ].join('\n'));
     mat.userData._catFurShader=shader;
   };
-  mat.customProgramCacheKey=()=> 'catFurShaderV6';
+  mat.customProgramCacheKey=()=> 'catFurShaderV7';
   mat.needsUpdate=true;
 }
 function _applyCatHairToBones(model,hairCfg){
@@ -1243,9 +1273,11 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
         }
         m.userData._catFurAmount=0;
         m.userData._catCoatAmount=0;
+        m.userData._catCowAmount=0;
         if(m.userData._catFurShader){
           m.userData._catFurShader.uniforms.uCatFurAmount.value=0;
           m.userData._catFurShader.uniforms.uCatCoatAmount.value=0;
+          m.userData._catFurShader.uniforms.uCatCowAmount.value=0;
         }
         m.needsUpdate=true;
         continue;
@@ -1262,6 +1294,7 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
         if(m.userData._catFurShader){
           m.userData._catFurShader.uniforms.uCatFurAmount.value=0;
           m.userData._catFurShader.uniforms.uCatCoatAmount.value=0;
+          m.userData._catFurShader.uniforms.uCatCowAmount.value=0;
         }
         m.needsUpdate=true;
         continue;
@@ -1282,9 +1315,11 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
         m.userData._catFurTintHex=_catTmpColorB.getHex();
         m.userData._catCoatTintHex=_catTmpColorB.getHex();
         m.userData._catCoatAmount=0;
+        m.userData._catCowAmount=0;
         if(m.userData._catFurShader){
           m.userData._catFurShader.uniforms.uCatFurAmount.value=0;
           m.userData._catFurShader.uniforms.uCatCoatAmount.value=0;
+          m.userData._catFurShader.uniforms.uCatCowAmount.value=0;
         }
         m.needsUpdate=true;
         continue;
@@ -1313,11 +1348,19 @@ function _applyCatAppearanceToSingleModel(model,baseScale){
       m.userData._catFurTintHex=_catFurTintColor.getHex();
       m.userData._catCoatTintHex=colorCfg.coat;
       m.userData._catCoatAmount=0; // disabled — m.color does all recoloring
+      // Cow pattern via shader
+      const isCowPreset=colorCfg.pattern==='cow';
+      m.userData._catCowAmount=isCowPreset?1.0:0;
+      m.userData._catCowColor1=colorCfg.coat||0x333333;
+      m.userData._catCowColor2=colorCfg.coat2||0xeeeeee;
       if(m.userData._catFurShader){
         m.userData._catFurShader.uniforms.uCatFurAmount.value=hairCfg.furRim;
         m.userData._catFurShader.uniforms.uCatFurTint.value.copy(_catFurTintColor);
         m.userData._catFurShader.uniforms.uCatCoatTint.value.setHex(colorCfg.coat);
         m.userData._catFurShader.uniforms.uCatCoatAmount.value=0;
+        m.userData._catFurShader.uniforms.uCatCowAmount.value=isCowPreset?1.0:0;
+        m.userData._catFurShader.uniforms.uCatCowColor1.value.setHex(colorCfg.coat||0x333333);
+        m.userData._catFurShader.uniforms.uCatCowColor2.value.setHex(colorCfg.coat2||0xeeeeee);
       }
       m.needsUpdate=true;
     }
