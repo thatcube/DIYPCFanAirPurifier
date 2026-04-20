@@ -24,6 +24,7 @@ import * as leaderboard from './modules/leaderboard.js';
 import * as collision from './modules/game-collision.js';
 import * as spatial from './modules/spatial.js';
 import { createRoom } from './modules/room.js';
+import { createPurifier } from './modules/purifier.js';
 import {
   SHADOW_UPDATE_INTERVAL_MS, IDLE_FRAME_MS
 } from './modules/constants.js';
@@ -62,6 +63,10 @@ if (loadingEl) loadingEl.style.display = 'none';
 // Build the room
 const roomRefs = createRoom(scene);
 console.log('[main] Room created');
+
+// Build the purifier
+const purifierRefs = createPurifier(scene);
+console.log('[main] Purifier created');
 
 // Position camera to see the room
 camera.position.set(45, 35, 65);
