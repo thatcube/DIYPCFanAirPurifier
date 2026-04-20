@@ -7719,12 +7719,13 @@ function _mbPlayNext(){
 }
 function _mbSkipNext(){
   if(!_mbOn) return;
+  _showFpResetIndicator('⏭ NEXT');
   _mbPlayNext();
 }
 function _mbSkipPrev(){
   if(!_mbOn) return;
+  _showFpResetIndicator('⏮ PREV');
   _mbStopCurrentSong();
-  // Back up 2: one for the song that just stopped, one more for previous
   _mbQueueIdx=Math.max(0, _mbQueueIdx-2);
   _mbPlayNext();
 }
@@ -10628,14 +10629,12 @@ document.addEventListener('keydown',e=>{
   }
   if(e.key===';'){
     _mbSkipPrev();
-    _showFpResetIndicator('⏮ PREV');
     e.preventDefault();
     e.stopImmediatePropagation();
     return;
   }
   if(e.key==="'"){
     _mbSkipNext();
-    _showFpResetIndicator('⏭ NEXT');
     e.preventDefault();
     e.stopImmediatePropagation();
     return;
