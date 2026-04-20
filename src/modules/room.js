@@ -1404,6 +1404,21 @@ export function createRoom(scene) {
     }
   });
 
+  // Collect wall + baseboard meshes for time-of-day recoloring
+  const wallMeshes = [];
+  const baseMeshes = [];
+  scene.traverse(obj => {
+    if (obj.isMesh && obj._isRoom && obj.material) {
+      const c = obj.material.color;
+      if (!c) return;
+      const hex = c.getHex();
+      // Wall color 0xd8d4ce or close
+      if (hex === 0xd8d4ce || hex === 0xd5d0ca || hex === 0xd0ccc6) wallMeshes.push(obj);
+      // Baseboard color 0xc0bbb4
+      if (hex === 0xc0bbb4) baseMeshes.push(obj);
+    }
+  });
+
   // Return refs for other modules
   return {
     floorY, floorMat, floor, ceiling,
@@ -1413,6 +1428,14 @@ export function createRoom(scene) {
     outdoor: typeof outdoor !== 'undefined' ? outdoor : null,
     bedX, bedZ, bedL, bedW, bedH, bedClearance,
     tblX, tblZ, tblW, tblD, tblH,
-    winCenterY, winCenterZ, winW, winH
+    winCenterY, winCenterZ, winW, winH,
+    // Lighting refs
+    ceilLightOn, ceilLightX, ceilLightZ, ceilY,
+    domeMat, mirroredWindowX: -leftWallX,
+    winTop, winBottom, winFront, winBack,
+    wallMeshes, baseMeshes,
+    tvCenterX, tvCenterY, tvZ, tvD,
+    lampLight, lampOn,
+    leftWallX
   };
 }
