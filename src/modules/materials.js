@@ -19,7 +19,8 @@ export function stdMat(opts = {}) {
   if (!('roughness' in opts)) opts.roughness = 0.5;
   // Only apply env map to metallic/glossy surfaces
   if (opts.metalness > 0.3 || opts.roughness < 0.15) {
-    opts.envMap = state.envMap || window._roomEnvMap;
+    const env = state.envMap || window._roomEnvMap;
+    if (env) opts.envMap = env;
     if (opts.envMapIntensity === undefined) opts.envMapIntensity = 0.6;
   } else {
     if (opts.envMapIntensity === undefined) opts.envMapIntensity = 0;
