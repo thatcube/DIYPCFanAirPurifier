@@ -1093,27 +1093,9 @@ function _recolorFurTexture(srcTex, coatHex, coat2Hex, pattern){
     tmpC.setRGB(r,g,b);
     tmpC.getHSL(tmpHSL);
     if(tmpHSL.l > 0.05 && tmpHSL.l < 0.97){
-      let useHSL=tHSL;
-      if(isCow && tc2){
-        // Cow pattern: use large-scale position in texture for patches.
-        // Divide texture into a coarse grid and use noise per cell.
-        const cellW=Math.max(1, Math.floor(w/6));
-        const cellH=Math.max(1, Math.floor(h/6));
-        const cellX=Math.floor(px/cellW);
-        const cellY=Math.floor(py/cellH);
-        // Hash the cell index to get a stable random 0-1
-        const cellHash=Math.abs(Math.sin(cellX*127.1+cellY*311.7)*43758.5453)%1;
-        // Bottom rows bias white (belly), top rows bias dark (back)
-        const vertBias=(cellY/(h/cellH))*0.3;
-        const isWhite=(cellHash+vertBias) > 0.5;
-        if(isWhite){
-          d[i]=235; d[i+1]=235; d[i+2]=235;
-        } else {
-          d[i]=45; d[i+1]=45; d[i+2]=50;
-        }
-        continue;
-      }
-      tmpC.setHSL(useHSL.h, useHSL.s, tmpHSL.l);
+      // For cow pattern, the shader handles the two-color blend.
+      // Just desaturate the texture to gray so the shader colors show.
+      tmpC.setHSL(tHSL.h, tHSL.s, tmpHSL.l);
       d[i]  =Math.round(tmpC.r*255);
       d[i+1]=Math.round(tmpC.g*255);
       d[i+2]=Math.round(tmpC.b*255);
@@ -1155,8 +1137,9 @@ function _getCatFurNoiseTexture(){
   return tex;
 }
 function _ensureCatFurShader(mat){
-  if(!mat || mat.userData._catFurShaderInit) return;
-  mat.userData._catFurShaderInit=true;
+  if(!mat) return;
+  // Always reassign onBeforeCompile — cow uniforms may have been added since
+  // last compile. customProgramCacheKey change forces Three.js to recompile.
   mat.onBeforeCompile=(shader)=>{
     shader.uniforms.uCatFurAmount={value:Number(mat.userData._catFurAmount)||0};
     shader.uniforms.uCatFurTint={value:new THREE.Color(Number(mat.userData._catFurTintHex)||0xffffff)};
@@ -1209,12 +1192,22 @@ function _ensureCatFurShader(mat){
         'float catFuzz = mix(1.0, mix(0.76,1.28,catNoise), min(1.0, uCatFurAmount * 0.95) * catFurMask);',
         'vec3 catFurGlow = uCatFurTint * (catFurRim * uCatFurAmount * catFurMask);',
         'vec3 catFinal = (catColorized * catFuzz) + catFurGlow;',
-        // Cow pattern disabled in shader — handled via texture recoloring
+        // Cow pattern: use world-space position for dark/white patches.
+        // vViewPosition gives the fragment position in view space — use
+        // its components as a proxy for model-space position.
+        'if(uCatCowAmount > 0.01){',
+        '  vec3 wp = vViewPosition;',
+        '  float cn = cowNoise(wp.xy*0.8) * 0.4 + cowNoise(wp.xz*1.2+vec2(3.7,1.3)) * 0.35 + cowNoise(wp.yz*1.5+vec2(7.1,5.3)) * 0.25;',
+        '  float cowMask = step(0.46, cn);',
+        '  vec3 cowCol = mix(uCatCowColor1, uCatCowColor2, cowMask);',
+        '  float cowLuma = max(0.2, catLightLuma * 1.5);',
+        '  catFinal = cowCol * cowLuma;',
+        '}',
         'gl_FragColor = vec4( catFinal, diffuseColor.a );'
       ].join('\n'));
     mat.userData._catFurShader=shader;
   };
-  mat.customProgramCacheKey=()=> 'catFurShaderV7';
+  mat.customProgramCacheKey=()=> 'catFurShaderV8';
   mat.needsUpdate=true;
 }
 function _applyCatHairToBones(model,hairCfg){
