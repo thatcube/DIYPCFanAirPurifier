@@ -16,6 +16,7 @@ export function createPurifier(scene) {
   // Safe DOM helper — returns a no-op proxy if element doesn't exist
   const _nullEl = { classList: { add(){}, remove(){}, toggle(){} }, style: {}, querySelector(){ return _nullEl; }, querySelectorAll(){ return []; }, get value(){ return ''; }, set value(v){}, get textContent(){ return ''; }, set textContent(v){} };
   const _el = (id) => document.getElementById(id) || _nullEl;
+  const _markShadowsDirty = () => {}; // no-op — shadows managed by main.js
   const { H, W, D, ply, ft, bunFootH, bunFootR, panelW } = state;
   const _boardThickness = ply === 0.75 ? '34' : 'half';
 
@@ -3209,5 +3210,6 @@ export function createPurifier(scene) {
     setFanColor,
     toggleFanRGB,
     showWallBracket,
+    showConsoleProps,
   };
 }

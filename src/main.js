@@ -108,6 +108,10 @@ const placementOffset = new THREE.Vector3(45, 0, -68);
 purifierGroup.position.copy(placementOffset);
 purifierGroup.rotation.y = 90 * Math.PI / 180;
 
+// Show console props for Under TV mode (Xbox, Switch, game stack)
+purifierRefs.showConsoleProps(true);
+purifierRefs.showWallBracket(false);
+
 // Position camera — orbit around the purifier (Under TV position)
 camera.position.set(placementOffset.x + 25, 20, placementOffset.z + 35);
 controls.target.set(placementOffset.x, 8, placementOffset.z);
@@ -222,11 +226,32 @@ window._toggleSpin = () => {
 };
 
 // Placement
+let _prevPlacement = 'tv';
 window._setPlacement = (mode) => {
   const offsets = spatial.PLACEMENT_OFFSETS[mode] || spatial.PLACEMENT_OFFSETS.floor;
   placementOffset.set(offsets.x, offsets.y, offsets.z);
   purifierGroup.position.copy(placementOffset);
-  purifierGroup.rotation.y = mode === 'tv' ? Math.PI / 2 : 0;
+
+  // Rotation + visibility: TV and Wall both rotate 90°
+  if (mode === 'tv' || mode === 'wall') {
+    purifierGroup.rotation.y = Math.PI / 2;
+    purifierRefs.showConsoleProps(mode === 'tv');
+    purifierRefs.showWallBracket(mode === 'wall');
+  } else {
+    purifierGroup.rotation.y = 0;
+    purifierRefs.showConsoleProps(false);
+    purifierRefs.showWallBracket(false);
+  }
+
+  // Auto-toggle feet for wall mount (no feet on wall)
+  if (mode === 'wall') {
+    purifierRefs.setFeetStyle('none');
+  } else if (_prevPlacement === 'wall') {
+    purifierRefs.setFeetStyle('bun'); // restore default
+  }
+  _prevPlacement = mode;
+
+  // Update UI
   const ts = document.getElementById('turntableSlider');
   const tl = document.getElementById('turntableLabel');
   const deg = Math.round(purifierGroup.rotation.y * 180 / Math.PI);
@@ -236,6 +261,7 @@ window._setPlacement = (mode) => {
   const btnId = mode === 'tv' ? 'btnPlaceTv' : mode === 'wall' ? 'btnPlaceWall' : 'btnPlaceFloor';
   const btn = document.getElementById(btnId);
   if (btn) btn.classList.add('on');
+
   // Re-aim camera at the purifier
   controls.target.set(placementOffset.x, placementOffset.y + 8, placementOffset.z);
   camera.position.set(placementOffset.x + 25, placementOffset.y + 20, placementOffset.z + 35);
