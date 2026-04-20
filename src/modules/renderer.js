@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { state } from './state.js';
-import { QUALITY_DPR_TIERS } from './constants.js';
+import { QUALITY_DPR_TIERS_MOBILE, QUALITY_DPR_TIERS_DESKTOP } from './constants.js';
 
 /**
  * Create and configure the WebGL renderer.
@@ -36,7 +36,8 @@ export function createRenderer(canvas) {
     throw e;
   }
 
-  const dpr = QUALITY_DPR_TIERS[state.qualityTier] || QUALITY_DPR_TIERS[0];
+  const dprTiers = state.isMobile ? QUALITY_DPR_TIERS_MOBILE : QUALITY_DPR_TIERS_DESKTOP;
+  const dpr = Math.min(window.devicePixelRatio, dprTiers[state.qualityTier] || dprTiers[0]);
   renderer.setPixelRatio(dpr);
   renderer.setClearColor(0xd4dce8, 1);
   renderer.shadowMap.enabled = true;

@@ -1,17 +1,16 @@
 // ─── Quality tiers + performance constants ──────────────────────────
 
-// Shadow quality tiers (map size)
-export const QUALITY_SHADOW_TIERS = [2048, 1024, 512];
+// Shadow quality tiers (map size) — 4 tiers, mobile/desktop
+export const QUALITY_SHADOW_TIERS_MOBILE  = [1024, 768, 512, 384];
+export const QUALITY_SHADOW_TIERS_DESKTOP = [2048, 1536, 1024, 768];
 
 // Particle count tiers
 export const PARTICLE_TIER_COUNTS = [350, 280, 200, 140];
 
-// Device pixel ratio tiers  
-export const QUALITY_DPR_TIERS = [
-  Math.min(window.devicePixelRatio, 0.85),
-  Math.min(window.devicePixelRatio, 0.65),
-  Math.min(window.devicePixelRatio, 0.5)
-];
+// Device pixel ratio cap tiers — raw caps, NOT pre-computed.
+// Apply as Math.min(devicePixelRatio, cap) at usage time.
+export const QUALITY_DPR_TIERS_MOBILE  = [0.72, 0.64, 0.56, 0.50];
+export const QUALITY_DPR_TIERS_DESKTOP = [0.85, 0.74, 0.64, 0.55];
 
 // Shadow throttle in play mode (~45 Hz)
 export const SHADOW_UPDATE_INTERVAL_MS = 1000 / 45;
