@@ -249,23 +249,18 @@ function _buildStaticBoxes() {
 function _getBoxes() {
   resetBoxPool();
   const result = [];
-  const ox = _placementOffset ? _placementOffset.x : 0;
-  const oy = _placementOffset ? _placementOffset.y : 0;
-  const oz = _placementOffset ? _placementOffset.z : 0;
 
+  // In the modular build, the room stays at origin and only the purifier
+  // group moves. Room collision boxes don't need offset shifting.
   for (const box of _staticBoxes) {
-    if (box.room) {
-      const b = acquireBox();
-      b.xMin = box.xMin - ox;
-      b.xMax = box.xMax - ox;
-      b.zMin = box.zMin - oz;
-      b.zMax = box.zMax - oz;
-      b.yTop = box.yTop - oy;
-      b.yBottom = box.yBottom !== undefined ? box.yBottom - oy : undefined;
-      result.push(b);
-    } else {
-      result.push(box);
-    }
+    const b = acquireBox();
+    b.xMin = box.xMin;
+    b.xMax = box.xMax;
+    b.zMin = box.zMin;
+    b.zMax = box.zMax;
+    b.yTop = box.yTop;
+    b.yBottom = box.yBottom;
+    result.push(b);
   }
   return result;
 }
@@ -442,10 +437,9 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   let nx = fpPos.x + moveX;
   let nz = fpPos.z + moveZ;
   const r = BODY_R;
-  const oy = _placementOffset ? _placementOffset.y : 0;
 
-  // Wall bounds
-  const bounds = getBounds(_placementOffset || new THREE.Vector3());
+  // Wall bounds — room stays at origin, no placement offset needed
+  const bounds = getBounds(new THREE.Vector3());
   if (nx < bounds.xMin + r) { nx = bounds.xMin + r; _velX = Math.max(_velX, 0); }
   else if (nx > bounds.xMax - r) { nx = bounds.xMax - r; _velX = Math.min(_velX, 0); }
   if (nz < bounds.zMin + r) { nz = bounds.zMin + r; _velZ = Math.max(_velZ, 0); }
@@ -454,7 +448,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   // Furniture AABBs
   let bonkedThisFrame = false;
   let bonkIntensity = 0;
-  let groundY = getFloorY() - oy;
+  let groundY = getPlayerFloorY(); // eye-height floor (floorY + EYE_H)
   const boxes = _getBoxes();
 
   for (const box of boxes) {
@@ -498,7 +492,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
   // Ceiling
   const floorY = getFloorY();
-  const ceilMax = (floorY + 80 - oy) - 0.5;
+  const ceilMax = (floorY + 80) - 0.5;
   if (fpPos.y > ceilMax) { fpPos.y = ceilMax; fpVy = Math.min(fpVy, 0); }
 
   // Bonk SFX
@@ -534,7 +528,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     let dzC = -lookDir.z * camDist + right.z * camShoulder;
 
     // Wall/ceiling/floor clamp
-    const bnd = getBounds(_placementOffset || new THREE.Vector3());
+    const bnd = getBounds(new THREE.Vector3());
     const m = 0.5;
     const cyMin = floorY + 3, cyMax = (floorY + 80) - 3;
     const maxDX = dxC > 0 ? (bnd.xMax - m - focal.x) : (focal.x - (bnd.xMin + m));
