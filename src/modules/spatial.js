@@ -66,9 +66,9 @@ export function getWinCenterY() { return getFloorY() + 48; }
 export const WIN_CENTER_Z = BED_Z;  // centered on bed along Z
 
 // ── Ceiling light ───────────────────────────────────────────────────
-// IMPORTANT: The fixture MESH is at (0, ceilY, -15) but the actual
-// light SOURCE (ceilGlow) is at (-45, ceilY-8, 51). These are NOT
-// at the same position. DO NOT merge them.
+// The fixture mesh and ceilGlow light are both at (ceilLightX, ceilY, ceilLightZ)
+// and both tagged _isRoom so they move together with the room.
+// ceilGlow is offset -8 in Y to create a better lighting angle on the ceiling.
 export const CEIL_LIGHT_X = 0;
 export const CEIL_LIGHT_Z = -15;
 

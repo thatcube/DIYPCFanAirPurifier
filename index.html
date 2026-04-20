@@ -7202,13 +7202,13 @@ ceilSpot.shadow.camera.far=95;
 // The fixture MESH (fixBase, dome) is at (ceilLightX=0, ceilY, ceilLightZ=-15)
 // but the actual LIGHT SOURCE (ceilGlow) is at (-45, ceilY-8, 51). These are
 // NOT at the same coordinates and never were. An hour of troubleshooting
-// intensity/decay/shadow-casting was wasted because the PointLight was
-// assumed to be co-located with the fixture mesh. Moving the light source
-// to its correct world-space position instantly fixed the "3 walls receive
-// zero light" problem. DO NOT move ceilGlow back to ceilLightX/ceilLightZ.
+// The light SOURCE should be co-located with the fixture mesh and tagged
+// _isRoom so it moves with the room when placement changes. Previously
+// it was at a hardcoded world position that only matched in Under TV mode.
 ceilGlow=new THREE.PointLight(0xfff3df,0.35,0,0.8);
-ceilGlow.position.set(-45,ceilY-8,51);
+ceilGlow.position.set(ceilLightX,ceilY-8,ceilLightZ);
 ceilGlow.castShadow=false;
+ceilGlow._isRoom=true;
 scene.add(ceilGlow);
 
 // Curtains — simple draped fabric panels on each side of the window
