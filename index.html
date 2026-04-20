@@ -11081,15 +11081,15 @@ function _spawnSecretIfUntriggered(triggerId, spawnFn){
   // Flush visibility so the new coin shows immediately while in Play Mode.
   if(typeof _setCoinsVisible==='function') _setCoinsVisible(_coinGroup.visible);
 }
-// 1) FAN CLICK → Microsoft wink coin on top of the Xbox Series X that
-//    sits on the purifier (Under-TV placement). Coin rides with the
-//    purifier so it rotates with the turntable.
+// 1) FAN CLICK → secret coin on top of the purifier. Spawns on the first
+//    fan interaction. Placed at purifier top center so it works in any
+//    placement mode.
 function _spawnSecretXboxCoin(){
   _spawnSecretIfUntriggered('xbox', ()=>{
     _addCoin(
       purifierGroup,
-      new THREE.Vector3(0, (H/2+ply) + 11.85 + 2.2, 8),
-      {insidePurifier:true, consoleProp:true, secret:true}
+      new THREE.Vector3(0, (H/2+ply)+3, 0),
+      {insidePurifier:true, secret:true}
     );
   });
 }
