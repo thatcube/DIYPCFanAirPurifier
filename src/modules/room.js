@@ -589,7 +589,7 @@ export function createRoom(scene) {
     'img/pokopia.jpg',
     (tex)=>{
       tex.colorSpace=THREE.SRGBColorSpace||tex.colorSpace;
-      tex.anisotropy=Math.min(8, renderer.capabilities.getMaxAnisotropy());
+      tex.anisotropy=Math.min(8, (state.renderer ? state.renderer.capabilities.getMaxAnisotropy() : 4));
       screen.material.map=tex;
       screen.material.emissiveMap=tex;
       screen.material.emissive=new THREE.Color(0xffffff);
@@ -936,10 +936,9 @@ export function createRoom(scene) {
   
   // Keep daylight aligned with the mirrored window opening to avoid overhead leakage.
   const mirroredWindowX=-leftWallX;
-  key.position.set(mirroredWindowX+14, winCenterY+3, winCenterZ);
-  addRoom(key.target);
-  key.target.position.set(0, winCenterY+1, winCenterZ);
-  key.target.updateMatrixWorld();
+  // key light repositioning moved to lighting module — needs window coords
+  // key.position.set(mirroredWindowX+14, winCenterY+3, winCenterZ);
+  // key.target.position.set(0, winCenterY+1, winCenterZ);
   
   // Wall sections around the window (4 pieces: below, above, front, back)
   // Below window
