@@ -1375,14 +1375,14 @@ export function createRoom(scene) {
       }
       axesGroup.add(shaft);
       axesGroup.add(cone);
-      // Label
-      const hexStr='#'+a.color.toString(16).padStart(6,'0');
-      const lbl=makeTextSprite(a.label,hexStr);
-      lbl.position.set(dx*(axLen+coneH+3), dy*(axLen+coneH+3), dz*(axLen+coneH+3));
-      lbl.scale.multiplyScalar(2.0);
-      lbl.renderOrder=999;
-      lbl.material.depthTest=false;
-      axesGroup.add(lbl);
+      // Label (makeTextSprite not available in module — skip for now)
+      // const hexStr='#'+a.color.toString(16).padStart(6,'0');
+      // const lbl=makeTextSprite(a.label,hexStr);
+      // lbl.position.set(dx*(axLen+coneH+3), dy*(axLen+coneH+3), dz*(axLen+coneH+3));
+      // lbl.scale.multiplyScalar(2.0);
+      // lbl.renderOrder=999;
+      // lbl.material.depthTest=false;
+      // axesGroup.add(lbl);
     });
   }
   // ── X-mirror pass ─────────────────────────────────────────────────
