@@ -4,43 +4,95 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DIY PC Fan Air Purifier</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #d4dce8; font-family: system-ui, -apple-system, sans-serif; }
-    canvas#c { display: block; width: 100%; height: 100%; }
-    #fps { position: fixed; bottom: 8px; right: 8px; font-size: 11px; font-family: 'SF Mono', Menlo, Consolas, monospace; color: rgba(0,0,0,0.4); pointer-events: none; z-index: 100; }
-    #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #d4dce8; color: #4a5568; font-size: 16px; font-weight: 600; z-index: 1000; transition: opacity 0.5s; }
-
-    /* Game mode button */
-    #playDockBtn { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 200; background: rgba(8,12,18,0.86); color: #d9f3ff; border: 1px solid rgba(145,222,255,0.48); border-radius: 12px; padding: 10px 20px; font-family: system-ui; font-size: 14px; font-weight: 700; cursor: pointer; backdrop-filter: blur(10px); transition: all 0.2s; letter-spacing: 0.5px; }
-    #playDockBtn:hover { background: rgba(20,30,50,0.95); border-color: rgba(145,222,255,0.8); }
-    body.play-mode #playDockBtn { display: none; }
-
-    /* FP HUD */
-    #fpHud { display: none; position: fixed; top: 0; left: 0; width: 100%; z-index: 300; pointer-events: none; }
-    #coinHud { position: fixed; top: 16px; left: 16px; background: rgba(8,12,18,0.75); color: #ffd700; border: 1px solid rgba(255,215,0,0.4); border-radius: 10px; padding: 8px 14px; font-size: 16px; font-weight: 700; backdrop-filter: blur(8px); }
-    #fpCrosshair { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 4px; height: 4px; background: rgba(255,255,255,0.7); border-radius: 50%; z-index: 301; pointer-events: none; box-shadow: 0 0 6px rgba(255,255,255,0.3); }
-    #fpControls { position: fixed; bottom: 16px; left: 16px; background: rgba(8,12,18,0.65); color: rgba(255,255,255,0.6); border-radius: 8px; padding: 6px 10px; font-size: 11px; line-height: 1.6; backdrop-filter: blur(6px); }
-    #fpControls kbd { background: rgba(255,255,255,0.12); border-radius: 3px; padding: 1px 5px; font-size: 10px; }
-    #fpChargeBar { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); width: 120px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
-    #fpChargeFill { width: 0%; height: 100%; background: linear-gradient(90deg, #4af, #f4a); border-radius: 3px; transition: width 0.05s; }
-
-    /* Pause overlay */
-    #fpPauseOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 400; align-items: center; justify-content: center; flex-direction: column; gap: 12px; backdrop-filter: blur(4px); }
-    #fpPauseOverlay button { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 10px 28px; font-size: 14px; font-weight: 600; cursor: pointer; min-width: 160px; }
-    #fpPauseOverlay button:hover { background: rgba(255,255,255,0.2); }
-    #fpPauseOverlay h2 { color: #fff; font-size: 24px; margin-bottom: 8px; }
-  </style>
 </head>
 <body>
   <div id="loading">Loading...</div>
   <canvas id="c"></canvas>
   <div id="fps"></div>
 
-  <!-- Game mode UI -->
-  <button id="playDockBtn" onclick="window._toggleFP && window._toggleFP()">▶ Play Mode <kbd style="opacity:0.5;font-size:10px;margin-left:4px">G</kbd></button>
+  <!-- Control Panel -->
+  <button class="panel-fab" id="panelFab" onclick="document.getElementById('panelL').style.display='flex';this.style.display='none'">☰</button>
+  <div class="panel panel-l" id="panelL">
+    <div class="panel-header">
+      <h3>Control Center</h3>
+      <button class="panel-close" onclick="this.closest('.panel').style.display='none';document.getElementById('panelFab').style.display='flex'">✕</button>
+    </div>
+    <div class="panel-scroll">
 
-  <!-- FP HUD (shown during game) -->
+      <!-- Structure -->
+      <div class="section-group">
+        <h4>Structure</h4>
+        <div class="ctrl-row"><label>Wood stain</label>
+          <div class="seg">
+            <button class="on" id="btnStainRaw" onclick="window._setStain&&window._setStain('raw')">Raw</button>
+            <button id="btnStainOil" onclick="window._setStain&&window._setStain('oil')">Oil</button>
+            <button id="btnStainWalnut" onclick="window._setStain&&window._setStain('walnut')">Walnut</button>
+          </div>
+        </div>
+        <div class="ctrl-row"><label>Exploded view</label>
+          <div class="toggle-sw" id="togExplode" onclick="window._toggleExplode&&window._toggleExplode()"></div>
+        </div>
+      </div>
+
+      <!-- Finish -->
+      <div class="section-group">
+        <h4>Finish & Feet</h4>
+        <div class="ctrl-row"><label>Show filters</label>
+          <div class="toggle-sw on" id="togFilter" onclick="window._toggleFilter&&window._toggleFilter()"></div>
+        </div>
+        <div class="ctrl-row"><label>Fan grills</label>
+          <div class="toggle-sw on" id="togGrill" onclick="window._toggleGrills&&window._toggleGrills()"></div>
+        </div>
+        <div class="ctrl-row" id="grillColorSection"><label>Grill color</label>
+          <div class="seg">
+            <button class="on" id="btnGrillBlack" onclick="window._setGrillColor&&window._setGrillColor('black')">Black</button>
+            <button id="btnGrillSilver" onclick="window._setGrillColor&&window._setGrillColor('silver')">Silver</button>
+          </div>
+        </div>
+        <div class="ctrl-row"><label>Placement</label>
+          <div class="seg">
+            <button id="btnPlaceFloor" onclick="window._setPlacement&&window._setPlacement('floor')">Floor</button>
+            <button class="on" id="btnPlaceTv" onclick="window._setPlacement&&window._setPlacement('tv')">TV</button>
+            <button id="btnPlaceWall" onclick="window._setPlacement&&window._setPlacement('wall')">Wall</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fans -->
+      <div class="section-group">
+        <h4>Fans</h4>
+        <div class="ctrl-row"><label>Spin fans</label>
+          <div class="toggle-sw on" id="togSpin" onclick="window._toggleSpin&&window._toggleSpin()"></div>
+        </div>
+        <div class="slider-row">
+          <label>Speed</label>
+          <input type="range" min="0" max="1800" value="900" id="fanSpeedSlider" oninput="window._setFanSpeed&&window._setFanSpeed(this.value);document.getElementById('fanSpeedVal').textContent=this.value+'rpm'">
+          <span id="fanSpeedVal">900rpm</span>
+        </div>
+      </div>
+
+      <!-- Scene -->
+      <div class="section-group">
+        <h4>Scene</h4>
+        <div class="slider-row">
+          <label>Time</label>
+          <input type="range" min="0" max="1439" value="870" id="todSlider" oninput="window._setTOD&&window._setTOD(this.value)">
+          <span id="todLabel">2:30 PM</span>
+        </div>
+        <div class="slider-row">
+          <label>Turntable</label>
+          <input type="range" min="0" max="360" value="90" id="turntableSlider" oninput="window._setTurntable&&window._setTurntable(this.value);document.getElementById('turntableLabel').textContent=this.value+'°'">
+          <span id="turntableLabel">90°</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Game mode -->
+  <button id="playDockBtn" onclick="window._toggleFP&&window._toggleFP()">▶ Play Mode <kbd style="opacity:0.5;font-size:10px;margin-left:4px">G</kbd></button>
+
+  <!-- FP HUD -->
   <div id="fpHud">
     <div id="coinHud">🪙 <span id="coinCount">0/0</span></div>
   </div>
@@ -54,9 +106,9 @@
   <!-- Pause overlay -->
   <div id="fpPauseOverlay">
     <h2>Paused</h2>
-    <button onclick="window._resumeFP && window._resumeFP()">Resume</button>
-    <button onclick="window._resetFP && window._resetFP()">Reset Run</button>
-    <button onclick="window._exitFP && window._exitFP()">Exit Game</button>
+    <button onclick="window._resumeFP&&window._resumeFP()">Resume</button>
+    <button onclick="window._resetFP&&window._resetFP()">Reset Run</button>
+    <button onclick="window._exitFP&&window._exitFP()">Exit Game</button>
   </div>
 
   <script type="module" src="/src/main.js"></script>
