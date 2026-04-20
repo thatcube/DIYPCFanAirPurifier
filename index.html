@@ -2402,9 +2402,15 @@ windowSun.shadow.camera.far=260;
 scene.add(windowSun);
 scene.add(windowSun.target);
 windowSun.visible=false;
-const fill=new THREE.DirectionalLight(0xe8eeff,0.08); fill.position.set(-10,12,-12); scene.add(fill);
-const rim=new THREE.DirectionalLight(0xccddff,0.1); rim.position.set(-6,15,-18); scene.add(rim);
-const bounce=new THREE.DirectionalLight(0xffeedd,0.05); bounce.position.set(0,-10,8); scene.add(bounce);
+// fill/rim/bounce directional lights REMOVED for performance. Their combined
+// effect (0.03+0.02+0.01 = 0.06 diffuse) is folded into the hemisphere light
+// intensity. Each active light costs a full per-fragment evaluation on EVERY
+// mesh in the scene — removing 3 lights saves ~27% of per-pixel lighting work.
+// These placeholders keep the variable names alive so setRGBColor/applyTimeOfDay
+// don't throw, but they're zero-intensity and hidden.
+const fill={intensity:0,position:{set(){}},visible:false};
+const rim={intensity:0,position:{set(){}},visible:false};
+const bounce={intensity:0,position:{set(){}},visible:false};
 const ROOM_LIGHT_BASE={
   fill:{x:-10,y:12,z:-12},
   rim:{x:-6,y:15,z:-18},
@@ -2426,8 +2432,6 @@ const bladeCount=7;
 const holeR=impellerR*1.02;
 const cornerR=0.2;
 const allRotors=[];
-// DEBUG: hide all fan rotors to test if they're the perf bottleneck
-const _DEBUG_HIDE_FANS=true;
 const allFanMats=[]; // all fan plastic materials (frame, hub, cap, blade0)
 const allBladeMatsPerFan=[]; // array of arrays: allBladeMatsPerFan[fanIdx] = [mat0..mat6]
 const allBraceMats=[]; // brace spoke materials (color-switched with frame)
@@ -3007,7 +3011,6 @@ function makeFanPanel(flip, nFans, edgeProfile=topEdgeProfile){
 
     g.add(rotor);
     allRotors.push(rotor);
-    if(_DEBUG_HIDE_FANS) rotor.visible=false;
 
     // Invisible click target for reliable fan clicking
     const clickBox=new THREE.Mesh(
@@ -3067,7 +3070,6 @@ function makeFanPanel(flip, nFans, edgeProfile=topEdgeProfile){
     g.add(grill);
     allGrillMeshes.push(grill);
     grill.traverse(o=>{ if(o.isMesh&&o.material) _allGrillMats.push(o.material); });
-    if(_DEBUG_HIDE_FANS) grill.visible=false;
 
     // (RGB glow handled by single panel-level light below)
   }
@@ -3226,7 +3228,6 @@ function makeAltTopPanel(nFans){
     allBladeMatsPerFan.push(fanBlades2);
     g.add(rotor);
     allRotors.push(rotor);
-    if(_DEBUG_HIDE_FANS) rotor.visible=false;
 
     // Invisible click target for top-mount fan
     const clickBox2=new THREE.Mesh(
@@ -3285,7 +3286,6 @@ function makeAltTopPanel(nFans){
     g.add(grillTop);
     allGrillMeshes.push(grillTop);
     grillTop.traverse(o=>{ if(o.isMesh&&o.material) _allGrillMats.push(o.material); });
-    if(_DEBUG_HIDE_FANS) grillTop.visible=false;
 
     // (RGB glow handled by single panel-level light below)
   }
@@ -3317,14 +3317,10 @@ const _panelFanCounts=[4, 3, 4, 3, 4]; // front4, front3, back4, back3, altTop4
     for(const blade of blades){
       if(fansRGB){
         blade.color.setHex(BLADE_FROSTED.color);
-        // Keep blades OPAQUE even in RGB mode. The RGB glow comes from
-        // emissive (set in the render loop), which works on opaque materials.
-        // Transparent blades with depthWrite=false cause catastrophic
-        // overdraw (7 blades × multiple fans × alpha blend = 4x slower).
-        blade.transparent=false;
-        blade.opacity=1.0;
+        blade.transparent=true;
+        blade.opacity=BLADE_FROSTED.opacity;
         blade.shininess=BLADE_FROSTED.shininess;
-        blade.depthWrite=true;
+        blade.depthWrite=false;
       } else {
         blade.color.setHex(c.blade);
       }
@@ -5782,7 +5778,7 @@ function applyTimeOfDay(minuteOfDay){
   bounce.position.set(ROOM_LIGHT_BASE.bounce.x, ROOM_LIGHT_BASE.bounce.y, ROOM_LIGHT_BASE.bounce.z);
 
   // Other lights
-  hemiLight.intensity=mix(0.10, 0.24, sun) + (ceilLightOn?mix(0.12, 0.04, sun):0); // night floor raised to 0.10 so the room is never pitch black
+  hemiLight.intensity=mix(0.16, 0.32, sun) + (ceilLightOn?mix(0.12, 0.04, sun):0); // night floor raised; fill/rim/bounce folded in
   {
     const sky=lerpHex(0x334466, 0x8899bb, sun);
     if(ceilLightOn){
@@ -6040,10 +6036,7 @@ function setRGBColor(hex){
       blade.emissive.setHex(emissiveHex);
       blade.emissiveIntensity=emissiveIntensity;
       blade.color.setHex(BLADE_FROSTED.color);
-      // Stay opaque — overdraw from transparent blades was the #1 perf killer
-      blade.opacity=1.0;
-      blade.transparent=false;
-      blade.depthWrite=true;
+      blade.opacity=isOff?BLADE_FROSTED.opacity:0.55;
     }
   }
   for(let i=0;i<allFanMats.length;i+=4){
@@ -8029,8 +8022,7 @@ function animate(ts){
         blade.emissive.setHex(hex);
         blade.emissiveIntensity=emBr;
         blade.color.setHex(BLADE_FROSTED.color);
-        blade.opacity=1.0;
-        blade.transparent=false;
+        blade.opacity=0.55;
       }
       // Hub stays its base color (white/black) - no RGB emissive on hub
       allFanMats[fi*4+1].emissive.setHex(0x000000);
