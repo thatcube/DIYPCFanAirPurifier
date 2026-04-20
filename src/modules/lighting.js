@@ -153,13 +153,13 @@ export function createCeilingLights(ceilLightX, ceilY, ceilLightZ, floorY) {
   ceilSpot.shadow.camera.near = 10;
   ceilSpot.shadow.camera.far = 95;
 
-  // ── IMPORTANT: ceiling light fixture vs. light source positioning ──
-  // The fixture MESH is at (ceilLightX, ceilY, ceilLightZ) but the actual
-  // LIGHT SOURCE (ceilGlow) is at (-45, ceilY-8, 51). These are NOT at the
-  // same coordinates. DO NOT move ceilGlow to ceilLightX/ceilLightZ.
+  // ceilGlow is co-located with the fixture mesh and tagged _isRoom so
+  // it moves with the room when placement changes. Offset -8 in Y for
+  // a better lighting angle on the ceiling plane.
   ceilGlow = new THREE.PointLight(0xfff3df, 0.35, 0, 0.8);
-  ceilGlow.position.set(-45, ceilY - 8, 51);
+  ceilGlow.position.set(ceilLightX, ceilY - 8, ceilLightZ);
   ceilGlow.castShadow = false;
+  ceilGlow._isRoom = true;
   scene.add(ceilGlow);
 }
 
