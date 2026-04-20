@@ -3066,11 +3066,10 @@ function makeFanPanel(flip, nFans, edgeProfile=topEdgeProfile){
     // (RGB glow handled by single panel-level light below)
   }
 
-  // Single RGB glow light per panel side (instead of per-fan)
-  const glow=new THREE.PointLight(0x000000,0,45);
-  glow.position.set(0,0,inDir*(ply/2+fanDepth/2));
-  g.add(glow);
-  allFanGlows.push(glow);
+  // Per-panel glow lights REMOVED — replaced with per-grill emissive
+  // materials (zero lighting cost) + a single purifier-level PointLight.
+  // Each grill still visually glows its own color; only 1 light hits the
+  // GPU instead of 5.
 
   return g;
 }
@@ -3282,11 +3281,7 @@ function makeAltTopPanel(nFans){
     // (RGB glow handled by single panel-level light below)
   }
 
-  // Single RGB glow light for top panel
-  const topGlow=new THREE.PointLight(0x000000,0,45);
-  topGlow.position.set(0,0,0);
-  g.add(topGlow);
-  allFanGlows.push(topGlow);
+  // Per-panel glow lights REMOVED — see purifier-level PointLight below.
 
   return g;
 }
@@ -6008,11 +6003,9 @@ function setRGB(color){
   }
   if(color==='rainbow'){
     const dist=RGB_BASE_DIST*(0.5+rgbBrightness*1.5);
-    for(const gl of allFanGlows){
-      gl.intensity=(0.9*rgbBrightness+0.05);
-      gl.distance=dist;
-      gl.visible=rgbBrightness>0.001;
-    }
+    _purifierGlow.intensity=(0.9*rgbBrightness+0.05);
+    _purifierGlow.distance=dist;
+    _purifierGlow.visible=rgbBrightness>0.001;
     return;
   }
   setRGBColor(color==='off'?0x000000:customRGBHex);
@@ -6022,15 +6015,10 @@ function setRGBColor(hex){
   const isOff=(hex===0x000000);
   const intensity=isOff?0:0.9;
   const dist=RGB_BASE_DIST*(0.5+br*1.5);
-  for(const gl of allFanGlows){
-    gl.color.setHex(hex);
-    gl.intensity=intensity*br;
-    gl.distance=dist;
-    // When the LEDs are off we set intensity to 0, but Three.js still
-    // uploads the light to the uniform array and every lit fragment pays
-    // the distance falloff cost. Hiding them drops the count completely.
-    gl.visible=!isOff && br>0.001;
-  }
+  _purifierGlow.color.setHex(hex);
+  _purifierGlow.intensity=intensity*br;
+  _purifierGlow.distance=dist;
+  _purifierGlow.visible=!isOff && br>0.001;
   const emissiveHex=isOff?0x000000:hex;
   const emissiveIntensity=isOff?0:6.0*br;
   // Fan blades + hub caps
@@ -8034,20 +8022,36 @@ function animate(ts){
       allFanMats[fi*4+2].emissiveIntensity=0;
     }
 
-    // Panel glows match the middle fan's base hue
+    // Per-grill emissive coloring — each grill visually glows its own color
+    // without needing a separate PointLight (zero per-pixel lighting cost).
+    // One single _purifierGlow PointLight handles room illumination.
     const panelFanCounts=_panelFanCounts;
     let fanIdx=0;
-    for(let gi=0;gi<allFanGlows.length;gi++){
-      const nf=panelFanCounts[gi]||3;
-      const midFanIdx=fanIdx+Math.floor(nf/2);
-      const midPanelFanIdx=Math.floor(nf/2)%Math.max(visibleFanCount,3);
-      const midHue=(hueBase+midPanelFanIdx*fanStep)%1;
-      hueColor.setHSL(midHue,1,0.5);
-      allFanGlows[gi].color.copy(hueColor);
-      allFanGlows[gi].intensity=0.9*rb+0.05;
-      allFanGlows[gi].visible=rb>0.001;
-      fanIdx+=nf;
+    let avgGlowHue=hueBase;
+    for(let gi=0;gi<allGrillMeshes.length;gi++){
+      // Each grill gets the hue of its corresponding fan position
+      const panelIdx=gi<(panelFanCounts[0]||0)?0:
+                     gi<(panelFanCounts[0]||0)+(panelFanCounts[1]||0)?1:
+                     gi<(panelFanCounts[0]||0)+(panelFanCounts[1]||0)+(panelFanCounts[2]||0)?2:
+                     gi<(panelFanCounts[0]||0)+(panelFanCounts[1]||0)+(panelFanCounts[2]||0)+(panelFanCounts[3]||0)?3:4;
+      const grillFanIdx=gi-(panelIdx>0?(panelFanCounts.slice(0,panelIdx).reduce((a,b)=>a+b,0)):0);
+      const grillHue=(hueBase+grillFanIdx*fanStep)%1;
+      hueColor.setHSL(grillHue,1,0.5);
+      const gm=allGrillMeshes[gi];
+      gm.traverse(o=>{
+        if(o.isMesh&&o.material){
+          o.material.emissive=o.material.emissive||new THREE.Color();
+          o.material.emissive.copy(hueColor);
+          o.material.emissiveIntensity=rb*2.5;
+        }
+      });
     }
+    // Single purifier glow light — uses the average hue
+    const midHue=(hueBase+hueRange*0.5)%1;
+    hueColor.setHSL(midHue,1,0.5);
+    _purifierGlow.color.copy(hueColor);
+    _purifierGlow.intensity=0.9*rb+0.05;
+    _purifierGlow.visible=rb>0.001;
 
     // Subtle tint on filter/wood
     const avgHue=(hueBase+hueRange*0.5)%1;
@@ -10931,6 +10935,12 @@ const purifierGroup=new THREE.Group();
   purifierGroup.add(tvGameStackProps); // game stack rides with purifier in Under TV placement
   scene.add(purifierGroup);
 }
+// Single RGB glow PointLight for the whole purifier — replaces the 5
+// per-panel PointLights. Same visual effect, 80% less per-pixel work.
+const _purifierGlow=new THREE.PointLight(0x000000,0,45);
+_purifierGlow.position.set(0,0,0);
+_purifierGlow.castShadow=false;
+purifierGroup.add(_purifierGlow);
 
 // ─── Play Mode collectibles (coins) ───
 // Hidden by default; only shown in Play Mode. Pickup within _coinPickR units.
