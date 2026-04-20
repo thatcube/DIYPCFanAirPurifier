@@ -7704,7 +7704,7 @@ function _mbPlayAudio(song){
 }
 function _mbPlayNext(){
   _mbStopCurrentSong();
-  if(!_mbOn) return; // laptop was turned off while a song was ending
+  if(!_mbOn) return;
   if(!_mbQueue.length || _mbQueueIdx>=_mbQueue.length){
     _mbQueue=_mbBuildQueue();
     _mbQueueIdx=0;
@@ -7716,6 +7716,17 @@ function _mbPlayNext(){
   _mbLastPlayed=song.name;
   if(song.kind==='audio') _mbPlayAudio(song);
   else _mbPlayChiptune(song);
+}
+function _mbSkipNext(){
+  if(!_mbOn) return;
+  _mbPlayNext();
+}
+function _mbSkipPrev(){
+  if(!_mbOn) return;
+  _mbStopCurrentSong();
+  // Back up 2: one for the song that just stopped, one more for previous
+  _mbQueueIdx=Math.max(0, _mbQueueIdx-2);
+  _mbPlayNext();
 }
 let _mbOn=false; // tracks whether the MacBook music system is currently ON
 function _startMacbookMusic(){
@@ -10611,6 +10622,20 @@ document.addEventListener('keydown',e=>{
   if(e.key==='p'||e.key==='P'){
     _showCoords=!_showCoords;
     _showFpResetIndicator(_showCoords?'COORDS ON':'COORDS OFF');
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
+  if(e.key===';'){
+    _mbSkipPrev();
+    _showFpResetIndicator('⏮ PREV');
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
+  if(e.key==="'"){
+    _mbSkipNext();
+    _showFpResetIndicator('⏭ NEXT');
     e.preventDefault();
     e.stopImmediatePropagation();
     return;
