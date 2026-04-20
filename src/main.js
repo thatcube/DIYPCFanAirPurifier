@@ -50,8 +50,9 @@ controls.maxPolarAngle = Math.PI * 0.48;
 // Lights
 lighting.createLights(state.isMobile);
 
-// Add catGroup to scene
+// Add catGroup to scene — visible by default for the model viewer
 scene.add(catAnimation.catGroup);
+catAnimation.catGroup.visible = true;
 
 // Hide loading overlay
 const loadingEl = document.getElementById('loading');

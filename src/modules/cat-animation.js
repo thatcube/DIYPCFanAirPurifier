@@ -99,14 +99,16 @@ export function triggerNod() {
  * @param {object} refs - { applyCatColorToModel, playLauncherOpen, setLauncherCatPreview }
  */
 export function loadGameplayCat(refs = {}) {
-  if (!GLTFLoader) { console.warn('GLTFLoader not available'); return; }
+  console.log('[cat-anim] loadGameplayCat called, GLTFLoader=', typeof GLTFLoader);
   const nonce = ++gameLoadNonce;
   clearGameplayCat();
   const loader = new GLTFLoader();
   const sources = getSourcesForModelKey(catModelKey);
+  console.log('[cat-anim] loading sources:', sources);
 
   _loadWithFallback(loader, (gltf, src) => {
     if (nonce !== gameLoadNonce) return;
+    console.log('[cat-anim] loaded:', src);
     catModel = gltf.scene;
     _collectIdleBones(catModel);
     _stripBackdrop(catModel, src);
