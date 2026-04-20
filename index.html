@@ -1095,21 +1095,13 @@ function _recolorFurTexture(srcTex, coatHex, coat2Hex, pattern){
     if(tmpHSL.l > 0.05 && tmpHSL.l < 0.97){
       let useHSL=tHSL;
       if(isCow && tc2){
-        // Cow pattern: use noise to decide dark patches vs white areas.
-        // For low-saturation colors (gray/white), we must directly set
-        // luminance since hue+sat alone don't distinguish them.
-        const vertBias=py/h; // 0=top, 1=bottom
-        const noise=_cowNoise(px,py);
-        const thresh=0.35 + vertBias*0.35;
-        const isWhitePatch = noise > thresh;
-        // Blend the target luminance with the original to keep some detail
-        const targetL = isWhitePatch ? tHSL2.l : tHSL.l;
-        const blendL = targetL * 0.7 + tmpHSL.l * 0.3;
-        useHSL = isWhitePatch ? tHSL2 : tHSL;
-        tmpC.setHSL(useHSL.h, useHSL.s, Math.max(0.05, Math.min(0.97, blendL)));
-        d[i]  =Math.round(tmpC.r*255);
-        d[i+1]=Math.round(tmpC.g*255);
-        d[i+2]=Math.round(tmpC.b*255);
+        // DEBUG: blatant stripes to verify texture recoloring works at all
+        const stripe = (px % 60) < 30;
+        if(stripe){
+          d[i]=255; d[i+1]=0; d[i+2]=255; // hot pink
+        } else {
+          d[i]=0; d[i+1]=255; d[i+2]=0; // neon green
+        }
         continue;
       }
       tmpC.setHSL(useHSL.h, useHSL.s, tmpHSL.l);
