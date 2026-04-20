@@ -2685,6 +2685,7 @@ scene.add(botPanel); parts.bot=botPanel; origins.bot=botPanel.position.clone();
 
 // ─── Fan grills ───
 const allGrillMeshes=[];
+const _allGrillMats=[]; // cached flat list of all grill materials (avoid per-frame traverse)
 let grillsVisible=false;
 let grillColor='black'; // 'black' or 'silver'
 const C_GRILL_BLACK=0x1a1a1a;
@@ -3062,6 +3063,7 @@ function makeFanPanel(flip, nFans, edgeProfile=topEdgeProfile){
     grill.visible=grillsVisible;
     g.add(grill);
     allGrillMeshes.push(grill);
+    grill.traverse(o=>{ if(o.isMesh&&o.material) _allGrillMats.push(o.material); });
 
     // (RGB glow handled by single panel-level light below)
   }
@@ -3277,6 +3279,7 @@ function makeAltTopPanel(nFans){
     grillTop.visible=grillsVisible;
     g.add(grillTop);
     allGrillMeshes.push(grillTop);
+    grillTop.traverse(o=>{ if(o.isMesh&&o.material) _allGrillMats.push(o.material); });
 
     // (RGB glow handled by single panel-level light below)
   }
@@ -8022,29 +8025,16 @@ function animate(ts){
       allFanMats[fi*4+2].emissiveIntensity=0;
     }
 
-    // Per-grill emissive coloring — each grill visually glows its own color
-    // without needing a separate PointLight (zero per-pixel lighting cost).
-    // One single _purifierGlow PointLight handles room illumination.
-    const panelFanCounts=_panelFanCounts;
-    let fanIdx=0;
-    let avgGlowHue=hueBase;
-    for(let gi=0;gi<allGrillMeshes.length;gi++){
-      // Each grill gets the hue of its corresponding fan position
-      const panelIdx=gi<(panelFanCounts[0]||0)?0:
-                     gi<(panelFanCounts[0]||0)+(panelFanCounts[1]||0)?1:
-                     gi<(panelFanCounts[0]||0)+(panelFanCounts[1]||0)+(panelFanCounts[2]||0)?2:
-                     gi<(panelFanCounts[0]||0)+(panelFanCounts[1]||0)+(panelFanCounts[2]||0)+(panelFanCounts[3]||0)?3:4;
-      const grillFanIdx=gi-(panelIdx>0?(panelFanCounts.slice(0,panelIdx).reduce((a,b)=>a+b,0)):0);
-      const grillHue=(hueBase+grillFanIdx*fanStep)%1;
-      hueColor.setHSL(grillHue,1,0.5);
-      const gm=allGrillMeshes[gi];
-      gm.traverse(o=>{
-        if(o.isMesh&&o.material){
-          o.material.emissive=o.material.emissive||new THREE.Color();
-          o.material.emissive.copy(hueColor);
-          o.material.emissiveIntensity=rb*2.5;
-        }
-      });
+    // Per-grill emissive — use cached flat material list (no traverse)
+    // All grills share the same average hue for simplicity + speed.
+    const avgGlowHue=(hueBase+hueRange*0.5)%1;
+    hueColor.setHSL(avgGlowHue,1,0.5);
+    const grillEmI=rb*2.5;
+    for(let mi=0;mi<_allGrillMats.length;mi++){
+      const gm=_allGrillMats[mi];
+      if(!gm.emissive) gm.emissive=new THREE.Color();
+      gm.emissive.copy(hueColor);
+      gm.emissiveIntensity=grillEmI;
     }
     // Single purifier glow light — uses the average hue
     const midHue=(hueBase+hueRange*0.5)%1;
