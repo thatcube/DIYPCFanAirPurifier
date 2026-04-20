@@ -11213,11 +11213,16 @@ function _updateCoins(ts,frameScale){
         _coinSecretScore++;
         const hud=document.getElementById('secretCoinHud');
         const el=document.getElementById('secretCoinCount');
-        if(hud) hud.style.display='';
+        if(hud) hud.style.display='flex';
         if(el){
           el.textContent=String(_coinSecretScore);
           el.classList.add('pop');
           setTimeout(()=>el.classList.remove('pop'), 350);
+        }
+        // Check if all secrets found
+        const totalSecrets=_coins.filter(c2=>c2.secret).length;
+        if(_coinSecretScore>=totalSecrets && totalSecrets>0){
+          setTimeout(()=>_showFpResetIndicator('✨ ALL SECRETS FOUND! ✨'), 400);
         }
       }
       // Brief celebratory beep via WebAudio.
@@ -11225,14 +11230,32 @@ function _updateCoins(ts,frameScale){
         const ac=_coinAC||(window.AudioContext||window.webkitAudioContext) && new (window.AudioContext||window.webkitAudioContext)();
         if(ac){
           _coinAC=ac;
-          const o=ac.createOscillator(), g=ac.createGain();
-          o.type='triangle'; o.frequency.value=880;
-          g.gain.value=0.12;
-          o.connect(g).connect(ac.destination);
-          o.start();
-          o.frequency.exponentialRampToValueAtTime(1760, ac.currentTime+0.12);
-          g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+0.25);
-          o.stop(ac.currentTime+0.26);
+          if(c.secret){
+            // Secret coin: sparkly multi-note arpeggio (more impressive)
+            const notes=[1047, 1319, 1568, 2093]; // C6 E6 G6 C7
+            notes.forEach((freq, idx)=>{
+              const o=ac.createOscillator(), g=ac.createGain();
+              o.type='sine';
+              o.frequency.value=freq;
+              g.gain.value=0.15;
+              o.connect(g).connect(ac.destination);
+              const t=ac.currentTime+idx*0.08;
+              o.start(t);
+              g.gain.setValueAtTime(0.15, t);
+              g.gain.exponentialRampToValueAtTime(0.001, t+0.3);
+              o.stop(t+0.32);
+            });
+          } else {
+            // Regular coin: simple rising beep
+            const o=ac.createOscillator(), g=ac.createGain();
+            o.type='triangle'; o.frequency.value=880;
+            g.gain.value=0.12;
+            o.connect(g).connect(ac.destination);
+            o.start();
+            o.frequency.exponentialRampToValueAtTime(1760, ac.currentTime+0.12);
+            g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+0.25);
+            o.stop(ac.currentTime+0.26);
+          }
         }
       }catch(e){}
 
