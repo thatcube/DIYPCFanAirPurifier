@@ -1034,17 +1034,38 @@ function _loadCatAssetWithFallback(loader,onLoad,onError,sourcesOverride){
 // patterns via coat2Hex + pattern='cow'.
 // Cache keyed by texture UUID + coat hex + pattern to avoid re-processing.
 const _recoloredTexCache=new Map();
-// Simple hash-based noise for cow patches (no dependency needed)
-function _cowNoise(x,y){
-  // Two layers of hash noise at different scales for organic patches
-  const h1=Math.sin(x*0.031+y*0.017)*43758.5453;
-  const h2=Math.sin(x*0.013-y*0.029+2.7)*22578.1459;
-  const h3=Math.sin(x*0.057+y*0.041-1.3)*31415.9265;
-  const n1=(h1-Math.floor(h1));
-  const n2=(h2-Math.floor(h2));
-  const n3=(h3-Math.floor(h3));
-  // Blend layers: big blobs + medium detail
-  return n1*0.5 + n2*0.3 + n3*0.2;
+// Smooth value noise for cow patches — interpolated grid noise that produces
+// large coherent blobs, not per-pixel static. cellSize controls patch scale.
+function _cowNoise(x, y){
+  const cellSize=80; // ~80 pixels per noise cell = big patches
+  const gx=x/cellSize, gy=y/cellSize;
+  const ix=Math.floor(gx), iy=Math.floor(gy);
+  const fx=gx-ix, fy=gy-iy;
+  // Smooth interpolation (hermite curve)
+  const sx=fx*fx*(3-2*fx), sy=fy*fy*(3-2*fy);
+  // Hash function for grid corners
+  const hash=(a,b)=>{
+    const n=Math.sin(a*127.1+b*311.7)*43758.5453;
+    return n-Math.floor(n);
+  };
+  // Bilinear interpolation of corner values
+  const v00=hash(ix,iy), v10=hash(ix+1,iy);
+  const v01=hash(ix,iy+1), v11=hash(ix+1,iy+1);
+  const top=v00+(v10-v00)*sx;
+  const bot=v01+(v11-v01)*sx;
+  // Layer two octaves for more organic shape
+  const n1=top+(bot-top)*sy;
+  const cellSize2=200;
+  const gx2=x/cellSize2, gy2=y/cellSize2;
+  const ix2=Math.floor(gx2), iy2=Math.floor(gy2);
+  const fx2=gx2-ix2, fy2=gy2-iy2;
+  const sx2=fx2*fx2*(3-2*fx2), sy2=fy2*fy2*(3-2*fy2);
+  const w00=hash(ix2+99,iy2+77), w10=hash(ix2+100,iy2+77);
+  const w01=hash(ix2+99,iy2+78), w11=hash(ix2+100,iy2+78);
+  const top2=w00+(w10-w00)*sx2;
+  const bot2=w01+(w11-w01)*sx2;
+  const n2=top2+(bot2-top2)*sy2;
+  return n1*0.5+n2*0.5;
 }
 function _recolorFurTexture(srcTex, coatHex, coat2Hex, pattern){
   if(!srcTex || !srcTex.image) return srcTex;
@@ -1075,13 +1096,21 @@ function _recolorFurTexture(srcTex, coatHex, coat2Hex, pattern){
       let useHSL=tHSL;
       if(isCow && tc2){
         // Cow pattern: use noise to decide dark patches vs white areas.
-        // Bottom half of texture (higher py) tends toward white (belly),
-        // top half toward dark (back), with noisy patch boundaries.
+        // For low-saturation colors (gray/white), we must directly set
+        // luminance since hue+sat alone don't distinguish them.
         const vertBias=py/h; // 0=top, 1=bottom
         const noise=_cowNoise(px,py);
-        // Threshold shifts with vertical position: bottom is mostly white
-        const thresh=0.35 + vertBias*0.35; // top=0.35, bottom=0.70
-        useHSL = noise > thresh ? tHSL2 : tHSL;
+        const thresh=0.35 + vertBias*0.35;
+        const isWhitePatch = noise > thresh;
+        // Blend the target luminance with the original to keep some detail
+        const targetL = isWhitePatch ? tHSL2.l : tHSL.l;
+        const blendL = targetL * 0.7 + tmpHSL.l * 0.3;
+        useHSL = isWhitePatch ? tHSL2 : tHSL;
+        tmpC.setHSL(useHSL.h, useHSL.s, Math.max(0.05, Math.min(0.97, blendL)));
+        d[i]  =Math.round(tmpC.r*255);
+        d[i+1]=Math.round(tmpC.g*255);
+        d[i+2]=Math.round(tmpC.b*255);
+        continue;
       }
       tmpC.setHSL(useHSL.h, useHSL.s, tmpHSL.l);
       d[i]  =Math.round(tmpC.r*255);
