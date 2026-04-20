@@ -1095,12 +1095,22 @@ function _recolorFurTexture(srcTex, coatHex, coat2Hex, pattern){
     if(tmpHSL.l > 0.05 && tmpHSL.l < 0.97){
       let useHSL=tHSL;
       if(isCow && tc2){
-        // DEBUG: blatant stripes to verify texture recoloring works at all
-        const stripe = (px % 60) < 30;
-        if(stripe){
-          d[i]=255; d[i+1]=0; d[i+2]=255; // hot pink
+        // Cow pattern: smooth noise picks dark gray vs white patches.
+        // Direct RGB writes — HSL doesn't work for low-saturation colors.
+        const vertBias=py/h;
+        const noise=_cowNoise(px,py);
+        const thresh=0.35 + vertBias*0.35;
+        if(noise > thresh){
+          // White patch — blend with original luminance for detail
+          const lum=tmpHSL.l;
+          d[i]  =Math.round(240*0.7 + d[i]*0.3);
+          d[i+1]=Math.round(240*0.7 + d[i+1]*0.3);
+          d[i+2]=Math.round(240*0.7 + d[i+2]*0.3);
         } else {
-          d[i]=0; d[i+1]=255; d[i+2]=0; // neon green
+          // Dark gray patch
+          d[i]  =Math.round(60*0.7 + d[i]*0.3);
+          d[i+1]=Math.round(60*0.7 + d[i+1]*0.3);
+          d[i+2]=Math.round(60*0.7 + d[i+2]*0.3);
         }
         continue;
       }
