@@ -47,7 +47,7 @@ export function getMusicGain() { return _musicGain; }
 
 export function start() {
   try {
-    const ac = _ensureAC();
+    _ensureAC();
     if (_on) return;
     _on = true;
     _queue = _buildQueue();

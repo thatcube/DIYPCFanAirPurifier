@@ -200,12 +200,12 @@ export function createMoonGlow(leftWallX, winCenterY, winCenterZ) {
  * Apply time-of-day lighting. Called every frame or on slider change.
  *
  * @param {number} minuteOfDay - 0..1439
- * @param {object} refs - references to room meshes and state needed by ToD:
- *   { ceilLightOn, domeMat, outdoor, currentRGB, customRGBHex,
- *     setRGBColor, mirroredWindowX, winCenterY, winCenterZ, winW,
+ * @param {object} refs - references to room meshes and state:
+ *   { ceilLightOn, domeMat, outdoor,
+ *     mirroredWindowX, winCenterY, winCenterZ, winW,
  *     winTop, winBottom, winFront, winBack,
- *     wallMeshes, baseMeshes, floorMat, recessWalls, baseboardRecesses,
- *     _markShadowsDirty, isolateMode, renderer, scene }
+ *     wallMeshes, baseMeshes, floorMat,
+ *     _markShadowsDirty }
  */
 export function applyTimeOfDay(minuteOfDay, refs) {
   const sun  = sunCurve(minuteOfDay);

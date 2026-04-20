@@ -24,7 +24,10 @@ export const state = {
   W: 5.44,     // filter width
   H: 19.69,    // filter height  
   D: 24.69,    // filter depth
-  ply: 0.5,    // plywood thickness (half-inch)
+  ply: (() => {
+    try { return sessionStorage.getItem('boardThickness') === '34' ? 0.75 : 0.5; }
+    catch (e) { return 0.5; }
+  })(),
   ft: 0.78,    // filter thickness
   bunFootH: 2.5,
   bunFootR: 0.55,
