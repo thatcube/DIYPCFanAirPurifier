@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { state } from './state.js';
 import { stdMat } from './materials.js';
+import { fpMode as _fpMode } from './game-fp.js';
 
 export function createPurifier(scene) {
   const canvas = document.getElementById('c');

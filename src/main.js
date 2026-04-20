@@ -119,6 +119,9 @@ const _now = new Date();
 const _minutesNow = _now.getHours() * 60 + _now.getMinutes();
 lighting.applyTimeOfDay(_minutesNow, todRefs);
 
+// Force shadow update after TOD repositions lights
+_shadowDirtyOneShot = true;
+
 // ── Wire module cross-references ────────────────────────────────────
 
 music.setToastFn(showToast);
@@ -198,8 +201,8 @@ function animate(ts) {
   particles.updateSpinSpeed(animFrameScale);
   particles.update(animFrameScale);
 
-  // Shadow throttle
-  if (_shadowDirtyOneShot) {
+  // Shadow throttle — update on dirty flag OR periodically
+  if (_shadowDirtyOneShot || (ts - _lastShadowUpdateTs) >= SHADOW_UPDATE_INTERVAL_MS) {
     renderer.shadowMap.needsUpdate = true;
     _shadowDirtyOneShot = false;
     _lastShadowUpdateTs = ts;
