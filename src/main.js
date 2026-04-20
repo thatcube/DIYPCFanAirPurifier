@@ -145,6 +145,29 @@ catAnimation.loadGameplayCat({
 
 particles.init();
 
+// ── Game mode ───────────────────────────────────────────────────────
+
+gameFp.init({
+  camera,
+  canvas,
+  controls,
+  catGroup: catAnimation.catGroup,
+  scene,
+  placementOffset: new THREE.Vector3(),
+  markShadowsDirty,
+  showToast,
+  roomRefs
+});
+
+// Expose bridge functions for HTML onclick handlers
+window._toggleFP = () => gameFp.toggleFirstPerson();
+window._resumeFP = () => gameFp.setPaused(false);
+window._resetFP = () => {
+  gameFp.toggleFirstPerson(); // exit
+  setTimeout(() => gameFp.toggleFirstPerson(), 100); // re-enter
+};
+window._exitFP = () => { if (gameFp.fpMode) gameFp.toggleFirstPerson(); };
+
 // ── Render loop ─────────────────────────────────────────────────────
 
 let _lastFrameTs = 0;
@@ -160,8 +183,11 @@ function animate(ts) {
   const dtSec = Math.min(rawDt / 1000, 0.1);
   const animFrameScale = dtSec * 60;
 
-  // Controls
-  controls.update();
+  // Controls (only in orbit mode)
+  if (!gameFp.fpMode) controls.update();
+
+  // Game mode physics
+  gameFp.updatePhysics(ts, dtSec, animFrameScale);
 
   // Cat animation mixer
   if (catAnimation.catMixer) {
@@ -178,6 +204,12 @@ function animate(ts) {
     _shadowDirtyOneShot = false;
     _lastShadowUpdateTs = ts;
   }
+
+  // FP HUD elements visibility
+  const fpControlsEl = document.getElementById('fpControls');
+  const fpChargeBar = document.getElementById('fpChargeBar');
+  if (fpControlsEl) fpControlsEl.style.display = gameFp.fpMode ? 'block' : 'none';
+  if (fpChargeBar) fpChargeBar.style.display = gameFp.fpMode ? 'block' : 'none';
 
   // Render
   renderer.render(scene, camera);

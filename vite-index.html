@@ -10,12 +10,55 @@
     canvas#c { display: block; width: 100%; height: 100%; }
     #fps { position: fixed; bottom: 8px; right: 8px; font-size: 11px; font-family: 'SF Mono', Menlo, Consolas, monospace; color: rgba(0,0,0,0.4); pointer-events: none; z-index: 100; }
     #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #d4dce8; color: #4a5568; font-size: 16px; font-weight: 600; z-index: 1000; transition: opacity 0.5s; }
+
+    /* Game mode button */
+    #playDockBtn { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 200; background: rgba(8,12,18,0.86); color: #d9f3ff; border: 1px solid rgba(145,222,255,0.48); border-radius: 12px; padding: 10px 20px; font-family: system-ui; font-size: 14px; font-weight: 700; cursor: pointer; backdrop-filter: blur(10px); transition: all 0.2s; letter-spacing: 0.5px; }
+    #playDockBtn:hover { background: rgba(20,30,50,0.95); border-color: rgba(145,222,255,0.8); }
+    body.play-mode #playDockBtn { display: none; }
+
+    /* FP HUD */
+    #fpHud { display: none; position: fixed; top: 0; left: 0; width: 100%; z-index: 300; pointer-events: none; }
+    #coinHud { position: fixed; top: 16px; left: 16px; background: rgba(8,12,18,0.75); color: #ffd700; border: 1px solid rgba(255,215,0,0.4); border-radius: 10px; padding: 8px 14px; font-size: 16px; font-weight: 700; backdrop-filter: blur(8px); }
+    #fpCrosshair { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 4px; height: 4px; background: rgba(255,255,255,0.7); border-radius: 50%; z-index: 301; pointer-events: none; box-shadow: 0 0 6px rgba(255,255,255,0.3); }
+    #fpControls { position: fixed; bottom: 16px; left: 16px; background: rgba(8,12,18,0.65); color: rgba(255,255,255,0.6); border-radius: 8px; padding: 6px 10px; font-size: 11px; line-height: 1.6; backdrop-filter: blur(6px); }
+    #fpControls kbd { background: rgba(255,255,255,0.12); border-radius: 3px; padding: 1px 5px; font-size: 10px; }
+    #fpChargeBar { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); width: 120px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
+    #fpChargeFill { width: 0%; height: 100%; background: linear-gradient(90deg, #4af, #f4a); border-radius: 3px; transition: width 0.05s; }
+
+    /* Pause overlay */
+    #fpPauseOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 400; align-items: center; justify-content: center; flex-direction: column; gap: 12px; backdrop-filter: blur(4px); }
+    #fpPauseOverlay button { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 10px 28px; font-size: 14px; font-weight: 600; cursor: pointer; min-width: 160px; }
+    #fpPauseOverlay button:hover { background: rgba(255,255,255,0.2); }
+    #fpPauseOverlay h2 { color: #fff; font-size: 24px; margin-bottom: 8px; }
   </style>
 </head>
 <body>
   <div id="loading">Loading...</div>
   <canvas id="c"></canvas>
   <div id="fps"></div>
+
+  <!-- Game mode UI -->
+  <button id="playDockBtn" onclick="window._toggleFP && window._toggleFP()">▶ Play Mode <kbd style="opacity:0.5;font-size:10px;margin-left:4px">G</kbd></button>
+
+  <!-- FP HUD (shown during game) -->
+  <div id="fpHud">
+    <div id="coinHud">🪙 <span id="coinCount">0/0</span></div>
+  </div>
+  <div id="fpCrosshair"></div>
+  <div id="fpControls" style="display:none">
+    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move · <kbd>Space</kbd> Jump (hold to charge)<br>
+    <kbd>Shift</kbd> Sprint · <kbd>V</kbd> Camera · <kbd>G</kbd> Exit · <kbd>Esc</kbd> Pause
+  </div>
+  <div id="fpChargeBar" style="display:none"><div id="fpChargeFill"></div></div>
+
+  <!-- Pause overlay -->
+  <div id="fpPauseOverlay">
+    <h2>Paused</h2>
+    <button onclick="window._resumeFP && window._resumeFP()">Resume</button>
+    <button onclick="window._resetFP && window._resetFP()">Reset Run</button>
+    <button onclick="window._exitFP && window._exitFP()">Exit Game</button>
+  </div>
+
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
