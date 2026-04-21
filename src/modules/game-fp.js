@@ -507,19 +507,19 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   _lastPhysicsTs = ts;
   const frameScale = fpDtMs / (1000 / 60);
 
-  // ── Look ──────────────────────────────────────────────────────────
-  const maxLookStep = 28;
+  // ── Look (smoothed) ────────────────────────────────────────────────
+  const maxLookStep = 32;
   const stepX = Math.max(-maxLookStep, Math.min(maxLookStep, fpLookDX));
   const stepY = Math.max(-maxLookStep, Math.min(maxLookStep, fpLookDY));
   fpLookDX -= stepX;
   fpLookDY -= stepY;
-  if (Math.abs(fpLookDX) > maxLookStep * 4) fpLookDX *= 0.6;
-  if (Math.abs(fpLookDY) > maxLookStep * 4) fpLookDY *= 0.6;
-  fpYaw -= stepX * 0.002;
-  fpPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, fpPitch - stepY * 0.002));
+  if (Math.abs(fpLookDX) > maxLookStep * 4) fpLookDX *= 0.5;
+  if (Math.abs(fpLookDY) > maxLookStep * 4) fpLookDY *= 0.5;
+  fpYaw -= stepX * 0.0022;
+  fpPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, fpPitch - stepY * 0.0022));
 
   // ── Movement ──────────────────────────────────────────────────────
-  const spd = fpKeys.shift ? 0.45 : 0.22;
+  const spd = fpKeys.shift ? 0.52 : 0.26;
   const fwd = _fwd.set(-Math.sin(fpYaw), 0, -Math.cos(fpYaw));
   const right = _right.set(fwd.z, 0, -fwd.x);
 
@@ -530,11 +530,13 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   if (fpKeys.d) { tgtX -= right.x * spd; tgtZ -= right.z * spd; }
 
   const inputActive = fpKeys.w || fpKeys.a || fpKeys.s || fpKeys.d;
-  const accelBase = inputActive ? 0.18 : 0.22;
+  // Slower accel = weightier start, slower decel = more slide/momentum
+  const accelBase = inputActive ? 0.12 : 0.10;
   const accel = 1 - Math.pow(1 - accelBase, frameScale);
   _velX += (tgtX - _velX) * accel;
   _velZ += (tgtZ - _velZ) * accel;
-  if (!inputActive && Math.hypot(_velX, _velZ) < 0.005) { _velX = 0; _velZ = 0; }
+  // Lower dead zone so momentum carries further before stopping
+  if (!inputActive && Math.hypot(_velX, _velZ) < 0.002) { _velX = 0; _velZ = 0; }
 
   const moveX = _velX * frameScale;
   const moveZ = _velZ * frameScale;
@@ -631,9 +633,11 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   const grounded = Math.abs(fpPos.y - groundY) < 0.05;
   const horizSpd = Math.hypot(_velX, _velZ);
   if (grounded && horizSpd > 0.02) {
-    _bobPhase += horizSpd * 0.55 * frameScale;
+    _bobPhase += horizSpd * 0.6 * frameScale;
   }
-  const bobY = grounded ? Math.sin(_bobPhase) * Math.min(horizSpd, 0.5) * 0.07 : 0;
+  // More pronounced bob that scales with speed — sprinting bobs more
+  const bobAmp = Math.min(horizSpd, 0.5) * 0.12;
+  const bobY = grounded ? Math.sin(_bobPhase) * bobAmp : 0;
 
   // ── Camera ────────────────────────────────────────────────────────
   const lookDir = _viewDir.set(
