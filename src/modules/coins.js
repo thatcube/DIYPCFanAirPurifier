@@ -252,8 +252,8 @@ export function spawnRoomCoins(roomRefs) {
   addCoin(_coinGroup, new THREE.Vector3(35, fy + 3, 20), {});
   // 9. On closet shelf
   addCoin(_coinGroup, new THREE.Vector3(-(shelfCx), fy + 80 - 24 + 0.4 + 2.5, secZ), {});
-  // 10. On top of mini split
-  addCoin(_coinGroup, new THREE.Vector3(-msX, msY + msH / 2 + 2.2, msZ - msD / 2 + 1.5), {});
+  // 10. On top of mini split (in front of wall, not behind it)
+  addCoin(_coinGroup, new THREE.Vector3(-msX, msY + msH / 2 + 2.2, msZ + msD / 2 + 1.5), {});
   // 11. On top of TV
   addCoin(_coinGroup, new THREE.Vector3(-tvCenterX, tvCenterY + tvH / 2 + bezel + 2.2, tvZ - tvD / 2 + 1.2), {});
   // 12. Closet corner (floor)
