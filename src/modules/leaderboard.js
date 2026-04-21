@@ -520,6 +520,12 @@ async function _renameLatestEntryShared(entryId, nextName, baseData) {
     };
   } catch (e) {
     if (e && e.apiCode) {
+      // Older deployed backends may not have /run/rename yet.
+      if (e.apiCode === 'not_found' || e.httpStatus === 404) {
+        _sharedOnline = false;
+        _statusNote = 'Local rename fallback';
+        return _renameLatestEntryLocal(cleanId, cleanName, baseData);
+      }
       _sharedOnline = true;
       _statusNote = `Rename rejected (${e.apiCode})`;
       void refreshSharedLeaderboard();
@@ -808,7 +814,11 @@ export function openFinishDialogForRun(timeMs, coinTotal, secretCoins) {
     catModel: sanitizeModelKey(catModelKey)
   };
 
-  _openFinishDialogOverlay(true);
+  _openFinishDialogOverlay(false);
+  // Save immediately so editable name appears in the final leaderboard row.
+  void _submitPendingFinishRun().then(() => {
+    _focusFinishRowNameInput();
+  });
 }
 
 export function closeFinishDialog() {
@@ -831,6 +841,18 @@ export function closeFinishDialog() {
 
 function _getFinishRowNameInput() {
   return document.querySelector('#finishDialogList .finishDialogRowNameInput');
+}
+
+function _focusFinishRowNameInput() {
+  requestAnimationFrame(() => {
+    const input = _getFinishRowNameInput();
+    if (!input || input.disabled) return;
+    input.focus();
+    if (typeof input.setSelectionRange === 'function') {
+      const len = String(input.value || '').length;
+      try { input.setSelectionRange(len, len); } catch (e) { /* ignore */ }
+    }
+  });
 }
 
 function _submitPendingFinishRun() {
@@ -871,6 +893,7 @@ function _submitPendingFinishRun() {
         renderLeaderboardPanel();
         showShareButton(runData);
         _renderFinishDialog();
+        _focusFinishRowNameInput();
         return runData;
       }
 
@@ -934,12 +957,13 @@ function _renderFinishDialog() {
   }
 
   if (saveHint) {
-    if (pending || canRenameSavedEntry) {
+    if (pending) {
+      if (_finishSaveStatus === 'error') saveHint.textContent = 'Save failed. Please wait and it will retry.';
+      else saveHint.textContent = 'Saving run...';
+    } else if (canRenameSavedEntry) {
       if (_finishSaveStatus === 'saving') saveHint.textContent = 'Saving...';
       else if (_finishSaveStatus === 'error') saveHint.textContent = 'Save failed. Leave the field again to retry.';
-      else saveHint.textContent = pending
-        ? 'Edit your leaderboard row name, then leave the field to autosave.'
-        : 'Saved. Edit and leave the field to update this run.';
+      else saveHint.textContent = 'Saved. Edit and leave your leaderboard row to update this run.';
     } else if (Math.floor(Number(data.rank) || 0) > 0 || _finishSaveStatus === 'saved') {
       saveHint.textContent = 'Saved.';
     } else {
@@ -955,18 +979,8 @@ function _renderFinishDialog() {
   }
   if (list) {
     const ownId = String(data.entryId || '');
-    const editableEntryId = pending ? '__pending__' : (canRenameSavedEntry ? _finishEditableEntryId : '');
-    const draftName = _sanitizePlayerName(data.name || _playerName || 'Player') || 'Player';
+    const editableEntryId = canRenameSavedEntry ? _finishEditableEntryId : '';
     const rows = [];
-
-    if (pending) {
-      rows.push(`<li class="own pending" data-entry-id="__pending__">
-        <span class="rk">—</span>
-        <span class="nm nm-edit"><input type="text" class="finishDialogRowNameInput" maxlength="24" value="${_escapeHtml(draftName)}" autocomplete="off" spellcheck="false" /></span>
-        ${_catBadgeHtml({ catModel: data.catModel, catColor: data.catColor, catHair: data.catHair })}
-        <span class="tm">${formatRunTime(runTimeMs)}</span>
-      </li>`);
-    }
 
     if (_leaderboard.length) {
       for (let i = 0; i < _leaderboard.length; i++) {
@@ -983,7 +997,9 @@ function _renderFinishDialog() {
           <span class="tm">${formatRunTime(r.timeMs)}</span>
         </li>`);
       }
-    } else if (!pending) {
+    } else if (pending) {
+      rows.push('<li style="opacity:0.72;padding:8px 10px">Saving run...</li>');
+    } else {
       rows.push('<li style="opacity:0.62;padding:8px 10px">No runs yet.</li>');
     }
 
@@ -991,7 +1007,7 @@ function _renderFinishDialog() {
 
     const rowInput = _getFinishRowNameInput();
     if (rowInput) {
-      rowInput.disabled = _finishSubmitting || !(pending || canRenameSavedEntry);
+      rowInput.disabled = _finishSubmitting || !canRenameSavedEntry;
       rowInput.addEventListener('input', () => {
         _finishNameDirty = true;
         _finishSaveStatus = 'idle';
