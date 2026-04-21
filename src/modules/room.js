@@ -1343,45 +1343,27 @@ export function createRoom(scene) {
   duvet.castShadow=true; duvet.receiveShadow=true; duvet._isRoom=true;
   addRoom(duvet);
 
-  // ── Backpack under the bed (laying flat, pillow-style soft shape) ───
+  // ── Backpack under the bed (laying flat, natural fabric shape) ──────
   {
-    // Real backpack dimensions laid flat: 19" long × 13" wide × 7" thick (stuffed)
-    const bpL = 19, bpW = 13, bpThick = 5; // slightly compressed when flat
+    // Realistic dimensions: 19×13" footprint, ~5" thick when stuffed and flat
+    const bpL = 19, bpW = 13, bpThick = 5;
     const bpX = bedX + 3;
     const bpZ = bedZ + 4;
     const bpY = floorY + bpThick / 2 + 0.1;
-    const bpAngle = 0.18; // slight rotation for natural tossed look
+    const bpAngle = 0.18;
 
-    // Fabric texture — woven noise
-    const fabricCvs = document.createElement('canvas');
-    fabricCvs.width = 128; fabricCvs.height = 128;
-    const fctx = fabricCvs.getContext('2d');
-    fctx.fillStyle = '#2a2a2e';
-    fctx.fillRect(0, 0, 128, 128);
-    // Weave pattern
-    for (let wy = 0; wy < 128; wy += 2) {
-      fctx.fillStyle = `rgba(255,255,255,${0.02 + Math.random() * 0.015})`;
-      fctx.fillRect(0, wy, 128, 1);
-    }
-    for (let wx = 0; wx < 128; wx += 3) {
-      fctx.fillStyle = `rgba(255,255,255,${0.01 + Math.random() * 0.01})`;
-      fctx.fillRect(wx, 0, 1, 128);
-    }
-    const fabricTex = new THREE.CanvasTexture(fabricCvs);
-    fabricTex.wrapS = fabricTex.wrapT = THREE.RepeatWrapping;
-    fabricTex.repeat.set(3, 4);
+    // Fabric material
     const bpMat = new THREE.MeshStandardMaterial({
-      color: 0x2a2a2e, roughness: 0.94, metalness: 0.02, map: fabricTex
+      color: 0x2a2a2e, roughness: 0.94, metalness: 0.02
     });
 
-    // Pillow-style soft body: subdivided box with rounded edges + puffiness
-    const bodyGeo = new THREE.BoxGeometry(bpL, bpThick, bpW, 16, 6, 12);
+    // Main body — subdivided box with gentle edge rounding and subtle surface variation
+    const bodyGeo = new THREE.BoxGeometry(bpL, bpThick, bpW, 14, 5, 10);
     const bp = bodyGeo.attributes.position;
-    const edgeR = 2.8; // rounding radius
+    const edgeR = 1.8;
     for (let i = 0; i < bp.count; i++) {
       let x = bp.getX(i), y = bp.getY(i), z = bp.getZ(i);
-      const nx = x / (bpL / 2), nz = z / (bpW / 2);
-      // Round edges (same technique as pillows)
+      // Soft edge rounding
       const ex = Math.max(0, Math.abs(x) - bpL / 2 + edgeR);
       const ey = Math.max(0, Math.abs(y) - bpThick / 2 + edgeR);
       const ez = Math.max(0, Math.abs(z) - bpW / 2 + edgeR);
@@ -1392,18 +1374,18 @@ export function createRoom(scene) {
         if (ey > 0) y = Math.sign(y) * (bpThick / 2 - edgeR + ey * sc);
         if (ez > 0) z = Math.sign(z) * (bpW / 2 - edgeR + ez * sc);
       }
-      // Puffiness — dome the top
-      const cx2 = nx * nx, cz2 = nz * nz;
-      const puff = (1 - cx2) * (1 - cz2);
-      if (y > 0) y += puff * 1.2;
-      // Flatten bottom
-      if (y < 0) y *= 0.55;
-      // Subtle wrinkle displacement
-      y += Math.sin(x * 2.3 + z * 1.7) * 0.06 + Math.cos(z * 3.1 + x * 0.9) * 0.05;
-      // One end slightly tapers (top of backpack is narrower)
-      if (x > bpL * 0.2) {
-        const taper = 1 - (x - bpL * 0.2) / (bpL * 0.3) * 0.12;
-        z *= Math.max(0.88, taper);
+      // Gentle top bulge (stuffed, not pillow-puffy)
+      const nx = x / (bpL / 2), nz = z / (bpW / 2);
+      if (y > 0) y += (1 - nx * nx) * (1 - nz * nz) * 0.6;
+      // Flat bottom
+      if (y < 0) y *= 0.7;
+      // Subtle wrinkle
+      y += Math.sin(x * 1.8 + z * 2.4) * 0.04;
+      // Taper the top end slightly
+      if (x > bpL * 0.15) {
+        const t = (x - bpL * 0.15) / (bpL * 0.35);
+        z *= 1 - t * 0.08;
+        y *= 1 - t * 0.05;
       }
       bp.setXYZ(i, x, y, z);
     }
@@ -1414,63 +1396,70 @@ export function createRoom(scene) {
     bpBody.castShadow = true; bpBody.receiveShadow = true; bpBody._isRoom = true;
     addRoom(bpBody);
 
-    // Straps — two draped ribbons
-    const strapMat = new THREE.MeshStandardMaterial({ color: 0x1e1e22, roughness: 0.96 });
+    // Straps — lighter color so they're visible, trailing out from the body
+    const strapMat = new THREE.MeshStandardMaterial({ color: 0x444448, roughness: 0.88 });
     for (const sz of [-1, 1]) {
-      const strapGeo = new THREE.BoxGeometry(12, 0.3, 1.4, 10, 1, 1);
+      const strapGeo = new THREE.BoxGeometry(14, 0.4, 1.6, 10, 1, 1);
       const sp = strapGeo.attributes.position;
       for (let si = 0; si < sp.count; si++) {
         let sx = sp.getX(si), sy = sp.getY(si);
-        // Natural sag curve
-        sy -= Math.cos(sx / 12 * Math.PI) * 0.5;
-        // Slight twist
-        const twist = sx / 12 * 0.15 * sz;
-        sp.setXY(si, sx, sy + twist);
+        sy -= Math.cos(sx / 14 * Math.PI) * 0.6;
+        sp.setXY(si, sx, sy);
       }
       strapGeo.computeVertexNormals();
       const strap = new THREE.Mesh(strapGeo, strapMat);
-      strap.position.set(bpX - 2, bpY + bpThick / 2 + 0.08, bpZ + sz * 3.5);
-      strap.rotation.y = bpAngle;
+      // Position straps trailing out from the narrow end, on the floor
+      strap.position.set(bpX + bpL / 2 + 3, floorY + 0.3, bpZ + sz * 3);
+      strap.rotation.y = bpAngle + sz * 0.1;
       strap.castShadow = true; strap.receiveShadow = true; strap._isRoom = true;
       addRoom(strap);
     }
 
-    // Microsoft logo — load SVG as texture on one side
-    const msLoader = new THREE.TextureLoader();
-    const msLogoTex = msLoader.load('img/Microsoft_logo.svg');
-    const msLogo = new THREE.Mesh(
-      new THREE.PlaneGeometry(5, 5),
-      new THREE.MeshStandardMaterial({
-        map: msLogoTex, transparent: true, roughness: 0.6, metalness: 0.1,
-        color: 0xffffff
-      })
-    );
-    // Place on the top-right area of the bag, facing up
-    msLogo.rotation.x = -Math.PI / 2;
-    msLogo.rotation.z = bpAngle;
-    msLogo.position.set(bpX + 3, bpY + bpThick / 2 + 0.2, bpZ + 1.5);
-    msLogo._isRoom = true;
-    addRoom(msLogo);
+    // Logos — render SVGs to canvas since Three.js r128 can't load SVGs as textures
+    function loadSvgToCanvas(url, size, callback) {
+      const img = new Image();
+      img.onload = () => {
+        const cvs = document.createElement('canvas');
+        cvs.width = size; cvs.height = size;
+        const ctx = cvs.getContext('2d');
+        ctx.drawImage(img, 0, 0, size, size);
+        callback(cvs);
+      };
+      img.crossOrigin = 'anonymous';
+      img.src = url;
+    }
 
-    // Power BI logo on the other side
-    const pbiLogoTex = msLoader.load('img/Power_BI_Logo.svg');
-    const pbiLogo = new THREE.Mesh(
-      new THREE.PlaneGeometry(4, 4),
-      new THREE.MeshStandardMaterial({
-        map: pbiLogoTex, transparent: true, roughness: 0.6, metalness: 0.1,
-        color: 0xffffff
-      })
-    );
-    pbiLogo.rotation.x = -Math.PI / 2;
-    pbiLogo.rotation.z = bpAngle;
-    pbiLogo.position.set(bpX - 3, bpY + bpThick / 2 + 0.2, bpZ - 1.5);
-    pbiLogo._isRoom = true;
-    addRoom(pbiLogo);
+    // Microsoft logo on one half of the top
+    loadSvgToCanvas('img/Microsoft_logo.svg', 256, (cvs) => {
+      const tex = new THREE.CanvasTexture(cvs);
+      const mat = new THREE.MeshStandardMaterial({
+        map: tex, transparent: true, roughness: 0.65, metalness: 0.05
+      });
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(5, 5), mat);
+      plane.rotation.x = -Math.PI / 2;
+      plane.rotation.z = bpAngle;
+      plane.position.set(bpX + 3, bpY + bpThick / 2 + 0.25, bpZ + 0.5);
+      plane._isRoom = true;
+      addRoom(plane);
+    });
 
-    // Zipper line across the top
+    // Power BI logo on the other half
+    loadSvgToCanvas('img/Power_BI_Logo.svg', 256, (cvs) => {
+      const tex = new THREE.CanvasTexture(cvs);
+      const mat = new THREE.MeshStandardMaterial({
+        map: tex, transparent: true, roughness: 0.65, metalness: 0.05
+      });
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), mat);
+      plane.rotation.x = -Math.PI / 2;
+      plane.rotation.z = bpAngle;
+      plane.position.set(bpX - 3, bpY + bpThick / 2 + 0.25, bpZ - 0.5);
+      plane._isRoom = true;
+      addRoom(plane);
+    });
+
+    // Zipper line
     const zipMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.4, metalness: 0.6 });
-    const zipGeo = new THREE.BoxGeometry(bpL * 0.7, 0.15, 0.25, 8, 1, 1);
-    const zip = new THREE.Mesh(zipGeo, zipMat);
+    const zip = new THREE.Mesh(new THREE.BoxGeometry(bpL * 0.7, 0.15, 0.3), zipMat);
     zip.position.set(bpX, bpY + bpThick / 2 + 0.12, bpZ + bpW / 2 - 1.2);
     zip.rotation.y = bpAngle;
     zip._isRoom = true;
