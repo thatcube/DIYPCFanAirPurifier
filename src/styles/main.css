@@ -125,7 +125,7 @@ canvas#c { display: block; width: 100%; height: 100%; }
 .panel-l { left: 12px; width: 290px; }
 .panel-l::after {
   content: ''; position: absolute; inset: 0; z-index: -1;
-  background: rgba(0,0,0,0.5); pointer-events: none;
+  background: rgba(0,0,0,0.35); pointer-events: none;
   border-radius: inherit;
 }
 

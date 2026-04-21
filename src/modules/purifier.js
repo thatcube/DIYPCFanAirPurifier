@@ -1471,8 +1471,7 @@ export function createPurifier(scene) {
     exploded=!exploded;
     { const el=_el('togExplode'); if(el) el.classList.toggle('on',exploded); }
     if(exploded){
-      // Exploding turns off airflow and dimensions
-      if(airflowOn) toggleAirflow();
+      // Exploding turns off dimensions
       if(dimVisible) toggleDimensions();
       // Auto-enable isolate mode (track that explode did it)
       if(!isolateMode){ _isolateAutoExplode=true; toggleIsolate(); }
