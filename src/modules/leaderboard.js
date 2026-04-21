@@ -829,7 +829,7 @@ function _ensureFinishPreviewRenderer() {
   _finishPreviewCanvas = canvas;
   _finishPreviewRenderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power' });
   _finishPreviewRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  _finishPreviewRenderer.outputEncoding = THREE.sRGBEncoding;
+  _finishPreviewRenderer.outputColorSpace = THREE.SRGBColorSpace;
   _finishPreviewRenderer.toneMapping = THREE.ACESFilmicToneMapping;
   _finishPreviewRenderer.toneMappingExposure = 1.2;
 
@@ -1114,7 +1114,6 @@ function _renderFinishDialog() {
   const summaryRank = document.getElementById('finishDialogSummaryRank');
   const summarySecret = document.getElementById('finishDialogSummarySecret');
   const catText = document.getElementById('finishDialogCatText');
-  const saveHint = document.getElementById('finishDialogSaveHint');
   const copyBtn = document.getElementById('finishDialogCopy');
   const list = document.getElementById('finishDialogList');
 
@@ -1142,20 +1141,6 @@ function _renderFinishDialog() {
     sanitizeHairKey(data.catHair || catHairKey)
   );
 
-  if (saveHint) {
-    if (pending) {
-      if (_finishSaveStatus === 'error') saveHint.textContent = 'Save failed. Please wait and it will retry.';
-      else saveHint.textContent = 'Saving run...';
-    } else if (canRenameSavedEntry) {
-      if (_finishSaveStatus === 'saving') saveHint.textContent = 'Saving...';
-      else if (_finishSaveStatus === 'error') saveHint.textContent = 'Save failed. Leave the field again to retry.';
-      else saveHint.textContent = 'Saved. Edit and leave your leaderboard row to update this run.';
-    } else if (Math.floor(Number(data.rank) || 0) > 0 || _finishSaveStatus === 'saved') {
-      saveHint.textContent = 'Saved.';
-    } else {
-      saveHint.textContent = '';
-    }
-  }
   if (copyBtn) copyBtn.style.display = pending ? 'none' : '';
 
   if (coinBadge) {
@@ -1173,12 +1158,31 @@ function _renderFinishDialog() {
         const r = _leaderboard[i];
         const own = (ownId && r.id === ownId) || (!ownId && r.playerId === _playerId);
         const editable = !pending && !!editableEntryId && r.id === editableEntryId;
+        let nameCell = _escapeHtml(r.name);
+
+        if (editable) {
+          const rawName = String(r.name || '');
+          const trimmedName = rawName.trim().toLowerCase();
+          const showEnterNameLabel = !trimmedName || trimmedName === 'player';
+          let rowStatus = '';
+          let rowStatusClass = '';
+
+          if (_finishSaveStatus === 'saving') rowStatus = 'Saving...';
+          else if (_finishSaveStatus === 'error') {
+            rowStatus = 'Save failed';
+            rowStatusClass = ' is-error';
+          } else if (_finishSaveStatus === 'saved') rowStatus = 'Saved';
+
+          nameCell = `<span class="finishDialogRowNameWrap">
+            ${showEnterNameLabel ? '<span class="finishDialogRowNameLabel">Enter name</span>' : ''}
+            <input type="text" class="finishDialogRowNameInput" maxlength="24" value="${_escapeHtml(rawName)}" placeholder="${showEnterNameLabel ? 'Enter name' : ''}" autocomplete="off" spellcheck="false" />
+            ${rowStatus ? `<span id="finishDialogRowSaveHint" class="finishDialogRowSaveHint${rowStatusClass}">${rowStatus}</span>` : ''}
+          </span>`;
+        }
+
         rows.push(`<li class="${own ? 'own' : ''}" data-entry-id="${_escapeHtml(r.id)}">
           <span class="rk">#${i + 1}</span>
-          <span class="nm ${editable ? 'nm-edit' : ''}">${editable
-            ? `<input type="text" class="finishDialogRowNameInput" maxlength="24" value="${_escapeHtml(r.name)}" autocomplete="off" spellcheck="false" />`
-            : _escapeHtml(r.name)
-          }</span>
+          <span class="nm ${editable ? 'nm-edit' : ''}">${nameCell}</span>
           ${_catBadgeHtml(r)}
           <span class="tm">${formatRunTime(r.timeMs)}</span>
         </li>`);
@@ -1198,6 +1202,8 @@ function _renderFinishDialog() {
         _finishNameDirty = true;
         _finishSaveStatus = 'idle';
         _finishDialogData = { ...(_finishDialogData || {}), name: rowInput.value };
+        const rowSaveHint = document.getElementById('finishDialogRowSaveHint');
+        if (rowSaveHint) rowSaveHint.textContent = '';
       });
       rowInput.addEventListener('keydown', e => {
         if (e.key === 'Enter') {
@@ -1323,7 +1329,6 @@ function _createFinishDialogDOM() {
             <span id="finishDialogCatText" class="finishDialogCatText">Cat</span>
           </div>
         </div>
-        <div id="finishDialogSaveHint"></div>
       </div>
       <div id="finishDialogBoard">
         <h4>LEADERBOARD · TOP 25</h4>
