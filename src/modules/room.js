@@ -1343,156 +1343,81 @@ export function createRoom(scene) {
   duvet.castShadow=true; duvet.receiveShadow=true; duvet._isRoom=true;
   addRoom(duvet);
 
-  // ── Backpack under the bed (laying flat, natural fabric shape) ──────
+  // ── Items under the bed (partially hiding the coin) ────────────────
   {
-    // Realistic dimensions: 19×13" footprint, ~5" thick when stuffed and flat
-    const bpL = 19, bpW = 13, bpThick = 5;
-    const bpX = bedX + 3;
-    const bpZ = bedZ + 4;
-    const bpY = floorY + bpThick / 2 + 0.1;
-    const bpAngle = 0.18;
+    const underBedY = floorY;
+    const itemX = bedX + 5; // slightly off-center
+    const itemZ = bedZ + 4; // near coin
 
-    // Fabric material
-    const bpMat = new THREE.MeshStandardMaterial({
-      color: 0x2a2a2e, roughness: 0.94, metalness: 0.02
-    });
-
-    // Main body — subdivided box with gentle edge rounding and subtle surface variation
-    const bodyGeo = new THREE.BoxGeometry(bpL, bpThick, bpW, 14, 5, 10);
-    const bp = bodyGeo.attributes.position;
-    const edgeR = 1.8;
-    for (let i = 0; i < bp.count; i++) {
-      let x = bp.getX(i), y = bp.getY(i), z = bp.getZ(i);
-      // Soft edge rounding
-      const ex = Math.max(0, Math.abs(x) - bpL / 2 + edgeR);
-      const ey = Math.max(0, Math.abs(y) - bpThick / 2 + edgeR);
-      const ez = Math.max(0, Math.abs(z) - bpW / 2 + edgeR);
-      const dist = Math.sqrt(ex * ex + ey * ey + ez * ez);
-      if (dist > edgeR) {
-        const sc = edgeR / dist;
-        if (ex > 0) x = Math.sign(x) * (bpL / 2 - edgeR + ex * sc);
-        if (ey > 0) y = Math.sign(y) * (bpThick / 2 - edgeR + ey * sc);
-        if (ez > 0) z = Math.sign(z) * (bpW / 2 - edgeR + ez * sc);
-      }
-      // Gentle top bulge (stuffed, not pillow-puffy)
-      const nx = x / (bpL / 2), nz = z / (bpW / 2);
-      if (y > 0) y += (1 - nx * nx) * (1 - nz * nz) * 0.6;
-      // Flat bottom
-      if (y < 0) y *= 0.7;
-      // Subtle wrinkle
-      y += Math.sin(x * 1.8 + z * 2.4) * 0.04;
-      // Taper the top end slightly
-      if (x > bpL * 0.15) {
-        const t = (x - bpL * 0.15) / (bpL * 0.35);
-        z *= 1 - t * 0.08;
-        y *= 1 - t * 0.05;
-      }
-      bp.setXYZ(i, x, y, z);
-    }
-    bodyGeo.computeVertexNormals();
-    const bpBody = new THREE.Mesh(bodyGeo, bpMat);
-    bpBody.position.set(bpX, bpY, bpZ);
-    bpBody.rotation.y = bpAngle;
-    bpBody.castShadow = true; bpBody.receiveShadow = true; bpBody._isRoom = true;
-    addRoom(bpBody);
-
-    // Shoulder straps — two wide flat bands on top of the bag
-    const strapMat = new THREE.MeshStandardMaterial({ color: 0x222228, roughness: 0.92 });
-    const bagTop = bpY + bpThick / 2;
-    for (const sz of [-1, 1]) {
-      // Each strap: a wide flat box sitting on top, running most of the bag length
-      const strapW = 2.2, strapThick = 0.4, strapL = bpL - 3;
-      const strap = new THREE.Mesh(
-        new THREE.BoxGeometry(strapL, strapThick, strapW),
-        strapMat
-      );
-      strap.position.set(bpX, bagTop + strapThick / 2 + 0.05, bpZ + sz * 3.2);
-      strap.rotation.y = bpAngle;
-      strap.castShadow = true; strap.receiveShadow = true; strap._isRoom = true;
-      addRoom(strap);
-      // Padding bump at shoulder area (thicker in the middle)
-      const pad = new THREE.Mesh(
-        new THREE.BoxGeometry(strapL * 0.5, 0.5, strapW + 0.6),
-        strapMat
-      );
-      pad.position.set(bpX, bagTop + strapThick + 0.3, bpZ + sz * 3.2);
-      pad.rotation.y = bpAngle;
-      pad.castShadow = true; pad.receiveShadow = true; pad._isRoom = true;
-      addRoom(pad);
-    }
-
-    // Grab handle — small loop at top end
-    const handleMat = new THREE.MeshStandardMaterial({ color: 0x333338, roughness: 0.85 });
-    const handleLoop = new THREE.Mesh(
-      new THREE.TorusGeometry(1.2, 0.3, 6, 12, Math.PI),
-      handleMat
-    );
-    handleLoop.position.set(bpX + bpL / 2 - 0.5, bagTop + 0.5, bpZ);
-    handleLoop.rotation.y = bpAngle;
-    handleLoop.rotation.z = Math.PI / 2; // arch upward
-    handleLoop.castShadow = true; handleLoop.receiveShadow = true; handleLoop._isRoom = true;
-    addRoom(handleLoop);
-
-    // Front pocket — slightly raised section on top face
-    const pocketMat = new THREE.MeshStandardMaterial({ color: 0x2e2e34, roughness: 0.9 });
-    const pocket = new THREE.Mesh(
-      new THREE.BoxGeometry(bpL * 0.55, 0.5, bpW * 0.75),
-      pocketMat
-    );
-    pocket.position.set(bpX - 2, bagTop + 0.3, bpZ);
-    pocket.rotation.y = bpAngle;
-    pocket.castShadow = true; pocket.receiveShadow = true; pocket._isRoom = true;
-    addRoom(pocket);
-
-    // Logos — render SVGs to canvas since Three.js r128 can't load SVGs as textures
-    function loadSvgToCanvas(url, size, callback) {
+    // Helper: load SVG to canvas for texture
+    function loadSvgTex(url, size, cb) {
       const img = new Image();
       img.onload = () => {
-        const cvs = document.createElement('canvas');
-        cvs.width = size; cvs.height = size;
-        const ctx = cvs.getContext('2d');
-        ctx.drawImage(img, 0, 0, size, size);
-        callback(cvs);
+        const c = document.createElement('canvas');
+        c.width = size; c.height = size;
+        c.getContext('2d').drawImage(img, 0, 0, size, size);
+        cb(new THREE.CanvasTexture(c));
       };
       img.crossOrigin = 'anonymous';
       img.src = url;
     }
 
-    // Microsoft logo on one half of the top
-    loadSvgToCanvas('img/Microsoft_logo.svg', 256, (cvs) => {
-      const tex = new THREE.CanvasTexture(cvs);
-      const mat = new THREE.MeshStandardMaterial({
-        map: tex, transparent: true, roughness: 0.65, metalness: 0.05
+    // 1. Microsoft Surface laptop box — clean white box with MS logo
+    {
+      const boxW = 16, boxD = 12, boxH = 2.5;
+      const boxMat = new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.3, metalness: 0.05 });
+      const surfBox = new THREE.Mesh(new THREE.BoxGeometry(boxW, boxH, boxD), boxMat);
+      surfBox.position.set(itemX, underBedY + boxH / 2 + 0.1, itemZ);
+      surfBox.rotation.y = 0.15;
+      surfBox.castShadow = true; surfBox.receiveShadow = true; surfBox._isRoom = true;
+      addRoom(surfBox);
+      // Microsoft logo on top
+      loadSvgTex('img/Microsoft_logo.svg', 256, (tex) => {
+        const logo = new THREE.Mesh(
+          new THREE.PlaneGeometry(6, 3),
+          new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.3 })
+        );
+        logo.rotation.x = -Math.PI / 2;
+        logo.position.set(itemX, underBedY + boxH + 0.12, itemZ);
+        logo.rotation.z = 0.15;
+        logo._isRoom = true;
+        addRoom(logo);
       });
-      const plane = new THREE.Mesh(new THREE.PlaneGeometry(5, 5), mat);
-      plane.rotation.x = -Math.PI / 2;
-      plane.rotation.z = bpAngle;
-      plane.position.set(bpX + 3, bpY + bpThick / 2 + 0.25, bpZ + 0.5);
-      plane._isRoom = true;
-      addRoom(plane);
-    });
+    }
 
-    // Power BI logo on the other half
-    loadSvgToCanvas('img/Power_BI_Logo.svg', 256, (cvs) => {
-      const tex = new THREE.CanvasTexture(cvs);
-      const mat = new THREE.MeshStandardMaterial({
-        map: tex, transparent: true, roughness: 0.65, metalness: 0.05
+    // 2. Power BI notebook/binder — dark yellow-gold cover
+    {
+      const nbW = 10, nbD = 7.5, nbH = 0.8;
+      const nbMat = new THREE.MeshStandardMaterial({ color: 0xf2c811, roughness: 0.6, metalness: 0.05 });
+      const notebook = new THREE.Mesh(new THREE.BoxGeometry(nbW, nbH, nbD), nbMat);
+      // Lean it against the Surface box at an angle
+      notebook.position.set(itemX + 8, underBedY + nbH / 2 + 0.1, itemZ - 1);
+      notebook.rotation.y = -0.3;
+      notebook.rotation.z = 0.08; // slight tilt
+      notebook.castShadow = true; notebook.receiveShadow = true; notebook._isRoom = true;
+      addRoom(notebook);
+      // Power BI logo on top
+      loadSvgTex('img/Power_BI_Logo.svg', 256, (tex) => {
+        const logo = new THREE.Mesh(
+          new THREE.PlaneGeometry(4, 4),
+          new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.5 })
+        );
+        logo.rotation.x = -Math.PI / 2;
+        logo.position.set(itemX + 8, underBedY + nbH + 0.12, itemZ - 1);
+        logo.rotation.z = -0.3;
+        logo._isRoom = true;
+        addRoom(logo);
       });
-      const plane = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), mat);
-      plane.rotation.x = -Math.PI / 2;
-      plane.rotation.z = bpAngle;
-      plane.position.set(bpX - 3, bpY + bpThick / 2 + 0.25, bpZ - 0.5);
-      plane._isRoom = true;
-      addRoom(plane);
-    });
-
-    // Zipper line
-    const zipMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.4, metalness: 0.6 });
-    const zip = new THREE.Mesh(new THREE.BoxGeometry(bpL * 0.7, 0.15, 0.3), zipMat);
-    zip.position.set(bpX, bpY + bpThick / 2 + 0.12, bpZ + bpW / 2 - 1.2);
-    zip.rotation.y = bpAngle;
-    zip._isRoom = true;
-    addRoom(zip);
+      // Spine detail (darker edge)
+      const spine = new THREE.Mesh(
+        new THREE.BoxGeometry(0.3, nbH + 0.1, nbD),
+        new THREE.MeshStandardMaterial({ color: 0xc9a00e, roughness: 0.5 })
+      );
+      spine.position.set(itemX + 8 - nbW / 2 - 0.15, underBedY + nbH / 2 + 0.1, itemZ - 1);
+      spine.rotation.y = -0.3;
+      spine._isRoom = true;
+      addRoom(spine);
+    }
   }
   
   // Enable shadows on key furniture (not walls/baseboards/trim — those don't need it)
