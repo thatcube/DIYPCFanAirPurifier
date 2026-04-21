@@ -26,20 +26,14 @@
   --accent: #00a4ef;
   --accent-glow: rgba(0, 164, 239, 0.35);
   --accent-dim: rgba(0, 164, 239, 0.12);
-  /* Inside fill: 4 corner radials, subtle, blending where they meet */
+  /* Inside fill: 4 quadrant blocks with soft blended edges */
   --accent-gradient:
-    radial-gradient(ellipse at 0% 0%, rgba(242,80,34,0.35) 0%, transparent 70%),
-    radial-gradient(ellipse at 100% 0%, rgba(127,186,0,0.32) 0%, transparent 70%),
-    radial-gradient(ellipse at 0% 100%, rgba(0,164,239,0.35) 0%, transparent 70%),
-    radial-gradient(ellipse at 100% 100%, rgba(255,185,0,0.32) 0%, transparent 70%),
-    rgba(255,255,255,0.06);
-  /* Border: same layout but full brightness */
+    linear-gradient(to right, rgba(242,80,34,0.4) 0%, rgba(242,80,34,0.3) 40%, rgba(127,186,0,0.3) 60%, rgba(127,186,0,0.4) 100%) top / 100% 50% no-repeat,
+    linear-gradient(to right, rgba(0,164,239,0.4) 0%, rgba(0,164,239,0.3) 40%, rgba(255,185,0,0.3) 60%, rgba(255,185,0,0.4) 100%) bottom / 100% 50% no-repeat;
+  /* Border: same layout, full brightness */
   --accent-border:
-    radial-gradient(ellipse at 0% 0%, #f25022 0%, transparent 70%),
-    radial-gradient(ellipse at 100% 0%, #7fba00 0%, transparent 70%),
-    radial-gradient(ellipse at 0% 100%, #00a4ef 0%, transparent 70%),
-    radial-gradient(ellipse at 100% 100%, #ffb900 0%, transparent 70%),
-    rgba(120,120,120,0.5);
+    linear-gradient(to right, #f25022 0%, #f25022 40%, #7fba00 60%, #7fba00 100%) top / 100% 50% no-repeat,
+    linear-gradient(to right, #00a4ef 0%, #00a4ef 40%, #ffb900 60%, #ffb900 100%) bottom / 100% 50% no-repeat;
 
   /* Text — vibrant on glass */
   --text: #e8f4ff;
