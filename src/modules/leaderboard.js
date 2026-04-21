@@ -8,8 +8,10 @@ import {
   sanitizeColorKey, sanitizeModelKey, sanitizeHairKey,
   CAT_COLOR_EMOJI, CAT_MODEL_EMOJI, CAT_MODEL_LABELS_SHORT
 } from './cat-appearance.js';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { trapFocus, saveFocus } from './a11y.js';
-import { CAT_COLOR_PRESETS } from './constants.js';
+import { CAT_COLOR_PRESETS, CAT_MODEL_PRESETS } from './constants.js';
 
 // ── Config ──────────────────────────────────────────────────────────
 
@@ -742,11 +744,191 @@ let _onExitGame = null;
 let _finishFocusTrap = null;
 let _finishSavedFocus = null;
 
+const _finishPreviewOffsets = {
+  classic: 0.35,
+  toon: 1.6,
+  bababooey: -0.35,
+};
+const _finishPreviewBaseYaw = THREE.MathUtils.degToRad(35);
+let _finishPreviewRenderer = null;
+let _finishPreviewScene = null;
+let _finishPreviewCamera = null;
+let _finishPreviewCanvas = null;
+let _finishPreviewModel = null;
+let _finishPreviewModelKey = '';
+let _finishPreviewColorKey = '';
+let _finishPreviewHairKey = '';
+let _finishPreviewRaf = 0;
+let _finishPreviewLoader = null;
+let _finishPreviewLoadToken = 0;
+let _finishPreviewLoading = false;
+
 export function isFinishDialogOpen() { return _finishDialogOpen; }
 
 export function setCallbacks(opts) {
   _onPlayAgain = opts.onPlayAgain || null;
   _onExitGame = opts.onExitGame || null;
+}
+
+function _disposeFinishPreviewModel(model) {
+  if (!model) return;
+  model.traverse(o => {
+    if (!o.isMesh) return;
+    if (o.geometry) o.geometry.dispose();
+    if (!o.material) return;
+    if (Array.isArray(o.material)) {
+      for (const m of o.material) if (m && typeof m.dispose === 'function') m.dispose();
+    } else if (typeof o.material.dispose === 'function') {
+      o.material.dispose();
+    }
+  });
+}
+
+function _clearFinishPreviewModel() {
+  if (!_finishPreviewScene || !_finishPreviewModel) return;
+  _finishPreviewScene.remove(_finishPreviewModel);
+  _disposeFinishPreviewModel(_finishPreviewModel);
+  _finishPreviewModel = null;
+}
+
+function _resizeFinishPreview() {
+  if (!_finishPreviewRenderer || !_finishPreviewCamera || !_finishPreviewCanvas) return;
+  const rect = _finishPreviewCanvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  _finishPreviewRenderer.setSize(rect.width, rect.height, false);
+  _finishPreviewCamera.aspect = rect.width / rect.height;
+  _finishPreviewCamera.updateProjectionMatrix();
+}
+
+function _startFinishPreviewLoop() {
+  if (_finishPreviewRaf) return;
+  const tick = () => {
+    if (!_finishDialogOpen || !_finishPreviewRenderer || !_finishPreviewScene || !_finishPreviewCamera) {
+      _finishPreviewRaf = 0;
+      return;
+    }
+    _resizeFinishPreview();
+    if (_finishPreviewModel) _finishPreviewModel.rotation.y += 0.012;
+    _finishPreviewRenderer.render(_finishPreviewScene, _finishPreviewCamera);
+    _finishPreviewRaf = requestAnimationFrame(tick);
+  };
+  _finishPreviewRaf = requestAnimationFrame(tick);
+}
+
+function _stopFinishPreviewLoop() {
+  if (!_finishPreviewRaf) return;
+  cancelAnimationFrame(_finishPreviewRaf);
+  _finishPreviewRaf = 0;
+}
+
+function _ensureFinishPreviewRenderer() {
+  const canvas = document.getElementById('finishDialogCatCanvas');
+  if (!canvas) return false;
+  if (_finishPreviewRenderer && _finishPreviewCanvas === canvas) return true;
+
+  _finishPreviewCanvas = canvas;
+  _finishPreviewRenderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power' });
+  _finishPreviewRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  _finishPreviewRenderer.outputEncoding = THREE.sRGBEncoding;
+  _finishPreviewRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+  _finishPreviewRenderer.toneMappingExposure = 1.2;
+
+  _finishPreviewScene = new THREE.Scene();
+  _finishPreviewCamera = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
+  _finishPreviewCamera.position.set(1.35, 2.55, 9.6);
+  _finishPreviewCamera.lookAt(0, 0.95, 0);
+
+  _finishPreviewScene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  const keyLight = new THREE.DirectionalLight(0xffeedd, 1.2);
+  keyLight.position.set(3, 5, 4);
+  _finishPreviewScene.add(keyLight);
+  const rimLight = new THREE.DirectionalLight(0x8899bb, 0.4);
+  rimLight.position.set(-3, 2, -4);
+  _finishPreviewScene.add(rimLight);
+
+  if (!_finishPreviewLoader) _finishPreviewLoader = new GLTFLoader();
+  _resizeFinishPreview();
+  return true;
+}
+
+function _tintFinishPreviewModel(model, modelKey, colorKey) {
+  if (!model || modelKey !== 'classic') return;
+  const coat = new THREE.Color((CAT_COLOR_PRESETS[colorKey] || CAT_COLOR_PRESETS.charcoal).coat);
+  const skip = /(eye|pupil|nose|mouth|tongue|tooth|teeth|whisker|inner|ear)/i;
+  model.traverse(o => {
+    if (!o.isMesh || !o.material) return;
+    if (skip.test(String(o.name || ''))) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats) {
+      if (!m || !m.color || !(m.isMeshStandardMaterial || m.isMeshPhysicalMaterial)) continue;
+      m.color.lerp(coat, 0.82);
+      m.needsUpdate = true;
+    }
+  });
+}
+
+function _placeFinishPreviewModel(model, modelKey) {
+  const targetHeight = 3;
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const h = Math.max(size.y, 0.001);
+  const scale = targetHeight / h;
+  model.scale.setScalar(scale);
+
+  box.setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  model.position.x -= center.x;
+  model.position.z -= center.z;
+  model.position.y -= box.min.y + (_finishPreviewOffsets[modelKey] || 0);
+  model.rotation.y = _finishPreviewBaseYaw;
+}
+
+function _setFinishPreviewModel(modelKey, colorKey, hairKey) {
+  const safeModel = sanitizeModelKey(modelKey);
+  const safeColor = sanitizeColorKey(colorKey);
+  const safeHair = sanitizeHairKey(hairKey);
+
+  if (!_ensureFinishPreviewRenderer()) return;
+  if (
+    _finishPreviewModelKey === safeModel &&
+    _finishPreviewColorKey === safeColor &&
+    _finishPreviewHairKey === safeHair &&
+    (_finishPreviewModel || _finishPreviewLoading)
+  ) {
+    _startFinishPreviewLoop();
+    return;
+  }
+
+  _finishPreviewModelKey = safeModel;
+  _finishPreviewColorKey = safeColor;
+  _finishPreviewHairKey = safeHair;
+  _clearFinishPreviewModel();
+
+  const preset = CAT_MODEL_PRESETS[safeModel] || CAT_MODEL_PRESETS.classic;
+  const sources = (preset.sources && preset.sources.length ? preset.sources : ['assets/cat.glb']).slice();
+  const token = ++_finishPreviewLoadToken;
+  _finishPreviewLoading = true;
+
+  const tryLoad = (idx) => {
+    if (idx >= sources.length || !_finishPreviewLoader) {
+      if (token === _finishPreviewLoadToken) _finishPreviewLoading = false;
+      return;
+    }
+    _finishPreviewLoader.load(sources[idx], (gltf) => {
+      if (token !== _finishPreviewLoadToken) return;
+      const model = gltf.scene;
+      _placeFinishPreviewModel(model, safeModel);
+      _tintFinishPreviewModel(model, safeModel, safeColor);
+      _finishPreviewScene.add(model);
+      _finishPreviewModel = model;
+      _finishPreviewLoading = false;
+      _startFinishPreviewLoop();
+    }, undefined, () => {
+      tryLoad(idx + 1);
+    });
+  };
+
+  tryLoad(0);
 }
 
 function _openFinishDialogOverlay(focusNameInput = false) {
@@ -824,6 +1006,7 @@ export function openFinishDialogForRun(timeMs, coinTotal, secretCoins) {
 export function closeFinishDialog() {
   if (!_finishDialogOpen) return;
   _finishDialogOpen = false;
+  _stopFinishPreviewLoop();
   _finishDialogData = null;
   _finishPendingRun = null;
   _finishEditableEntryId = '';
@@ -930,7 +1113,7 @@ function _renderFinishDialog() {
   const summaryTime = document.getElementById('finishDialogSummaryTime');
   const summaryRank = document.getElementById('finishDialogSummaryRank');
   const summarySecret = document.getElementById('finishDialogSummarySecret');
-  const summaryCat = document.getElementById('finishDialogCatPreview');
+  const catText = document.getElementById('finishDialogCatText');
   const saveHint = document.getElementById('finishDialogSaveHint');
   const copyBtn = document.getElementById('finishDialogCopy');
   const list = document.getElementById('finishDialogList');
@@ -942,19 +1125,22 @@ function _renderFinishDialog() {
   if (summaryTime) summaryTime.textContent = formatRunTime(runTimeMs);
   if (summaryRank) {
     summaryRank.textContent = pending
-      ? 'Pending save'
+      ? 'Saving...'
       : (rank > 0 ? `#${rank}` : 'Unranked');
   }
   if (summarySecret) {
     summarySecret.textContent = `${secretCount} found`;
   }
-  if (summaryCat) {
-    summaryCat.innerHTML = _catBadgeHtml({
-      catModel: sanitizeModelKey(data.catModel || catModelKey),
-      catColor: sanitizeColorKey(data.catColor || catColorKey),
-      catHair: sanitizeHairKey(data.catHair || catHairKey),
-    });
+  if (catText) {
+    const mk = sanitizeModelKey(data.catModel || catModelKey);
+    const label = CAT_MODEL_LABELS_SHORT[mk] || 'Cat';
+    catText.textContent = label;
   }
+  _setFinishPreviewModel(
+    sanitizeModelKey(data.catModel || catModelKey),
+    sanitizeColorKey(data.catColor || catColorKey),
+    sanitizeHairKey(data.catHair || catHairKey)
+  );
 
   if (saveHint) {
     if (pending) {
@@ -975,7 +1161,7 @@ function _renderFinishDialog() {
   if (coinBadge) {
     const c = Math.floor(Number(data.coins) || Number(data.coinTotal) || Number(_finishPendingRun?.coinTotal) || 0);
     const t = Math.floor(Number(data.coinTotal) || Number(_finishPendingRun?.coinTotal) || 0);
-    coinBadge.textContent = `${c} / ${t} coins`;
+    coinBadge.textContent = `${c} / ${t}`;
   }
   if (list) {
     const ownId = String(data.entryId || '');
@@ -1114,10 +1300,6 @@ function _createFinishDialogDOM() {
   overlay.innerHTML = `
     <div id="finishDialogCard" role="dialog" aria-modal="true" aria-label="Run complete">
       <div id="finishDialogHeader">
-        <div id="finishDialogEyebrow">
-          <span>RUN COMPLETE</span>
-          <span class="tag" id="finishDialogCoinBadge">0 / 0 coins</span>
-        </div>
         <div id="finishDialogSummaryGrid">
           <div class="finishDialogSummaryItem finishDialogSummaryItemTime">
             <span class="k">Time</span>
@@ -1128,12 +1310,17 @@ function _createFinishDialogDOM() {
             <span class="v" id="finishDialogSummaryRank">Pending save</span>
           </div>
           <div class="finishDialogSummaryItem">
+            <span class="k">Coins</span>
+            <span class="v" id="finishDialogCoinBadge">0 / 0</span>
+          </div>
+          <div class="finishDialogSummaryItem">
             <span class="k">Secret Coins</span>
             <span class="v" id="finishDialogSummarySecret">0 found</span>
           </div>
           <div class="finishDialogSummaryItem finishDialogSummaryItemCat">
             <span class="k">Cat</span>
-            <span class="v" id="finishDialogCatPreview"></span>
+            <span class="v" id="finishDialogCatPreview"><canvas id="finishDialogCatCanvas" aria-hidden="true"></canvas></span>
+            <span id="finishDialogCatText" class="finishDialogCatText">Cat</span>
           </div>
         </div>
         <div id="finishDialogSaveHint"></div>
