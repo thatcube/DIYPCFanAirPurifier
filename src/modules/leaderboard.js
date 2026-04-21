@@ -236,8 +236,8 @@ export function renderLeaderboardPanel() {
     return;
   }
   if (emptyEl) emptyEl.style.display = 'none';
-  // Show top 10 in the pause card
-  const top = _leaderboard.slice(0, 10);
+  // Show top 5 in the pause card
+  const top = _leaderboard.slice(0, 5);
   list.innerHTML = top.map((r, i) => {
     const own = r.playerId ? (r.playerId === _playerId) : (r.name === _playerName);
     return `<li class="${own ? 'own' : ''}">
