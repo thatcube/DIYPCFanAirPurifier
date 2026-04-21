@@ -803,10 +803,10 @@ function _bindInputs() {
     }
   });
 
-  // G key to enter game from orbit mode
+  // G key to open character select from orbit mode
   document.addEventListener('keydown', e => {
     if (fpMode) return;
-    if (e.code === 'KeyG') toggleFirstPerson();
+    if (e.code === 'KeyG' && window._openCharSelect) window._openCharSelect();
   });
 
   // ── Mobile joystick ─────────────────────────────────────────────

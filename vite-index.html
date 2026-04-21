@@ -149,7 +149,37 @@
   </div>
 
   <!-- Game mode -->
-  <button id="playDockBtn" onclick="window._toggleFP&&window._toggleFP()">▶ Play Mode <kbd class="key-hint">G</kbd></button>
+  <button id="playDockBtn" onclick="window._openCharSelect&&window._openCharSelect()">▶ Play Mode <kbd class="key-hint">G</kbd></button>
+
+  <!-- Character Select (Smash Bros style) -->
+  <div id="charSelect">
+    <div class="char-select-inner">
+      <h2>Choose Your Cat</h2>
+      <div class="char-grid">
+        <div class="char-card" data-model="classic" onclick="window._selectCat&&window._selectCat('classic',this)">
+          <div class="char-icon">🐱</div>
+          <div class="char-name">Classic</div>
+          <div class="char-colors" id="classicColors">
+            <button class="color-dot on" data-color="charcoal" style="background:#0a0a12" onclick="event.stopPropagation();window._selectColor&&window._selectColor('charcoal',this)"></button>
+            <button class="color-dot" data-color="cream" style="background:#B08030" onclick="event.stopPropagation();window._selectColor&&window._selectColor('cream',this)"></button>
+            <button class="color-dot" data-color="midnight" style="background:#040818" onclick="event.stopPropagation();window._selectColor&&window._selectColor('midnight',this)"></button>
+            <button class="color-dot" data-color="snow" style="background:#d8d8d8" onclick="event.stopPropagation();window._selectColor&&window._selectColor('snow',this)"></button>
+          </div>
+        </div>
+        <div class="char-card" data-model="toon" onclick="window._selectCat&&window._selectCat('toon',this)">
+          <div class="char-icon">🧡</div>
+          <div class="char-name">Toon</div>
+          <div class="char-sub">Orange tabby</div>
+        </div>
+        <div class="char-card" data-model="bababooey" onclick="window._selectCat&&window._selectCat('bababooey',this)">
+          <div class="char-icon">👹</div>
+          <div class="char-name">Bababooey</div>
+          <div class="char-sub">Cursed energy</div>
+        </div>
+      </div>
+      <button class="char-start" onclick="window._startGame&&window._startGame()">START RUN</button>
+    </div>
+  </div>
 
   <!-- FP HUD -->
   <div id="fpHud">
