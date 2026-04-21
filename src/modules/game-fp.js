@@ -429,21 +429,21 @@ function _getBoxes() {
     result.push(b);
   }
 
-  // Console props collision — hardcoded world-space for TV placement
+  // Console props collision — world-space for TV placement
   if (px === 45) {
     const topSurface = yTopPanel;
-    // Xbox: tall upright box at world ~(37, _, -68)
-    result.push({ xMin: 34, xMax: 40, zMin: -71, zMax: -65, yTop: topSurface + 11.85, yBottom: topSurface });
-    // Switch dock: flat wide box at world ~(51, _, -68)
-    result.push({ xMin: 47, xMax: 55, zMin: -69.5, zMax: -66.5, yTop: topSurface + 3.5, yBottom: topSurface });
-    // Switch tablet in dock
-    result.push({ xMin: 46, xMax: 56, zMin: -69, zMax: -67, yTop: topSurface + 5.5, yBottom: topSurface + 0.75 });
+    // Xbox at world (53, _, -68): 5.94×5.94 footprint, 11.85 tall
+    result.push({ xMin: 50, xMax: 56, zMin: -71, zMax: -65, yTop: topSurface + 11.85, yBottom: topSurface });
+    // Switch dock at world (39, _, -68): ~8×3 footprint, 3.5 tall
+    result.push({ xMin: 35, xMax: 43, zMin: -69.5, zMax: -66.5, yTop: topSurface + 3.5, yBottom: topSurface });
+    // Switch tablet at world (39, _, -68): wider, thinner
+    result.push({ xMin: 34, xMax: 44, zMin: -69, zMax: -67, yTop: topSurface + 5.5, yBottom: topSurface + 0.75 });
   }
 
-  // MacBook — just the keyboard base (thin flat slab on the bed)
+  // MacBook at world (65.85, bedTop, 13.35) — thin keyboard slab
   {
-    const mbX = -(BED_X - 58/2 + 12);
-    const mbZ = BED_Z + 6;
+    const mbX = 65.85;
+    const mbZ = 13.35;
     const fy = getFloorY();
     const mbY = fy + BED_SLATS_FROM_FLOOR + 1 + 5 + 5 + 1.5;
     result.push({ xMin: mbX - 6, xMax: mbX + 6, zMin: mbZ - 4, zMax: mbZ + 4, yTop: mbY + 0.5, yBottom: mbY });
