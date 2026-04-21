@@ -266,6 +266,22 @@ window._openCharSelect = () => {
   if (classicCard) classicCard.classList.add('selected');
 };
 
+window._closeCharSelect = () => {
+  const cs = document.getElementById('charSelect');
+  if (cs) cs.classList.remove('open');
+  if (_charSelectFocusTrap) { _charSelectFocusTrap.release(); _charSelectFocusTrap = null; }
+  if (_charSelectSavedFocus) { _charSelectSavedFocus.restore(); _charSelectSavedFocus = null; }
+};
+
+// Escape key closes char select
+document.getElementById('charSelect')?.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    window._closeCharSelect();
+  }
+});
+
 window._selectCat = (model, el) => {
   _selectedModel = model;
   document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
