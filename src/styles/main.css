@@ -109,17 +109,19 @@ canvas#c { display: block; width: 100%; height: 100%; }
   background-image: var(--glass-specular);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  border: none; border-radius: var(--r-md);
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: var(--r-md);
   color: #fff; font-family: inherit; font-weight: 700;
   cursor: pointer; text-shadow: var(--text-shadow);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2), 0 6px 24px rgba(0,0,0,0.15);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.15);
   transition: all 0.35s var(--ease-out-expo);
   overflow: hidden;
   position: relative;
 }
 .glass-btn:hover {
   transform: translateY(-2px);
-  box-shadow: inset 0 0 0 1px rgba(160,210,255,0.45), 0 10px 32px rgba(120,180,255,0.2);
+  border-color: rgba(160,210,255,0.5);
+  box-shadow: 0 10px 32px rgba(120,180,255,0.2);
   filter: brightness(1.15);
 }
 .glass-btn:active { transform: translateY(1px); }
@@ -133,14 +135,15 @@ canvas#c { display: block; width: 100%; height: 100%; }
     var(--glass-specular);
 }
 
-/* ── Secondary: lighter glass, subtler ring ─────────────────────── */
+/* ── Secondary: lighter glass, subtler border ───────────────────── */
 .glass-btn--secondary {
   background-color: var(--glass-light);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14);
+  border-color: rgba(255,255,255,0.14);
   color: #e0e8f4;
 }
 .glass-btn--secondary:hover {
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3), 0 6px 20px rgba(0,0,0,0.12);
+  border-color: rgba(255,255,255,0.35);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
   filter: brightness(1.1);
 }
 
@@ -151,10 +154,11 @@ canvas#c { display: block; width: 100%; height: 100%; }
     radial-gradient(ellipse at 50% 0%, rgba(255,100,100,0.1) 0%, transparent 50%),
     var(--glass-specular);
   color: rgba(255,180,180,0.9);
-  box-shadow: inset 0 0 0 1px rgba(255,120,120,0.25);
+  border-color: rgba(255,120,120,0.3);
 }
 .glass-btn--danger:hover {
-  box-shadow: inset 0 0 0 1px rgba(255,120,120,0.45), 0 8px 28px rgba(255,80,80,0.15);
+  border-color: rgba(255,120,120,0.55);
+  box-shadow: 0 8px 28px rgba(255,80,80,0.15);
   filter: brightness(1.12);
 }
 
@@ -376,7 +380,7 @@ input[type=range]::-moz-range-thumb {
 #playDockBtn {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
   z-index: 200;
-  padding: 14px 32px; font-size: 15px; font-weight: 800; letter-spacing: 0.4px;
+  padding: 16px 40px; font-size: 16px; font-weight: 800; letter-spacing: 0.5px;
 }
 #playDockBtn:hover {
   transform: translateX(-50%) translateY(-3px);
