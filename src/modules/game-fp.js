@@ -181,6 +181,50 @@ function _buildStaticBoxes() {
     yTop: fy + TBL_H, room: true
   });
 
+  // Objects on nightstand (all X-mirrored)
+  const lampX = TBL_X + TBL_W / 2 - 6, lampZ = TBL_Z + TBL_D / 2 - 6;
+  // Coffee mug (cylinder r=1.4, h=3.5)
+  _staticBoxes.push({
+    xMin: -(TBL_X - 3 + 1.4), xMax: -(TBL_X - 3 - 1.4),
+    zMin: TBL_Z - 5 - 1.4, zMax: TBL_Z - 5 + 1.4,
+    yTop: fy + TBL_H + 3.5, yBottom: fy + TBL_H, room: true
+  });
+  // Air quality monitor (wedge 3.5x4x2.8)
+  _staticBoxes.push({
+    xMin: -(TBL_X - 8 + 3.5 / 2), xMax: -(TBL_X - 8 - 3.5 / 2),
+    zMin: TBL_Z + 2 - 2.8 / 2, zMax: TBL_Z + 2 + 2.8 / 2,
+    yTop: fy + TBL_H + 4.0, yBottom: fy + TBL_H, room: true
+  });
+  // Book stack (5x2x7)
+  _staticBoxes.push({
+    xMin: -(TBL_X - 1 + 5 / 2), xMax: -(TBL_X - 1 - 5 / 2),
+    zMin: TBL_Z + 2 - 7 / 2, zMax: TBL_Z + 2 + 7 / 2,
+    yTop: fy + TBL_H + 2.0, yBottom: fy + TBL_H, room: true
+  });
+  // Lamp base (cylinder r≈4, h=0.8)
+  _staticBoxes.push({
+    xMin: -(lampX + 4), xMax: -(lampX - 4),
+    zMin: lampZ - 4, zMax: lampZ + 4,
+    yTop: fy + TBL_H + 0.8, yBottom: fy + TBL_H, room: true
+  });
+  // Lamp shade walls (4 slabs around the shade so interior stays open)
+  {
+    const shadeR = 6.5, shadeThick = 1.1;
+    const shadeBot = fy + TBL_H + 16.8, shadeTop = fy + TBL_H + 26.8;
+    _staticBoxes.push(
+      { xMin: -(lampX + shadeR), xMax: -(lampX + shadeR - shadeThick), zMin: lampZ - shadeR, zMax: lampZ + shadeR, yTop: shadeTop, yBottom: shadeBot, room: true },
+      { xMin: -(lampX - shadeR + shadeThick), xMax: -(lampX - shadeR), zMin: lampZ - shadeR, zMax: lampZ + shadeR, yTop: shadeTop, yBottom: shadeBot, room: true },
+      { xMin: -(lampX + shadeR - shadeThick), xMax: -(lampX - shadeR + shadeThick), zMin: lampZ - shadeR, zMax: lampZ - shadeR + shadeThick, yTop: shadeTop, yBottom: shadeBot, room: true },
+      { xMin: -(lampX + shadeR - shadeThick), xMax: -(lampX - shadeR + shadeThick), zMin: lampZ + shadeR - shadeThick, zMax: lampZ + shadeR, yTop: shadeTop, yBottom: shadeBot, room: true }
+    );
+    // Bulb collision pad inside shade (so player can land and grab coin)
+    _staticBoxes.push({
+      xMin: -(lampX + 2.4), xMax: -(lampX - 2.4),
+      zMin: lampZ - 2.4, zMax: lampZ + 2.4,
+      yTop: fy + TBL_H + 20.8, yBottom: fy + TBL_H + 18.6, room: true
+    });
+  }
+
   // Right wall solid portions (flanking closet opening)
   _staticBoxes.push(
     { xMin: -(SIDE_WALL_X + 0.5), xMax: -SIDE_WALL_X, zMin: OPP_WALL_Z, zMax: CLOSET_Z - CLOSET_W / 2, yTop: fy + WALL_HEIGHT, room: true },
