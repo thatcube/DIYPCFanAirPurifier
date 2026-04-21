@@ -477,7 +477,7 @@ input[type=range]::-moz-range-thumb {
 .pause-toggle-row {
   display: flex; align-items: center; gap: 8px;
   background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-  border-radius: var(--r-pill); padding: 6px 14px 6px 12px;
+  border-radius: var(--r-sm); padding: 6px 14px 6px 12px;
   font-size: 11px; color: var(--text-dim);
 }
 .pause-toggle-row span { font-size: 11px; }
