@@ -800,11 +800,11 @@ export function createRoom(scene) {
         const rp1=new THREE.Mesh(new THREE.BoxGeometry(0.3, rpH1, rpW), bifoldMat);
         rp1.position.set(panelThick/2+0.16, -closetH*0.26, zCenter);
         rp1.castShadow=true; rp1.receiveShadow=true;
-        rp1._isBifoldLeaf=true; rp1._isRoom=true; parent.add(rp1);
+        rp1._isBifoldLeaf=true; parent.add(rp1);
         const rp2=new THREE.Mesh(new THREE.BoxGeometry(0.3, rpH2, rpW), bifoldMat);
         rp2.position.set(panelThick/2+0.16, closetH*0.18, zCenter);
         rp2.castShadow=true; rp2.receiveShadow=true;
-        rp2._isBifoldLeaf=true; rp2._isRoom=true; parent.add(rp2);
+        rp2._isBifoldLeaf=true; parent.add(rp2);
       }
       const outerPanel=new THREE.Mesh(
         new THREE.BoxGeometry(panelThick, closetH-1, panelW2-0.3),
@@ -812,7 +812,7 @@ export function createRoom(scene) {
       );
       outerPanel.position.set(0, 0, -leafSide*panelW2/2);
       outerPanel.castShadow=true; outerPanel.receiveShadow=true;
-      outerPanel._isBifoldLeaf=true; outerPanel._isRoom=true;
+      outerPanel._isBifoldLeaf=true;
       leafPivot.add(outerPanel);
       addRaisedDetails(leafPivot, -leafSide*panelW2/2);
       // Inner-panel hinge group — pivoted at the middle joint (panelW2 along
@@ -827,7 +827,7 @@ export function createRoom(scene) {
       );
       innerPanel.position.set(0, 0, -leafSide*panelW2/2);
       innerPanel.castShadow=true; innerPanel.receiveShadow=true;
-      innerPanel._isBifoldLeaf=true; innerPanel._isRoom=true;
+      innerPanel._isBifoldLeaf=true;
       innerGroup.add(innerPanel);
       addRaisedDetails(innerGroup, -leafSide*panelW2/2);
       // White round handle on the inner panel, near the mid-leaf joint side so
@@ -835,11 +835,11 @@ export function createRoom(scene) {
       // face by ~0.6".
       const handle=new THREE.Mesh(new THREE.SphereGeometry(0.75, 14, 10), handleMat);
       handle.position.set(panelThick/2+0.6, 0, -leafSide*(panelW2*0.22));
-      handle._isBifoldLeaf=true; handle._isRoom=true;
+      handle._isBifoldLeaf=true;
       const handleStem=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,0.55,10), handleMat);
       handleStem.rotation.z=Math.PI/2;
       handleStem.position.set(panelThick/2+0.25, 0, -leafSide*(panelW2*0.22));
-      handleStem._isBifoldLeaf=true; handleStem._isRoom=true;
+      handleStem._isBifoldLeaf=true;
       innerGroup.add(handle);
       innerGroup.add(handleStem);
     }
@@ -1503,9 +1503,9 @@ export function createRoom(scene) {
     }
   });
 
-  // Freeze world matrices on all static room objects
+  // Freeze world matrices on all static room objects (skip bifold — they animate)
   scene.traverse(obj => {
-    if (obj.isMesh && !obj.isPoints && obj._isRoom) {
+    if (obj.isMesh && !obj.isPoints && obj._isRoom && !obj._isBifoldLeaf) {
       obj.updateMatrixWorld(true);
       obj.matrixAutoUpdate = false;
     }
