@@ -25,7 +25,7 @@ import * as gameFp from './modules/game-fp.js';
 import { createRoom } from './modules/room.js';
 import { createPurifier } from './modules/purifier.js';
 import { initInteractions, coinBump } from './modules/ui-interactions.js';
-import { initPreviews } from './modules/cat-preview.js';
+import { initPreviews, recolorClassicPreview } from './modules/cat-preview.js';
 import {
   SHADOW_UPDATE_INTERVAL_MS, IDLE_FRAME_MS
 } from './modules/constants.js';
@@ -237,6 +237,9 @@ window._selectColor = (color, el) => {
   _selectedColor = color;
   document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('on'));
   if (el) el.classList.add('on');
+  // Update the 3D preview color
+  const colorMap = { charcoal: 0x0a0a12, cream: 0xB08030, midnight: 0x040818, snow: 0xd8d8d8 };
+  recolorClassicPreview(colorMap[color] || 0x0a0a12);
 };
 
 window._startGame = () => {
