@@ -1342,6 +1342,58 @@ export function createRoom(scene) {
   duvet.position.set(bedX, mattY+mattH/2+duvetH/2, duvetZ);
   duvet.castShadow=true; duvet.receiveShadow=true; duvet._isRoom=true;
   addRoom(duvet);
+
+  // ── Backpack under the bed (partially hiding the coin) ────────────
+  {
+    const bpW = 10, bpH = 14, bpD = 5; // width, height, depth in inches
+    const bpX = bedX + 3; // slightly off-center under bed
+    const bpZ = bedZ + 4; // matches coin Z position
+    const bpY = floorY + bpH / 2 + 0.2; // resting on floor
+    // Main body — rounded-ish dark gray bag
+    const bpMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2e, roughness: 0.85, metalness: 0.05 });
+    const bpBody = new THREE.Mesh(new THREE.BoxGeometry(bpD, bpH, bpW), bpMat);
+    bpBody.position.set(bpX, bpY, bpZ);
+    // Lean it slightly against the back (toward headboard)
+    bpBody.rotation.x = -0.15;
+    bpBody.castShadow = true; bpBody.receiveShadow = true; bpBody._isRoom = true;
+    addRoom(bpBody);
+    // Top flap (slightly lighter)
+    const flapMat = new THREE.MeshStandardMaterial({ color: 0x333338, roughness: 0.8, metalness: 0.05 });
+    const flap = new THREE.Mesh(new THREE.BoxGeometry(bpD + 0.4, 1.5, bpW + 0.4), flapMat);
+    flap.position.set(bpX, bpY + bpH / 2 + 0.5, bpZ);
+    flap.rotation.x = -0.15;
+    flap.castShadow = true; flap.receiveShadow = true; flap._isRoom = true;
+    addRoom(flap);
+    // Strap (one visible hanging down the front)
+    const strapMat = new THREE.MeshStandardMaterial({ color: 0x222226, roughness: 0.9 });
+    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.6, bpH - 2, 1.2), strapMat);
+    strap.position.set(bpX - bpD / 2 - 0.5, bpY - 1, bpZ - 2);
+    strap.rotation.x = -0.1; strap.rotation.z = 0.15;
+    strap.castShadow = true; strap.receiveShadow = true; strap._isRoom = true;
+    addRoom(strap);
+    // Microsoft logo — canvas texture on front face
+    const logoCvs = document.createElement('canvas');
+    logoCvs.width = 128; logoCvs.height = 128;
+    const lctx = logoCvs.getContext('2d');
+    lctx.fillStyle = '#2a2a2e';
+    lctx.fillRect(0, 0, 128, 128);
+    // 4-square MS logo centered
+    const sq = 20, gap = 3, cx = 64, cy = 64;
+    const colors = ['#f25022', '#7fba00', '#00a4ef', '#ffb900'];
+    const offsets = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+    offsets.forEach(([ox, oy], i) => {
+      lctx.fillStyle = colors[i];
+      lctx.fillRect(cx + ox * (gap / 2) - (ox > 0 ? 0 : sq), cy + oy * (gap / 2) - (oy > 0 ? 0 : sq), sq, sq);
+    });
+    const logoTex = new THREE.CanvasTexture(logoCvs);
+    const logoMat = new THREE.MeshStandardMaterial({ map: logoTex, roughness: 0.7, metalness: 0.1 });
+    const logo = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), logoMat);
+    logo.position.set(bpX - bpD / 2 - 0.05, bpY + 1, bpZ);
+    logo.rotation.y = -Math.PI / 2; // face outward from bed
+    logo.rotation.x = -0.15; // match bag lean
+    logo._isRoom = true;
+    addRoom(logo);
+  }
   
   // Enable shadows on key furniture (not walls/baseboards/trim — those don't need it)
   [headboard, lRail, rRail, footboard, mattress, duvet].forEach(m=>{ m.castShadow=true; });
