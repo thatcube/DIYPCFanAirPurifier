@@ -668,13 +668,9 @@ function animate(ts) {
       // Hide the regular pause overlay (finish takes precedence)
       const pauseOv = document.getElementById('fpPauseOverlay');
       if (pauseOv) pauseOv.style.display = 'none';
-      // Name dialog → record run → open finish dialog
-      leaderboard.openNameDialog(false, async () => {
-        const runData = await leaderboard.recordRun(finalTime, coins.coinTotal, coins.coinSecretScore);
-        leaderboard.renderLeaderboardPanel();
-        leaderboard.showShareButton(runData);
-        leaderboard.openFinishDialog(runData);
-      });
+      // Open finish screen immediately and let player edit name inline
+      // before saving this run.
+      leaderboard.openFinishDialogForRun(finalTime, coins.coinTotal, coins.coinSecretScore);
     }
   }
 
