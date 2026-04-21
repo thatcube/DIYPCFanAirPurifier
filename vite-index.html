@@ -158,7 +158,10 @@
   <!-- Character Select (Smash Bros style) -->
   <div id="charSelect" role="dialog" aria-modal="true" aria-label="Character select">
     <div class="char-select-inner">
-      <h2>Choose Your Cat</h2>
+      <div class="char-select-header">
+        <h2>Choose Your Cat</h2>
+        <button class="char-back" aria-label="Back" onclick="window._closeCharSelect&&window._closeCharSelect()"><i class="ph ph-x"></i></button>
+      </div>
       <div class="char-grid">
         <div class="char-card selected" data-model="classic" role="button" tabindex="0" aria-label="Classic cat" onclick="window._selectCat&&window._selectCat('classic',this)">
           <canvas class="char-preview" id="previewClassic"></canvas>
