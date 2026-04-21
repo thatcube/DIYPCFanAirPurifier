@@ -309,17 +309,18 @@ input[type=range]::-moz-range-thumb {
 #playDockBtn {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
   z-index: 200;
-  background: var(--accent-gradient);
-  color: #0a0e14; border: none; border-radius: var(--r-md);
+  background: var(--accent-border);
+  color: #fff; border: none; border-radius: var(--r-md);
   padding: 14px 32px; font-family: inherit; font-size: 15px;
   font-weight: 800; cursor: pointer; letter-spacing: 0.4px;
-  box-shadow: 0 8px 32px rgba(145,222,255,0.3), 0 2px 8px rgba(0,0,0,0.2);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.2);
   transition: all var(--dur-med) var(--spring);
   animation: playBtnPulse 3s ease-in-out infinite;
 }
 @keyframes playBtnPulse {
-  0%, 100% { box-shadow: 0 8px 32px rgba(145,222,255,0.3), 0 2px 8px rgba(0,0,0,0.2); }
-  50% { box-shadow: 0 8px 40px rgba(145,222,255,0.5), 0 2px 8px rgba(0,0,0,0.2); }
+  0%, 100% { box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.2); }
+  50% { box-shadow: 0 8px 40px rgba(0,164,239,0.4), 0 2px 8px rgba(0,0,0,0.2); }
 }
 #playDockBtn:hover {
   transform: translateX(-50%) scale(1.06) translateY(-2px);
