@@ -1146,17 +1146,38 @@ export function createRoom(scene) {
   ceilGlow._isRoom=true;
   addRoom(ceilGlow);
   
-  // Curtains — simple draped fabric panels on each side of the window
-  const curtainH=winH+12, curtainW=14, curtainD=1.5;
+  // Curtains — draped fabric panels with ripple folds
+  const curtainH=winH+12, curtainW=14, curtainD=2;
   const curtainMat=new THREE.MeshStandardMaterial({color:0xc5bfb5,roughness:0.95,metalness:0,side:THREE.DoubleSide});
+  function makeCurtainGeo(w, h, d) {
+    const geo = new THREE.BoxGeometry(d, h, w, 1, 8, 16);
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      let x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      // Sinusoidal ripple folds along Z (width direction)
+      const nz = z / (w / 2);
+      const ripple = Math.sin(nz * Math.PI * 4.5) * 0.6 + Math.sin(nz * Math.PI * 2.1) * 0.3;
+      x += ripple;
+      // Slight gathering at the top — narrower at top, wider at bottom
+      const ny = (y + h / 2) / h; // 0 at bottom, 1 at top
+      z *= 1 - ny * 0.15;
+      // Subtle vertical wave
+      x += Math.sin(y * 0.3 + z * 0.5) * 0.15;
+      pos.setXYZ(i, x, y, z);
+    }
+    geo.computeVertexNormals();
+    return geo;
+  }
   // Front curtain (toward Z=-50 side of window)
-  const cL=roomRoundBox(curtainD, curtainH, curtainW, 0.5, 0xc5bfb5,
-    leftWallX+1.2, winCenterY, winFront-curtainW/2-1, 0,0,0);
-  cL.material.roughness=0.95;
+  const cLGeo = makeCurtainGeo(curtainW, curtainH, curtainD);
+  const cL = new THREE.Mesh(cLGeo, curtainMat);
+  cL.position.set(leftWallX+1.2, winCenterY, winFront-curtainW/2-1);
+  cL.castShadow=true; cL.receiveShadow=true; cL._isRoom=true; addRoom(cL);
   // Back curtain (toward Z=+50 side of window)
-  const cR=roomRoundBox(curtainD, curtainH, curtainW, 0.5, 0xc5bfb5,
-    leftWallX+1.2, winCenterY, winBack+curtainW/2+1, 0,0,0);
-  cR.material.roughness=0.95;
+  const cRGeo = makeCurtainGeo(curtainW, curtainH, curtainD);
+  const cR = new THREE.Mesh(cRGeo, curtainMat);
+  cR.position.set(leftWallX+1.2, winCenterY, winBack+curtainW/2+1);
+  cR.castShadow=true; cR.receiveShadow=true; cR._isRoom=true; addRoom(cR);
   // Curtain rod
   const rodGeo=new THREE.CylinderGeometry(0.25,0.25,winW+curtainW*2+8,8);
   rodGeo.rotateX(Math.PI/2);

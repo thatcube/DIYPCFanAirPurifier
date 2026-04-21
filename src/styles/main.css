@@ -6,28 +6,32 @@
 /* ─── Design Tokens ──────────────────────────────────────────────── */
 :root {
   /* Liquid Glass surfaces */
-  --glass: rgba(18, 22, 30, 0.42);
-  --glass-light: rgba(18, 22, 30, 0.32);
-  --glass-border: rgba(255, 255, 255, 0.18);
-  --glass-border-strong: rgba(255, 255, 255, 0.3);
+  --glass: rgba(18, 22, 30, 0.38);
+  --glass-light: rgba(18, 22, 30, 0.28);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-border-strong: rgba(255, 255, 255, 0.28);
   --glass-blur: blur(64px) saturate(2.2) brightness(1.1);
   --glass-soft: rgba(255, 255, 255, 0.04);
   --glass-stroke-soft: rgba(255, 255, 255, 0.07);
 
-  /* Liquid Glass specular highlight */
+  /* Liquid Glass specular — multi-color iridescent highlight (MS brand tints) */
   --glass-specular: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.22) 0%,
-    rgba(255, 255, 255, 0.06) 30%,
-    rgba(255, 255, 255, 0.0) 50%
+    165deg,
+    rgba(242, 80, 34, 0.06) 0%,
+    rgba(127, 186, 0, 0.04) 15%,
+    rgba(255, 255, 255, 0.2) 25%,
+    rgba(0, 164, 239, 0.06) 40%,
+    rgba(255, 255, 255, 0.04) 55%,
+    rgba(255, 185, 0, 0.04) 70%,
+    rgba(255, 255, 255, 0.0) 85%
   );
 
-  /* Accent */
+  /* Accent — richer multi-stop gradient */
   --accent: #91deff;
   --accent-glow: rgba(145, 222, 255, 0.35);
   --accent-dim: rgba(145, 222, 255, 0.12);
-  --accent-gradient: linear-gradient(135deg, #91deff 0%, #6fb8ff 50%, #a78bfa 100%);
-  --accent-gradient-warm: linear-gradient(135deg, #ffd700 0%, #ff9500 50%, #ff5e5e 100%);
+  --accent-gradient: linear-gradient(135deg, #00a4ef 0%, #91deff 30%, #a78bfa 60%, #ffb900 100%);
+  --accent-gradient-warm: linear-gradient(135deg, #f25022 0%, #ffb900 50%, #7fba00 100%);
 
   /* Text — vibrant on glass */
   --text: #e8f4ff;
@@ -787,7 +791,7 @@ input[type=range]::-moz-range-thumb {
 .finishDlgBtn:active { transform: translateY(1px); }
 .finishDlgBtn.secondary { background: rgba(255,255,255,0.1); color: #e0e8f4; }
 .finishDlgBtn.secondary:hover { background: rgba(255,255,255,0.14); }
-.finishDlgBtn.primary { background: linear-gradient(90deg, #5cd8ff, #ffd873); color: #081019; }
+.finishDlgBtn.primary { background: linear-gradient(135deg, #00a4ef, #91deff, #ffb900); color: #081019; }
 .finishDlgBtn.primary:hover { filter: brightness(1.05); }
 .finishDlgBtn.danger {
   background: rgba(255,95,110,0.16); border: 1px solid rgba(255,95,110,0.42);
