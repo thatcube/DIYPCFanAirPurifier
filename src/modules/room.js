@@ -1471,7 +1471,33 @@ export function createRoom(scene) {
       // Screen overlay plane — matches monolith's exact positioning knobs
       const screenW = localSize.x * 0.96;
       const screenH = screenW * 0.68;
-      const scrGeo = new THREE.PlaneGeometry(screenW, screenH);
+      const cornerR = screenH * 0.04;
+
+      // Rounded-rect shape for screen border radius
+      const rrShape = new THREE.Shape();
+      const w = screenW, h = screenH, r = Math.min(cornerR, w / 2, h / 2);
+      const sx = -w / 2, sy = -h / 2;
+      rrShape.moveTo(sx + r, sy);
+      rrShape.lineTo(sx + w - r, sy);
+      rrShape.quadraticCurveTo(sx + w, sy, sx + w, sy + r);
+      rrShape.lineTo(sx + w, sy + h - r);
+      rrShape.quadraticCurveTo(sx + w, sy + h, sx + w - r, sy + h);
+      rrShape.lineTo(sx + r, sy + h);
+      rrShape.quadraticCurveTo(sx, sy + h, sx, sy + h - r);
+      rrShape.lineTo(sx, sy + r);
+      rrShape.quadraticCurveTo(sx, sy, sx + r, sy);
+
+      const scrGeo = new THREE.ShapeGeometry(rrShape, 12);
+      // Remap UVs to [0,1] so texture fills correctly
+      {
+        const pos = scrGeo.attributes.position;
+        const uv = scrGeo.attributes.uv;
+        for (let i = 0; i < pos.count; i++) {
+          uv.setXY(i, (pos.getX(i) + screenW / 2) / screenW, (pos.getY(i) + screenH / 2) / screenH);
+        }
+        uv.needsUpdate = true;
+      }
+
       const scrMat = new THREE.MeshBasicMaterial({
         map: _macbookLogoTex, color: 0xffffff,
         toneMapped: false, side: THREE.DoubleSide
