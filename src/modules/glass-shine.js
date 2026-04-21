@@ -1,10 +1,9 @@
 // ═══════════════════════════════════════════════════════════════════
 //  glass-shine.js — Cursor-tracking specular highlight, click ripple,
-//  and 3D tilt effect for glass buttons. Pure DOM — no dependencies.
+//  border glow, and press spring for glass buttons.
 // ═══════════════════════════════════════════════════════════════════
 
 const SELECTOR = '#playDockBtn, .char-start, .pause-btn, .finishDlgBtn, .pause-pill';
-const TILT_MAX = 8; // degrees
 
 // ── Shine (mouse-tracking highlight) ────────────────────────────────
 
@@ -12,7 +11,6 @@ function _ensureShine(el) {
   if (el._glassShine) return el._glassShine;
   const shine = document.createElement('div');
   shine.className = 'glass-shine';
-  // Only set position if the element doesn't already have one in CSS
   const computed = getComputedStyle(el).position;
   if (computed === 'static') el.style.position = 'relative';
   el.appendChild(shine);
@@ -29,35 +27,19 @@ function _onMouseMove(e) {
   shine.style.setProperty('--shine-x', x + '%');
   shine.style.setProperty('--shine-y', y + '%');
 
-  // 3D tilt — rotate toward cursor
-  const cx = (e.clientX - rect.left) / rect.width - 0.5;  // -0.5 to 0.5
-  const cy = (e.clientY - rect.top) / rect.height - 0.5;
-  const rotY = cx * TILT_MAX;
-  const rotX = -cy * TILT_MAX;
-  // Preserve existing translateX(-50%) for centered buttons
-  const base = el._glassBaseTransform || '';
-  el.style.transform = base + ` perspective(400px) rotateX(${rotX}deg) rotateY(${rotY}deg)`;
-}
-
-function _onMouseEnter(e) {
-  const el = e.currentTarget;
-  // Capture the base CSS transform before we modify it
-  if (!el._glassBaseTransform) {
-    el._glassBaseTransform = getComputedStyle(el).transform;
-    if (el._glassBaseTransform === 'none') el._glassBaseTransform = '';
-    // For #playDockBtn, the CSS uses translateX(-50%) which becomes a matrix
-    // Just store the CSS rule value instead
-    const rawTransform = el.style.transform || '';
-    el._glassBaseTransform = rawTransform;
-  }
+  // Border glow — shift the box-shadow glow toward the cursor
+  const nx = (e.clientX - rect.left) / rect.width - 0.5; // -0.5 to 0.5
+  const ny = (e.clientY - rect.top) / rect.height - 0.5;
+  const glowX = nx * 16;
+  const glowY = ny * 12;
+  el.style.boxShadow = `${glowX}px ${glowY}px 28px rgba(160,200,255,0.18), inset 0 1px 0 rgba(255,255,255,0.22)`;
 }
 
 function _onMouseLeave(e) {
   const el = e.currentTarget;
   const shine = el._glassShine;
   if (shine) shine.style.opacity = '0';
-  // Reset tilt
-  el.style.transform = el._glassBaseTransform || '';
+  el.style.boxShadow = '';
 }
 
 // ── Ripple (click expanding ring) ───────────────────────────────────
@@ -76,11 +58,17 @@ function _onPointerDown(e) {
   ripple.style.left = (x - size / 2) + 'px';
   ripple.style.top = (y - size / 2) + 'px';
   el.appendChild(ripple);
-
   ripple.addEventListener('animationend', () => ripple.remove());
+
+  // Press spring — quick scale down then bounce back via CSS
+  el.classList.add('glass-pressed');
+  el.addEventListener('animationend', function onEnd() {
+    el.classList.remove('glass-pressed');
+    el.removeEventListener('animationend', onEnd);
+  }, { once: true });
 }
 
-// ── Init: attach to all matching buttons ────────────────────────────
+// ── Init ─────────────────────────────────────────────────────────────
 
 export function initGlassShine() {
   _attachAll();
@@ -92,7 +80,6 @@ function _attachAll() {
   document.querySelectorAll(SELECTOR).forEach(el => {
     if (el._glassShineAttached) return;
     el._glassShineAttached = true;
-    el.addEventListener('mouseenter', _onMouseEnter);
     el.addEventListener('mousemove', _onMouseMove);
     el.addEventListener('mouseleave', _onMouseLeave);
     el.addEventListener('pointerdown', _onPointerDown);
