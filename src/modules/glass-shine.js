@@ -1,49 +1,47 @@
 // ═══════════════════════════════════════════════════════════════════
 //  glass-shine.js — Cursor-tracking specular highlight, click ripple,
-//  border glow, and press spring for glass buttons.
+//  and cursor-following glow for glass buttons.
 // ═══════════════════════════════════════════════════════════════════
 
 const SELECTOR = '#playDockBtn, .char-start, .pause-btn, .finishDlgBtn, .pause-pill';
 
-// ── Shine (mouse-tracking highlight) ────────────────────────────────
+// ── Shine + Glow (mouse-tracking highlight) ─────────────────────────
 
-function _ensureShine(el) {
-  if (el._glassShine) return el._glassShine;
-  const shine = document.createElement('div');
-  shine.className = 'glass-shine';
+function _ensureOverlays(el) {
+  if (el._glassShine) return;
   const computed = getComputedStyle(el).position;
   if (computed === 'static') el.style.position = 'relative';
+
+  // Shine: radial spotlight that follows cursor
+  const shine = document.createElement('div');
+  shine.className = 'glass-shine';
   el.appendChild(shine);
   el._glassShine = shine;
-  return shine;
+
+  // Glow: soft colored shadow that follows cursor (rendered as an overlay
+  // so we never touch el.style.boxShadow and don't fight CSS :hover)
+  const glow = document.createElement('div');
+  glow.className = 'glass-glow';
+  el.appendChild(glow);
+  el._glassGlow = glow;
 }
 
 function _onMouseMove(e) {
   const el = e.currentTarget;
-  const shine = _ensureShine(el);
+  _ensureOverlays(el);
   const rect = el.getBoundingClientRect();
   const x = ((e.clientX - rect.left) / rect.width) * 100;
   const y = ((e.clientY - rect.top) / rect.height) * 100;
-  shine.style.setProperty('--shine-x', x + '%');
-  shine.style.setProperty('--shine-y', y + '%');
-
-  // Border glow — shift the box-shadow glow toward the cursor
-  // Include the inset border ring so it doesn't get wiped by inline style
-  const nx = (e.clientX - rect.left) / rect.width - 0.5;
-  const ny = (e.clientY - rect.top) / rect.height - 0.5;
-  const glowX = nx * 16;
-  const glowY = ny * 12;
-  const isDanger = el.classList.contains('danger');
-  const ringColor = isDanger ? 'rgba(255,120,120,0.45)' : 'rgba(160,210,255,0.45)';
-  const glowColor = isDanger ? 'rgba(255,100,100,0.18)' : 'rgba(160,200,255,0.18)';
-  el.style.boxShadow = `inset 0 0 0 1px ${ringColor}, ${glowX}px ${glowY}px 28px ${glowColor}`;
+  el._glassShine.style.setProperty('--shine-x', x + '%');
+  el._glassShine.style.setProperty('--shine-y', y + '%');
+  el._glassGlow.style.setProperty('--glow-x', x + '%');
+  el._glassGlow.style.setProperty('--glow-y', y + '%');
 }
 
 function _onMouseLeave(e) {
   const el = e.currentTarget;
-  const shine = el._glassShine;
-  if (shine) shine.style.opacity = '0';
-  el.style.boxShadow = '';
+  if (el._glassShine) el._glassShine.style.opacity = '0';
+  if (el._glassGlow) el._glassGlow.style.opacity = '0';
 }
 
 // ── Ripple (click expanding ring) ───────────────────────────────────
@@ -80,6 +78,6 @@ function _attachAll() {
     el.addEventListener('mousemove', _onMouseMove);
     el.addEventListener('mouseleave', _onMouseLeave);
     el.addEventListener('pointerdown', _onPointerDown);
-    _ensureShine(el);
+    _ensureOverlays(el);
   });
 }
