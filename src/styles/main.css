@@ -127,6 +127,7 @@ canvas#c { display: block; width: 100%; height: 100%; }
   box-shadow: 0 6px 24px rgba(0,0,0,0.15);
   transition: all 0.35s var(--ease-out-expo);
   position: relative;
+  overflow: hidden;
 }
 .glass-btn:hover {
   transform: translateY(-2px);
@@ -1061,7 +1062,7 @@ body.play-mode #runTimerHud { display: block; }
 /* The shine overlay — positioned by JS */
 .glass-shine {
   position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-  pointer-events: none; z-index: -1;
+  pointer-events: none; z-index: 1;
   background: radial-gradient(
     circle 140px at var(--shine-x, 50%) var(--shine-y, -40%),
     rgba(200,220,255,0.35) 0%,
@@ -1079,7 +1080,7 @@ body.play-mode #runTimerHud { display: block; }
 /* Cursor-following glow — soft colored halo */
 .glass-glow {
   position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-  pointer-events: none; z-index: -1;
+  pointer-events: none; z-index: 1;
   background: radial-gradient(
     circle 180px at var(--glow-x, 50%) var(--glow-y, 50%),
     rgba(140,190,255,0.22) 0%,
@@ -1099,7 +1100,7 @@ body.play-mode #runTimerHud { display: block; }
     rgba(160,200,255,0.18) 35%,
     transparent 65%
   );
-  pointer-events: none; z-index: -1;
+  pointer-events: none; z-index: 1;
   transform: scale(0); opacity: 1;
   animation: glassRippleExpand 0.55s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
 }
