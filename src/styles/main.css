@@ -105,6 +105,8 @@ canvas#c { display: block; width: 100%; height: 100%; }
    All interactive glass buttons use .glass-btn as the base class.
    ═══════════════════════════════════════════════════════════════════ */
 .glass-btn {
+  -webkit-appearance: none;
+  appearance: none;
   background-color: var(--glass);
   background-image: var(--glass-specular);
   backdrop-filter: var(--glass-blur);
