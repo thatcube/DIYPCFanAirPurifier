@@ -114,9 +114,6 @@
           <input type="range" min="0" max="1800" value="900" id="fanSpeedSlider" oninput="window._setFanSpeed&&window._setFanSpeed(this.value);document.getElementById('fanSpeedVal').textContent=this.value+'rpm'">
           <span id="fanSpeedVal">900rpm</span>
         </div>
-        <div class="ctrl-row"><label>Show airflow</label>
-          <div class="toggle-sw" id="togAirflow" onclick="window._toggleAirflow&&window._toggleAirflow()"></div>
-        </div>
         <div class="ctrl-row"><label>Fan color</label>
           <div class="seg">
             <button class="on" id="btnFanWhite" onclick="window._setFanColor&&window._setFanColor('white')">White</button>
