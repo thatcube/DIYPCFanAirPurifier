@@ -28,9 +28,9 @@ function _applyLoopPause(action, ts, pauseSeconds) {
 }
 
 const MODEL_MAP = {
-  classic:   { src: 'assets/cat.glb',           scale: 4.5, y: -2.5, camY: 1.7, camZ: 4.7, targetY: 1.0 },
-  toon:      { src: 'assets/tooncat.glb',       scale: 4.0, y: -3.0, camY: 1.85, camZ: 5.15, targetY: 1.1 },
-  bababooey: { src: 'assets/bababooey_cat.glb', scale: 4.5, y: -2.5, camY: 1.9, camZ: 5.35, targetY: 1.15 },
+  classic:   { src: 'assets/cat.glb',           camZ: 12, camY: 2 },
+  toon:      { src: 'assets/tooncat.glb',       camZ: 14, camY: 2.5 },
+  bababooey: { src: 'assets/bababooey_cat.glb', camZ: 14, camY: 2.5 },
 };
 
 /**
@@ -79,6 +79,49 @@ function _stripBababooeyBackdrop(model) {
   }
 }
 
+function _processLoadedModel(preview, entry, gltf, preset) {
+  const model = gltf.scene;
+
+  // Strip bababooey backdrop
+  if (entry.key === 'bababooey') _stripBababooeyBackdrop(model);
+
+  // Auto-fit: scale to consistent height, center XZ, sit on ground
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const s = 4 / maxDim;
+  model.scale.setScalar(s);
+  // Re-center after scaling
+  box.setFromObject(model);
+  box.getCenter(center);
+  model.position.x -= center.x;
+  model.position.z -= center.z;
+  model.position.y -= box.min.y;
+
+  // Material cleanup
+  model.traverse(child => {
+    if (child.isMesh && child.material) {
+      child.material.metalness = 0;
+      child.material.roughness = Math.max(child.material.roughness, 0.6);
+    }
+  });
+
+  preview.scene.add(model);
+  preview.model = model;
+
+  // Animation mixer
+  if (gltf.animations && gltf.animations.length > 0) {
+    const mixer = new THREE.AnimationMixer(model);
+    let clip = gltf.animations.find(a => /idle/i.test(a.name)) || gltf.animations[0];
+    const action = mixer.clipAction(clip);
+    action.play();
+    preview.mixer = mixer;
+    preview.idleAction = action;
+    preview.loopPause = Math.max(0, Number(preset.idleLoopPause) || 0);
+  }
+}
+
 export function initPreviews() {
   const loader = new GLTFLoader();
   const entries = [
@@ -104,10 +147,10 @@ export function initPreviews() {
     // Scene
     const scene = new THREE.Scene();
 
-    // Camera — use preset values for framing
-    const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+    // Camera
+    const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 200);
     camera.position.set(0, cfg.camY, cfg.camZ);
-    camera.lookAt(0, cfg.targetY, 0);
+    camera.lookAt(0, 1, 0);
 
     // Lights
     scene.add(new THREE.AmbientLight(0xffffff, 0.6));
@@ -122,43 +165,18 @@ export function initPreviews() {
     const preview = { renderer, scene, camera, model: null, mixer: null, key: entry.key, cfg, animSpeed };
     previews.push(preview);
 
-    // Load model
-    loader.load(cfg.src, (gltf) => {
-      const model = gltf.scene;
-
-      // Strip bababooey backdrop (graph/chart mesh)
-      if (entry.key === 'bababooey') {
-        _stripBababooeyBackdrop(model);
-      }
-
-      model.scale.setScalar(cfg.scale);
-      model.position.y = cfg.y;
-
-      // Clean up materials for consistent look
-      model.traverse(child => {
-        if (child.isMesh && child.material) {
-          child.material.metalness = 0;
-          child.material.roughness = Math.max(child.material.roughness, 0.6);
-        }
+    // Load model (with fallback for alt filenames)
+    const loadModel = (src) => {
+      loader.load(src, (gltf) => {
+        _processLoadedModel(preview, entry, gltf, preset);
+      }, undefined, (err) => {
+        const altSources = { 'assets/tooncat.glb': 'assets/toon-cat.glb', 'assets/toon-cat.glb': 'assets/tooncat.glb' };
+        const alt = altSources[src];
+        if (alt) { loadModel(alt); }
+        else { console.warn('[cat-preview] failed to load', src, err); }
       });
-
-      scene.add(model);
-      preview.model = model;
-
-      // Animation mixer
-      if (gltf.animations && gltf.animations.length > 0) {
-        const mixer = new THREE.AnimationMixer(model);
-        // Find idle animation, fall back to first
-        let clip = gltf.animations.find(a => /idle/i.test(a.name)) || gltf.animations[0];
-        const action = mixer.clipAction(clip);
-        action.play();
-        preview.mixer = mixer;
-        preview.idleAction = action;
-        preview.loopPause = Math.max(0, Number(preset.idleLoopPause) || 0);
-      }
-    }, undefined, (err) => {
-      console.warn('[cat-preview] failed to load', cfg.src, err);
-    });
+    };
+    loadModel(cfg.src);
   }
 
   if (!_animId) _animate();
