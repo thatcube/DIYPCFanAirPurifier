@@ -88,6 +88,10 @@ export default {
         return withCors(await handleRunFinish(request, env, cfg));
       }
 
+      if (url.pathname === '/api/run/rename' && request.method === 'POST') {
+        return withCors(await handleRunRename(request, env, cfg));
+      }
+
       if (url.pathname === '/api/admin/leaderboard' && request.method === 'GET') {
         return withCors(await handleAdminLeaderboard(request, env, cfg));
       }
@@ -356,6 +360,70 @@ async function handleRunFinish(request, env, cfg) {
   return jsonResponse(200, {
     ok: true,
     rank,
+    entry,
+    leaderboard,
+    maxEntries: cfg.LB_MAX,
+    perPlayer: cfg.LB_PER_PLAYER,
+  });
+}
+
+async function handleRunRename(request, env, cfg) {
+  const now = Date.now();
+  const ipHash = await getRequestIpHash(request, env);
+  const allowed = await rateLimit(env.LB_DB, ipHash, 'run_rename', 120, 10 * 60 * 1000, now);
+  if (!allowed) return apiError(429, 'rate_limited', 'Too many rename requests');
+
+  const body = await parseBody(request);
+  const entryId = String(body?.entryId || '').trim().slice(0, 64);
+  const name = sanitizeName(body?.name || '', cfg.MAX_NAME_LEN);
+  const playerId = sanitizePlayerId(body?.playerId);
+  if (!entryId) return apiError(400, 'bad_request', 'entryId is required');
+  if (!name) return apiError(400, 'bad_request', 'name is required');
+  if (!playerId) return apiError(400, 'bad_request', 'playerId is required');
+
+  const target = await env.LB_DB
+    .prepare(
+      `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id
+       FROM leaderboard_entries WHERE id = ? LIMIT 1`
+    )
+    .bind(entryId)
+    .first();
+  if (!target) return apiError(404, 'not_found', 'Entry not found');
+
+  const targetPlayerId = sanitizePlayerId(target.player_id ?? target.playerId);
+  if (!targetPlayerId || targetPlayerId !== playerId) {
+    return apiError(403, 'forbidden', 'Entry does not belong to this player');
+  }
+
+  const latest = await env.LB_DB
+    .prepare(`SELECT id, at_ms FROM leaderboard_entries WHERE player_id = ? ORDER BY at_ms DESC LIMIT 1`)
+    .bind(playerId)
+    .first();
+  if (!latest || String(latest.id || '') !== entryId) {
+    return apiError(409, 'not_latest_entry', 'Only your latest run can be renamed');
+  }
+
+  await env.LB_DB
+    .prepare(`UPDATE leaderboard_entries SET name = ? WHERE id = ?`)
+    .bind(name, entryId)
+    .run();
+
+  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg);
+  const rank = leaderboard.findIndex((row) => row.id === entryId) + 1;
+  const entry = leaderboard.find((row) => row.id === entryId) || {
+    id: entryId,
+    name,
+    timeMs: Math.floor(Number(target.time_ms ?? target.timeMs) || 0),
+    at: Math.floor(Number(target.at_ms ?? target.at) || now),
+    catColor: sanitizeCatColor(target.cat_color ?? target.catColor),
+    catHair: sanitizeCatHair(target.cat_hair ?? target.catHair),
+    catModel: sanitizeCatModel(target.cat_model ?? target.catModel),
+    playerId,
+  };
+
+  return jsonResponse(200, {
+    ok: true,
+    rank: rank > 0 ? rank : 0,
     entry,
     leaderboard,
     maxEntries: cfg.LB_MAX,

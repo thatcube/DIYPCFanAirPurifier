@@ -345,6 +345,55 @@ app.post('/api/run/finish', (req, res) => {
   });
 });
 
+app.post('/api/run/rename', (req, res) => {
+  const ip = getClientIp(req);
+  if (!rateLimit(ip, 'run_rename', 120, 10 * 60 * 1000)) {
+    return apiError(res, 429, 'rate_limited', 'Too many rename requests');
+  }
+
+  const entryId = String(req.body?.entryId || '').trim().slice(0, 64);
+  const name = sanitizeName(req.body?.name || '');
+  const playerId = sanitizePlayerId(req.body?.playerId || '');
+
+  if (!entryId) return apiError(res, 400, 'bad_request', 'entryId is required');
+  if (!name) return apiError(res, 400, 'bad_request', 'name is required');
+  if (!playerId) return apiError(res, 400, 'bad_request', 'playerId is required');
+
+  const idx = leaderboard.findIndex((row) => String(row && row.id || '') === entryId);
+  if (idx < 0) return apiError(res, 404, 'not_found', 'Entry not found');
+
+  const target = leaderboard[idx];
+  const targetPlayerId = sanitizePlayerId(target.playerId || '');
+  if (!targetPlayerId || targetPlayerId !== playerId) {
+    return apiError(res, 403, 'forbidden', 'Entry does not belong to this player');
+  }
+
+  let latest = null;
+  for (const row of leaderboard) {
+    if (sanitizePlayerId(row.playerId || '') !== playerId) continue;
+    if (!latest || Number(row.at || 0) > Number(latest.at || 0)) latest = row;
+  }
+  if (!latest || String(latest.id || '') !== entryId) {
+    return apiError(res, 409, 'not_latest_entry', 'Only your latest run can be renamed');
+  }
+
+  leaderboard[idx] = { ...target, name };
+  leaderboard = normalizeLeaderboard(leaderboard);
+  saveLeaderboard(leaderboard);
+
+  const rank = leaderboard.findIndex((row) => String(row.id || '') === entryId) + 1;
+  const entry = leaderboard.find((row) => String(row.id || '') === entryId) || { ...target, name };
+
+  return res.json({
+    ok: true,
+    rank: rank > 0 ? rank : 0,
+    entry,
+    leaderboard,
+    maxEntries: LB_MAX,
+    perPlayer: LB_PER_PLAYER,
+  });
+});
+
 app.get('/api/admin/leaderboard', requireAdmin, (_req, res) => {
   return res.json({
     ok: true,
