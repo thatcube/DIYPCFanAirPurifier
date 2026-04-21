@@ -482,6 +482,34 @@ function _getBoxes() {
     }
   }
 
+  // Nightstand drawer fronts — dynamic collision (tracks slide position)
+  if (_roomRefs && _roomRefs.drawers) {
+    for (const drw of _roomRefs.drawers) {
+      if (!drw || !drw._drawerW) continue;
+      // After X-mirror: world X = -drw.position.x, Z = drw.position.z + slide offset
+      const wx = -drw.position.x;
+      const wy = drw.position.y;
+      const wz = drw.position.z; // already includes slide via group.position.z
+      const hw = drw._drawerW / 2;
+      const hh = drw._drawerH / 2;
+      const trayD = drw._drawerTrayD || 10;
+      // Front face (thin wall)
+      result.push({
+        xMin: wx - hw, xMax: wx + hw,
+        zMin: wz - 0.8, zMax: wz + 0.4,
+        yTop: wy + hh, yBottom: wy - hh
+      });
+      // If drawer is closed, add the full body as solid
+      if (!drw._drawerOpen) {
+        result.push({
+          xMin: wx - hw, xMax: wx + hw,
+          zMin: wz, zMax: wz + trayD + 1,
+          yTop: wy + hh, yBottom: wy - hh
+        });
+      }
+    }
+  }
+
   return result;
 }
 

@@ -1683,6 +1683,7 @@ export function createRoom(scene) {
     ceilGlow: typeof ceilGlow !== 'undefined' ? ceilGlow : null,
     leftWallX,
     toggleMacbook,
-    getMacbookScreenMesh: () => _macbookScreen
+    getMacbookScreenMesh: () => _macbookScreen,
+    drawers
   };
 }

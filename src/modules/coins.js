@@ -265,6 +265,40 @@ export function spawnRoomCoins(roomRefs) {
   addCoin(_coinGroup, new THREE.Vector3(-(TBL_X + TBL_W / 2 - 6), fy + TBL_H + 28.5, TBL_Z + TBL_D / 2 - 6), {});
   // 14. Inside the purifier (purifier group is at x=45, z=-68)
   addCoin(_coinGroup, new THREE.Vector3(45, fy + 3, -68), { insidePurifier: true });
+
+  // 15. Hidden inside a random nightstand drawer (moves with the drawer when opened)
+  if (roomRefs && roomRefs.drawers && roomRefs.drawers.length > 0) {
+    const drawerIdx = Math.floor(Math.random() * roomRefs.drawers.length);
+    const drw = roomRefs.drawers[drawerIdx];
+    // Place coin inside the drawer tray (local coords relative to drawer group)
+    // After X-mirror, drawer group.position.x is pre-mirror, so coin world X = -drw.pos.x
+    // Coin is in _coinGroup (world space), so we compute the world position
+    const coinInDrawer = makeCoin();
+    // Drawer center in world space (post-mirror)
+    const dwx = -drw.position.x;
+    const dwy = drw.position.y;
+    const dwz = drw.position.z + (drw._drawerTrayD || 10) / 2 + 0.4; // center of tray
+    coinInDrawer.position.set(dwx, dwy, dwz);
+    coinInDrawer.visible = false;
+    _coinGroup.add(coinInDrawer);
+    const drawerCoinEntry = {
+      id: 'coin_' + (coinTotal + 1),
+      mesh: coinInDrawer,
+      basePos: new THREE.Vector3(dwx, dwy, dwz),
+      bobPhase: Math.random() * Math.PI * 2,
+      spinSpeed: 0.04 + Math.random() * 0.02,
+      parent: _coinGroup,
+      collected: false,
+      insidePurifier: false,
+      inDrawer: true,
+      consoleProp: false,
+      secret: false,
+      isDynamic: false,
+      _drawerRef: drw
+    };
+    coins.push(drawerCoinEntry);
+    coinTotal++;
+  }
 }
 
 // ── Secret coin system ──────────────────────────────────────────────
@@ -374,6 +408,14 @@ export function updateCoins(ts, playerPos) {
     // Spin + bob
     c.mesh.rotation.y = t * c.spinSpeed * 60;
     c.mesh.position.y = c.basePos.y + Math.sin(t * 2 + c.bobPhase) * 0.8;
+
+    // Drawer coins: track the drawer's slide position
+    if (c.inDrawer && c._drawerRef) {
+      const drw = c._drawerRef;
+      const dwz = drw.position.z + (drw._drawerTrayD || 10) / 2 + 0.4;
+      c.mesh.position.z = dwz;
+      c.basePos.z = dwz;
+    }
 
     // Pickup check
     if (playerPos) {
