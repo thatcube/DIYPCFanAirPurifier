@@ -88,6 +88,7 @@ let _markShadowsDirty = null;
 let _showToast = null;
 let _roomRefs = null;
 let _fpHud = null;
+let _purifierGroup = null;
 
 // Collision boxes from room (set during init)
 let _staticBoxes = [];
@@ -133,6 +134,7 @@ export function init(refs) {
   _catGroup = refs.catGroup;
   _scene = refs.scene;
   _placementOffset = refs.placementOffset || new THREE.Vector3();
+  _purifierGroup = refs.purifierGroup || null;
   _markShadowsDirty = refs.markShadowsDirty || (() => {});
   _showToast = refs.showToast || (() => {});
   _roomRefs = refs.roomRefs || {};
@@ -339,9 +341,8 @@ function _getBoxes() {
   const yBotPanel = py - H / 2 - ply;
   const yBotFeet = yBotPanel - bunFootH;
 
-  // The purifier rotates 90° in TV/Wall mode. When rotated, local X→world Z and local Z→world -X.
-  // Detect rotation from the placementOffset (TV/Wall = rotated)
-  const rotated = (px === 45 || px === -17); // TV or Wall placement
+  // Detect rotation from the actual purifierGroup rotation
+  const rotated = _purifierGroup ? Math.abs(_purifierGroup.rotation.y) > 0.1 : false;
 
   // Build 4 wall AABBs (top, bottom, front, back) + 2 filter sides
   const localBoxes = [

@@ -97,7 +97,7 @@ const purifierGroup = new THREE.Group();
 {
   const toMove = [];
   scene.children.forEach(c => {
-    if (c.isLight || c.isCamera || c._isRoom || c === catAnimation.catGroup || c.isPoints) return;
+    if (c.isLight || c.isCamera || c._isRoom || c._isCoins || c === catAnimation.catGroup || c.isPoints) return;
     toMove.push(c);
   });
   toMove.forEach(c => purifierGroup.add(c));
@@ -183,6 +183,7 @@ gameFp.init({
   catGroup: catAnimation.catGroup,
   scene,
   placementOffset,
+  purifierGroup,
   markShadowsDirty,
   showToast,
   roomRefs

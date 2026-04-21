@@ -187,6 +187,7 @@ export function getCoinGroup() { return _coinGroup; }
 export function createCoinGroup(scene) {
   _coinGroup = new THREE.Group();
   _coinGroup.visible = false;
+  _coinGroup._isCoins = true; // prevent being scooped into purifierGroup
   scene.add(_coinGroup);
   return _coinGroup;
 }
