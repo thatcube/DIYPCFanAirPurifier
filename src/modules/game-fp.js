@@ -428,6 +428,9 @@ export function toggleFirstPerson() {
     for (const k in fpKeys) fpKeys[k] = false;
     fpLookDX = 0;
     fpLookDY = 0;
+    _velX = 0;
+    _velZ = 0;
+    _lastPhysicsTs = 0;
 
     // Exit pointer lock
     if (document.pointerLockElement) document.exitPointerLock();
@@ -435,7 +438,18 @@ export function toggleFirstPerson() {
     // Hide coins + cat, stop timer
     coins.setCoinsVisible(false);
     leaderboard.stopTimer();
-    if (_catGroup) _catGroup.visible = false;
+    if (_catGroup) {
+      _catGroup.visible = false;
+      _catGroup.position.set(0, 0, 0);
+      _catGroup.rotation.set(0, 0, 0);
+    }
+
+    // Restore orbit camera to look at purifier
+    if (_controls && _placementOffset) {
+      _controls.target.set(_placementOffset.x, _placementOffset.y + 8, _placementOffset.z);
+      _camera.position.set(_placementOffset.x + 25, _placementOffset.y + 20, _placementOffset.z + 35);
+      _controls.update();
+    }
 
     if (_markShadowsDirty) _markShadowsDirty();
     document.body.classList.remove('play-mode');
