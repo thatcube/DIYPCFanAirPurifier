@@ -463,7 +463,7 @@ function _getBoxes() {
       result.push({
         cx: wp.x, cz: wp.z,
         hw: hw, hd: 0.3,           // 0.3" thin wall
-        angle: worldRotY,
+        angle: -worldRotY,
         yTop: wp.y + hh, yBottom: wp.y - hh,
         obb: true
       });
