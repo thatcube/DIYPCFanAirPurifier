@@ -458,7 +458,7 @@ function _getBoxes() {
     }
   }
 
-  // MacBook collision (on the bed, always present)
+  // MacBook collision — just the open lid screen area
   {
     const mbX = -(BED_X - 58/2 + 12); // post-mirror
     const mbZ = BED_Z + 6;
@@ -466,11 +466,11 @@ function _getBoxes() {
     const slatY = fy + BED_SLATS_FROM_FLOOR;
     const mattY = slatY + 1 + 5;
     const mbY = mattY + 5 + 1.5; // bed top
-    // MacBook footprint ~12.3×8.7" closed, ~3" tall when open
+    // Slim collision for the screen/lid only (~10×7", 3" tall when angled open)
     result.push({
-      xMin: mbX - 7, xMax: mbX + 7,
-      zMin: mbZ - 5, zMax: mbZ + 5,
-      yTop: mbY + 6, yBottom: mbY,
+      xMin: mbX - 5, xMax: mbX + 5,
+      zMin: mbZ - 3.5, zMax: mbZ + 3.5,
+      yTop: mbY + 3, yBottom: mbY,
     });
   }
 
