@@ -496,6 +496,13 @@ function animate(ts) {
       }
       _lastCatX = gameFp.fpPos.x;
       _lastCatZ = gameFp.fpPos.z;
+
+      // Apply idle loop pause (bababooey pauses 2.2s between bounces when standing still)
+      const loopPause = Math.max(0, Number(preset.idleLoopPause) || 0);
+      const idleAction = catAnimation.catIdleAction || catAnimation.catWalkAction;
+      if (loopPause > 0 && idleAction) {
+        catAnimation.applyLoopPause(idleAction, ts, loopPause, moveBlend < 0.1);
+      }
     }
   }
 

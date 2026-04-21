@@ -9,6 +9,24 @@ import { CAT_MODEL_PRESETS } from './constants.js';
 const previews = []; // { renderer, scene, camera, model, mixer, animSpeed }
 let _animId = null;
 
+/** Pause a looping action for `pauseSeconds` between loops */
+function _applyLoopPause(action, ts, pauseSeconds) {
+  if (!action) return;
+  const clip = action.getClip();
+  if (!clip || clip.duration <= 0) return;
+  const cycleTime = action.time % clip.duration;
+  const nearEnd = cycleTime > clip.duration * 0.92;
+  if (nearEnd) {
+    if (!action._loopPauseStart) action._loopPauseStart = ts;
+    if (ts - action._loopPauseStart < pauseSeconds * 1000) {
+      action.paused = true; return;
+    }
+    action._loopPauseStart = null; action.paused = false;
+  } else {
+    action._loopPauseStart = null; action.paused = false;
+  }
+}
+
 const MODEL_MAP = {
   classic:   { src: 'assets/cat.glb',           scale: 4.5, y: -2.5, camY: 1.7, camZ: 4.7, targetY: 1.0 },
   toon:      { src: 'assets/tooncat.glb',       scale: 4.0, y: -3.0, camY: 1.85, camZ: 5.15, targetY: 1.1 },
@@ -135,6 +153,8 @@ export function initPreviews() {
         const action = mixer.clipAction(clip);
         action.play();
         preview.mixer = mixer;
+        preview.idleAction = action;
+        preview.loopPause = Math.max(0, Number(preset.idleLoopPause) || 0);
       }
     }, undefined, (err) => {
       console.warn('[cat-preview] failed to load', cfg.src, err);
@@ -171,6 +191,10 @@ function _animate() {
     // Update mixer with model-specific animation speed
     if (p.mixer) {
       p.mixer.update(dt * p.animSpeed);
+      // Apply idle loop pause (bababooey pauses between bounces)
+      if (p.idleAction && p.loopPause > 0) {
+        _applyLoopPause(p.idleAction, performance.now(), p.loopPause);
+      }
     }
 
     p.renderer.render(p.scene, p.camera);
