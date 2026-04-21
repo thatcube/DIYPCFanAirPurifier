@@ -450,6 +450,17 @@ export function renderLeaderboardPanel() {
 
 // ── Share / Copy result ─────────────────────────────────────────────
 
+function _buildLeaderboardUrl(entryId, timeMs) {
+  const base = `${location.origin}/leaderboard`;
+  const params = new URLSearchParams();
+  const cleanId = String(entryId || '').trim();
+  const ms = Math.floor(Number(timeMs));
+  if (cleanId) params.set('entry', cleanId);
+  if (Number.isFinite(ms) && ms > 0) params.set('timeMs', String(ms));
+  const q = params.toString();
+  return q ? `${base}?${q}` : base;
+}
+
 function _buildShareText(data) {
   const row = data || {};
   const rankTxt = row.rank && row.rank > 0 ? `#${row.rank}` : 'Unranked';
@@ -461,9 +472,13 @@ function _buildShareText(data) {
   const colorChip = (catModel !== 'bababooey')
     ? ` ${CAT_COLOR_EMOJI[catColor] || ''} ${catColor.charAt(0).toUpperCase() + catColor.slice(1)}`
     : '';
+  const url = _buildLeaderboardUrl(row.entryId || '', row.timeMs || 0);
   const secretCount = Math.floor(Number(row.secretCoins) || 0);
   const secretChip = secretCount > 0 ? ` · 🔵 ${secretCount} secret${secretCount > 1 ? 's' : ''}` : '';
-  return `${who} · DIY Air Purifier · ${formatRunTime(row.timeMs || 0)} · ${rankTxt} · ${modelEmoji} ${modelLabel}${colorChip}${secretChip}`;
+  return [
+    `${who} · DIY Air Purifier · ${formatRunTime(row.timeMs || 0)} · ${rankTxt} · ${modelEmoji} ${modelLabel}${colorChip}${secretChip}`,
+    url
+  ].join('\n');
 }
 
 async function _copyTextToClipboard(text) {

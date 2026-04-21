@@ -178,7 +178,11 @@
     const metaEl = document.getElementById('meta');
     const emptyEl = document.getElementById('empty');
     const copyBtn = document.getElementById('copyLinkBtn');
-    const hitId = new URLSearchParams(location.search).get('entry') || '';
+    const query = new URLSearchParams(location.search);
+    const hitId = query.get('entry') || '';
+    const _queryTimeRaw = query.get('timeMs') || query.get('time') || '';
+    const _queryTimeMsNum = Math.floor(Number(_queryTimeRaw));
+    const queryTimeMs = Number.isFinite(_queryTimeMsNum) && _queryTimeMsNum > 0 ? _queryTimeMsNum : 0;
 
     function escapeHtml(v) {
       return String(v || '').replace(/[&<>"']/g, (ch) => ({
@@ -238,7 +242,9 @@
         if (!rows.length) {
           rowsEl.innerHTML = '';
           emptyEl.style.display = 'block';
-          metaEl.textContent = 'Shared leaderboard is live. No runs yet.';
+          metaEl.textContent = queryTimeMs
+            ? `Shared leaderboard is live. No runs yet. Your time: ${fmtRun(queryTimeMs)}`
+            : 'Shared leaderboard is live. No runs yet.';
           return;
         }
 
@@ -254,7 +260,9 @@
         }).join('');
 
         emptyEl.style.display = 'none';
-        metaEl.textContent = `Fastest first | Top ${data.maxEntries || 25} | Max ${data.perPlayer || 3} per player`;
+        metaEl.textContent = queryTimeMs
+          ? `Fastest first | Top ${data.maxEntries || 25} | Max ${data.perPlayer || 3} per player | Your time ${fmtRun(queryTimeMs)}`
+          : `Fastest first | Top ${data.maxEntries || 25} | Max ${data.perPlayer || 3} per player`;
 
         if (hitId) {
           const allRows = rowsEl.querySelectorAll('[data-entry-id]');
