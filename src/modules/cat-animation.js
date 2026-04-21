@@ -220,14 +220,26 @@ function _loadWithFallback(loader, onLoad, onError, sources) {
 
 function _stripBackdrop(model, src) {
   if (!/bababooey/i.test(src)) return;
+  const hint = /(graph|chart|grid|axis|axes|backdrop|background|board|screen|panel|plane|pplane|lambert1|floor|ground)/i;
   const toRemove = [];
   model.traverse(o => {
     if (!o.isMesh) return;
-    const n = String(o.name || '').toLowerCase();
-    if (n.includes('backdrop') || n.includes('background') || n.includes('plane') || n.includes('floor') || n.includes('ground')) {
-      toRemove.push(o);
-    }
+    const n = String(o.name || '');
+    const mn = String(o.material && o.material.name || '');
+    if (hint.test(n) || hint.test(mn)) toRemove.push(o);
   });
+  // Fallback: remove largest planar mesh
+  if (toRemove.length === 0) {
+    let biggest = null, bigArea = 0;
+    model.traverse(o => {
+      if (!o.isMesh || !o.geometry) return;
+      o.geometry.computeBoundingBox();
+      const bb = o.geometry.boundingBox;
+      const dims = [bb.max.x-bb.min.x, bb.max.y-bb.min.y, bb.max.z-bb.min.z].sort((a,b)=>b-a);
+      if (dims[2] < dims[0]*0.1 && dims[0]*dims[1] > bigArea) { bigArea = dims[0]*dims[1]; biggest = o; }
+    });
+    if (biggest) toRemove.push(biggest);
+  }
   for (const o of toRemove) { if (o.parent) o.parent.remove(o); }
 }
 
