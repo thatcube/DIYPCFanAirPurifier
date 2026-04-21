@@ -516,18 +516,45 @@ function _respawn() {
 // ── Set paused ──────────────────────────────────────────────────────
 
 export function setPaused(paused) {
+  if (!fpMode) return;
   fpPaused = !!paused;
+
   const overlay = document.getElementById('fpPauseOverlay');
-  if (overlay) overlay.style.display = fpPaused ? 'flex' : 'none';
+  const lbPanel = document.getElementById('fpLeaderboard');
+  const crosshair = document.getElementById('fpCrosshair');
+  // Don't show pause overlay if finish overlay is open
+  const finishOpen = document.getElementById('fpFinishOverlay')?.classList.contains('open');
 
   if (fpPaused) {
-    if (document.pointerLockElement) {
-      _fpIgnorePointerUnlock = true;
-      document.exitPointerLock();
-      setTimeout(() => { _fpIgnorePointerUnlock = false; }, 300);
-    }
+    // Clear held keys + look deltas
+    for (const k in fpKeys) fpKeys[k] = false;
+    fpLookDX = 0;
+    fpLookDY = 0;
+    _lastPhysicsTs = 0;
+
+    // Show pause overlay (unless finish is showing)
+    if (overlay && !finishOpen) overlay.style.display = 'flex';
+    if (lbPanel) lbPanel.style.display = 'block';
+    if (crosshair) crosshair.style.opacity = '0.25';
+
+    // Sync mute checkboxes
+    const sfxCb = document.getElementById('fpPauseMuteSfx');
+    const musicCb = document.getElementById('fpPauseMuteMusic');
+    if (sfxCb) sfxCb.checked = sfxMuted;
+    if (musicCb) musicCb.checked = musicMuted;
+
+    // Release pointer lock
+    _fpIgnorePointerUnlock = true;
+    if (document.pointerLockElement) document.exitPointerLock();
+    setTimeout(() => { _fpIgnorePointerUnlock = false; }, 300);
   } else {
-    if (_canvas) {
+    // Hide overlays
+    if (overlay) overlay.style.display = 'none';
+    if (lbPanel) lbPanel.style.display = '';
+    if (crosshair) crosshair.style.opacity = '';
+
+    // Re-lock pointer (desktop only)
+    if (_canvas && !state.isMobile) {
       _fpIgnorePointerUnlock = true;
       _canvas.requestPointerLock();
       setTimeout(() => { _fpIgnorePointerUnlock = false; }, 300);
