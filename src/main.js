@@ -206,7 +206,59 @@ gameFp.init({
 });
 
 // Expose bridge functions for HTML onclick handlers
-window._toggleFP = () => gameFp.toggleFirstPerson();
+
+// Character select screen
+let _selectedModel = 'classic';
+let _selectedColor = 'charcoal';
+
+window._openCharSelect = () => {
+  const cs = document.getElementById('charSelect');
+  if (cs) cs.classList.add('open');
+  // Pre-select classic
+  document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
+  const classicCard = document.querySelector('.char-card[data-model="classic"]');
+  if (classicCard) classicCard.classList.add('selected');
+};
+
+window._selectCat = (model, el) => {
+  _selectedModel = model;
+  document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
+  if (el) el.classList.add('selected');
+  // Show/hide color dots (only for colorable models)
+  const colorSection = document.getElementById('classicColors');
+  if (colorSection) colorSection.style.display = model === 'classic' ? 'flex' : 'none';
+};
+
+window._selectColor = (color, el) => {
+  _selectedColor = color;
+  document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('on'));
+  if (el) el.classList.add('on');
+};
+
+window._startGame = () => {
+  const cs = document.getElementById('charSelect');
+  if (cs) cs.classList.remove('open');
+  // Apply cat selection
+  catAppearance.setCatModelKeyRaw(_selectedModel);
+  if (catAppearance.isColorable(_selectedModel)) {
+    catAppearance.setCatColorKeyRaw(_selectedColor);
+  }
+  // Reload cat model with new selection
+  catAnimation.loadGameplayCat({
+    applyCatColorToModel: catAnimation.applyColorToAll
+  });
+  // Enter game mode
+  gameFp.toggleFirstPerson();
+};
+
+// G key opens character select instead of directly entering game
+window._toggleFP = () => {
+  if (gameFp.fpMode) {
+    gameFp.toggleFirstPerson(); // exit
+  } else {
+    window._openCharSelect(); // open character select
+  }
+};
 window._resumeFP = () => gameFp.setPaused(false);
 window._resetFP = () => {
   gameFp.toggleFirstPerson();

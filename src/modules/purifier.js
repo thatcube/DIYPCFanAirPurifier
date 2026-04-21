@@ -9,6 +9,7 @@ import { state } from './state.js';
 import { stdMat } from './materials.js';
 import { fpMode as _fpMode } from './game-fp.js';
 import { spawnSecretFanCoin, spawnSecretLampCoin, spawnSecretCeilingLightCoins, spawnSecretWindowCoin, spawnSecretDrawerCoin } from './coins.js';
+import { triggerNod as _triggerCatNod } from './cat-animation.js';
 
 export function createPurifier(scene) {
   const canvas = document.getElementById('c');
