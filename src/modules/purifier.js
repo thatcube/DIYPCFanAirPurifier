@@ -2184,28 +2184,156 @@ export function createPurifier(scene) {
     if(dimVisible && exploded) collapseView();
   }
   
-  // ─── Wood stain selector (3 options) ───
-  let stainMode='raw';
+  // ─── Wood stain selector (3 species with distinct grains) ───
+  let stainMode='ash';
   const STAIN_COLORS={
-    raw:    {col:new THREE.Color(0xd2b48c), shine:18, swatch:'#ddc89e'},
-    oil:    {col:new THREE.Color(0x8b6340), shine:25, swatch:'#8b6340'},
+    ash:    {col:new THREE.Color(0xd8c8a8), shine:20, swatch:'#d8c8a8'},
+    birch:  {col:new THREE.Color(0xd2b48c), shine:18, swatch:'#ddc89e'},
     walnut: {col:new THREE.Color(0x4a2c17), shine:30, swatch:'#4a2c17'},
   };
   function setStain(mode){
     stainMode=mode;
-    document.querySelectorAll('#btnStainRaw,#btnStainOil,#btnStainWalnut').forEach(b=>b.classList.remove('on'));
-    _el(mode==='raw'?'btnStainRaw':mode==='oil'?'btnStainOil':'btnStainWalnut').classList.add('on');
+    document.querySelectorAll('#btnStainAsh,#btnStainBirch,#btnStainWalnut').forEach(b=>b.classList.remove('on'));
+    _el(mode==='ash'?'btnStainAsh':mode==='birch'?'btnStainBirch':'btnStainWalnut').classList.add('on');
     applyCurrentStain();
   }
   
+  // Species-specific texture pools
+  const _speciesTexPools = { ash: [], birch: birchTexPool, walnut: [] };
+  function _makeSpeciesTextures(species, count) {
+    const pool = [];
+    for (let i = 0; i < count; i++) {
+      pool.push(makeWoodTexture(1024, 42 + i * 73, species));
+    }
+    return pool;
+  }
+  function makeWoodTexture(size, seed, species) {
+    const cvs = document.createElement('canvas');
+    cvs.width = cvs.height = size || 512;
+    const ctx = cvs.getContext('2d');
+    const W = cvs.width, HH = cvs.height;
+    let s = seed || 1;
+    function rand() { s = (s * 16807 + 0) % 2147483647; return (s & 0x7fffffff) / 0x7fffffff; }
+
+    const configs = {
+      ash: {
+        bases: ['#e8dcc4', '#e5d8be', '#dfd0b0', '#ecdcc8'],
+        grainColor: 'rgba(170,145,100,', grainDark: 'rgba(140,115,70,',
+        grainCount: 300, grainAmp: 3, grainFreq: 0.003, // straighter, subtler
+        clusterCount: 15, streakCount: 2, knotChance: 0.15,
+        highlightAlpha: 0.08
+      },
+      birch: {
+        bases: ['#e8d5b0', '#e5d0a8', '#ecdcb8', '#e0c89e'],
+        grainColor: 'rgba(150,115,60,', grainDark: 'rgba(180,150,100,',
+        grainCount: 400, grainAmp: 5, grainFreq: 0.008,
+        clusterCount: 10, streakCount: 4, knotChance: 0.3,
+        highlightAlpha: 0.06
+      },
+      walnut: {
+        bases: ['#6b4423', '#5a3a1e', '#704a28', '#4f3018'],
+        grainColor: 'rgba(90,55,20,', grainDark: 'rgba(60,35,10,',
+        grainCount: 350, grainAmp: 8, grainFreq: 0.012, // wavy, dramatic
+        clusterCount: 8, streakCount: 6, knotChance: 0.25,
+        highlightAlpha: 0.04
+      }
+    };
+    const cfg = configs[species] || configs.birch;
+
+    // Base color
+    ctx.fillStyle = cfg.bases[Math.floor(rand() * cfg.bases.length)];
+    ctx.fillRect(0, 0, W, HH);
+
+    // Soft color bands
+    const bandCount = 12 + Math.floor(rand() * 15);
+    for (let i = 0; i < bandCount; i++) {
+      const y = rand() * HH, h = 20 + rand() * 80;
+      ctx.fillStyle = cfg.grainColor + (0.1 + rand() * 0.2) + ')';
+      ctx.fillRect(0, y, W, h);
+    }
+
+    // Grain lines
+    for (let i = 0; i < cfg.grainCount; i++) {
+      const baseY = rand() * HH;
+      const amp = cfg.grainAmp * (0.5 + rand());
+      const freq = cfg.grainFreq * (0.5 + rand());
+      const phase = rand() * Math.PI * 2;
+      ctx.strokeStyle = (rand() > 0.4 ? cfg.grainDark : cfg.grainColor) + (0.12 + rand() * 0.2) + ')';
+      ctx.lineWidth = 0.4 + rand() * 1.8;
+      ctx.beginPath();
+      ctx.moveTo(0, baseY);
+      for (let x = 0; x < W; x += 3) {
+        ctx.lineTo(x, baseY + Math.sin(x * freq + phase) * amp + (rand() - 0.5) * 1.2);
+      }
+      ctx.stroke();
+    }
+
+    // Tight grain clusters
+    for (let g = 0; g < cfg.clusterCount; g++) {
+      const cy = rand() * HH;
+      const count = 3 + Math.floor(rand() * 10);
+      for (let i = 0; i < count; i++) {
+        const y = cy + i * (0.8 + rand() * 1.2);
+        ctx.strokeStyle = cfg.grainDark + (0.06 + rand() * 0.1) + ')';
+        ctx.lineWidth = 0.3 + rand() * 0.5;
+        ctx.beginPath();
+        for (let x = 0; x < W; x += 4) {
+          ctx.lineTo(x, y + Math.sin(x * cfg.grainFreq * 1.5 + rand() * 6) * 2);
+        }
+        ctx.stroke();
+      }
+    }
+
+    // Darker streaks
+    for (let i = 0; i < cfg.streakCount; i++) {
+      const y = rand() * HH;
+      ctx.strokeStyle = cfg.grainDark + (0.18 + rand() * 0.15) + ')';
+      ctx.lineWidth = 1 + rand() * 2.5;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      for (let x = 0; x < W; x += 4) {
+        ctx.lineTo(x, y + Math.sin(x * cfg.grainFreq * 0.6 + rand() * 6) * cfg.grainAmp * 1.5);
+      }
+      ctx.stroke();
+    }
+
+    // Highlights
+    for (let i = 0; i < 25; i++) {
+      const y = rand() * HH;
+      ctx.strokeStyle = `rgba(255,250,235,${cfg.highlightAlpha + rand() * 0.06})`;
+      ctx.lineWidth = 2 + rand() * 5;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      for (let x = 0; x < W; x += 8) ctx.lineTo(x, y + (rand() - 0.5) * 1.5);
+      ctx.stroke();
+    }
+
+    const tex = new THREE.CanvasTexture(cvs);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }
+  // Pre-generate ash textures (birch already done above)
+  _speciesTexPools.ash = _makeSpeciesTextures('ash', 6);
+  _speciesTexPools.walnut = _makeSpeciesTextures('walnut', 6);
+
   function applyCurrentStain(){
     const s=STAIN_COLORS[stainMode];
+    const texPool = _speciesTexPools[stainMode] || _speciesTexPools.birch;
+    let tIdx = 0;
     for(const m of allBirchMats){
       m.color.copy(s.col);
       m.shininess=s.shine;
+      if (texPool.length > 0) {
+        m.map = texPool[tIdx % texPool.length];
+        tIdx++;
+      }
       m.needsUpdate=true;
     }
-    _el('legendWood').querySelector('.swatch').style.background=s.swatch;
+    const legendEl = _el('legendWood');
+    if (legendEl) {
+      const sw = legendEl.querySelector('.swatch');
+      if (sw) sw.style.background = s.swatch;
+    }
   }
   
   function applyXrayToObject(root,on){
