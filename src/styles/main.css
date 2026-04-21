@@ -1061,112 +1061,63 @@ input[type=range]::-moz-range-thumb {
   padding: 2px 8px; border-radius: 999px;
   border: 1px solid rgba(255,216,115,0.35); font-size: 10px;
 }
-#finishDialogTime {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 56px;
-  font-weight: var(--weight-bold);
-  letter-spacing: 0.2px;
-  line-height: 1.05; margin-top: 6px; color: #fff;
-  text-shadow: 0 1px 14px rgba(159,227,255,0.18);
-}
-#finishDialogNameRow {
-  margin-top: 10px;
-  display: grid;
-  gap: 6px;
-}
-#finishDialogNameRow label {
-  font-size: 10px;
-  letter-spacing: var(--type-tracking-wide);
-  font-weight: var(--weight-semibold);
-  color: rgba(210, 235, 255, 0.74);
-}
-.finishDialogNameControls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-#finishDialogNameInput {
-  flex: 1 1 180px;
-  min-width: 0;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: var(--r-sm);
-  padding: 8px 10px;
-  color: #fff;
-  font-size: 13px;
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-#finishDialogNameInput:focus {
-  border-color: rgba(159,227,255,0.62);
-  box-shadow: 0 0 0 3px rgba(159,227,255,0.12);
-}
-#finishDialogNameCount {
-  display: inline;
-  min-width: 38px;
-  text-align: right;
-  font-size: 10px;
-  color: rgba(255,255,255,0.52);
-  font-variant-numeric: tabular-nums;
-}
 #finishDialogSaveHint {
+  margin-top: 8px;
   min-height: 16px;
   font-size: 11px;
   color: rgba(220, 238, 255, 0.62);
 }
-#finishDialogRankHero {
-  display: none; margin: 12px 0 2px; align-items: center; gap: 14px;
-  padding: 12px 16px; border-radius: 14px;
-  background: linear-gradient(180deg, rgba(159,227,255,0.08), rgba(159,227,255,0.02));
-  border: 1px solid rgba(159,227,255,0.22);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+#finishDialogSummaryGrid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
-#finishDialogRankHero.on { display: flex; }
-#finishDialogRankHero.medal {
-  background: linear-gradient(180deg, rgba(255,216,115,0.14), rgba(255,216,115,0.03));
-  border-color: rgba(255,216,115,0.4);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 24px rgba(255,216,115,0.08);
+.finishDialogSummaryItem {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 9px 10px;
+  display: grid;
+  gap: 4px;
 }
-#finishDialogRankHero .rankNum {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 56px;
-  font-weight: var(--weight-bold);
-  line-height: 1;
-  letter-spacing: -0.8px;
-  background: linear-gradient(180deg, #fff, #9fe3ff 80%);
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-  text-shadow: 0 1px 14px rgba(159,227,255,0.2);
-  flex-shrink: 0;
-}
-#finishDialogRankHero.medal .rankNum {
-  background: linear-gradient(180deg, #fff4d1, #ffd873 70%, #ffa94d);
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-  text-shadow: 0 1px 14px rgba(255,216,115,0.24);
-}
-#finishDialogRankHero .rankTag {
-  display: flex; flex-direction: column; justify-content: center; gap: 3px;
-  min-width: 0; flex: 1;
-}
-#finishDialogRankHero .rankTag b {
-  font-size: 18px;
-  font-weight: var(--weight-bold);
-  letter-spacing: 0.01em;
-  color: #fff;
-  line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-#finishDialogRankHero.medal .rankTag b { color: #fff6dc; }
-#finishDialogRankHero .rankTag span {
-  font-size: 11px;
-  font-weight: var(--weight-semibold);
+.finishDialogSummaryItem .k {
+  font-size: 10px;
   letter-spacing: var(--type-tracking-wide);
-  color: #9fc7e4;
-  opacity: 0.85;
+  color: rgba(197, 225, 245, 0.78);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+}
+.finishDialogSummaryItem .v {
+  font-size: 14px;
+  color: #eaf4ff;
+  font-weight: var(--weight-semibold);
   line-height: 1.2;
 }
-#finishDialogRankHero.medal .rankTag span { color: #ffd48a; opacity: 0.95; }
+.finishDialogSummaryItemTime .v {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 30px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 0 1px 12px rgba(159,227,255,0.16);
+}
+.finishDialogSummaryItemCat .v {
+  display: inline-flex;
+  align-items: center;
+}
+#finishDialogSummaryRank {
+  color: #9fe3ff;
+}
+#finishDialogSummarySecret {
+  color: #b8ecff;
+}
+@media (max-width: 560px) {
+  #finishDialogSummaryGrid {
+    grid-template-columns: 1fr;
+  }
+}
 #finishDialogBoard { padding: 8px 14px 0; overflow-y: auto; flex: 1; }
 #finishDialogBoard h4 {
   margin: 8px 0 6px;
@@ -1191,8 +1142,34 @@ input[type=range]::-moz-range-thumb {
 }
 #finishDialogList li .rk { opacity: 0.66; font-variant-numeric: tabular-nums; }
 #finishDialogList li .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#finishDialogList li .nm.nm-edit {
+  overflow: visible;
+  white-space: normal;
+}
 #finishDialogList li .tm { font-variant-numeric: tabular-nums; font-weight: 700; color: #9fe3ff; }
 #finishDialogList li.own .tm { color: var(--gold); }
+#finishDialogList li.pending {
+  border-style: dashed;
+}
+.finishDialogRowNameInput {
+  width: 100%;
+  min-width: 0;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 7px;
+  padding: 6px 8px;
+  color: #fff;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.finishDialogRowNameInput:focus {
+  border-color: rgba(159,227,255,0.62);
+  box-shadow: 0 0 0 3px rgba(159,227,255,0.12);
+}
+.finishDialogRowNameInput:disabled {
+  opacity: 0.72;
+}
 .finishDialogActions {
   display: flex; justify-content: flex-end; gap: 8px;
   padding: 12px 16px 14px; border-top: 1px solid rgba(255,255,255,0.06);

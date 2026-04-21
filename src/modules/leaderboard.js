@@ -446,6 +446,96 @@ export async function recordRun(timeMs, coinTotal, secretCoins) {
   return _recordRunLocal(timeMs, coinTotal, secretCoins);
 }
 
+function _latestEntryForPlayer(rows, playerId) {
+  const pid = _sanitizePlayerId(playerId);
+  if (!pid) return null;
+  let latest = null;
+  for (const row of (rows || [])) {
+    if (!row) continue;
+    if (_sanitizePlayerId(row.playerId || '') !== pid) continue;
+    if (!latest || Number(row.at || 0) > Number(latest.at || 0)) latest = row;
+  }
+  return latest;
+}
+
+function _renameLatestEntryLocal(entryId, nextName, baseData) {
+  const cleanId = String(entryId || '').trim();
+  const cleanName = _sanitizePlayerName(nextName || '');
+  if (!cleanId || !cleanName) return null;
+
+  const idx = _leaderboard.findIndex((row) => String(row && row.id || '') === cleanId);
+  if (idx < 0) return null;
+
+  const target = _leaderboard[idx];
+  const targetPid = _sanitizePlayerId(target.playerId || '');
+  if (!targetPid || targetPid !== _playerId) return null;
+
+  const latest = _latestEntryForPlayer(_leaderboard, _playerId);
+  if (!latest || String(latest.id || '') !== cleanId) return null;
+
+  _leaderboard[idx] = { ...target, name: cleanName };
+  _leaderboard = _normalizeLeaderboard(_leaderboard);
+  _saveLeaderboard();
+
+  const rank = _leaderboard.findIndex((row) => String(row.id || '') === cleanId) + 1;
+  const row = _leaderboard.find((r) => String(r.id || '') === cleanId) || _leaderboard[idx];
+  return {
+    ...(baseData || {}),
+    entryId: cleanId,
+    rank: rank > 0 ? rank : 0,
+    name: cleanName,
+    timeMs: Math.floor(Number((row && row.timeMs) || (baseData && baseData.timeMs) || 0)),
+    catColor: sanitizeColorKey((row && row.catColor) || (baseData && baseData.catColor) || catColorKey),
+    catHair: sanitizeHairKey((row && row.catHair) || (baseData && baseData.catHair) || catHairKey),
+    catModel: sanitizeModelKey((row && row.catModel) || (baseData && baseData.catModel) || catModelKey),
+  };
+}
+
+async function _renameLatestEntryShared(entryId, nextName, baseData) {
+  const cleanId = String(entryId || '').trim();
+  const cleanName = _sanitizePlayerName(nextName || '');
+  if (!cleanId || !cleanName) return null;
+
+  if (!_sharedOnline) return _renameLatestEntryLocal(cleanId, cleanName, baseData);
+
+  try {
+    const data = await _lbApiRequest('/run/rename', {
+      entryId: cleanId,
+      name: cleanName,
+      playerId: _playerId,
+    });
+    _sharedOnline = true;
+    _statusNote = '';
+    _leaderboard = _normalizeLeaderboard(Array.isArray(data.leaderboard) ? data.leaderboard : _leaderboard);
+    const serverEntry = (data && data.entry) ? data.entry : {};
+    return {
+      ...(baseData || {}),
+      entryId: cleanId,
+      rank: Math.floor(Number(data && data.rank) || 0),
+      name: _sanitizePlayerName(serverEntry.name || cleanName || (baseData && baseData.name) || _playerName || 'Player'),
+      timeMs: Math.floor(Number(serverEntry.timeMs) || Number((baseData && baseData.timeMs) || 0)),
+      catColor: sanitizeColorKey(serverEntry.catColor || (baseData && baseData.catColor) || catColorKey),
+      catHair: sanitizeHairKey(serverEntry.catHair || (baseData && baseData.catHair) || catHairKey),
+      catModel: sanitizeModelKey(serverEntry.catModel || (baseData && baseData.catModel) || catModelKey),
+    };
+  } catch (e) {
+    if (e && e.apiCode) {
+      _sharedOnline = true;
+      _statusNote = `Rename rejected (${e.apiCode})`;
+      void refreshSharedLeaderboard();
+      return null;
+    }
+    _sharedOnline = false;
+    _statusNote = 'Local fallback';
+    return _renameLatestEntryLocal(cleanId, cleanName, baseData);
+  }
+}
+
+async function _renameLatestEntry(entryId, nextName, baseData) {
+  if (LB_SHARED_ENABLED) return _renameLatestEntryShared(entryId, nextName, baseData);
+  return _renameLatestEntryLocal(entryId, nextName, baseData);
+}
+
 // ── Render leaderboard panel (in-game, shown on pause) ──────────────
 
 export function renderLeaderboardPanel() {
@@ -636,6 +726,7 @@ function _updateNameDialogCount() {
 let _finishDialogOpen = false;
 let _finishDialogData = null;
 let _finishPendingRun = null;
+let _finishEditableEntryId = '';
 let _finishSubmitting = false;
 let _finishSubmitPromise = null;
 let _finishNameDirty = false;
@@ -667,7 +758,7 @@ function _openFinishDialogOverlay(focusNameInput = false) {
   // Focus relevant control after render
   requestAnimationFrame(() => {
     const target = focusNameInput
-      ? document.getElementById('finishDialogNameInput')
+      ? _getFinishRowNameInput()
       : document.getElementById('finishDialogAgain');
     if (!target) return;
     target.focus();
@@ -681,6 +772,7 @@ function _openFinishDialogOverlay(focusNameInput = false) {
 export function openFinishDialog(data) {
   _finishDialogData = data || null;
   _finishPendingRun = null;
+  _finishEditableEntryId = '';
   _finishSubmitting = false;
   _finishSubmitPromise = null;
   _finishNameDirty = false;
@@ -698,6 +790,7 @@ export function openFinishDialogForRun(timeMs, coinTotal, secretCoins) {
   hideShareButton();
 
   _finishPendingRun = { timeMs: safeTime, coinTotal: safeCoins, secretCoins: safeSecret };
+  _finishEditableEntryId = '';
   _finishSubmitting = false;
   _finishSubmitPromise = null;
   _finishNameDirty = false;
@@ -723,6 +816,7 @@ export function closeFinishDialog() {
   _finishDialogOpen = false;
   _finishDialogData = null;
   _finishPendingRun = null;
+  _finishEditableEntryId = '';
   _finishSubmitting = false;
   _finishSubmitPromise = null;
   _finishNameDirty = false;
@@ -735,23 +829,21 @@ export function closeFinishDialog() {
   if (copyBtn) copyBtn.textContent = 'Copy result';
 }
 
-function _updateFinishNameCount() {
-  const input = document.getElementById('finishDialogNameInput');
-  const counter = document.getElementById('finishDialogNameCount');
-  if (!input || !counter) return;
-  const max = Number(input.getAttribute('maxlength')) || 24;
-  const len = (input.value || '').length;
-  counter.textContent = `${len}/${max}`;
-  counter.classList.toggle('on', len >= Math.ceil(max * 0.75));
-  counter.classList.toggle('warn', len >= Math.ceil(max * 0.9) && len < max);
-  counter.classList.toggle('max', len >= max);
+function _getFinishRowNameInput() {
+  return document.querySelector('#finishDialogList .finishDialogRowNameInput');
 }
 
 function _submitPendingFinishRun() {
-  if (!_finishPendingRun) return Promise.resolve(_finishDialogData);
+  const hasPendingRun = !!_finishPendingRun;
+  const currentEntryId = String((_finishDialogData && _finishDialogData.entryId) || '').trim();
+  const canRenameSavedEntry = !hasPendingRun && !!_finishEditableEntryId && currentEntryId === _finishEditableEntryId;
+
+  if (!hasPendingRun) {
+    if (!canRenameSavedEntry || !_finishNameDirty) return Promise.resolve(_finishDialogData);
+  }
   if (_finishSubmitting && _finishSubmitPromise) return _finishSubmitPromise;
 
-  const input = document.getElementById('finishDialogNameInput');
+  const input = _getFinishRowNameInput();
   const typedName = _sanitizePlayerName(input ? input.value : '');
   const fallbackName = _sanitizePlayerName(_readPlayerName() || _playerName || 'Player') || 'Player';
   const name = typedName || fallbackName;
@@ -768,19 +860,33 @@ function _submitPendingFinishRun() {
 
   const job = (async () => {
     try {
-      const pending = _finishPendingRun;
-      const runData = await recordRun(pending.timeMs, pending.coinTotal, pending.secretCoins);
-      _finishPendingRun = null;
+      if (hasPendingRun) {
+        const pending = _finishPendingRun;
+        const runData = await recordRun(pending.timeMs, pending.coinTotal, pending.secretCoins);
+        _finishPendingRun = null;
+        _finishEditableEntryId = String((runData && runData.entryId) || '').trim();
+        _finishSubmitting = false;
+        _finishSaveStatus = 'saved';
+        _finishDialogData = runData || null;
+        renderLeaderboardPanel();
+        showShareButton(runData);
+        _renderFinishDialog();
+        return runData;
+      }
+
+      const renamed = await _renameLatestEntry(_finishEditableEntryId, name, _finishDialogData || {});
+      if (!renamed) throw new Error('rename_failed');
       _finishSubmitting = false;
       _finishSaveStatus = 'saved';
-      _finishDialogData = runData || null;
+      _finishDialogData = renamed;
       renderLeaderboardPanel();
-      showShareButton(runData);
+      showShareButton(renamed);
       _renderFinishDialog();
-      return runData;
+      return renamed;
     } catch (e) {
       _finishSubmitting = false;
       _finishSaveStatus = 'error';
+      _finishNameDirty = true;
       if (input) input.disabled = false;
       _renderFinishDialog();
       return null;
@@ -796,31 +902,44 @@ function _submitPendingFinishRun() {
 function _renderFinishDialog() {
   const data = _finishDialogData || {};
   const pending = !!_finishPendingRun;
-  const timeEl = document.getElementById('finishDialogTime');
-  const nameEl = document.getElementById('finishDialogName');
-  const rankHero = document.getElementById('finishDialogRankHero');
-  const rankNum = document.getElementById('finishDialogRankNum');
-  const rankText = document.getElementById('finishDialogRankText');
+  const canRenameSavedEntry = !pending && !!_finishEditableEntryId && String(data.entryId || '').trim() === _finishEditableEntryId;
   const coinBadge = document.getElementById('finishDialogCoinBadge');
-  const nameInput = document.getElementById('finishDialogNameInput');
+  const summaryTime = document.getElementById('finishDialogSummaryTime');
+  const summaryRank = document.getElementById('finishDialogSummaryRank');
+  const summarySecret = document.getElementById('finishDialogSummarySecret');
+  const summaryCat = document.getElementById('finishDialogCatPreview');
   const saveHint = document.getElementById('finishDialogSaveHint');
   const copyBtn = document.getElementById('finishDialogCopy');
   const list = document.getElementById('finishDialogList');
 
-  if (timeEl) timeEl.textContent = formatRunTime(data.timeMs || _finishPendingRun?.timeMs || 0);
-  if (nameEl) nameEl.textContent = data.name || _playerName || 'Player';
-  if (nameInput) {
-    if (!_finishNameDirty || document.activeElement !== nameInput) {
-      nameInput.value = data.name || _playerName || 'Player';
-    }
-    nameInput.disabled = !pending || _finishSubmitting;
-    _updateFinishNameCount();
+  const runTimeMs = Math.floor(Number(data.timeMs) || Number(_finishPendingRun?.timeMs) || 0);
+  const rank = Math.floor(Number(data.rank) || 0);
+  const secretCount = Math.max(0, Math.floor(Number(data.secretCoins) || Number(_finishPendingRun?.secretCoins) || 0));
+
+  if (summaryTime) summaryTime.textContent = formatRunTime(runTimeMs);
+  if (summaryRank) {
+    summaryRank.textContent = pending
+      ? 'Pending save'
+      : (rank > 0 ? `#${rank}` : 'Unranked');
   }
+  if (summarySecret) {
+    summarySecret.textContent = `${secretCount} found`;
+  }
+  if (summaryCat) {
+    summaryCat.innerHTML = _catBadgeHtml({
+      catModel: sanitizeModelKey(data.catModel || catModelKey),
+      catColor: sanitizeColorKey(data.catColor || catColorKey),
+      catHair: sanitizeHairKey(data.catHair || catHairKey),
+    });
+  }
+
   if (saveHint) {
-    if (pending) {
+    if (pending || canRenameSavedEntry) {
       if (_finishSaveStatus === 'saving') saveHint.textContent = 'Saving...';
-      else if (_finishSaveStatus === 'error') saveHint.textContent = 'Save failed. Retry by leaving the field again.';
-      else saveHint.textContent = 'Autosaves when you leave the name field.';
+      else if (_finishSaveStatus === 'error') saveHint.textContent = 'Save failed. Leave the field again to retry.';
+      else saveHint.textContent = pending
+        ? 'Edit your leaderboard row name, then leave the field to autosave.'
+        : 'Saved. Edit and leave the field to update this run.';
     } else if (Math.floor(Number(data.rank) || 0) > 0 || _finishSaveStatus === 'saved') {
       saveHint.textContent = 'Saved.';
     } else {
@@ -829,46 +948,71 @@ function _renderFinishDialog() {
   }
   if (copyBtn) copyBtn.style.display = pending ? 'none' : '';
 
-  const rank = Math.floor(Number(data.rank) || 0);
-  if (rankHero && rankNum) {
-    if (!pending && rank > 0) {
-      rankHero.classList.add('on');
-      rankHero.classList.toggle('medal', rank <= 3);
-      rankNum.textContent = `#${rank}`;
-      if (rankText) {
-        if (rank === 1) rankText.textContent = 'First place — legendary.';
-        else if (rank === 2) rankText.textContent = '2nd place — podium!';
-        else if (rank === 3) rankText.textContent = '3rd place — podium!';
-        else rankText.textContent = 'on the leaderboard';
-      }
-    } else {
-      rankHero.classList.remove('on', 'medal');
-    }
-  }
   if (coinBadge) {
     const c = Math.floor(Number(data.coins) || Number(data.coinTotal) || Number(_finishPendingRun?.coinTotal) || 0);
     const t = Math.floor(Number(data.coinTotal) || Number(_finishPendingRun?.coinTotal) || 0);
     coinBadge.textContent = `${c} / ${t} coins`;
   }
   if (list) {
-    if (!_leaderboard.length) {
-      list.innerHTML = '<li style="opacity:0.62;padding:8px 10px">No runs yet.</li>';
-    } else {
-      const ownId = String(data.entryId || '');
-      list.innerHTML = _leaderboard.map((r, i) => {
+    const ownId = String(data.entryId || '');
+    const editableEntryId = pending ? '__pending__' : (canRenameSavedEntry ? _finishEditableEntryId : '');
+    const draftName = _sanitizePlayerName(data.name || _playerName || 'Player') || 'Player';
+    const rows = [];
+
+    if (pending) {
+      rows.push(`<li class="own pending" data-entry-id="__pending__">
+        <span class="rk">—</span>
+        <span class="nm nm-edit"><input type="text" class="finishDialogRowNameInput" maxlength="24" value="${_escapeHtml(draftName)}" autocomplete="off" spellcheck="false" /></span>
+        ${_catBadgeHtml({ catModel: data.catModel, catColor: data.catColor, catHair: data.catHair })}
+        <span class="tm">${formatRunTime(runTimeMs)}</span>
+      </li>`);
+    }
+
+    if (_leaderboard.length) {
+      for (let i = 0; i < _leaderboard.length; i++) {
+        const r = _leaderboard[i];
         const own = (ownId && r.id === ownId) || (!ownId && r.playerId === _playerId);
-        return `<li class="${own ? 'own' : ''}">
+        const editable = !pending && !!editableEntryId && r.id === editableEntryId;
+        rows.push(`<li class="${own ? 'own' : ''}" data-entry-id="${_escapeHtml(r.id)}">
           <span class="rk">#${i + 1}</span>
-          <span class="nm">${_escapeHtml(r.name)}</span>
+          <span class="nm ${editable ? 'nm-edit' : ''}">${editable
+            ? `<input type="text" class="finishDialogRowNameInput" maxlength="24" value="${_escapeHtml(r.name)}" autocomplete="off" spellcheck="false" />`
+            : _escapeHtml(r.name)
+          }</span>
           ${_catBadgeHtml(r)}
           <span class="tm">${formatRunTime(r.timeMs)}</span>
-        </li>`;
-      }).join('');
-      setTimeout(() => {
-        const ownLi = list.querySelector('li.own');
-        if (ownLi) ownLi.scrollIntoView({ block: 'center' });
-      }, 0);
+        </li>`);
+      }
+    } else if (!pending) {
+      rows.push('<li style="opacity:0.62;padding:8px 10px">No runs yet.</li>');
     }
+
+    list.innerHTML = rows.join('');
+
+    const rowInput = _getFinishRowNameInput();
+    if (rowInput) {
+      rowInput.disabled = _finishSubmitting || !(pending || canRenameSavedEntry);
+      rowInput.addEventListener('input', () => {
+        _finishNameDirty = true;
+        _finishSaveStatus = 'idle';
+        _finishDialogData = { ...(_finishDialogData || {}), name: rowInput.value };
+      });
+      rowInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          rowInput.blur();
+        }
+        e.stopPropagation();
+      });
+      rowInput.addEventListener('blur', () => {
+        void _submitPendingFinishRun();
+      });
+    }
+
+    setTimeout(() => {
+      const ownLi = list.querySelector('li.own');
+      if (ownLi) ownLi.scrollIntoView({ block: 'center' });
+    }, 0);
   }
 
   // Update timer state indicator
@@ -958,22 +1102,25 @@ function _createFinishDialogDOM() {
           <span>RUN COMPLETE</span>
           <span class="tag" id="finishDialogCoinBadge">0 / 0 coins</span>
         </div>
-        <div id="finishDialogTime">00:00.000</div>
-        <div id="finishDialogNameRow">
-          <label for="finishDialogNameInput">Name for this run</label>
-          <div class="finishDialogNameControls">
-            <input type="text" id="finishDialogNameInput" maxlength="24" autocomplete="off" spellcheck="false" />
-            <span id="finishDialogNameCount" class="name-dialog-count">0/24</span>
+        <div id="finishDialogSummaryGrid">
+          <div class="finishDialogSummaryItem finishDialogSummaryItemTime">
+            <span class="k">Time</span>
+            <span class="v" id="finishDialogSummaryTime">00:00.000</span>
           </div>
-          <div id="finishDialogSaveHint"></div>
+          <div class="finishDialogSummaryItem">
+            <span class="k">Placement</span>
+            <span class="v" id="finishDialogSummaryRank">Pending save</span>
+          </div>
+          <div class="finishDialogSummaryItem">
+            <span class="k">Secret Coins</span>
+            <span class="v" id="finishDialogSummarySecret">0 found</span>
+          </div>
+          <div class="finishDialogSummaryItem finishDialogSummaryItemCat">
+            <span class="k">Cat</span>
+            <span class="v" id="finishDialogCatPreview"></span>
+          </div>
         </div>
-        <div id="finishDialogRankHero">
-          <span class="rankNum" id="finishDialogRankNum">#—</span>
-          <span class="rankTag">
-            <b id="finishDialogName">Player</b>
-            <span id="finishDialogRankText">on the board</span>
-          </span>
-        </div>
+        <div id="finishDialogSaveHint"></div>
       </div>
       <div id="finishDialogBoard">
         <h4>LEADERBOARD · TOP 25</h4>
@@ -990,13 +1137,13 @@ function _createFinishDialogDOM() {
 
   document.getElementById('finishDialogExit').addEventListener('click', async () => {
     await _submitPendingFinishRun();
-    if (_finishPendingRun) return;
+    if (_finishPendingRun || (_finishNameDirty && _finishSaveStatus === 'error')) return;
     closeFinishDialog();
     if (_onExitGame) _onExitGame();
   });
   document.getElementById('finishDialogAgain').addEventListener('click', async () => {
     await _submitPendingFinishRun();
-    if (_finishPendingRun) return;
+    if (_finishPendingRun || (_finishNameDirty && _finishSaveStatus === 'error')) return;
     closeFinishDialog();
     if (_onPlayAgain) _onPlayAgain();
   });
@@ -1012,28 +1159,10 @@ function _createFinishDialogDOM() {
       setTimeout(() => { if (btn) btn.textContent = 'Copy result'; }, 1500);
     }
   });
-  const nameInput = document.getElementById('finishDialogNameInput');
-  if (nameInput) {
-    nameInput.addEventListener('input', () => {
-      _finishNameDirty = true;
-      _finishSaveStatus = 'idle';
-      _updateFinishNameCount();
-    });
-    nameInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        void _submitPendingFinishRun();
-      }
-      e.stopPropagation();
-    });
-    nameInput.addEventListener('blur', () => {
-      void _submitPendingFinishRun();
-    });
-  }
   overlay.addEventListener('click', async e => {
     if (e.target !== overlay) return;
     await _submitPendingFinishRun();
-    if (_finishPendingRun) return;
+    if (_finishPendingRun || (_finishNameDirty && _finishSaveStatus === 'error')) return;
     closeFinishDialog();
   });
   overlay.addEventListener('keydown', e => e.stopPropagation());
@@ -1043,7 +1172,7 @@ function _createFinishDialogDOM() {
       e.preventDefault();
       void (async () => {
         await _submitPendingFinishRun();
-        if (_finishPendingRun) return;
+        if (_finishPendingRun || (_finishNameDirty && _finishSaveStatus === 'error')) return;
         closeFinishDialog();
       })();
     }
