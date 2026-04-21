@@ -782,7 +782,7 @@ export function createPurifier(scene) {
       // Rotor
       const rotor=new THREE.Group();
       rotor.position.set(0,fanYPos,fz);
-      rotor.userData.axis=new THREE.Vector3(0,-1,0); // spin around Y (downward into box)
+      rotor.userData.axis=new THREE.Vector3(0,0,-1); // spin around local Z (= world Y after rotateX PI/2)
       rotor.rotation.x=Math.PI/2; // orient blades horizontally, facing down
   
       const hubMat=stdMat({color:0x111111,shininess:40});
