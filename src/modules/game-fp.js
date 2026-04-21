@@ -572,6 +572,7 @@ export function setPaused(paused) {
   fpPaused = !!paused;
 
   const overlay = document.getElementById('fpPauseOverlay');
+  const lbPanel = document.getElementById('fpLeaderboard');
   const crosshair = document.getElementById('fpCrosshair');
   // Don't show pause overlay if finish dialog or name dialog is open
   const finishOpen = leaderboard.isFinishDialogOpen() || leaderboard.isNameDialogOpen();
@@ -585,6 +586,7 @@ export function setPaused(paused) {
 
     // Show pause overlay (unless finish is showing)
     if (overlay && !finishOpen) overlay.style.display = 'flex';
+    if (lbPanel && !finishOpen) { lbPanel.style.display = 'block'; leaderboard.renderLeaderboardPanel(); }
     if (crosshair) crosshair.style.opacity = '0.25';
 
     // Sync mute toggle states
@@ -600,6 +602,7 @@ export function setPaused(paused) {
   } else {
     // Hide overlays
     if (overlay) overlay.style.display = 'none';
+    if (lbPanel) lbPanel.style.display = 'none';
     if (crosshair) crosshair.style.opacity = '';
 
     // Re-lock pointer (desktop only) — delay to avoid SecurityError

@@ -402,13 +402,95 @@ input[type=range]::-moz-range-thumb {
 }
 #runTimerState { font-size: 10px; opacity: 0.4; margin-left: 6px; font-weight: 600; }
 
+/* ═══════════════════════════════════════════════════════════════════
+   PAUSE OVERLAY — frosted glass modal
+   ═══════════════════════════════════════════════════════════════════ */
+#fpPauseOverlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5); z-index: 400;
+  align-items: center; justify-content: center;
+  flex-direction: column; gap: 10px;
+  backdrop-filter: blur(8px) saturate(0.8);
+  animation: fadeIn 0.3s var(--ease-out-expo) both;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+#fpPauseOverlay h2 {
+  color: #fff; font-size: 28px; font-weight: 800;
+  margin-bottom: 4px; letter-spacing: -0.5px;
+}
+@keyframes bounceIn {
+  from { opacity: 0; transform: scale(0.8) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.pause-card {
+  background: rgba(14, 18, 26, 0.55); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: var(--r-xl); padding: 28px 32px;
+  max-width: 420px; width: 90%; text-align: center;
+  backdrop-filter: blur(48px) saturate(1.8) brightness(1.05);
+  -webkit-backdrop-filter: blur(48px) saturate(1.8) brightness(1.05);
+  box-shadow:
+    0 20px 60px rgba(0,0,0,0.4),
+    inset 0 0 0 0.5px rgba(255,255,255,0.15),
+    inset 0 1px 1px rgba(255,255,255,0.2);
+  animation: bounceIn 0.4s var(--spring) both;
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
+}
+.pause-sub { color: var(--text-dim); font-size: 11px; margin-bottom: 16px; }
+.pause-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.pause-btn {
+  border: 1px solid var(--glass-border); border-radius: var(--r-md);
+  padding: 12px 20px; font-size: 14px; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+  transition: all var(--dur-med) var(--spring);
+  backdrop-filter: blur(12px);
+}
+.pause-btn:hover { transform: scale(1.03) translateY(-1px); }
+.pause-btn:active { transform: scale(0.96); }
+.pause-btn.primary {
+  background: var(--accent-gradient); color: #0a0e14; border: none;
+  box-shadow: 0 4px 16px rgba(145,222,255,0.3);
+}
+.pause-btn.danger {
+  background: var(--danger-bg); color: var(--danger); border-color: var(--danger-border);
+}
+.pause-toggles {
+  display: flex; gap: 16px; justify-content: center; margin-bottom: 14px;
+}
+.pause-toggle-row {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-sm); padding: 6px 14px 6px 12px;
+  font-size: 11px; color: var(--text-dim);
+}
+.pause-toggle-row span { font-size: 11px; }
+.pause-actions { display: flex; gap: 8px; justify-content: center; margin-bottom: 14px; }
+.pause-pill {
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: var(--r-sm); padding: 7px 16px; font-size: 11px; font-weight: 600;
+  color: var(--text-dim); cursor: pointer; font-family: inherit;
+  transition: all var(--dur-med) var(--spring);
+}
+.pause-pill:hover { background: rgba(255,255,255,0.14); color: var(--text); }
+.pause-controls {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+  font-size: 10px; color: rgba(255,255,255,0.35); text-align: left;
+  border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;
+}
+.pause-controls kbd {
+  background: rgba(255,255,255,0.08); border-radius: 3px;
+  padding: 1px 5px; font-size: 9px; border: 1px solid rgba(255,255,255,0.08);
+}
+
 /* ─── Leaderboard (in-game pause panel) ──────────────────────────── */
 #fpLeaderboard {
   display: none; position: fixed; top: 64px; right: 16px;
   background: var(--glass); color: var(--text);
   border: 1px solid var(--glass-border); border-radius: var(--r-lg);
   padding: 12px 16px; font-size: 11px; width: 280px; max-height: 380px;
-  overflow-y: auto; backdrop-filter: var(--glass-blur); z-index: 300;
+  overflow-y: auto; backdrop-filter: var(--glass-blur); z-index: 410;
   box-shadow: 0 12px 40px rgba(0,0,0,0.3);
   animation: slideDown 0.5s var(--spring) 0.1s both;
 }
