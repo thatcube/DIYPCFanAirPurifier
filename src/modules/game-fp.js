@@ -440,13 +440,22 @@ function _getBoxes() {
     result.push({ xMin: 34, xMax: 44, zMin: -69, zMax: -67, yTop: topSurface + 5.5, yBottom: topSurface + 0.75 });
   }
 
-  // MacBook at world (65.85, bedTop, 13.35) — thin keyboard slab
+  // MacBook — rotated OBB matching the GLB placement in room.js
+  // room.js: position (65.85, bedTopY, 13.35), rotation.y = PI + 25°
+  // The collision angle is just the 25° offset (PI component is facing direction, not footprint rotation)
   {
     const mbX = 65.85;
     const mbZ = 13.35;
     const fy = getFloorY();
     const mbY = fy + BED_SLATS_FROM_FLOOR + 1 + 5 + 5 + 1.5;
-    result.push({ xMin: mbX - 6, xMax: mbX + 6, zMin: mbZ - 4, zMax: mbZ + 4, yTop: mbY + 0.5, yBottom: mbY });
+    // 14" wide × ~9" deep laptop footprint, rotated 25°
+    result.push({
+      cx: mbX, cz: mbZ,
+      hw: 7, hd: 4.5,           // half-width, half-depth
+      angle: 25 * Math.PI / 180, // rotation in radians
+      yTop: mbY + 0.5, yBottom: mbY,
+      obb: true
+    });
   }
 
   return result;
@@ -679,13 +688,63 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   if (nz < bounds.zMin + r) { nz = bounds.zMin + r; _velZ = Math.max(_velZ, 0); }
   else if (nz > bounds.zMax - r) { nz = bounds.zMax - r; _velZ = Math.min(_velZ, 0); }
 
-  // Furniture AABBs
+  // Furniture AABBs (+ OBBs)
   let bonkedThisFrame = false;
   let bonkIntensity = 0;
   let groundY = getPlayerFloorY(); // eye-height floor (floorY + EYE_H)
   const boxes = _getBoxes();
 
   for (const box of boxes) {
+    // ── OBB (rotated box) collision ───────────────────────────────
+    if (box.obb) {
+      // Transform player into OBB local space
+      const dx = nx - box.cx, dz = nz - box.cz;
+      const cosA = Math.cos(-box.angle), sinA = Math.sin(-box.angle);
+      const lx = dx * cosA - dz * sinA; // local X
+      const lz = dx * sinA + dz * cosA; // local Z
+      // Closest point on local AABB to local player pos
+      const clampX = Math.max(-box.hw, Math.min(box.hw, lx));
+      const clampZ = Math.max(-box.hd, Math.min(box.hd, lz));
+      const distX = lx - clampX, distZ = lz - clampZ;
+      const distSq = distX * distX + distZ * distZ;
+      if (distSq < r * r) {
+        // Y-axis checks (same as AABB path)
+        const prevFeet = fpPos.y - EYE_H;
+        const newFeet = newY - EYE_H;
+        const newHeadTop = newY + HEAD_EXTRA;
+        const onTopPrev = prevFeet >= box.yTop - 0.25;
+        if (onTopPrev && newFeet >= box.yTop - 0.5) {
+          groundY = Math.max(groundY, box.yTop + EYE_H);
+        } else if (box.yBottom !== undefined && newHeadTop <= box.yBottom - 0.2) {
+          // Fully beneath — pass through
+        } else if (box.yBottom !== undefined && newFeet < box.yBottom - 0.2 && fpVy > 0.05) {
+          bonkedThisFrame = true;
+          bonkIntensity = Math.max(bonkIntensity, fpVy * 1.2);
+          newY = box.yBottom - 0.2 - HEAD_EXTRA;
+          if (fpVy > 0) fpVy = 0;
+        } else {
+          // Push out in local space, then rotate back to world
+          const dist = Math.sqrt(distSq) || 0.001;
+          const pushDist = r - dist;
+          const pushLX = (distX / dist) * pushDist;
+          const pushLZ = (distZ / dist) * pushDist;
+          // Rotate push vector back to world space
+          const cosB = Math.cos(box.angle), sinB = Math.sin(box.angle);
+          const pushWX = pushLX * cosB - pushLZ * sinB;
+          const pushWZ = pushLX * sinB + pushLZ * cosB;
+          nx += pushWX;
+          nz += pushWZ;
+          // Kill velocity along push direction
+          const pushLen = Math.sqrt(pushWX * pushWX + pushWZ * pushWZ) || 1;
+          const nPX = pushWX / pushLen, nPZ = pushWZ / pushLen;
+          const velDot = _velX * nPX + _velZ * nPZ;
+          if (velDot < 0) { _velX -= velDot * nPX; _velZ -= velDot * nPZ; }
+        }
+      }
+      continue; // skip AABB path
+    }
+
+    // ── Standard AABB collision ───────────────────────────────────
     const xOverlap = nx + r > box.xMin && nx - r < box.xMax;
     const zOverlap = nz + r > box.zMin && nz - r < box.zMax;
     if (xOverlap && zOverlap) {
