@@ -300,11 +300,11 @@ export function createRoom(scene) {
     const handle=new THREE.Mesh(handleGeo, mugMat);
     handle.rotation.z=Math.PI/2;
     handle.rotation.y=Math.PI/2;
-    handle.position.set(0, mugH*0.5, -mugR);
+    handle.position.set(0, mugH*0.5, mugR);
     mugGroup.add(handle);
     // Position and rotate the whole mug
     mugGroup.position.set(mugX, mugY, mugZ);
-    mugGroup.rotation.y=60*Math.PI/180; // 60° rotation
+    mugGroup.rotation.y=30*Math.PI/180; // angled so handle faces toward player
     // Only mark the GROUP as room — not the children. Marking children caused
     // applyRoomDelta to double-shift them (once for group, once per child) each
     // time the room was nudged, which is why the mug drifted outside the room.
