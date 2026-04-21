@@ -192,6 +192,14 @@ catAnimation.loadGameplayCat({
 
 particles.init();
 
+// ── Leaderboard + finish dialog ──────────────────────────────────────
+
+leaderboard.init();
+leaderboard.setCallbacks({
+  onPlayAgain: () => window._playAgain(),
+  onExitGame: () => window._exitFP()
+});
+
 // ── Game mode ───────────────────────────────────────────────────────
 
 gameFp.init({
@@ -274,14 +282,16 @@ window._toggleFP = () => {
 };
 window._resumeFP = () => gameFp.setPaused(false);
 window._resetFP = () => {
+  leaderboard.closeFinishDialog();
   gameFp.setPaused(false);
+  gameFp.resetTimer();
+  coins.fullReset();
   gameFp.toggleFirstPerson();
-  setTimeout(() => gameFp.toggleFirstPerson(), 100);
+  setTimeout(() => window._openCharSelect(), 100);
 };
 window._exitFP = () => {
   // Close any overlays first
-  const fin = document.getElementById('fpFinishOverlay');
-  if (fin) fin.classList.remove('open');
+  leaderboard.closeFinishDialog();
   const pause = document.getElementById('fpPauseOverlay');
   if (pause) pause.style.display = 'none';
   // Release pointer lock
@@ -299,10 +309,8 @@ window._toggleMuteMusic = (checked) => {
 };
 window._switchCamFP = () => gameFp.setCamMode();
 window._playAgain = () => {
-  const fin = document.getElementById('fpFinishOverlay');
-  if (fin) fin.classList.remove('open');
+  leaderboard.closeFinishDialog();
   gameFp.setPaused(false);
-  // Reset and restart
   gameFp.toggleFirstPerson();
   setTimeout(() => window._openCharSelect(), 100);
 };
@@ -509,16 +517,16 @@ function animate(ts) {
     if (coins.coinScore >= coins.coinTotal && coins.coinTotal > 0 && !leaderboard.isFinished()) {
       leaderboard.stopTimer();
       const finalTime = leaderboard.getElapsed();
-      const finEl = document.getElementById('finishTime');
-      const finCoins = document.getElementById('finishCoins');
-      const finOverlay = document.getElementById('fpFinishOverlay');
-      if (finEl) finEl.textContent = leaderboard.formatRunTime(finalTime);
-      if (finCoins) finCoins.textContent = coins.coinScore + '/' + coins.coinTotal + ' coins';
-      if (finOverlay) finOverlay.classList.add('open');
       gameFp.setPaused(true);
       // Hide the regular pause overlay (finish takes precedence)
       const pauseOv = document.getElementById('fpPauseOverlay');
       if (pauseOv) pauseOv.style.display = 'none';
+      // Name dialog → record run → open finish dialog
+      leaderboard.openNameDialog(false, () => {
+        const runData = leaderboard.recordRun(finalTime, coins.coinTotal, coins.coinSecretScore);
+        leaderboard.renderLeaderboardPanel();
+        leaderboard.openFinishDialog(runData);
+      });
     }
   }
 
