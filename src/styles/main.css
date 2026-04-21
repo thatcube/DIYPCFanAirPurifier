@@ -22,22 +22,17 @@
     radial-gradient(ellipse at 75% 75%, rgba(255, 185, 0, 0.06) 0%, transparent 50%),
     linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.03) 40%, transparent 60%);
 
-  /* Accent — MS colors blurred and blended */
+  /* Accent — MS colors as subtle frosted tint, bright border */
   --accent: #00a4ef;
   --accent-glow: rgba(0, 164, 239, 0.35);
   --accent-dim: rgba(0, 164, 239, 0.12);
-  --accent-gradient:
-    radial-gradient(circle at 25% 30%, rgba(242,80,34,0.45) 0%, transparent 55%),
-    radial-gradient(circle at 75% 30%, rgba(127,186,0,0.4) 0%, transparent 55%),
-    radial-gradient(circle at 25% 70%, rgba(0,164,239,0.45) 0%, transparent 55%),
-    radial-gradient(circle at 75% 70%, rgba(255,185,0,0.4) 0%, transparent 55%),
-    linear-gradient(180deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
-  --accent-gradient-warm:
-    radial-gradient(circle at 25% 30%, rgba(242,80,34,0.5) 0%, transparent 50%),
-    radial-gradient(circle at 75% 30%, rgba(127,186,0,0.45) 0%, transparent 50%),
-    radial-gradient(circle at 25% 70%, rgba(0,164,239,0.5) 0%, transparent 50%),
-    radial-gradient(circle at 75% 70%, rgba(255,185,0,0.45) 0%, transparent 50%),
-    linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.03));
+  --accent-gradient: linear-gradient(135deg,
+    rgba(242,80,34,0.18) 0%, rgba(127,186,0,0.18) 33%,
+    rgba(0,164,239,0.18) 66%, rgba(255,185,0,0.18) 100%);
+  --accent-gradient-warm: linear-gradient(135deg,
+    rgba(242,80,34,0.25) 0%, rgba(127,186,0,0.25) 33%,
+    rgba(0,164,239,0.25) 66%, rgba(255,185,0,0.25) 100%);
+  --accent-border: linear-gradient(135deg, #f25022 0%, #7fba00 33%, #00a4ef 66%, #ffb900 100%);
 
   /* Text — vibrant on glass */
   --text: #e8f4ff;
@@ -564,9 +559,17 @@ input[type=range]::-moz-range-thumb {
 .pause-btn:hover { transform: scale(1.03) translateY(-1px); }
 .pause-btn:active { transform: scale(0.96); }
 .pause-btn.primary {
-  background: var(--accent-gradient); color: #fff; border: none;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  background: var(--accent-gradient);
+  border: 2px solid transparent;
+  background-clip: padding-box;
   box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  position: relative;
+}
+.pause-btn.primary::before {
+  content: ''; position: absolute; inset: -2px; border-radius: inherit;
+  background: linear-gradient(135deg, #f25022, #7fba00, #00a4ef, #ffb900);
+  z-index: -1; border-radius: calc(var(--r-md) + 2px);
 }
 .pause-btn.danger {
   background: var(--danger-bg); color: var(--danger); border-color: var(--danger-border);
@@ -799,8 +802,15 @@ input[type=range]::-moz-range-thumb {
 .finishDlgBtn.secondary { background: rgba(255,255,255,0.1); color: #e0e8f4; }
 .finishDlgBtn.secondary:hover { background: rgba(255,255,255,0.14); }
 .finishDlgBtn.primary {
-  background: var(--accent-gradient); color: #fff;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  background: var(--accent-gradient);
+  border: 2px solid transparent;
+  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  position: relative;
+}
+.finishDlgBtn.primary::before {
+  content: ''; position: absolute; inset: -2px;
+  background: linear-gradient(135deg, #f25022, #7fba00, #00a4ef, #ffb900);
+  z-index: -1; border-radius: 12px;
 }
 .finishDlgBtn.primary:hover { filter: brightness(1.05); }
 .finishDlgBtn.danger {
