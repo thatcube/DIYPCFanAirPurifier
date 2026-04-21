@@ -750,6 +750,10 @@ export function createRoom(scene) {
     }
     return rightWall;
   })();
+
+  // Corner fill — patch the 0.5" gap between right wall (z=48.5) and back wall (z=49)
+  roomBox(0.5, wallHeight, 0.5, 0xd8d4ce, sideWallX, floorY + wallHeight / 2, 48.75, 0, 0, 0);
+
   // Baseboard — break into two pieces so it doesn't cross the closet opening.
   const sideBaseboard1=roomBox(0.6, 3, (_closetZ-_closetW/2) - (-15 - wallDepth/2), 0xc0bbb4,
     sideWallX-0.5, floorY+1.5, (-15 - wallDepth/2 + (_closetZ-_closetW/2))/2, 0,0,0);
@@ -959,6 +963,9 @@ export function createRoom(scene) {
   // Baseboard on left wall
   const leftBaseboard=roomBox(0.6, 3, wallDepth, 0xc0bbb4, leftWallX+0.5, floorY+1.5, -15, 0,0,0);
   
+  // Corner fill — patch gap between left wall (z=48.5) and back wall (z=49)
+  roomBox(0.5, wallHeight, 0.5, 0xd8d4ce, leftWallX, floorY + wallHeight / 2, 48.75, 0, 0, 0);
+
   // Window sill
   roomBox(0.8, 0.5, winW+2, 0xc8c4be, leftWallX+0.4, winBottom-0.25, winCenterZ, 0,0,0);
   
