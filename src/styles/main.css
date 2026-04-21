@@ -440,13 +440,17 @@ input[type=range]::-moz-range-thumb {
 }
 /* Pause card layout */
 .pause-card {
-  background: var(--glass); border: 1px solid var(--glass-border);
+  background: rgba(14, 18, 26, 0.55); border: 1px solid rgba(255,255,255,0.15);
   border-radius: var(--r-xl); padding: 28px 32px;
   max-width: 420px; width: 90%; text-align: center;
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  backdrop-filter: blur(48px) saturate(1.8) brightness(1.05);
+  -webkit-backdrop-filter: blur(48px) saturate(1.8) brightness(1.05);
+  box-shadow:
+    0 20px 60px rgba(0,0,0,0.4),
+    inset 0 0 0 0.5px rgba(255,255,255,0.15),
+    inset 0 1px 1px rgba(255,255,255,0.2);
   animation: bounceIn 0.4s var(--spring) both;
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 #fpPauseOverlay h2 { margin-bottom: 4px; }
 .pause-sub { color: var(--text-dim); font-size: 11px; margin-bottom: 16px; }
@@ -468,13 +472,15 @@ input[type=range]::-moz-range-thumb {
   background: var(--danger-bg); color: var(--danger); border-color: var(--danger-border);
 }
 .pause-toggles {
-  display: flex; gap: 16px; justify-content: center; margin-bottom: 12px;
+  display: flex; gap: 16px; justify-content: center; margin-bottom: 14px;
 }
-.pause-toggle {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11px; color: var(--text-dim); cursor: pointer;
+.pause-toggle-row {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-pill); padding: 6px 14px 6px 12px;
+  font-size: 11px; color: var(--text-dim);
 }
-.pause-toggle input[type=checkbox] { accent-color: var(--accent); width: 14px; height: 14px; }
+.pause-toggle-row span { font-size: 11px; }
 .pause-actions { display: flex; gap: 8px; justify-content: center; margin-bottom: 14px; }
 .pause-pill {
   background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
@@ -500,12 +506,17 @@ input[type=range]::-moz-range-thumb {
 }
 #fpFinishOverlay.open { display: flex; }
 .finish-card {
-  background: var(--glass); border: 1px solid var(--glass-border);
+  background: rgba(14, 18, 26, 0.55); border: 1px solid rgba(255,255,255,0.15);
   border-radius: var(--r-xl); padding: 32px 40px;
   max-width: 400px; width: 90%; text-align: center;
-  backdrop-filter: var(--glass-blur);
-  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  backdrop-filter: blur(48px) saturate(1.8) brightness(1.05);
+  -webkit-backdrop-filter: blur(48px) saturate(1.8) brightness(1.05);
+  box-shadow:
+    0 20px 60px rgba(0,0,0,0.4),
+    inset 0 0 0 0.5px rgba(255,255,255,0.15),
+    inset 0 1px 1px rgba(255,255,255,0.2);
   animation: bounceIn 0.5s var(--spring) both;
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 .finish-card h2 { font-size: 24px; margin-bottom: 12px; }
 .finish-time {

@@ -209,8 +209,14 @@
         <button class="pause-btn danger" onclick="window._exitFP&&window._exitFP()">✕ Exit</button>
       </div>
       <div class="pause-toggles">
-        <label class="pause-toggle"><input type="checkbox" id="fpPauseMuteSfx" onchange="window._toggleMuteSfx&&window._toggleMuteSfx(this.checked)"> Mute SFX</label>
-        <label class="pause-toggle"><input type="checkbox" id="fpPauseMuteMusic" onchange="window._toggleMuteMusic&&window._toggleMuteMusic(this.checked)"> Mute Music</label>
+        <div class="pause-toggle-row">
+          <span>🔊 SFX</span>
+          <div class="toggle-sw" id="fpPauseMuteSfx" onclick="this.classList.toggle('on');window._toggleMuteSfx&&window._toggleMuteSfx(this.classList.contains('on'))"></div>
+        </div>
+        <div class="pause-toggle-row">
+          <span>🎵 Music</span>
+          <div class="toggle-sw" id="fpPauseMuteMusic" onclick="this.classList.toggle('on');window._toggleMuteMusic&&window._toggleMuteMusic(this.classList.contains('on'))"></div>
+        </div>
       </div>
       <div class="pause-actions">
         <button class="pause-pill" onclick="window._resetFP&&window._resetFP()">⟳ Reset Run</button>

@@ -450,7 +450,7 @@ export function toggleFirstPerson() {
     // Request pointer lock
     _fpIgnorePointerUnlock = true;
     setTimeout(() => { _fpIgnorePointerUnlock = false; }, 300);
-    if (_canvas) _canvas.requestPointerLock();
+    if (_canvas) try { _canvas.requestPointerLock(); } catch (e) {}
 
     // Disable orbit controls
     if (_controls) _controls.enabled = false;
@@ -548,11 +548,11 @@ export function setPaused(paused) {
     if (lbPanel) lbPanel.style.display = 'block';
     if (crosshair) crosshair.style.opacity = '0.25';
 
-    // Sync mute checkboxes
-    const sfxCb = document.getElementById('fpPauseMuteSfx');
-    const musicCb = document.getElementById('fpPauseMuteMusic');
-    if (sfxCb) sfxCb.checked = sfxMuted;
-    if (musicCb) musicCb.checked = musicMuted;
+    // Sync mute toggle states
+    const sfxTog = document.getElementById('fpPauseMuteSfx');
+    const musicTog = document.getElementById('fpPauseMuteMusic');
+    if (sfxTog) sfxTog.classList.toggle('on', sfxMuted);
+    if (musicTog) musicTog.classList.toggle('on', musicMuted);
 
     // Release pointer lock
     _fpIgnorePointerUnlock = true;
@@ -564,11 +564,13 @@ export function setPaused(paused) {
     if (lbPanel) lbPanel.style.display = '';
     if (crosshair) crosshair.style.opacity = '';
 
-    // Re-lock pointer (desktop only)
+    // Re-lock pointer (desktop only) — delay to avoid SecurityError
     if (_canvas && !state.isMobile) {
       _fpIgnorePointerUnlock = true;
-      _canvas.requestPointerLock();
-      setTimeout(() => { _fpIgnorePointerUnlock = false; }, 300);
+      setTimeout(() => {
+        try { _canvas.requestPointerLock(); } catch (e) {}
+        setTimeout(() => { _fpIgnorePointerUnlock = false; }, 300);
+      }, 200);
     }
   }
 }
@@ -870,7 +872,7 @@ function _bindInputs() {
   if (_canvas) {
     _canvas.addEventListener('click', () => {
       if (fpMode && !fpPaused && !document.pointerLockElement) {
-        _canvas.requestPointerLock();
+        try { _canvas.requestPointerLock(); } catch (e) {}
       }
     });
   }
