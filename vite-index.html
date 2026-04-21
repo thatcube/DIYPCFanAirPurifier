@@ -228,11 +228,11 @@
           <div class="pause-toggles">
             <div class="pause-toggle-row">
               <span><i class="ph-fill ph-speaker-high"></i> SFX</span>
-              <div class="toggle-sw" id="fpPauseMuteSfx" onclick="this.classList.toggle('on');window._toggleMuteSfx&&window._toggleMuteSfx(this.classList.contains('on'))"></div>
+              <div class="toggle-sw on" id="fpPauseMuteSfx" onclick="this.classList.toggle('on');window._toggleMuteSfx&&window._toggleMuteSfx(!this.classList.contains('on'))"></div>
             </div>
             <div class="pause-toggle-row">
               <span><i class="ph-fill ph-music-notes"></i> Music</span>
-              <div class="toggle-sw" id="fpPauseMuteMusic" onclick="this.classList.toggle('on');window._toggleMuteMusic&&window._toggleMuteMusic(this.classList.contains('on'))"></div>
+              <div class="toggle-sw on" id="fpPauseMuteMusic" onclick="this.classList.toggle('on');window._toggleMuteMusic&&window._toggleMuteMusic(!this.classList.contains('on'))"></div>
             </div>
           </div>
           <div class="pause-actions">
