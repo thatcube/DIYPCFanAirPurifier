@@ -2017,12 +2017,6 @@ export function createPurifier(scene) {
     else console.log('[purifier] no interactive target. hits:', hits.length, 'first:', hits[0]?.object?.uuid?.slice(0,8), 'parent:', hits[0]?.object?.parent?.constructor?.name);
     handleClickObject(obj);
   }
-      if(!isAncestorVisible(h.object)) continue;
-      obj=getInteractiveTarget(h.object);
-      if(obj) break;
-    }
-    handleClickObject(obj);
-  }
   
   function isAncestorVisible(obj){
     let p=obj;
