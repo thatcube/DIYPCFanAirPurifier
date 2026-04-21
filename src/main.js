@@ -423,8 +423,9 @@ function animate(ts) {
       const moveBlend = Math.min(1, vel * 8);
       catAnimation.catWalkAction.weight += (moveBlend - catAnimation.catWalkAction.weight) * Math.min(1, dtSec * 8);
       catAnimation.catIdleAction.weight += ((1 - moveBlend) - catAnimation.catIdleAction.weight) * Math.min(1, dtSec * 8);
-      // Speed up walk animation when sprinting (vel ~0.02 walk, ~0.04 sprint)
-      const animSpeed = 1.0 + Math.min(vel * 30, 1.8);
+      // Speed up walk animation only when sprinting
+      const isSprinting = gameFp.fpKeys.shift && vel > 0.01;
+      const animSpeed = isSprinting ? 1.0 + Math.min(vel * 30, 1.8) : 1.0;
       catAnimation.catWalkAction.timeScale += (animSpeed - catAnimation.catWalkAction.timeScale) * Math.min(1, dtSec * 6);
       _lastCatX = gameFp.fpPos.x;
       _lastCatZ = gameFp.fpPos.z;
