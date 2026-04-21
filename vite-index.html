@@ -196,42 +196,47 @@
   </div>
   <div id="fpChargeBar"><div id="fpChargeFill"></div></div>
 
-  <!-- Leaderboard (in-game) -->
-  <div id="fpLeaderboard">
-    <h4>Leaderboard</h4>
-    <ol id="fpLeaderboardList"></ol>
-  </div>
-
   <!-- Pause overlay -->
   <div id="fpPauseOverlay">
     <div class="pause-card">
-      <h2>Paused</h2>
-      <p class="pause-sub">Timer keeps running...</p>
-      <div class="pause-grid">
-        <button class="pause-btn primary" onclick="window._resumeFP&&window._resumeFP()"><i class="ph-fill ph-play"></i> Resume</button>
-        <button class="pause-btn danger" onclick="window._exitFP&&window._exitFP()"><i class="ph ph-sign-out"></i> Exit</button>
-      </div>
-      <div class="pause-toggles">
-        <div class="pause-toggle-row">
-          <span><i class="ph-fill ph-speaker-high"></i> SFX</span>
-          <div class="toggle-sw" id="fpPauseMuteSfx" onclick="this.classList.toggle('on');window._toggleMuteSfx&&window._toggleMuteSfx(this.classList.contains('on'))"></div>
+      <div class="pause-layout">
+        <!-- Left: controls -->
+        <div class="pause-left">
+          <h2>Paused</h2>
+          <p class="pause-sub">Timer keeps running...</p>
+          <div class="pause-grid">
+            <button class="pause-btn primary" onclick="window._resumeFP&&window._resumeFP()"><i class="ph-fill ph-play"></i> Resume</button>
+            <button class="pause-btn danger" onclick="window._exitFP&&window._exitFP()"><i class="ph ph-sign-out"></i> Exit</button>
+          </div>
+          <div class="pause-toggles">
+            <div class="pause-toggle-row">
+              <span><i class="ph-fill ph-speaker-high"></i> SFX</span>
+              <div class="toggle-sw" id="fpPauseMuteSfx" onclick="this.classList.toggle('on');window._toggleMuteSfx&&window._toggleMuteSfx(this.classList.contains('on'))"></div>
+            </div>
+            <div class="pause-toggle-row">
+              <span><i class="ph-fill ph-music-notes"></i> Music</span>
+              <div class="toggle-sw" id="fpPauseMuteMusic" onclick="this.classList.toggle('on');window._toggleMuteMusic&&window._toggleMuteMusic(this.classList.contains('on'))"></div>
+            </div>
+          </div>
+          <div class="pause-actions">
+            <button class="pause-pill" onclick="window._resetFP&&window._resetFP()"><i class="ph ph-arrow-counter-clockwise"></i> Reset Run</button>
+            <button class="pause-pill" onclick="window._switchCamFP&&window._switchCamFP()"><i class="ph ph-camera-rotate"></i> Switch Camera</button>
+          </div>
+          <div class="pause-controls">
+            <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
+            <div><kbd>Space</kbd> Jump (hold)</div>
+            <div><kbd>Shift</kbd> Sprint</div>
+            <div><kbd>V</kbd> Camera</div>
+            <div><kbd>R</kbd> Reset run</div>
+            <div><kbd>Esc</kbd> Resume</div>
+          </div>
         </div>
-        <div class="pause-toggle-row">
-          <span><i class="ph-fill ph-music-notes"></i> Music</span>
-          <div class="toggle-sw" id="fpPauseMuteMusic" onclick="this.classList.toggle('on');window._toggleMuteMusic&&window._toggleMuteMusic(this.classList.contains('on'))"></div>
+        <!-- Right: leaderboard -->
+        <div class="pause-right">
+          <h4 class="pause-lb-title"><i class="ph-fill ph-trophy"></i> Leaderboard</h4>
+          <ol id="fpLeaderboardList"></ol>
+          <div id="fpLeaderboardEmpty" class="pause-lb-empty">No runs yet. Collect all coins to post a time!</div>
         </div>
-      </div>
-      <div class="pause-actions">
-        <button class="pause-pill" onclick="window._resetFP&&window._resetFP()"><i class="ph ph-arrow-counter-clockwise"></i> Reset Run</button>
-        <button class="pause-pill" onclick="window._switchCamFP&&window._switchCamFP()"><i class="ph ph-camera-rotate"></i> Switch Camera</button>
-      </div>
-      <div class="pause-controls">
-        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
-        <div><kbd>Space</kbd> Jump (hold to charge)</div>
-        <div><kbd>Shift</kbd> Sprint</div>
-        <div><kbd>V</kbd> Switch camera</div>
-        <div><kbd>R</kbd> Reset run</div>
-        <div><kbd>Esc</kbd> Resume</div>
       </div>
     </div>
   </div>

@@ -228,12 +228,17 @@ export function recordRun(timeMs, coinTotal, secretCoins) {
 
 export function renderLeaderboardPanel() {
   const list = document.getElementById('fpLeaderboardList');
+  const emptyEl = document.getElementById('fpLeaderboardEmpty');
   if (!list) return;
   if (!_leaderboard.length) {
-    list.innerHTML = '<li style="opacity:0.62;padding:4px 2px">No runs yet. Grab every coin to post a time.</li>';
+    list.innerHTML = '';
+    if (emptyEl) emptyEl.style.display = '';
     return;
   }
-  list.innerHTML = _leaderboard.map((r, i) => {
+  if (emptyEl) emptyEl.style.display = 'none';
+  // Show top 10 in the pause card
+  const top = _leaderboard.slice(0, 10);
+  list.innerHTML = top.map((r, i) => {
     const own = r.playerId ? (r.playerId === _playerId) : (r.name === _playerName);
     return `<li class="${own ? 'own' : ''}">
       <span class="rk">#${i + 1}</span>
