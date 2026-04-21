@@ -457,19 +457,85 @@ function _getBoxes() {
     result.push({ xMin: 42, xMax: 49, zMin: -60, zMax: -56, yTop: topSurface + 8, yBottom: topSurface });
   }
 
-  // Closet bifold doors — thin wall at the closet opening (post-mirror X ≈ -50.5)
-  {
-    const cX = -50.5; // closet wall X (post-mirror)
-    const cZ = -50;   // closet center Z
-    const cW = 48;    // closet opening width
-    const cH = 66;    // closet door height
+  // Closet bifold doors — dynamic collision based on door state
+  // Each leaf has 2 panels (outer + inner) that fold into a V when open.
+  // When closed, panels form a flat wall blocking the opening.
+  // When open, the folded panels sit against the jambs and the opening is clear.
+  if (window._bifoldLeavesRef) {
     const fy = getFloorY();
-    // Thin wall spanning the full closet opening
-    result.push({
-      xMin: cX - 1.5, xMax: cX + 0.5,
-      zMin: cZ - cW / 2, zMax: cZ + cW / 2,
-      yTop: fy + cH, yBottom: fy, room: true
-    });
+    const cH = 66;           // closet door height
+    const panelW = 12;       // each panel is closetW/4 = 12"
+    const panelThick = 1.2;
+
+    for (const leaf of window._bifoldLeavesRef) {
+      const angle = leaf._leafAngle || 0;
+      // Leaf pivot world position (already mirrored)
+      const px = leaf.position.x; // world X (post-mirror, set by mirror pass)
+      const pz = leaf.position.z; // world Z
+      // leafSide: -1 means -Z jamb, +1 means +Z jamb
+      const ls = leaf._leafSide;
+      // sign used for rotation direction (matches purifier.js animation)
+      const sign = ls < 0 ? 1 : -1;
+      const theta = sign * angle; // actual rotation.y
+
+      if (angle < 0.05) {
+        // Doors effectively closed — single flat wall from this leaf's two panels
+        // Outer panel: from pivot to panelW along -leafSide*Z
+        // Inner panel: from panelW to 2*panelW along -leafSide*Z
+        const z0 = pz;
+        const z1 = pz - ls * panelW * 2; // far end of both panels
+        result.push({
+          xMin: px - panelThick / 2 - 0.3, xMax: px + panelThick / 2 + 0.3,
+          zMin: Math.min(z0, z1), zMax: Math.max(z0, z1),
+          yTop: fy + cH, yBottom: fy, room: true
+        });
+      } else {
+        // Doors open — compute world positions of outer and inner panels
+        // Outer panel: center at angle θ from pivot, panelW/2 along rotated -leafSide*Z
+        const cosT = Math.cos(theta);
+        const sinT = Math.sin(theta);
+        // Outer panel center in local coords: (0, 0, -ls*panelW/2)
+        // Rotated by theta around Y: x' = -ls*panelW/2 * sin(theta), z' = -ls*panelW/2 * cos(theta)
+        // But rotation is around Y axis, so local Z → world Z*cos - world X*sin... 
+        // Actually the pivot rotation.y = theta means:
+        //   local_x → world_x*cos(theta) + world_z*sin(theta)  [relative to pivot]
+        //   local_z → -world_x*sin(theta) + world_z*cos(theta)
+        // The outer panel local pos is (0, 0, -ls*panelW/2)
+        const outerLocalZ = -ls * panelW / 2;
+        const outerWX = px + outerLocalZ * sinT;  // local z contributes to world x
+        const outerWZ = pz + outerLocalZ * cosT;  // local z contributes to world z
+        // Outer panel extents (rotated rectangle approximated as AABB)
+        const outerHalfW = panelW / 2;
+        const outerExtX = Math.abs(outerHalfW * sinT) + panelThick / 2;
+        const outerExtZ = Math.abs(outerHalfW * cosT) + panelThick / 2;
+        result.push({
+          xMin: outerWX - outerExtX, xMax: outerWX + outerExtX,
+          zMin: outerWZ - outerExtZ, zMax: outerWZ + outerExtZ,
+          yTop: fy + cH, yBottom: fy, room: true
+        });
+
+        // Inner panel: hinged at the mid-joint (panelW along -ls*Z from pivot, rotated)
+        // Mid-joint world position:
+        const midLocalZ = -ls * panelW;
+        const midWX = px + midLocalZ * sinT;
+        const midWZ = pz + midLocalZ * cosT;
+        // Inner group rotation.y = -2*sign*angle = -2*theta
+        const innerTheta = theta - 2 * theta; // = -theta (inner folds back)
+        const innerCosT = Math.cos(innerTheta);
+        const innerSinT = Math.sin(innerTheta);
+        // Inner panel local pos relative to mid-joint: (0, 0, -ls*panelW/2)
+        const innerLocalZ = -ls * panelW / 2;
+        const innerWX = midWX + innerLocalZ * innerSinT;
+        const innerWZ = midWZ + innerLocalZ * innerCosT;
+        const innerExtX = Math.abs(outerHalfW * innerSinT) + panelThick / 2;
+        const innerExtZ = Math.abs(outerHalfW * innerCosT) + panelThick / 2;
+        result.push({
+          xMin: innerWX - innerExtX, xMax: innerWX + innerExtX,
+          zMin: innerWZ - innerExtZ, zMax: innerWZ + innerExtZ,
+          yTop: fy + cH, yBottom: fy, room: true
+        });
+      }
+    }
   }
 
   // MacBook open lid — thin wall matching the screen overlay mesh exactly
