@@ -723,6 +723,17 @@ function _respawn() {
 let _pauseFocusTrap = null;
 let _pauseSavedFocus = null;
 
+// Release pause focus trap without unpausing (for exit flow)
+export function releasePauseFocusTrap() {
+  if (_pauseFocusTrap) { _pauseFocusTrap.release(); _pauseFocusTrap = null; }
+  if (_pauseSavedFocus) { _pauseSavedFocus.restore(); _pauseSavedFocus = null; }
+}
+
+// Clear pause flag without triggering re-lock (for exit flow)
+export function clearPauseState() {
+  fpPaused = false;
+}
+
 export function setPaused(paused) {
   if (!fpMode) return;
   fpPaused = !!paused;
