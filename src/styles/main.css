@@ -6,13 +6,13 @@
 /* ─── Design Tokens ──────────────────────────────────────────────── */
 :root {
   /* Liquid Glass surfaces */
-  --glass: rgba(18, 22, 30, 0.38);
-  --glass-light: rgba(18, 22, 30, 0.28);
-  --glass-border: rgba(255, 255, 255, 0.16);
-  --glass-border-strong: rgba(255, 255, 255, 0.28);
-  --glass-blur: blur(64px) saturate(2.2) brightness(1.1);
+  --glass: rgba(255, 255, 255, 0.08);
+  --glass-light: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-border-strong: rgba(255, 255, 255, 0.35);
+  --glass-blur: blur(40px) saturate(1.8) brightness(1.15);
   --glass-soft: rgba(255, 255, 255, 0.04);
-  --glass-stroke-soft: rgba(255, 255, 255, 0.07);
+  --glass-stroke-soft: rgba(255, 255, 255, 0.08);
 
   /* Liquid Glass specular — MS logo quadrant tints over white highlight */
   --glass-specular:
@@ -554,8 +554,8 @@ input[type=range]::-moz-range-thumb {
 .pause-btn:hover { transform: scale(1.03) translateY(-1px); }
 .pause-btn:active { transform: scale(0.96); }
 .pause-btn.primary {
-  background: var(--accent-gradient); color: #0a0e14; border: none;
-  box-shadow: 0 4px 16px rgba(145,222,255,0.3);
+  background: linear-gradient(135deg, #00a4ef 0%, #91deff 50%, #7fba00 100%); color: #0a0e14; border: none;
+  box-shadow: 0 4px 16px rgba(0,164,239,0.3);
 }
 .pause-btn.danger {
   background: var(--danger-bg); color: var(--danger); border-color: var(--danger-border);
@@ -787,7 +787,7 @@ input[type=range]::-moz-range-thumb {
 .finishDlgBtn:active { transform: translateY(1px); }
 .finishDlgBtn.secondary { background: rgba(255,255,255,0.1); color: #e0e8f4; }
 .finishDlgBtn.secondary:hover { background: rgba(255,255,255,0.14); }
-.finishDlgBtn.primary { background: linear-gradient(135deg, #00a4ef, #91deff, #ffb900); color: #081019; }
+.finishDlgBtn.primary { background: linear-gradient(135deg, #00a4ef, #91deff, #7fba00); color: #081019; }
 .finishDlgBtn.primary:hover { filter: brightness(1.05); }
 .finishDlgBtn.danger {
   background: rgba(255,95,110,0.16); border: 1px solid rgba(255,95,110,0.42);
