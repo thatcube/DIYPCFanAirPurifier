@@ -565,8 +565,8 @@ export function createRoom(scene) {
   // 65" OLED: diagonal=65", 16:9 → ~56.7"W × 31.9"H, bezel ~0.3", depth ~1"
   const tvW=56.7, tvH=31.9, tvD=1.0, bezel=0.3;
   const tvCenterX=bedX; // centered on the bed
-  const tvCenterY=floorY+48; // center of screen ~48" from floor
-  const tvZ=oppWallZ+0.5+tvD/2+0.1;
+  const tvCenterY=floorY+44; // center of screen ~44" from floor
+  const tvZ=oppWallZ+0.5+tvD/2+1.1; // 1" away from wall
   
   // Thin black bezel frame
   const tvFrame=roomRoundBox(tvW+bezel*2, tvH+bezel*2, tvD, 0.4, 0x111111,
