@@ -27,7 +27,8 @@ export function createPurifier(scene) {
   let _roomCeilLightOn = true, _roomCeilSpot = null, _roomDomeMat = null, _roomCeilGlow = null;
   let _roomOutdoorMat = null, _roomOutdoorDayTex = null, _roomOutdoorNightTex = null;
   let _windowIsNight = false;
-  let _applyTimeOfDay = null; // function(minuteOfDay) from main.js
+  let _applyTimeOfDay = null;
+  let _toggleMacbook = null;
 
   // W, H, D, ply, ft declared in header from state
   // panelW declared in header from state
@@ -2012,6 +2013,7 @@ export function createPurifier(scene) {
     }
     // Clicked the MacBook → toggle screen + spawn secret coin on first click.
     if(obj._isMacbook){
+      if(_toggleMacbook) _toggleMacbook();
       if(_fpMode) spawnSecretMacbookCoin();
       return;
     }
@@ -3245,6 +3247,7 @@ export function createPurifier(scene) {
     if (refs.outdoorDayTex) _roomOutdoorDayTex = refs.outdoorDayTex;
     if (refs.outdoorNightTex) _roomOutdoorNightTex = refs.outdoorNightTex;
     if (refs.applyTimeOfDay) _applyTimeOfDay = refs.applyTimeOfDay;
+    if (refs.toggleMacbook) _toggleMacbook = refs.toggleMacbook;
   }
 
   // Return purifier refs
