@@ -554,8 +554,16 @@ input[type=range]::-moz-range-thumb {
 .pause-btn:hover { transform: scale(1.03) translateY(-1px); }
 .pause-btn:active { transform: scale(0.96); }
 .pause-btn.primary {
-  background: linear-gradient(135deg, #00a4ef 0%, #91deff 50%, #7fba00 100%); color: #0a0e14; border: none;
-  box-shadow: 0 4px 16px rgba(0,164,239,0.3);
+  background:
+    linear-gradient(135deg, rgba(242,80,34,0.85) 0%, rgba(242,80,34,0.85) 24%, transparent 25%) top left,
+    linear-gradient(135deg, transparent 74%, rgba(127,186,0,0.85) 75%) top right,
+    linear-gradient(135deg, rgba(0,164,239,0.85) 0%, rgba(0,164,239,0.85) 24%, transparent 25%) bottom left,
+    linear-gradient(135deg, transparent 74%, rgba(255,185,0,0.85) 75%) bottom right,
+    rgba(255,255,255,0.15);
+  background-size: 50% 50%;
+  background-repeat: no-repeat;
+  color: #fff; border: none; text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
 }
 .pause-btn.danger {
   background: var(--danger-bg); color: var(--danger); border-color: var(--danger-border);
@@ -787,7 +795,15 @@ input[type=range]::-moz-range-thumb {
 .finishDlgBtn:active { transform: translateY(1px); }
 .finishDlgBtn.secondary { background: rgba(255,255,255,0.1); color: #e0e8f4; }
 .finishDlgBtn.secondary:hover { background: rgba(255,255,255,0.14); }
-.finishDlgBtn.primary { background: linear-gradient(135deg, #00a4ef, #91deff, #7fba00); color: #081019; }
+.finishDlgBtn.primary {
+  background:
+    linear-gradient(to right, rgba(242,80,34,0.8) 0%, rgba(242,80,34,0.8) 100%) top left / 50% 50% no-repeat,
+    linear-gradient(to right, rgba(127,186,0,0.8) 0%, rgba(127,186,0,0.8) 100%) top right / 50% 50% no-repeat,
+    linear-gradient(to right, rgba(0,164,239,0.8) 0%, rgba(0,164,239,0.8) 100%) bottom left / 50% 50% no-repeat,
+    linear-gradient(to right, rgba(255,185,0,0.8) 0%, rgba(255,185,0,0.8) 100%) bottom right / 50% 50% no-repeat;
+  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  border-radius: 10px; overflow: hidden;
+}
 .finishDlgBtn.primary:hover { filter: brightness(1.05); }
 .finishDlgBtn.danger {
   background: rgba(255,95,110,0.16); border: 1px solid rgba(255,95,110,0.42);
