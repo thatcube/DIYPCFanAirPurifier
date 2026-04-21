@@ -53,6 +53,19 @@ function showToast(text) {
   }, 1800);
 }
 
+function ensureGlassBlurCompat() {
+  const blur = getComputedStyle(document.documentElement)
+    .getPropertyValue('--glass-blur')
+    .trim() || 'blur(24px)';
+  // Keep key control surfaces blurred even if production CSS processing
+  // collapses vendor-prefixed declarations differently.
+  const els = document.querySelectorAll('.panel, .panel-fab, #fpControlsPanel');
+  els.forEach((el) => {
+    el.style.setProperty('backdrop-filter', blur);
+    el.style.setProperty('-webkit-backdrop-filter', blur);
+  });
+}
+
 // Shadow state
 let _shadowDirtyOneShot = true;
 let _lastShadowUpdateTs = 0;
@@ -87,6 +100,7 @@ lighting.createLights(state.isMobile);
 // Hide loading overlay
 const loadingEl = document.getElementById('loading');
 if (loadingEl) loadingEl.style.display = 'none';
+ensureGlassBlurCompat();
 
 // ── Build scene ─────────────────────────────────────────────────────
 
@@ -239,6 +253,7 @@ gameFp.init({
 // Character select screen
 let _selectedModel = 'classic';
 let _selectedColor = 'charcoal';
+const _PLAY_PATH_AUTO_OPEN = /^\/play\/?$/.test(window.location.pathname);
 
 let _previewsInited = false;
 let _charSelectFocusTrap = null;
@@ -284,6 +299,12 @@ document.getElementById('charSelect')?.addEventListener('keydown', e => {
     window._closeCharSelect();
   }
 });
+
+if (_PLAY_PATH_AUTO_OPEN) {
+  setTimeout(() => {
+    if (!gameFp.fpMode) window._openCharSelect();
+  }, 120);
+}
 
 window._selectCat = (model, el) => {
   _selectedModel = model;

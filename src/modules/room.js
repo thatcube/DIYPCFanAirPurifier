@@ -1060,96 +1060,74 @@ export function createRoom(scene) {
   const wfm=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT*0.6, winW), frameMat);
   wfm.position.set(trimX, winCenterY, winCenterZ); wfm._isRoom=true; wfm._isWindow=true; addRoom(wfm);
   
-  // Outdoor scene visible through window — canvas-painted backdrop
+  // Outdoor scene visible through window — same composition for day + night.
+  const _clouds = [[80,90,60,25],[200,70,80,30],[350,100,55,20],[430,60,70,28]];
+  function drawOutdoorScene(ctx, night){
+    const skyGrad=ctx.createLinearGradient(0,0,0,300);
+    if(night){
+      skyGrad.addColorStop(0,'#0d1425');
+      skyGrad.addColorStop(0.35,'#1a2740');
+      skyGrad.addColorStop(0.55,'#232f45');
+      skyGrad.addColorStop(0.7,'#2b3242');
+    } else {
+      skyGrad.addColorStop(0,'#6a99c4');
+      skyGrad.addColorStop(0.35,'#a8c8da');
+      skyGrad.addColorStop(0.55,'#ddd8c8');
+      skyGrad.addColorStop(0.7,'#f0e8d8');
+    }
+    ctx.fillStyle=skyGrad;
+    ctx.fillRect(0,0,512,300);
+
+    // Distant hazy hills (same profile)
+    ctx.fillStyle=night?'#34404a':'#8aab8a';
+    ctx.beginPath(); ctx.moveTo(0,300);
+    for(let x=0;x<=512;x+=8) ctx.lineTo(x,280-Math.sin(x*0.012)*18-Math.sin(x*0.031)*8);
+    ctx.lineTo(512,300); ctx.fill();
+
+    // Closer tree line (same profile)
+    ctx.fillStyle=night?'#263427':'#4a7a4a';
+    ctx.beginPath(); ctx.moveTo(0,310);
+    for(let x=0;x<=512;x+=4){
+      const base=295-Math.sin(x*0.02)*10;
+      const tree=Math.sin(x*0.08)*12+Math.sin(x*0.15)*6+Math.cos(x*0.05)*8;
+      ctx.lineTo(x,base-Math.max(tree,0));
+    }
+    ctx.lineTo(512,310); ctx.fill();
+
+    // Ground / grass (same geometry)
+    const grassGrad=ctx.createLinearGradient(0,310,0,512);
+    if(night){
+      grassGrad.addColorStop(0,'#2b3f27');
+      grassGrad.addColorStop(0.4,'#223521');
+      grassGrad.addColorStop(1,'#182817');
+    } else {
+      grassGrad.addColorStop(0,'#5a8a45');
+      grassGrad.addColorStop(0.4,'#4a7a3a');
+      grassGrad.addColorStop(1,'#3a6a2a');
+    }
+    ctx.fillStyle=grassGrad; ctx.fillRect(0,305,512,207);
+
+    // Same cloud placements; dimmer at night.
+    ctx.globalAlpha=night?0.14:0.3;
+    ctx.fillStyle=night?'#9db2cf':'#ffffff';
+    _clouds.forEach(([cx,cy,rx,ry])=>{
+      ctx.beginPath(); ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha=1.0;
+  }
+
   const outdoorCvs=document.createElement('canvas');
   outdoorCvs.width=512; outdoorCvs.height=512;
   const oCtx=outdoorCvs.getContext('2d');
-  // Sky gradient
-  const skyGrad=oCtx.createLinearGradient(0,0,0,300);
-  skyGrad.addColorStop(0,'#6a99c4');
-  skyGrad.addColorStop(0.35,'#a8c8da');
-  skyGrad.addColorStop(0.55,'#ddd8c8');
-  skyGrad.addColorStop(0.7,'#f0e8d8');
-  oCtx.fillStyle=skyGrad; oCtx.fillRect(0,0,512,300);
-  // Distant hazy hills
-  oCtx.fillStyle='#8aab8a';
-  oCtx.beginPath(); oCtx.moveTo(0,300);
-  for(let x=0;x<=512;x+=8) oCtx.lineTo(x,280-Math.sin(x*0.012)*18-Math.sin(x*0.031)*8);
-  oCtx.lineTo(512,300); oCtx.fill();
-  // Closer tree line
-  oCtx.fillStyle='#4a7a4a';
-  oCtx.beginPath(); oCtx.moveTo(0,310);
-  for(let x=0;x<=512;x+=4){
-    const base=295-Math.sin(x*0.02)*10;
-    const tree=Math.sin(x*0.08)*12+Math.sin(x*0.15)*6+Math.cos(x*0.05)*8;
-    oCtx.lineTo(x,base-Math.max(tree,0));
-  }
-  oCtx.lineTo(512,310); oCtx.fill();
-  // Ground / grass
-  const grassGrad=oCtx.createLinearGradient(0,310,0,512);
-  grassGrad.addColorStop(0,'#5a8a45');
-  grassGrad.addColorStop(0.4,'#4a7a3a');
-  grassGrad.addColorStop(1,'#3a6a2a');
-  oCtx.fillStyle=grassGrad; oCtx.fillRect(0,305,512,207);
-  // Soft clouds
-  oCtx.globalAlpha=0.3;
-  oCtx.fillStyle='#ffffff';
-  [[80,90,60,25],[200,70,80,30],[350,100,55,20],[430,60,70,28]].forEach(([cx,cy,rx,ry])=>{
-    oCtx.beginPath(); oCtx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2); oCtx.fill();
-  });
-  oCtx.globalAlpha=1.0;
-  
+  drawOutdoorScene(oCtx, false);
   const outdoorTex=new THREE.CanvasTexture(outdoorCvs);
   outdoorTex.generateMipmaps=false;
   outdoorTex.minFilter=THREE.LinearFilter;
-  
-  // Night outdoor scene
+
   const nightOutdoorCvs=document.createElement('canvas');
   nightOutdoorCvs.width=512; nightOutdoorCvs.height=512;
   const nCtx=nightOutdoorCvs.getContext('2d');
-  // Night sky gradient
-  const nightSky=nCtx.createLinearGradient(0,0,0,300);
-  nightSky.addColorStop(0,'#0a0e1a');
-  nightSky.addColorStop(0.4,'#111828');
-  nightSky.addColorStop(0.7,'#1a2035');
-  nCtx.fillStyle=nightSky; nCtx.fillRect(0,0,512,300);
-  // Stars
-  nCtx.fillStyle='#ffffff';
-  for(let i=0;i<80;i++){
-    const sx=Math.random()*512, sy=Math.random()*260;
-    const sr=Math.random()*1.2+0.3;
-    nCtx.globalAlpha=Math.random()*0.6+0.3;
-    nCtx.beginPath(); nCtx.arc(sx,sy,sr,0,Math.PI*2); nCtx.fill();
-  }
-  nCtx.globalAlpha=1.0;
-  // Moon
-  nCtx.fillStyle='#e8e4d8';
-  nCtx.beginPath(); nCtx.arc(380,70,18,0,Math.PI*2); nCtx.fill();
-  nCtx.fillStyle='#d4d0c4'; nCtx.globalAlpha=0.4;
-  nCtx.beginPath(); nCtx.arc(374,64,18,0,Math.PI*2); nCtx.fill();
-  nCtx.globalAlpha=1.0;
-  // Moon glow
-  nCtx.fillStyle='rgba(200,195,170,0.08)';
-  nCtx.beginPath(); nCtx.arc(380,70,50,0,Math.PI*2); nCtx.fill();
-  // Dark hills
-  nCtx.fillStyle='#0d1518';
-  nCtx.beginPath(); nCtx.moveTo(0,300);
-  for(let x=0;x<=512;x+=8) nCtx.lineTo(x,280-Math.sin(x*0.012)*18-Math.sin(x*0.031)*8);
-  nCtx.lineTo(512,300); nCtx.fill();
-  // Dark tree line
-  nCtx.fillStyle='#0a1210';
-  nCtx.beginPath(); nCtx.moveTo(0,310);
-  for(let x=0;x<=512;x+=4){
-    const base=295-Math.sin(x*0.02)*10;
-    const tree=Math.sin(x*0.08)*12+Math.sin(x*0.15)*6+Math.cos(x*0.05)*8;
-    nCtx.lineTo(x,base-Math.max(tree,0));
-  }
-  nCtx.lineTo(512,310); nCtx.fill();
-  // Dark ground
-  const nightGrass=nCtx.createLinearGradient(0,310,0,512);
-  nightGrass.addColorStop(0,'#0e1a10');
-  nightGrass.addColorStop(1,'#080e08');
-  nCtx.fillStyle=nightGrass; nCtx.fillRect(0,305,512,207);
+  drawOutdoorScene(nCtx, true);
   const nightOutdoorTex=new THREE.CanvasTexture(nightOutdoorCvs);
   nightOutdoorTex.generateMipmaps=false;
   nightOutdoorTex.minFilter=THREE.LinearFilter;
