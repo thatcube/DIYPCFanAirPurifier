@@ -332,13 +332,13 @@ input[type=range]::-moz-range-thumb {
 }
 #playDockBtn::before {
   content: ''; position: absolute; inset: 0;
-  border: 1px solid transparent; border-radius: inherit;
+  border: 2px solid transparent; border-radius: inherit;
   background: var(--accent-border) border-box;
   -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
-  opacity: 0.4;
+  opacity: 0.6;
   pointer-events: none;
 }
 @keyframes playBtnPulse {
@@ -593,13 +593,13 @@ input[type=range]::-moz-range-thumb {
 }
 .pause-btn.primary::before {
   content: ''; position: absolute; inset: 0;
-  border: 1px solid transparent; border-radius: inherit;
+  border: 2px solid transparent; border-radius: inherit;
   background: var(--accent-border) border-box;
   -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
-  opacity: 0.35;
+  opacity: 0.55;
   pointer-events: none;
 }
 .pause-btn.danger {
@@ -850,13 +850,13 @@ input[type=range]::-moz-range-thumb {
 }
 .finishDlgBtn.primary::before {
   content: ''; position: absolute; inset: 0;
-  border: 1px solid transparent; border-radius: inherit;
+  border: 2px solid transparent; border-radius: inherit;
   background: var(--accent-border) border-box;
   -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
-  opacity: 0.35;
+  opacity: 0.55;
   pointer-events: none;
 }
 .finishDlgBtn.primary:hover { filter: brightness(1.05); }
@@ -1052,13 +1052,13 @@ body.play-mode #fpCrosshair { display: block; }
 }
 .char-start::before {
   content: ''; position: absolute; inset: 0;
-  border: 1px solid transparent; border-radius: inherit;
+  border: 2px solid transparent; border-radius: inherit;
   background: var(--accent-border) border-box;
   -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
-  opacity: 0.3;
+  opacity: 0.55;
   pointer-events: none;
 }
 .char-start:hover {
