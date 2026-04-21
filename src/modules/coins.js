@@ -225,9 +225,9 @@ export function spawnRoomCoins(roomRefs) {
   const hbThick = 3, hbH = 42 - bedClearance; // bedH - bedClearance
   const mattCenterZ = BED_Z - 2;
   // TV vars
-  const tvCenterX = BED_X, tvCenterY = fy + 48;
+  const tvCenterX = BED_X, tvCenterY = fy + 44;
   const tvW = 56.7, tvH = 31.9, tvD = 1.0, bezel = 0.3;
-  const tvZ = OPP_WALL_Z + 0.5 + tvD / 2 + 0.1;
+  const tvZ = OPP_WALL_Z + 0.5 + tvD / 2 + 1.1;
   // Mini split vars (must match room.js: msX=51-18-32/2=17 pre-mirror, msH=11, msD=8)
   const msW_r = 32, msH_r = 11, msD_r = 8;
   const msX_r = SIDE_WALL_X - 18 - msW_r / 2; // 17 pre-mirror → world -17

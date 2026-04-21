@@ -311,9 +311,9 @@ function _buildStaticBoxes() {
 
   // TV (wall-mounted, walkable under)
   const tvCenterX = BED_X;
-  const tvCenterY = fy + 48;
+  const tvCenterY = fy + 44;
   const tvW = 56.7, tvH = 31.9, tvD = 1.0, bezel = 0.3;
-  const tvZ = OPP_WALL_Z + 0.5 + tvD / 2 + 0.1;
+  const tvZ = OPP_WALL_Z + 0.5 + tvD / 2 + 1.1;
   _staticBoxes.push({
     xMin: -(tvCenterX + (tvW + bezel * 2) / 2), xMax: -(tvCenterX - (tvW + bezel * 2) / 2),
     zMin: OPP_WALL_Z, zMax: tvZ + tvD / 2 + 1,
