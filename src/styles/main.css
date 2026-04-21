@@ -362,6 +362,58 @@ input[type=range]::-moz-range-thumb {
   backdrop-filter: blur(8px);
   animation: slideUp 0.4s var(--spring) both;
 }
+/* Share button in HUD */
+#fpShareRow {
+  margin-top: 6px;
+}
+#fpShareBtn {
+  appearance: none; border: 1px solid rgba(159,227,255,0.45);
+  background: rgba(19,60,80,0.44); color: #d9f5ff;
+  border-radius: 9px; padding: 6px 10px; font-size: 11px;
+  font-weight: 700; letter-spacing: 0.35px; cursor: pointer;
+  font-family: inherit; transition: background 0.15s;
+}
+#fpShareBtn:hover { background: rgba(30,80,110,0.6); }
+/* Controls hint */
+#fpControlsHint {
+  display: none; position: fixed; bottom: 16px; left: 16px;
+  color: rgba(255,255,255,0.3); font-size: 10px;
+  pointer-events: none; z-index: 301;
+  animation: fadeIn 1s 2s both;
+}
+#fpControlsHint kbd {
+  background: rgba(255,255,255,0.08); border-radius: 4px;
+  padding: 1px 5px; font-size: 9px; border: 1px solid rgba(255,255,255,0.1);
+}
+/* Controls panel (H key toggle) */
+#fpControlsPanel {
+  position: fixed; right: 16px; bottom: 16px;
+  background: rgba(12,18,27,0.92); color: #e8eef7;
+  border: 1px solid rgba(128,190,232,0.25); border-radius: var(--r-lg);
+  padding: 0; width: 280px; z-index: 410;
+  backdrop-filter: blur(24px);
+  box-shadow: 0 12px 36px rgba(0,0,0,0.4);
+  animation: slideUp 0.3s var(--spring) both;
+}
+.fp-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px 8px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 10px; font-weight: 800; letter-spacing: 1.2px;
+  color: #9fe3ff; text-transform: uppercase;
+}
+.fp-panel-close {
+  background: none; border: none; color: rgba(255,255,255,0.4);
+  font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1;
+}
+.fp-panel-close:hover { color: #fff; }
+.fp-panel-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+  padding: 10px 14px 14px; font-size: 11px; color: rgba(255,255,255,0.5);
+}
+.fp-panel-grid kbd {
+  background: rgba(255,255,255,0.08); border-radius: 3px;
+  padding: 1px 5px; font-size: 9px; border: 1px solid rgba(255,255,255,0.08);
+}
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
@@ -867,6 +919,7 @@ body.play-mode #fpCrosshair { display: block; }
 }
 .char-start:active { transform: scale(0.95); }
 body.play-mode #fpControls { display: block; }
+body.play-mode #fpControlsHint { display: block; }
 body.play-mode #fpChargeBar { display: block; }
 body.play-mode #runTimerHud { display: block; }
 
@@ -876,6 +929,7 @@ body.play-mode #runTimerHud { display: block; }
   body.play-mode #mobileJumpBtn { display: flex !important; align-items: center; justify-content: center; }
   body.play-mode #mobileExitBtn { display: flex !important; align-items: center; justify-content: center; }
   body.play-mode #fpControls { display: none !important; }
+  body.play-mode #fpControlsHint { display: none !important; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════

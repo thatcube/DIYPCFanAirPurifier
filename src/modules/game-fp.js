@@ -625,6 +625,19 @@ export function setPaused(paused) {
   }
 }
 
+// ── Help panel toggle ───────────────────────────────────────────────
+
+let _helpOpen = false;
+function _toggleHelp() {
+  _helpOpen = !_helpOpen;
+  const panel = document.getElementById('fpControlsPanel');
+  const hint = document.getElementById('fpControlsHint');
+  if (panel) panel.style.display = _helpOpen ? 'block' : 'none';
+  if (hint) hint.style.display = _helpOpen ? 'none' : '';
+}
+// Expose for HTML onclick
+window._toggleHelp = _toggleHelp;
+
 // ── Set cam mode ────────────────────────────────────────────────────
 
 export function setCamMode(mode) {
@@ -963,6 +976,10 @@ function _bindInputs() {
         break;
       case 'KeyG':
         toggleFirstPerson();
+        break;
+      case 'KeyH':
+        _toggleHelp();
+        break;
         break;
     }
   });
