@@ -15,13 +15,20 @@
       --accent: #9fe3ff;
       --gold: #ffd873;
       --goldEdge: rgba(255, 216, 115, 0.45);
+      --font-ui: "Nunito Sans Variable", "Nunito Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "SF Mono", "IBM Plex Mono", Menlo, Consolas, monospace;
+      --tracking-base: 0.01em;
+      --tracking-wide: 0.045em;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      font-family: var(--font-ui);
       color: var(--text);
+      line-height: 1.45;
+      letter-spacing: var(--tracking-base);
+      text-rendering: optimizeLegibility;
       background: radial-gradient(1200px 700px at 18% -12%, #244868 0%, transparent 58%),
                   radial-gradient(900px 560px at 110% 10%, #1f3e56 0%, transparent 65%),
                   linear-gradient(180deg, var(--bg1), var(--bg0));
@@ -48,13 +55,15 @@
     h1 {
       margin: 0;
       font-size: clamp(20px, 2.4vw, 30px);
-      letter-spacing: 0.3px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
       color: var(--accent);
     }
     .sub {
       margin: 0;
       color: var(--muted);
       font-size: 13px;
+      line-height: 1.4;
     }
     .right {
       margin-left: auto;
@@ -71,6 +80,8 @@
       padding: 7px 10px;
       font-size: 12px;
       font-weight: 700;
+      letter-spacing: 0.01em;
+      line-height: 1.2;
       cursor: pointer;
       text-decoration: none;
       display: inline-flex;
@@ -99,18 +110,22 @@
       border-radius: 10px;
       background: rgba(255, 255, 255, 0.03);
       padding: 9px 11px;
+      font-size: 13px;
+      line-height: 1.35;
       scroll-margin-top: 22px;
     }
-    .rank { color: var(--muted); }
+    .rank { color: var(--muted); font-weight: 600; }
     .name {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     .time {
+      font-family: var(--font-mono);
       font-variant-numeric: tabular-nums;
       color: var(--accent);
       font-weight: 800;
+      letter-spacing: 0.02em;
     }
     .row.hit {
       background: rgba(255, 216, 115, 0.14);

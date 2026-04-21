@@ -37,11 +37,20 @@ let _elapsed = 0;
 let _running = false;
 let _finished = false;
 
+function _setTimerHudState(text, cls) {
+  const st = document.getElementById('runTimerState');
+  if (!st) return;
+  st.textContent = text;
+  st.classList.remove('running', 'finished', 'ready');
+  if (cls) st.classList.add(cls);
+}
+
 export function startTimer() {
   _startTs = performance.now();
   _elapsed = 0;
   _running = true;
   _finished = false;
+  _setTimerHudState('Running', 'running');
 }
 
 export function stopTimer() {
@@ -49,6 +58,7 @@ export function stopTimer() {
   _elapsed = performance.now() - _startTs;
   _running = false;
   _finished = true;
+  _setTimerHudState('Finished', 'finished');
   return _elapsed;
 }
 
@@ -67,6 +77,7 @@ export function resetTimer() {
   _elapsed = 0;
   _running = false;
   _finished = false;
+  _setTimerHudState('Ready', 'ready');
 }
 
 // ── Formatting ──────────────────────────────────────────────────────
@@ -712,8 +723,7 @@ function _renderFinishDialog() {
   }
 
   // Update timer state indicator
-  const st = document.getElementById('runTimerState');
-  if (st) st.textContent = rank > 0 ? `FINISHED #${rank}` : 'FINISHED';
+  _setTimerHudState(rank > 0 ? `Finished #${rank}` : 'Finished', 'finished');
 }
 
 // ── Initialize: create DOM, bind events ─────────────────────────────
@@ -814,7 +824,7 @@ function _createFinishDialogDOM() {
       </div>
       <div class="finishDialogActions">
         <button type="button" class="finishDlgBtn glass-btn glass-btn--danger" id="finishDialogExit"><i class="ph ph-sign-out"></i> Exit</button>
-        <button type="button" class="finishDlgBtn glass-btn glass-btn--secondary" id="finishDialogAgain"><i class="ph-fill ph-play"></i> Play Again</button>
+        <button type="button" class="finishDlgBtn glass-btn glass-btn--secondary" id="finishDialogAgain"><i class="ph-fill ph-play"></i> Play again</button>
         <button type="button" class="finishDlgBtn glass-btn glass-btn--primary" id="finishDialogCopy"><i class="ph ph-copy"></i> Copy result</button>
       </div>
     </div>

@@ -9,6 +9,10 @@ import { CAT_MODEL_PRESETS } from './constants.js';
 const previews = []; // { renderer, scene, camera, model, mixer, animSpeed }
 let _animId = null;
 
+const PREVIEW_BASE_YAW = THREE.MathUtils.degToRad(35);
+const PREVIEW_SPIN_SPEED = 0.012;
+const PREVIEW_RETURN_STIFFNESS = 0.16;
+
 /** Pause a looping action for `pauseSeconds` between loops */
 function _applyLoopPause(action, ts, pauseSeconds) {
   if (!action) return;
@@ -99,6 +103,7 @@ function _processLoadedModel(preview, entry, gltf, preset) {
   model.position.x -= center.x;
   model.position.z -= center.z;
   model.position.y -= box.min.y + (preview.cfg.yOffset || 0);
+  model.rotation.y = PREVIEW_BASE_YAW;
 
   // Material cleanup
   model.traverse(child => {
@@ -150,8 +155,8 @@ export function initPreviews() {
 
     // Camera — same for all models (cats are normalized to 3 units tall, feet at y=0)
     const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
-    camera.position.set(0, 1.5, 10);
-    camera.lookAt(0, 1.2, 0);
+    camera.position.set(1.35, 2.55, 9.6);
+    camera.lookAt(0, 0.95, 0);
 
     // Lights
     scene.add(new THREE.AmbientLight(0xffffff, 0.6));
@@ -189,6 +194,10 @@ function _animate() {
   const charSelect = document.getElementById('charSelect');
   if (!charSelect || !charSelect.classList.contains('open')) return;
 
+  // Only animate rotation for the currently selected cat card.
+  const selectedCard = document.querySelector('.char-card.selected[data-model]');
+  const selectedKey = selectedCard ? selectedCard.getAttribute('data-model') : 'classic';
+
   const dt = 1 / 60;
 
   for (const p of previews) {
@@ -202,9 +211,16 @@ function _animate() {
       p.camera.updateProjectionMatrix();
     }
 
-    // Spin model slowly
-    if (p.model) {
-      p.model.rotation.y += 0.012;
+    // Spin only the selected model; non-selected models ease back to base yaw.
+    if (p.model && p.key === selectedKey) {
+      p.model.rotation.y += PREVIEW_SPIN_SPEED;
+    } else if (p.model) {
+      const delta = Math.atan2(
+        Math.sin(PREVIEW_BASE_YAW - p.model.rotation.y),
+        Math.cos(PREVIEW_BASE_YAW - p.model.rotation.y)
+      );
+      p.model.rotation.y += delta * PREVIEW_RETURN_STIFFNESS;
+      if (Math.abs(delta) < 0.0009) p.model.rotation.y = PREVIEW_BASE_YAW;
     }
 
     // Update mixer with model-specific animation speed

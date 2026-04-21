@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import '@fontsource-variable/manrope';
+import '@fontsource-variable/nunito-sans';
 import './styles/main.css';
 
 // ── Module imports ──────────────────────────────────────────────────
@@ -248,6 +248,13 @@ gameFp.init({
   roomRefs
 });
 
+// Apply persisted mute settings to all active audio sources.
+coins.setSfxMuted(gameFp.sfxMuted);
+music.setMuted(gameFp.musicMuted);
+if (roomRefs && typeof roomRefs.setMacbookMuted === 'function') {
+  roomRefs.setMacbookMuted(gameFp.musicMuted);
+}
+
 // Expose bridge functions for HTML onclick handlers
 
 // Character select screen
@@ -352,6 +359,7 @@ window._toggleFP = () => {
     window._openCharSelect(); // open character select
   }
 };
+window._pauseFP = () => gameFp.setPaused(true);
 window._resumeFP = () => gameFp.setPaused(false);
 window._resetFP = () => {
   leaderboard.closeFinishDialog();
@@ -380,12 +388,17 @@ window._exitFP = () => {
 };
 window._toggleMuteSfx = (checked) => {
   gameFp.setSfxMuted(checked);
+  coins.setSfxMuted(checked);
 };
 window._toggleMuteMusic = (checked) => {
   gameFp.setMusicMuted(checked);
-  // Also mute/unmute the music module
+  // Mute all music sources wired in this app.
   music.setMuted(checked);
+  if (roomRefs && typeof roomRefs.setMacbookMuted === 'function') {
+    roomRefs.setMacbookMuted(checked);
+  }
 };
+window._syncAudioUi = () => gameFp.syncAudioToggleUi();
 window._switchCamFP = () => gameFp.setCamMode();
 window._playAgain = () => {
   leaderboard.closeFinishDialog();
@@ -605,7 +618,7 @@ document.addEventListener('keyup', e => {
 let _lastFrameTs = 0;
 let _fpsFrames = 0;
 let _fpsLast = performance.now();
-let _lastCatX = 0, _lastCatZ = 0;
+let _lastCatX = null, _lastCatZ = null;
 
 function animate(ts) {
   requestAnimationFrame(animate);
@@ -669,35 +682,112 @@ function animate(ts) {
   if (catAnimation.catMixer) {
     const preset = catAppearance.getSelectedModelPreset();
     const catAnimSpeed = Math.max(0.12, Number(preset.animSpeed) || 1);
-    catAnimation.catMixer.update(dtSec * catAnimSpeed);
-    // Blend walk/idle based on movement speed in game mode
-    if (gameFp.fpMode && catAnimation.catWalkAction && catAnimation.catIdleAction) {
-      const vel = Math.hypot(gameFp.fpPos.x - (_lastCatX || gameFp.fpPos.x), gameFp.fpPos.z - (_lastCatZ || gameFp.fpPos.z));
-      const moveBlend = Math.min(1, vel * 8);
-      const sprintMult = Math.max(1, Number(preset.sprintAnimMult) || 1);
-      const isSprinting = gameFp.fpKeys.shift && vel > 0.01;
+    const isBababooey = catAppearance.catModelKey === 'bababooey';
+    const hasWalkClip = !!catAnimation.catWalkAction;
+    const hasIdleClip = !!catAnimation.catIdleAction;
 
-      if (catAppearance.catModelKey === 'bababooey') {
-        // Bababooey: single bouncy clip — slow idle, ramped for run
+    // Keep speed derived from actual travel distance, with blend smoothing and
+    // hysteresis so cat clips don't flicker between idle/walk around thresholds.
+    const prevX = Number.isFinite(_lastCatX) ? _lastCatX : gameFp.fpPos.x;
+    const prevZ = Number.isFinite(_lastCatZ) ? _lastCatZ : gameFp.fpPos.z;
+    const vel = gameFp.fpMode
+      ? Math.hypot(gameFp.fpPos.x - prevX, gameFp.fpPos.z - prevZ)
+      : 0;
+    const animDt = dtSec * catAnimSpeed;
+    const st = catAnimation.catMixer.userData || (catAnimation.catMixer.userData = {});
+    if (!Number.isFinite(st._moveBlend)) st._moveBlend = vel > 0.03 ? 1 : 0;
+    let targetMove = st._moveBlend;
+    if (vel > 0.04) targetMove = 1;
+    else if (vel < 0.02) targetMove = 0;
+    const moveEase = 1 - Math.exp(-animDt * 9.5);
+    st._moveBlend += (targetMove - st._moveBlend) * moveEase;
+    const moveBlend = Math.max(0, Math.min(1, st._moveBlend));
+
+    if (!Number.isFinite(st._idleProceduralBlend)) st._idleProceduralBlend = 0;
+    const idleTarget = Math.max(0, Math.min(1, 1 - moveBlend));
+    const idleEase = 1 - Math.exp(-animDt * 7.0);
+    st._idleProceduralBlend += (idleTarget - st._idleProceduralBlend) * idleEase;
+    const idleBlend = Math.max(0, Math.min(1, st._idleProceduralBlend));
+
+    const sprintMult = Math.max(1, Number(preset.sprintAnimMult) || 1);
+    const sprinting = gameFp.fpMode && gameFp.fpKeys.shift && vel > 0.1;
+    const sprintBoost = sprinting ? sprintMult : 1;
+
+    if (hasWalkClip) {
+      catAnimation.catWalkAction.paused = false;
+      if (isBababooey) {
+        // Bababooey has a single bouncy clip: run it subtly at idle, then ramp up.
         const idleTs = 0.18;
-        const runTs = (0.85 + vel * 40) * (isSprinting ? sprintMult : 1);
+        const runTs = (0.85 + vel * 40) * sprintBoost;
         catAnimation.catWalkAction.timeScale = idleTs + (runTs - idleTs) * moveBlend;
       } else {
-        // Normal walk/idle blending
-        catAnimation.catWalkAction.weight += (moveBlend - catAnimation.catWalkAction.weight) * Math.min(1, dtSec * 8);
-        catAnimation.catIdleAction.weight += ((1 - moveBlend) - catAnimation.catIdleAction.weight) * Math.min(1, dtSec * 8);
-        const animSpeed = isSprinting ? 1.0 + Math.min(vel * 30, 1.8) * sprintMult : 1.0;
-        catAnimation.catWalkAction.timeScale += (animSpeed - catAnimation.catWalkAction.timeScale) * Math.min(1, dtSec * 6);
+        const walkBaseTs = catAppearance.catModelKey === 'toon'
+          ? (0.9 + vel * 2.2)
+          : (0.8 + vel * 2.0);
+        const walkTargetTs = walkBaseTs * sprintBoost;
+        const walkTs = Number(catAnimation.catWalkAction.timeScale) || walkTargetTs;
+        catAnimation.catWalkAction.timeScale += (walkTargetTs - walkTs) * Math.min(1, dtSec * 6);
       }
+    }
+
+    if (hasWalkClip && hasIdleClip) {
+      const walkW = Math.min(1, vel / 0.25) * moveBlend;
+      catAnimation.catWalkAction.weight = walkW;
+      catAnimation.catIdleAction.weight = (1 - walkW) * moveBlend;
+      catAnimation.catIdleAction.paused = false;
+    } else if (hasWalkClip && !isBababooey) {
+      // If there's no dedicated idle clip, freeze the walk loop when stationary.
+      catAnimation.catWalkAction.weight = 1;
+      catAnimation.catWalkAction.paused = moveBlend < 0.03;
+    }
+
+    if (isBababooey) {
+      if (!Number.isFinite(st._bababooeyRunBlend)) st._bababooeyRunBlend = 0;
+      const runTarget = Math.min(1, vel / 0.25) * moveBlend;
+      const runEase = 1 - Math.exp(-dtSec * 5.0);
+      st._bababooeyRunBlend += (runTarget - st._bababooeyRunBlend) * runEase;
+      const runBlend = Math.max(0, Math.min(1, st._bababooeyRunBlend));
+      if (hasWalkClip) catAnimation.catWalkAction.weight *= (1 - runBlend);
+      if (hasIdleClip) catAnimation.catIdleAction.weight *= (1 - runBlend);
+      st._bababooeyRunBlendSmoothed = runBlend;
+    }
+
+    const loopPause = Math.max(0, Number(preset.idleLoopPause) || 0);
+    const loopAction = catAnimation.catIdleAction || catAnimation.catWalkAction;
+    if (loopPause > 0 && loopAction) {
+      catAnimation.applyLoopPause(loopAction, ts, loopPause, idleBlend > 0.35 && vel < 0.03);
+    }
+
+    // Bababooey keeps subtle bounce motion at idle; other cats pause clip
+    // playback and rely on procedural idle when not moving.
+    let mixerDt = animDt;
+    if (!isBababooey) mixerDt *= moveBlend;
+    catAnimation.catMixer.update(Math.max(0, mixerDt));
+
+    if (idleBlend < 0.2) catAnimation.refreshGameplayIdleBasePose();
+    if (idleBlend > 0.001) catAnimation.applyGameplayProceduralIdle(ts, idleBlend);
+
+    if (isBababooey && moveBlend > 0.001) {
+      const runBlend = Number(st._bababooeyRunBlendSmoothed) || 0;
+      if (runBlend > 0.001) catAnimation.applyBababooeyProceduralRun(ts, vel, runBlend);
+    }
+
+    if (gameFp.fpMode) {
+      const gpOff = Number.isFinite(preset.gameGroundPinOffset)
+        ? preset.gameGroundPinOffset
+        : preset.groundPinOffset;
+      catAnimation.applyGameplayJumpDeform({
+        dtSec,
+        vy: gameFp.fpVy,
+        holdFrames: gameFp.getJumpHoldFrames(),
+        modelKey: catAppearance.catModelKey,
+        groundPinOffset: gpOff
+      });
+    }
+
+    if (gameFp.fpMode) {
       _lastCatX = gameFp.fpPos.x;
       _lastCatZ = gameFp.fpPos.z;
-
-      // Apply idle loop pause (bababooey pauses 2.2s between bounces when standing still)
-      const loopPause = Math.max(0, Number(preset.idleLoopPause) || 0);
-      const idleAction = catAnimation.catIdleAction || catAnimation.catWalkAction;
-      if (loopPause > 0 && idleAction) {
-        catAnimation.applyLoopPause(idleAction, ts, loopPause, moveBlend < 0.1);
-      }
     }
   }
 

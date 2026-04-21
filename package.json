@@ -15,7 +15,7 @@
     "cf:d1:create": "npx wrangler d1 create diy-air-purifier-leaderboard"
   },
   "dependencies": {
-    "@fontsource-variable/manrope": "^5.2.8",
+    "@fontsource-variable/nunito-sans": "^5.2.7",
     "express": "^4.21.2",
     "helmet": "^8.1.0",
     "three": "^0.128.0"

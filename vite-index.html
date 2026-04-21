@@ -156,7 +156,7 @@
   </div>
 
   <!-- Game mode -->
-  <button id="playDockBtn" class="glass-btn glass-btn--primary" onclick="window._openCharSelect&&window._openCharSelect()"><i class="ph ph-game-controller"></i> Play Mode <kbd class="key-hint">G</kbd></button>
+  <button id="playDockBtn" class="glass-btn glass-btn--primary" onclick="window._openCharSelect&&window._openCharSelect()"><i class="ph ph-game-controller"></i> Play mode <kbd class="key-hint">G</kbd></button>
 
   <!-- Character Select (Smash Bros style) -->
   <div id="charSelect" role="dialog" aria-modal="true" aria-label="Character select">
@@ -179,14 +179,15 @@
         <div class="char-card" data-model="toon" role="button" tabindex="0" aria-label="Toon cat" onclick="window._selectCat&&window._selectCat('toon',this)">
           <canvas class="char-preview" id="previewToon"></canvas>
           <div class="char-name">Toon</div>
-          <div class="char-sub">Orange tabby</div>
+          <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
         </div>
         <div class="char-card" data-model="bababooey" role="button" tabindex="0" aria-label="Bababooey cat" onclick="window._selectCat&&window._selectCat('bababooey',this)">
           <canvas class="char-preview" id="previewBababooey"></canvas>
           <div class="char-name">Bababooey</div>
+          <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
         </div>
       </div>
-      <button class="char-start glass-btn glass-btn--primary" onclick="window._startGame&&window._startGame()">START RUN</button>
+      <button class="char-start glass-btn glass-btn--primary" onclick="window._startGame&&window._startGame()">Start run</button>
     </div>
   </div>
 
@@ -194,7 +195,13 @@
   <div id="fpHud" role="status" aria-live="polite" aria-atomic="false">
     <div id="coinHud" aria-label="Coins collected"><i class="ph-fill ph-coins" style="color:#ffd700"></i> <span id="coinCount">0/0</span></div>
     <div id="secretCoinHud" aria-label="Secret coins" style="display:none"><i class="ph-fill ph-coin" style="color:#4ab8ff"></i> <span id="secretCoinCount">0</span></div>
-    <div id="runTimerHud" aria-label="Run timer"><span id="runTimerText">0:00.0</span> <span id="runTimerState"></span></div>
+    <div id="runTimerHud" aria-label="Run timer">
+      <div class="run-timer-meta">
+        <span class="run-timer-label"><i class="ph ph-stopwatch"></i> Run timer</span>
+        <span id="runTimerState" class="run-timer-state">Ready</span>
+      </div>
+      <span id="runTimerText">00:00.000</span>
+    </div>
     <div id="fpShareRow" style="display:none"><button id="fpShareBtn" type="button"><i class="ph ph-copy"></i> Copy result</button></div>
   </div>
   <div id="fpCrosshair"></div>
@@ -214,7 +221,20 @@
       <div>Crosshair turns blue on hover</div>
     </div>
   </div>
-  <div id="fpChargeBar"><div id="fpChargeFill"></div></div>
+  <div id="fpQuickControls" role="group" aria-label="Quick controls">
+    <button type="button" class="fpQuickBtn" id="fpQuickHelpBtn" onclick="window._toggleHelp&&window._toggleHelp()"><kbd>H</kbd> Help</button>
+    <button type="button" class="fpQuickBtn" onclick="window._switchCamFP&&window._switchCamFP()"><kbd>V</kbd> Camera</button>
+    <button type="button" class="fpQuickBtn" onclick="window._pauseFP&&window._pauseFP()"><kbd>Esc</kbd> Pause</button>
+    <button type="button" class="fpQuickBtn" onclick="window._resetFP&&window._resetFP()"><kbd>R</kbd> Reset</button>
+  </div>
+  <div id="fpChargeBar" aria-label="Jump charge">
+    <div class="fp-charge-head">
+      <span class="fp-charge-label"><i class="ph ph-arrow-fat-up"></i> Jump charge</span>
+      <span id="fpChargeValue">Ready</span>
+    </div>
+    <div class="fp-charge-track"><div id="fpChargeFill"></div></div>
+    <div id="fpChargeHint"><kbd>Hold Space</kbd> then release for a higher jump</div>
+  </div>
 
   <!-- Pause overlay -->
   <div id="fpPauseOverlay" role="dialog" aria-modal="true" aria-label="Pause menu">
@@ -230,17 +250,19 @@
           </div>
           <div class="pause-toggles">
             <div class="pause-toggle-row">
-              <span><i class="ph-fill ph-speaker-high"></i> SFX</span>
-              <div class="toggle-sw on" id="fpPauseMuteSfx" onclick="this.classList.toggle('on');window._toggleMuteSfx&&window._toggleMuteSfx(!this.classList.contains('on'))"></div>
+              <span class="pause-toggle-label"><i class="ph-fill ph-speaker-high"></i> SFX</span>
+              <div class="toggle-sw on" id="fpPauseMuteSfx" role="switch" aria-checked="true" onclick="this.classList.toggle('on');window._toggleMuteSfx&&window._toggleMuteSfx(!this.classList.contains('on'))"></div>
+              <span class="pause-toggle-state" id="fpPauseMuteSfxState">On</span>
             </div>
             <div class="pause-toggle-row">
-              <span><i class="ph-fill ph-music-notes"></i> Music</span>
-              <div class="toggle-sw on" id="fpPauseMuteMusic" onclick="this.classList.toggle('on');window._toggleMuteMusic&&window._toggleMuteMusic(!this.classList.contains('on'))"></div>
+              <span class="pause-toggle-label"><i class="ph-fill ph-music-notes"></i> Music</span>
+              <div class="toggle-sw on" id="fpPauseMuteMusic" role="switch" aria-checked="true" onclick="this.classList.toggle('on');window._toggleMuteMusic&&window._toggleMuteMusic(!this.classList.contains('on'))"></div>
+              <span class="pause-toggle-state" id="fpPauseMuteMusicState">On</span>
             </div>
           </div>
           <div class="pause-actions">
-            <button class="pause-pill" onclick="window._resetFP&&window._resetFP()"><i class="ph ph-arrow-counter-clockwise"></i> Reset Run</button>
-            <button class="pause-pill" onclick="window._switchCamFP&&window._switchCamFP()"><i class="ph ph-camera-rotate"></i> Switch Camera</button>
+            <button class="pause-pill" onclick="window._resetFP&&window._resetFP()"><i class="ph ph-arrow-counter-clockwise"></i> Reset run</button>
+            <button class="pause-pill" onclick="window._switchCamFP&&window._switchCamFP()"><i class="ph ph-camera-rotate"></i> Switch camera</button>
           </div>
           <div class="pause-controls">
             <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>

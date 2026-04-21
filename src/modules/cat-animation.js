@@ -343,3 +343,195 @@ export function applyLoopPause(action, ts, pauseSeconds, allowPause) {
     action.paused = false;
   }
 }
+
+export function refreshGameplayIdleBasePose() {
+  const all = [...idleTailBones, ...idleSpineBones, ...idleHeadBones];
+  for (const b of all) {
+    if (!b || !b.isBone) continue;
+    if (!b.userData) b.userData = {};
+    b.userData._catIdleBaseQuat = b.quaternion.clone();
+  }
+}
+
+export function applyGameplayProceduralIdle(ts, intensity) {
+  if (intensity <= 0) return;
+  const t = ts * 0.001;
+
+  for (let i = 0; i < idleTailBones.length; i++) {
+    const b = idleTailBones[i];
+    if (!b || !b.isBone) continue;
+    const base = (b.userData && b.userData._catIdleBaseQuat && b.userData._catIdleBaseQuat.isQuaternion)
+      ? b.userData._catIdleBaseQuat
+      : b.quaternion;
+    const wave = 0.75 + (i * 0.18);
+    const yaw = Math.sin((t * 1.7 * wave) + (i * 0.55)) * 0.065 * intensity;
+    const pitch = Math.sin((t * 1.2 * wave) + (i * 0.4)) * 0.025 * intensity;
+    const roll = Math.sin((t * 1.05 * wave) + (i * 0.9)) * 0.012 * intensity;
+    tmpEuler.set(pitch, yaw, roll);
+    tmpQuat.setFromEuler(tmpEuler);
+    tmpQuatB.copy(base).multiply(tmpQuat);
+    b.quaternion.slerp(tmpQuatB, Math.min(1, 0.5 * intensity));
+  }
+
+  for (let i = 0; i < idleSpineBones.length; i++) {
+    const b = idleSpineBones[i];
+    if (!b || !b.isBone) continue;
+    const base = (b.userData && b.userData._catIdleBaseQuat && b.userData._catIdleBaseQuat.isQuaternion)
+      ? b.userData._catIdleBaseQuat
+      : b.quaternion;
+    const swayScale = 0.65 - (i * 0.12);
+    const yaw = Math.sin((t * 0.82) + (i * 0.45)) * 0.012 * intensity * swayScale;
+    const pitch = Math.sin((t * 0.62) + (i * 0.35)) * 0.008 * intensity * swayScale;
+    tmpEuler.set(pitch, yaw, 0);
+    tmpQuat.setFromEuler(tmpEuler);
+    tmpQuatB.copy(base).multiply(tmpQuat);
+    b.quaternion.slerp(tmpQuatB, Math.min(1, 0.32 * intensity));
+  }
+
+  for (let i = 0; i < idleHeadBones.length; i++) {
+    const b = idleHeadBones[i];
+    if (!b || !b.isBone) continue;
+    const base = (b.userData && b.userData._catIdleBaseQuat && b.userData._catIdleBaseQuat.isQuaternion)
+      ? b.userData._catIdleBaseQuat
+      : b.quaternion;
+    const headScale = i === 0 ? 1 : 0.58;
+    const yaw = (Math.sin((t * 0.8) + 0.7) * 0.12 + Math.sin((t * 1.55) + 0.2) * 0.036) * intensity * headScale;
+    const pitch = (Math.sin((t * 0.62) + 1.1) * 0.072 + Math.sin((t * 1.35) + 0.9) * 0.021) * intensity * headScale;
+    tmpEuler.set(pitch, yaw, 0);
+    tmpQuat.setFromEuler(tmpEuler);
+    tmpQuatB.copy(base).multiply(tmpQuat);
+    b.quaternion.slerp(tmpQuatB, Math.min(1, 0.78 * intensity));
+  }
+}
+
+export function applyBababooeyProceduralRun(ts, moveSpeed, moveBlend) {
+  if (!babaBones.left && !babaBones.right && !babaBones.down && !babaBones.up && !babaBones.mid) return;
+  const t = ts * 0.001;
+  const sp = Math.max(0, moveSpeed);
+  const spN = Math.min(1, sp / 0.45);
+  const blend = Math.max(0, Math.min(1, moveBlend)) * spN;
+  if (blend <= 0.001) return;
+
+  const cadence = 6.0 + spN * 5.5;
+  const phase = t * cadence;
+  const pawAmp = (0.55 + spN * 0.55) * 0.5;
+  const liftL = Math.sin(phase);
+  const liftR = Math.sin(phase + Math.PI);
+  const lL = liftL * pawAmp * blend;
+  const lR = liftR * pawAmp * blend;
+
+  const apply = (bone, baseQ, euler, strength) => {
+    if (!bone || !baseQ) return;
+    tmpQuat.setFromEuler(euler);
+    tmpQuatB.copy(baseQ).multiply(tmpQuat);
+    const s = Math.min(1, (strength !== undefined ? strength : 0.65) * blend);
+    bone.quaternion.slerp(tmpQuatB, s);
+  };
+
+  tmpEuler.set(-Math.abs(lL) * 0.4, 0, lL * 0.85);
+  apply(babaBones.left, babaBase.left, tmpEuler, 0.7);
+
+  tmpEuler.set(-Math.abs(lR) * 0.4, 0, -lR * 0.85);
+  apply(babaBones.right, babaBase.right, tmpEuler, 0.7);
+
+  if (babaBones.down) {
+    tmpEuler.set(Math.sin(phase * 0.5) * 0.09 * blend, Math.sin((phase * 0.5) + 1.2) * 0.175 * blend, 0);
+    apply(babaBones.down, babaBase.down, tmpEuler, 0.6);
+  }
+  if (babaBones.up) {
+    const lean = (0.08 + spN * 0.16) * 0.5;
+    tmpEuler.set(-lean * blend, Math.sin(phase * 0.5) * 0.03 * blend, 0);
+    apply(babaBones.up, babaBase.up, tmpEuler, 0.6);
+  }
+  if (babaBones.mid) {
+    tmpEuler.set(Math.sin(phase) * 0.02 * blend, Math.sin(phase * 0.5) * 0.035 * blend, Math.sin(phase) * 0.025 * blend);
+    apply(babaBones.mid, babaBase.mid, tmpEuler, 0.5);
+  }
+}
+
+function _applyToonJumpLegs(squash) {
+  const L = toonLegBones;
+  const B = toonLegBase;
+  if (!L.upperBL && !L.upperBR && !L.upperFL && !L.upperFR) return;
+
+  const s = Math.max(-0.45, Math.min(1, squash));
+  const legScale = s >= 0 ? (1 - s * 0.55) : (1 + (-s) * 0.33);
+  const shinScale = 1 - (1 - legScale) * 0.8;
+
+  const setScale = (bone, v) => { if (bone) bone.scale.y = v; };
+  setScale(L.thighBL, legScale); setScale(L.thighBR, legScale);
+  setScale(L.upperBL, legScale); setScale(L.upperBR, legScale);
+  setScale(L.upperFL, legScale); setScale(L.upperFR, legScale);
+  setScale(L.lowerBL, shinScale); setScale(L.lowerBR, shinScale);
+  setScale(L.lowerFL, shinScale); setScale(L.lowerFR, shinScale);
+
+  const boneKeys = ['thighBL', 'thighBR', 'upperBL', 'upperBR', 'upperFL', 'upperFR',
+    'lowerBL', 'lowerBR', 'lowerFL', 'lowerFR'];
+  for (const k of boneKeys) {
+    const bone = L[k];
+    const baseQ = B[k];
+    if (bone && baseQ) bone.quaternion.copy(baseQ);
+  }
+
+  const splay = s > 0 ? Math.min(1, s) : 0;
+  if (splay <= 0.001) return;
+  const ang = splay * 0.95;
+  const fwdTuck = splay * 0.55;
+  const applyOffset = (bone, baseQ, ex, ey, ez) => {
+    if (!bone || !baseQ) return;
+    tmpEuler.set(ex, ey, ez);
+    tmpQuat.setFromEuler(tmpEuler);
+    tmpQuatB.copy(baseQ).multiply(tmpQuat);
+    bone.quaternion.copy(tmpQuatB);
+  };
+
+  applyOffset(L.thighBL, B.thighBL, +fwdTuck, 0, +ang);
+  applyOffset(L.thighBR, B.thighBR, +fwdTuck, 0, -ang);
+  applyOffset(L.upperBL, B.upperBL, +fwdTuck, 0, +ang);
+  applyOffset(L.upperBR, B.upperBR, +fwdTuck, 0, -ang);
+  applyOffset(L.upperFL, B.upperFL, -fwdTuck, 0, +ang);
+  applyOffset(L.upperFR, B.upperFR, -fwdTuck, 0, -ang);
+  const shinBend = splay * 0.7;
+  applyOffset(L.lowerBL, B.lowerBL, -shinBend * 0.6, 0, -ang * 0.4);
+  applyOffset(L.lowerBR, B.lowerBR, -shinBend * 0.6, 0, +ang * 0.4);
+  applyOffset(L.lowerFL, B.lowerFL, +shinBend * 0.6, 0, -ang * 0.4);
+  applyOffset(L.lowerFR, B.lowerFR, +shinBend * 0.6, 0, +ang * 0.4);
+}
+
+export function applyGameplayJumpDeform({ dtSec, vy, holdFrames, modelKey, groundPinOffset }) {
+  if (!catModel || !catMixer) return;
+  const st = catMixer.userData || (catMixer.userData = {});
+  if (!Number.isFinite(st._squashBlend)) st._squashBlend = 0;
+
+  const vY = Number(vy) || 0;
+  const held = Math.max(0, Number(holdFrames) || 0);
+  const grounded = Math.abs(vY) < 0.01;
+  const chargeN = Math.min(1, held / 60);
+  const isBaba = modelKey === 'bababooey';
+  const isToon = modelKey === 'toon';
+
+  let target = 0;
+  if (grounded && held > 0) {
+    target = 0.55 * chargeN;
+  } else if (vY > 0.05) {
+    target = Math.max(-0.45, -vY * 3.2);
+  } else if (vY < -0.03 && !isToon) {
+    const k = isBaba ? 11 : 7;
+    target = Math.min(1, (-vY) * k);
+  }
+
+  const ease = 1 - Math.exp(-Math.max(0, dtSec) * 14);
+  st._squashBlend += (target - st._squashBlend) * ease;
+  const s = st._squashBlend;
+
+  const syK = isBaba ? 0.55 : (isToon ? 0.12 : 0.35);
+  const sxzK = isBaba ? 0.40 : (isToon ? 0.06 : 0.22);
+  const sy = 1 - s * syK;
+  const sxz = 1 + s * sxzK;
+  catModel.scale.set(baseScale.x * sxz, baseScale.y * sy, baseScale.z * sxz);
+
+  if (isToon) {
+    _applyToonJumpLegs(s);
+    _pinToGround(catModel, baseLocalPos, groundPinOffset);
+  }
+}
