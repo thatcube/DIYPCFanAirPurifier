@@ -289,8 +289,14 @@ window._exitFP = () => {
   gameFp.fpPaused = false;
   if (gameFp.fpMode) gameFp.toggleFirstPerson();
 };
-window._toggleMuteSfx = (checked) => gameFp.setSfxMuted(checked);
-window._toggleMuteMusic = (checked) => gameFp.setMusicMuted(checked);
+window._toggleMuteSfx = (checked) => {
+  gameFp.setSfxMuted(checked);
+};
+window._toggleMuteMusic = (checked) => {
+  gameFp.setMusicMuted(checked);
+  // Also mute/unmute the music module
+  music.setMuted(checked);
+};
 window._switchCamFP = () => gameFp.setCamMode();
 window._playAgain = () => {
   const fin = document.getElementById('fpFinishOverlay');
