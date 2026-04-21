@@ -28,11 +28,15 @@ function _onMouseMove(e) {
   shine.style.setProperty('--shine-y', y + '%');
 
   // Border glow — shift the box-shadow glow toward the cursor
-  const nx = (e.clientX - rect.left) / rect.width - 0.5; // -0.5 to 0.5
+  // Include the inset border ring so it doesn't get wiped by inline style
+  const nx = (e.clientX - rect.left) / rect.width - 0.5;
   const ny = (e.clientY - rect.top) / rect.height - 0.5;
   const glowX = nx * 16;
   const glowY = ny * 12;
-  el.style.boxShadow = `${glowX}px ${glowY}px 28px rgba(160,200,255,0.18), inset 0 1px 0 rgba(255,255,255,0.22)`;
+  const isDanger = el.classList.contains('danger');
+  const ringColor = isDanger ? 'rgba(255,120,120,0.45)' : 'rgba(160,210,255,0.45)';
+  const glowColor = isDanger ? 'rgba(255,100,100,0.18)' : 'rgba(160,200,255,0.18)';
+  el.style.boxShadow = `inset 0 0 0 1px ${ringColor}, ${glowX}px ${glowY}px 28px ${glowColor}`;
 }
 
 function _onMouseLeave(e) {
