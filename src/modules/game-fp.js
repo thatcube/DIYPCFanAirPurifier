@@ -486,24 +486,26 @@ function _getBoxes() {
   if (_roomRefs && _roomRefs.drawers) {
     for (const drw of _roomRefs.drawers) {
       if (!drw || !drw._drawerW) continue;
-      // After X-mirror: world X = -drw.position.x, Z = drw.position.z + slide offset
-      const wx = -drw.position.x;
+      // Drawers are _isRoom so they went through the mirror pass already.
+      // position.x is already world X (negated by mirror). position.z is world Z.
+      const wx = drw.position.x;
       const wy = drw.position.y;
-      const wz = drw.position.z; // already includes slide via group.position.z
+      const wz = drw.position.z;
       const hw = drw._drawerW / 2;
       const hh = drw._drawerH / 2;
       const trayD = drw._drawerTrayD || 10;
-      // Front face (thin wall)
+      // The drawer front face — thin wall at the front of the drawer
+      // After mirror, the drawer's local -Z (front) maps to world +Z
       result.push({
         xMin: wx - hw, xMax: wx + hw,
-        zMin: wz - 0.8, zMax: wz + 0.4,
+        zMin: wz - 0.5, zMax: wz + 0.5,
         yTop: wy + hh, yBottom: wy - hh
       });
-      // If drawer is closed, add the full body as solid
+      // If drawer is closed, the full tray body is solid too
       if (!drw._drawerOpen) {
         result.push({
           xMin: wx - hw, xMax: wx + hw,
-          zMin: wz, zMax: wz + trayD + 1,
+          zMin: wz - 1, zMax: wz + trayD + 1,
           yTop: wy + hh, yBottom: wy - hh
         });
       }
