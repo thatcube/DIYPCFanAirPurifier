@@ -248,8 +248,8 @@ export function applyTimeOfDay(minuteOfDay, refs) {
   windowSun.target.position.set(mix(-22, 14, dayTravel), beamTgtY, beamTgtZ);
   windowSun.target.updateMatrixWorld();
 
-  key.position.set(refs.mirroredWindowX + 14, refs.winCenterY + 3, refs.winCenterZ);
-  key.target.position.set(0, refs.winCenterY + 1, refs.winCenterZ);
+  key.position.set(refs.mirroredWindowX + 14, refs.winCenterY + 22, refs.winCenterZ);
+  key.target.position.set(0, refs.winCenterY - 12, refs.winCenterZ);
   key.target.updateMatrixWorld();
   key.updateMatrixWorld();
   key.shadow.camera.updateProjectionMatrix();
