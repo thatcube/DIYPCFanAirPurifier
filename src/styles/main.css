@@ -439,7 +439,7 @@ input[type=range]::-moz-range-thumb {
   -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 .pause-layout {
-  display: grid; grid-template-columns: 1fr 1fr; min-height: 0;
+  display: grid; grid-template-columns: 1.4fr 1fr; min-height: 0;
 }
 @media (max-width: 600px) {
   .pause-layout { grid-template-columns: 1fr; }
