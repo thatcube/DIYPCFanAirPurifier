@@ -574,7 +574,7 @@ body.play-mode #fpCrosshair { display: block; }
   border-color: rgba(255,255,255,0.25);
   box-shadow: 0 12px 32px rgba(0,0,0,0.3);
 }
-.char-card:active { transform: scale(0.96); }
+.char-card:active:not(:has(.color-dot:active)) { transform: scale(0.96); }
 .char-card.selected {
   border-color: var(--accent);
   background: rgba(145,222,255,0.12);
@@ -600,7 +600,8 @@ body.play-mode #fpCrosshair { display: block; }
 }
 .char-colors {
   display: flex; gap: 6px; justify-content: center;
-  margin-top: 8px;
+  margin-top: 8px; min-height: 28px;
+  visibility: visible;
 }
 .color-dot {
   width: 24px; height: 24px; border-radius: var(--r-circle);
@@ -614,7 +615,6 @@ body.play-mode #fpCrosshair { display: block; }
 .color-dot.on {
   border-color: var(--accent);
   box-shadow: 0 0 8px rgba(145,222,255,0.4), 0 2px 6px rgba(0,0,0,0.3);
-  transform: scale(1.1);
 }
 .char-start {
   background: var(--accent-gradient);
