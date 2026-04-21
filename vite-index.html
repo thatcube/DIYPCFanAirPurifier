@@ -9,16 +9,17 @@
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
 </head>
 <body>
-  <div id="loading">Loading...</div>
+  <div id="loading" role="status" aria-live="polite">Loading...</div>
+  <main>
   <canvas id="c"></canvas>
   <div id="fps"></div>
 
   <!-- Control Panel -->
-  <button class="panel-fab" id="panelFab" onclick="document.getElementById('panelL').style.display='flex';this.style.display='none'"><i class="ph ph-sliders-horizontal"></i></button>
-  <div class="panel panel-l" id="panelL">
+  <button class="panel-fab" id="panelFab" aria-label="Open control panel" onclick="document.getElementById('panelL').style.display='flex';this.style.display='none'"><i class="ph ph-sliders-horizontal" aria-hidden="true"></i></button>
+  <aside class="panel panel-l" id="panelL" aria-label="Purifier controls">
     <div class="panel-header">
       <h3>Control Center</h3>
-      <button class="panel-close" onclick="this.closest('.panel').style.display='none';document.getElementById('panelFab').style.display='flex'"><i class="ph ph-x"></i></button>
+      <button class="panel-close" aria-label="Close control panel" onclick="this.closest('.panel').style.display='none';document.getElementById('panelFab').style.display='flex'"><i class="ph ph-x" aria-hidden="true"></i></button>
     </div>
     <div class="panel-scroll">
 
@@ -79,10 +80,10 @@
           </div>
         </div>
         <div class="ctrl-row" id="footDiameterRow"><label><i class="ph ph-circle-dashed"></i> Diameter <span id="footDiaLabel">1.5″</span></label>
-          <input type="range" class="slider" min="0" max="2" step="0.1" value="1.5" oninput="window._setFootDia&&window._setFootDia(this.value);document.getElementById('footDiaLabel').textContent=parseFloat(this.value).toFixed(1)+'″'" />
+          <input type="range" class="slider" min="0" max="2" step="0.1" value="1.5" aria-label="Foot diameter" oninput="window._setFootDia&&window._setFootDia(this.value);document.getElementById('footDiaLabel').textContent=parseFloat(this.value).toFixed(1)+'\u2033'" />
         </div>
         <div class="ctrl-row" id="footHeightRow"><label><i class="ph ph-arrows-vertical"></i> Height <span id="footHtLabel">3.5″</span></label>
-          <input type="range" class="slider" min="0" max="4" step="0.25" value="3.5" oninput="window._setFootHt&&window._setFootHt(this.value);document.getElementById('footHtLabel').textContent=parseFloat(this.value).toFixed(2)+'″'" />
+          <input type="range" class="slider" min="0" max="4" step="0.25" value="3.5" aria-label="Foot height" oninput="window._setFootHt&&window._setFootHt(this.value);document.getElementById('footHtLabel').textContent=parseFloat(this.value).toFixed(2)+'\u2033'" />
         </div>
       </div>
 
@@ -98,7 +99,7 @@
         </div>
         <div class="slider-row">
           <label>Turntable</label>
-          <input type="range" min="0" max="360" value="90" id="turntableSlider" oninput="window._setTurntable&&window._setTurntable(this.value);document.getElementById('turntableLabel').textContent=this.value+'°'">
+          <input type="range" min="0" max="360" value="90" id="turntableSlider" aria-label="Turntable angle" oninput="window._setTurntable&&window._setTurntable(this.value);document.getElementById('turntableLabel').textContent=this.value+'°'">
           <span id="turntableLabel">90°</span>
         </div>
       </div>
@@ -111,7 +112,7 @@
         </div>
         <div class="slider-row">
           <label>Speed</label>
-          <input type="range" min="0" max="1800" value="900" id="fanSpeedSlider" oninput="window._setFanSpeed&&window._setFanSpeed(this.value);document.getElementById('fanSpeedVal').textContent=this.value+'rpm'">
+          <input type="range" min="0" max="1800" value="900" id="fanSpeedSlider" aria-label="Fan speed" oninput="window._setFanSpeed&&window._setFanSpeed(this.value);document.getElementById('fanSpeedVal').textContent=this.value+'rpm'">
           <span id="fanSpeedVal">900rpm</span>
         </div>
         <div class="ctrl-row"><label><i class="ph ph-paint-bucket"></i> Fan color</label>
@@ -130,7 +131,7 @@
         <h4><i class="ph ph-sun"></i> Scene</h4>
         <div class="slider-row">
           <label>Time</label>
-          <input type="range" min="0" max="1439" value="870" id="todSlider" oninput="window._setTOD&&window._setTOD(this.value)">
+          <input type="range" min="0" max="1439" value="870" id="todSlider" aria-label="Time of day" oninput="window._setTOD&&window._setTOD(this.value)">
           <span id="todLabel">2:30 PM</span>
         </div>
         <div class="ctrl-row"><label><i class="ph ph-eye"></i> Isolate purifier</label>
@@ -145,9 +146,7 @@
       </div>
 
     </div>
-  </div>
-
-  <!-- Part tooltip (hover over purifier parts) -->
+  </aside>
   <div class="part-tooltip" id="partTooltip">
     <div class="tip-name" id="tipName"></div>
     <div class="tip-dims" id="tipDims"></div>
@@ -157,26 +156,26 @@
   <button id="playDockBtn" onclick="window._openCharSelect&&window._openCharSelect()"><i class="ph-fill ph-play"></i> Play Mode <kbd class="key-hint">G</kbd></button>
 
   <!-- Character Select (Smash Bros style) -->
-  <div id="charSelect">
+  <div id="charSelect" role="dialog" aria-modal="true" aria-label="Character select">
     <div class="char-select-inner">
       <h2>Choose Your Cat</h2>
       <div class="char-grid">
-        <div class="char-card selected" data-model="classic" onclick="window._selectCat&&window._selectCat('classic',this)">
+        <div class="char-card selected" data-model="classic" role="button" tabindex="0" aria-label="Classic cat" onclick="window._selectCat&&window._selectCat('classic',this)">
           <canvas class="char-preview" id="previewClassic"></canvas>
           <div class="char-name">Classic</div>
           <div class="char-colors" id="classicColors">
-            <button class="color-dot on" data-color="charcoal" style="background:#0a0a12" onclick="event.stopPropagation();window._selectColor&&window._selectColor('charcoal',this)"></button>
-            <button class="color-dot" data-color="cream" style="background:#B08030" onclick="event.stopPropagation();window._selectColor&&window._selectColor('cream',this)"></button>
-            <button class="color-dot" data-color="midnight" style="background:#040818" onclick="event.stopPropagation();window._selectColor&&window._selectColor('midnight',this)"></button>
-            <button class="color-dot" data-color="snow" style="background:#d8d8d8" onclick="event.stopPropagation();window._selectColor&&window._selectColor('snow',this)"></button>
+            <button class="color-dot on" data-color="charcoal" style="background:#0a0a12" aria-label="Charcoal" onclick="event.stopPropagation();window._selectColor&&window._selectColor('charcoal',this)"></button>
+            <button class="color-dot" data-color="cream" style="background:#B08030" aria-label="Cream" onclick="event.stopPropagation();window._selectColor&&window._selectColor('cream',this)"></button>
+            <button class="color-dot" data-color="midnight" style="background:#040818" aria-label="Midnight" onclick="event.stopPropagation();window._selectColor&&window._selectColor('midnight',this)"></button>
+            <button class="color-dot" data-color="snow" style="background:#d8d8d8" aria-label="Snow" onclick="event.stopPropagation();window._selectColor&&window._selectColor('snow',this)"></button>
           </div>
         </div>
-        <div class="char-card" data-model="toon" onclick="window._selectCat&&window._selectCat('toon',this)">
+        <div class="char-card" data-model="toon" role="button" tabindex="0" aria-label="Toon cat" onclick="window._selectCat&&window._selectCat('toon',this)">
           <canvas class="char-preview" id="previewToon"></canvas>
           <div class="char-name">Toon</div>
           <div class="char-sub">Orange tabby</div>
         </div>
-        <div class="char-card" data-model="bababooey" onclick="window._selectCat&&window._selectCat('bababooey',this)">
+        <div class="char-card" data-model="bababooey" role="button" tabindex="0" aria-label="Bababooey cat" onclick="window._selectCat&&window._selectCat('bababooey',this)">
           <canvas class="char-preview" id="previewBababooey"></canvas>
           <div class="char-name">Bababooey</div>
         </div>
@@ -186,16 +185,16 @@
   </div>
 
   <!-- FP HUD -->
-  <div id="fpHud">
-    <div id="coinHud"><i class="ph-fill ph-coins" style="color:#ffd700"></i> <span id="coinCount">0/0</span></div>
-    <div id="secretCoinHud" style="display:none"><i class="ph-fill ph-coin" style="color:#4ab8ff"></i> <span id="secretCoinCount">0</span></div>
-    <div id="runTimerHud"><span id="runTimerText">0:00.0</span> <span id="runTimerState"></span></div>
+  <div id="fpHud" role="status" aria-live="polite" aria-atomic="false">
+    <div id="coinHud" aria-label="Coins collected"><i class="ph-fill ph-coins" style="color:#ffd700"></i> <span id="coinCount">0/0</span></div>
+    <div id="secretCoinHud" aria-label="Secret coins" style="display:none"><i class="ph-fill ph-coin" style="color:#4ab8ff"></i> <span id="secretCoinCount">0</span></div>
+    <div id="runTimerHud" aria-label="Run timer"><span id="runTimerText">0:00.0</span> <span id="runTimerState"></span></div>
     <div id="fpShareRow" style="display:none"><button id="fpShareBtn" type="button"><i class="ph ph-copy"></i> Copy result</button></div>
   </div>
   <div id="fpCrosshair"></div>
   <div id="fpControlsHint">Press <kbd>H</kbd> for controls</div>
-  <div id="fpControlsPanel" style="display:none">
-    <div class="fp-panel-header"><span>Controls</span><button onclick="window._toggleHelp&&window._toggleHelp()" class="fp-panel-close">&times;</button></div>
+  <div id="fpControlsPanel" role="dialog" aria-label="Controls" style="display:none">
+    <div class="fp-panel-header"><span>Controls</span><button onclick="window._toggleHelp&&window._toggleHelp()" class="fp-panel-close" aria-label="Close controls panel">&times;</button></div>
     <div class="fp-panel-grid">
       <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
       <div><kbd>Space</kbd> Jump (hold to charge)</div>
@@ -212,7 +211,7 @@
   <div id="fpChargeBar"><div id="fpChargeFill"></div></div>
 
   <!-- Pause overlay -->
-  <div id="fpPauseOverlay">
+  <div id="fpPauseOverlay" role="dialog" aria-modal="true" aria-label="Pause menu">
     <div class="pause-card">
       <div class="pause-layout">
         <!-- Left: controls -->
@@ -262,8 +261,9 @@
       <div id="mobileJoyKnob"></div>
     </div>
   </div>
-  <button id="mobileJumpBtn" ontouchstart="window._mobileJump&&window._mobileJump(true)" ontouchend="window._mobileJump&&window._mobileJump(false)"><i class="ph-fill ph-arrow-fat-up"></i></button>
-  <button id="mobileExitBtn" onclick="window._exitFP&&window._exitFP()"><i class="ph ph-x"></i></button>
+  <button id="mobileJumpBtn" aria-label="Jump" ontouchstart="window._mobileJump&&window._mobileJump(true)" ontouchend="window._mobileJump&&window._mobileJump(false)"><i class="ph-fill ph-arrow-fat-up" aria-hidden="true"></i></button>
+  <button id="mobileExitBtn" aria-label="Exit game" onclick="window._exitFP&&window._exitFP()"><i class="ph ph-x" aria-hidden="true"></i></button>
+  </main>
 
   <script type="module" src="/src/main.js"></script>
 </body>
