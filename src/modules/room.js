@@ -1450,7 +1450,14 @@ export function createRoom(scene) {
     const duvetH = 1.5;
     const bedTopY = mattY2 + mattH / 2 + duvetH;
     const mattW = 58;
+    // Suppress GLTFLoader UV set warnings (macbook.glb uses custom UV sets unsupported by r128)
+    const _origWarn = console.warn;
+    console.warn = (...args) => {
+      if (typeof args[0] === 'string' && args[0].includes('Custom UV set')) return;
+      _origWarn.apply(console, args);
+    };
     mbLoader.load('assets/macbook.glb', (gltf) => {
+      console.warn = _origWarn; // restore
       const root = gltf.scene;
       // Scale to ~14" wide
       const bb = new THREE.Box3().setFromObject(root);

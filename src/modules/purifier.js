@@ -1835,7 +1835,7 @@ export function createPurifier(scene) {
   // Tag each rotor's children with a reference to that rotor for per-fan click
   for(const rotor of allRotors){
     rotor.userData.spinning=true;
-    rotor.userData.spinSpeed=0;
+    rotor.userData.spinSpeed=0.125; // start spinning immediately (50% of SPIN_MAX)
     rotor.traverse(o=>{o._rotor=rotor;});
   }
   // Also tag frame/brace meshes — find the nearest rotor in the same group
