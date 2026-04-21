@@ -140,6 +140,9 @@
         <div class="ctrl-row"><label><i class="ph ph-ruler"></i> Dimensions</label>
           <div class="toggle-sw" id="togDims" onclick="window._toggleDims&&window._toggleDims()"></div>
         </div>
+        <div class="ctrl-row"><label><i class="ph ph-scan"></i> X-ray mode</label>
+          <div class="toggle-sw" id="togXray" onclick="window._toggleXray&&window._toggleXray()"></div>
+        </div>
         <div class="ctrl-row"><label><i class="ph ph-chart-bar"></i> Show FPS</label>
           <div class="toggle-sw on" id="togFps" onclick="window._toggleFps&&window._toggleFps()"></div>
         </div>
@@ -153,7 +156,7 @@
   </div>
 
   <!-- Game mode -->
-  <button id="playDockBtn" class="glass-btn glass-btn--primary" onclick="window._openCharSelect&&window._openCharSelect()"><i class="ph-fill ph-play"></i> Play Mode <kbd class="key-hint">G</kbd></button>
+  <button id="playDockBtn" class="glass-btn glass-btn--primary" onclick="window._openCharSelect&&window._openCharSelect()"><i class="ph ph-game-controller"></i> Play Mode <kbd class="key-hint">G</kbd></button>
 
   <!-- Character Select (Smash Bros style) -->
   <div id="charSelect" role="dialog" aria-modal="true" aria-label="Character select">

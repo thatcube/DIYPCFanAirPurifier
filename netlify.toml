@@ -1,6 +1,16 @@
 [build]
-  command = "npm run vite:build && mv dist/vite-index.html dist/index.html"
+  command = "npm run vite:build"
   publish = "dist"
+
+[[redirects]]
+  from = "/"
+  to = "/vite-index.html"
+  status = 200
+
+[[redirects]]
+  from = "/index.html"
+  to = "/vite-index.html"
+  status = 301
 
 [[redirects]]
   from = "/leaderboard"
@@ -14,12 +24,12 @@
 
 [[redirects]]
   from = "/play"
-  to = "/index.html"
+  to = "/vite-index.html"
   status = 200
 
 [[redirects]]
   from = "/play/"
-  to = "/index.html"
+  to = "/vite-index.html"
   status = 200
 
 [[redirects]]

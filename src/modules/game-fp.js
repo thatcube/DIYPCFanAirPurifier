@@ -361,13 +361,17 @@ function _buildStaticBoxes() {
     yTop: pillowY + pillowH + 1.5, yBottom: fy + BED_CLEARANCE, room: true
   });
 
-  // Door extrusion — solid wall block behind the door recess
-  // extRight=51, extLeft=11, recessZ=19
-  _staticBoxes.push({
-    xMin: -51, xMax: -11,
-    zMin: 18.75, zMax: 49,
-    yTop: fy + WALL_HEIGHT, room: true
-  });
+  // Corner-door recess structure (door by the nightstand).
+  // Keep only the actual wall pieces static; the swinging door panel itself
+  // is added as dynamic collision in _getBoxes().
+  _staticBoxes.push(
+    // Left return wall into the recess
+    { xMin: -11.25, xMax: -10.75, zMin: 18.75, zMax: 49, yTop: fy + WALL_HEIGHT, room: true },
+    // Front face left of the doorway opening
+    { xMin: -15, xMax: -11, zMin: 18.75, zMax: 19.25, yTop: fy + WALL_HEIGHT, room: true },
+    // Front face right of the doorway opening
+    { xMin: -51, xMax: -47, zMin: 18.75, zMax: 19.25, yTop: fy + WALL_HEIGHT, room: true }
+  );
 }
 
 // ── Get collision boxes (per-frame) ─────────────────────────────────
@@ -535,6 +539,31 @@ function _getBoxes() {
           yTop: fy + cH, yBottom: fy, room: true
         });
       }
+    }
+  }
+
+  // Corner door (by nightstand) — dynamic collision from animated panel.
+  if (_roomRefs && _roomRefs.getCornerDoorPanelMesh) {
+    const doorPanel = _roomRefs.getCornerDoorPanelMesh();
+    if (doorPanel && doorPanel.parent) {
+      doorPanel.updateMatrixWorld(true);
+      const wp = new THREE.Vector3();
+      const wq = new THREE.Quaternion();
+      doorPanel.getWorldPosition(wp);
+      doorPanel.getWorldQuaternion(wq);
+      const rot = new THREE.Euler().setFromQuaternion(wq, 'YXZ');
+      // Matches room.js dimensions: doorW-1 by doorH-0.5 by doorThick
+      result.push({
+        cx: wp.x,
+        cz: wp.z,
+        hw: (32 - 1) / 2,
+        hd: 1.5 / 2 + 0.12,
+        angle: -rot.y,
+        yTop: wp.y + (80 - 0.5) / 2,
+        yBottom: wp.y - (80 - 0.5) / 2,
+        obb: true,
+        room: true
+      });
     }
   }
 
@@ -1078,7 +1107,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       if (h.distance > 220) break;
       let p = h.object;
       while (p) {
-        if (p._isLamp || p._isCeilLight || p._isFan || p._isFilterL || p._isFilterR || p._isDrawer || p._isBifoldLeaf || p._isWindow || p._isMacbook) { aimingAt = true; break; }
+        if (p._isLamp || p._isCeilLight || p._isFan || p._isFilterL || p._isFilterR || p._isDrawer || p._isBifoldLeaf || p._isCornerDoorHandle || p._isWindow || p._isMacbook) { aimingAt = true; break; }
         p = p.parent;
       }
       if (aimingAt) break;

@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import '@fontsource-variable/manrope';
 import './styles/main.css';
 
 // ── Module imports ──────────────────────────────────────────────────
@@ -37,7 +38,7 @@ import {
 // Toast notifications
 const _toast = document.createElement('div');
 _toast.className = 'toast';
-_toast.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-12px);opacity:0;pointer-events:none;z-index:10001;background:rgba(8,12,18,0.88);color:#d9f3ff;border:1px solid rgba(145,222,255,0.35);border-radius:14px;padding:9px 16px;font-family:system-ui;font-size:12px;font-weight:700;letter-spacing:0.4px;backdrop-filter:blur(16px);box-shadow:0 12px 32px rgba(0,0,0,0.35);transition:opacity 0.3s cubic-bezier(0.16,1,0.3,1),transform 0.4s cubic-bezier(0.34,1.56,0.64,1)';
+_toast.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-12px);opacity:0;pointer-events:none;z-index:10001;background:rgba(8,12,18,0.88);color:#d9f3ff;border:1px solid rgba(145,222,255,0.35);border-radius:14px;padding:9px 16px;font-family:var(--font-ui);font-size:12px;font-weight:700;letter-spacing:0.4px;backdrop-filter:blur(16px);box-shadow:0 12px 32px rgba(0,0,0,0.35);transition:opacity 0.3s cubic-bezier(0.16,1,0.3,1),transform 0.4s cubic-bezier(0.34,1.56,0.64,1)';
 document.body.appendChild(_toast);
 let _toastTimer = null;
 
@@ -179,7 +180,8 @@ purifierRefs.setRoomRefs({
     if (todLabel) todLabel.textContent = lighting.formatTime(minutes);
     markShadowsDirty();
   },
-  toggleMacbook: roomRefs.toggleMacbook
+  toggleMacbook: roomRefs.toggleMacbook,
+  toggleCornerDoor: roomRefs.toggleCornerDoor
 });
 
 // ── Wire module cross-references ────────────────────────────────────
@@ -531,6 +533,14 @@ window._toggleRGB = () => {
   purifierRefs.toggleFanRGB();
   const tog = document.getElementById('togRGB');
   if (tog) tog.classList.toggle('on');
+};
+
+window._toggleXray = () => {
+  if (!purifierRefs.toggleXray) return;
+  const isOn = purifierRefs.toggleXray();
+  const tog = document.getElementById('togXray');
+  if (tog) tog.classList.toggle('on', isOn);
+  markShadowsDirty();
 };
 
 window._toggleIsolate = () => {
