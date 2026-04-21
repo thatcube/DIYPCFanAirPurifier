@@ -115,7 +115,6 @@ canvas#c { display: block; width: 100%; height: 100%; }
   cursor: pointer; text-shadow: var(--text-shadow);
   box-shadow: 0 6px 24px rgba(0,0,0,0.15);
   transition: all 0.35s var(--ease-out-expo);
-  overflow: hidden;
   position: relative;
 }
 .glass-btn:hover {
@@ -1118,7 +1117,6 @@ body.play-mode #runTimerHud { display: block; }
 /* Suppress all focus outlines on mouse/touch — only show on keyboard nav */
 :focus:not(:focus-visible) {
   outline: none !important;
-  box-shadow: none;
 }
 :focus-visible {
   outline: 2px solid var(--accent);
