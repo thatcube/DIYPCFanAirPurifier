@@ -1459,8 +1459,10 @@ export function createRoom(scene) {
       root.updateMatrixWorld(true);
       const localBB = new THREE.Box3().setFromObject(root);
       const localSize = localBB.getSize(new THREE.Vector3());
-      // Place on duvet (post-mirror coords) — shifted 24" away from window
-      const rawX = bedX - mattW / 2 + 12 - 24;
+      // Place on duvet (post-mirror coords — async load skips mirror pass)
+      // position.x = -rawX = worldX directly. More negative rawX = higher worldX = closer to window.
+      // +24 to rawX moves 2ft AWAY from window.
+      const rawX = bedX - mattW / 2 + 12 + 24;
       root.position.set(-rawX, bedTopY - localBB.min.y, bedZ + 6);
       root.rotation.y = Math.PI + 25 * Math.PI / 180; // rotated ~25° for natural look
       root._isRoom = true;
