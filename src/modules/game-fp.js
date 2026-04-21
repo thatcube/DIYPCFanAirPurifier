@@ -434,15 +434,16 @@ function _getBoxes() {
   const consoleVis = _purifierGroup && _purifierGroup.children.some(c => c.visible && c.children && c.children.some(cc => cc.visible));
   if (px === 45) { // TV placement — console props visible
     const topSurface = yTopPanel;
-    // Xbox Series X: 5.94×11.85×5.94 at local (0, topY+xbH/2, 8)
+    // Xbox Series X at local z=8: 5.94×11.85×5.94
     const xbW = 5.94, xbH = 11.85, xbD = 5.94;
     localBoxes.length = 0;
     localBoxes.push(
-      { lxMin: -xbW/2, lxMax: xbW/2, lzMin: 8-xbD/2, lzMax: 8+xbD/2, yTop: topSurface + xbH, yBottom: topSurface },
-      // Switch dock at local z=-6 (rotated -90° so local X→world Z)
-      { lxMin: -2.5/2, lxMax: 2.5/2, lzMin: -6-7.7/2, lzMax: -6+7.7/2, yTop: topSurface + 3.5, yBottom: topSurface },
-      // Switch tablet above dock
-      { lxMin: -0.55/2, lxMax: 0.55/2, lzMin: -6-10.5/2, lzMax: -6+10.5/2, yTop: topSurface + 5.45, yBottom: topSurface + 0.75 }
+      // Xbox at z=8
+      { lxMin: -xbD/2, lxMax: xbD/2, lzMin: 8-xbW/2, lzMax: 8+xbW/2, yTop: topSurface + xbH, yBottom: topSurface },
+      // Switch dock at z=-6: 7.7 wide, 2.5 deep, 3.5 tall (already rotated -90° so dims swap)
+      { lxMin: -7.7/2, lxMax: 7.7/2, lzMin: -6-2.5/2, lzMax: -6+2.5/2, yTop: topSurface + 3.5, yBottom: topSurface },
+      // Switch tablet above dock: 10.5 wide, 0.55 deep
+      { lxMin: -10.5/2, lxMax: 10.5/2, lzMin: -6-0.55/2, lzMax: -6+0.55/2, yTop: topSurface + 5.45, yBottom: topSurface + 0.75 }
     );
     for (const lb of localBoxes) {
       const b = acquireBox();
@@ -458,7 +459,7 @@ function _getBoxes() {
     }
   }
 
-  // MacBook collision — just the open lid screen area
+  // MacBook collision — thin slab for the open lid/screen only
   {
     const mbX = -(BED_X - 58/2 + 12); // post-mirror
     const mbZ = BED_Z + 6;
@@ -466,11 +467,11 @@ function _getBoxes() {
     const slatY = fy + BED_SLATS_FROM_FLOOR;
     const mattY = slatY + 1 + 5;
     const mbY = mattY + 5 + 1.5; // bed top
-    // Slim collision for the screen/lid only (~10×7", 3" tall when angled open)
+    // Thin collision slab (~10" wide, ~1" deep, ~4" tall for the open screen)
     result.push({
       xMin: mbX - 5, xMax: mbX + 5,
-      zMin: mbZ - 3.5, zMax: mbZ + 3.5,
-      yTop: mbY + 3, yBottom: mbY,
+      zMin: mbZ - 0.5, zMax: mbZ + 0.5,
+      yTop: mbY + 4, yBottom: mbY,
     });
   }
 
