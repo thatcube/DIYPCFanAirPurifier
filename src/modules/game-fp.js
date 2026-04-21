@@ -320,6 +320,17 @@ function _buildStaticBoxes() {
     yTop: tvCenterY + tvH / 2 + bezel, yBottom: tvCenterY - tvH / 2 - bezel, room: true
   });
 
+  // Mini split (wall-mounted, walkable under)
+  const msW = 32, msH = 11, msD = 8;
+  const msX = SIDE_WALL_X - 18 - msW / 2;
+  const msY = fy + WALL_HEIGHT - 12 - msH / 2;
+  const msZ = OPP_WALL_Z + 0.5 + msD / 2;
+  _staticBoxes.push({
+    xMin: -(msX + msW / 2), xMax: -(msX - msW / 2),
+    zMin: OPP_WALL_Z, zMax: msZ + msD / 2 + 1,
+    yTop: msY + msH / 2, yBottom: msY - msH / 2, room: true
+  });
+
   // Headboard — full height from bed clearance to top of headboard
   // Monolith: hbW=bedW, hbThick=3, hbH=bedH-bedClearance=35.5
   const hbW = BED_W, hbThick = 3, hbH = BED_H - BED_CLEARANCE;
