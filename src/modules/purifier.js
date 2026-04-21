@@ -3105,8 +3105,16 @@ export function createPurifier(scene) {
       rotor.userData.spinSpeed += (target - rotor.userData.spinSpeed) * aFan;
       const spd = rotor.userData.spinSpeed;
       if (Math.abs(spd) > 0.0001) {
-        const axis = rotor.userData.axis || 'z';
-        rotor.rotation[axis] += spd * animFrameScale;
+        // axis is a Vector3 — find the dominant component for rotation
+        const av = rotor.userData.axis;
+        let axisKey = 'z';
+        if (av && av.isVector3) {
+          if (Math.abs(av.y) > Math.abs(av.x) && Math.abs(av.y) > Math.abs(av.z)) axisKey = 'y';
+          else if (Math.abs(av.x) > Math.abs(av.z)) axisKey = 'x';
+        } else if (typeof av === 'string') {
+          axisKey = av;
+        }
+        rotor.rotation[axisKey] += spd * animFrameScale;
       }
     }
 
