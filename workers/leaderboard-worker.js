@@ -48,7 +48,7 @@ const DEFAULTS = {
   MIN_RUN_MS: 12000,
   MAX_RUN_MS: 20 * 60 * 1000,
   MIN_COIN_INTERVAL_MS: 120,
-  COIN_COUNT: 16,
+  COIN_COUNT: 15,
 };
 
 let dbInitPromise = null;

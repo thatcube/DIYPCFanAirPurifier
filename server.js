@@ -17,7 +17,7 @@ const MIN_RUN_MS = Number(process.env.MIN_RUN_MS || 12000);
 const MAX_RUN_MS = Number(process.env.MAX_RUN_MS || 20 * 60 * 1000);
 const MIN_COIN_INTERVAL_MS = Number(process.env.MIN_COIN_INTERVAL_MS || 120);
 
-const defaultCoinCount = Number(process.env.COIN_COUNT || 16);
+const defaultCoinCount = Number(process.env.COIN_COUNT || 15);
 const coinIds = (process.env.COIN_IDS || '')
   .split(',')
   .map(v => v.trim())
