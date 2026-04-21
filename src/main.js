@@ -145,6 +145,22 @@ const todRefs = {
 // Apply initial time-of-day — default to 2:30 PM (matches monolith default)
 lighting.applyTimeOfDay(870, todRefs);
 
+// ── DEBUG: Uncomment to visualize key light position, target, and shadow frustum ──
+// {
+//   const srcOrb = new THREE.Mesh(new THREE.SphereGeometry(4, 16, 12),
+//     new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true, transparent: true, opacity: 0.8 }));
+//   srcOrb.position.copy(lighting.key.position);
+//   scene.add(srcOrb);
+//   const tgtOrb = new THREE.Mesh(new THREE.SphereGeometry(3, 12, 8),
+//     new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, transparent: true, opacity: 0.8 }));
+//   tgtOrb.position.copy(lighting.key.target.position);
+//   scene.add(tgtOrb);
+//   const helper = new THREE.CameraHelper(lighting.key.shadow.camera);
+//   scene.add(helper);
+//   console.log('[DEBUG] Key light at:', lighting.key.position.x.toFixed(1), lighting.key.position.y.toFixed(1), lighting.key.position.z.toFixed(1));
+//   console.log('[DEBUG] Key target at:', lighting.key.target.position.x.toFixed(1), lighting.key.target.position.y.toFixed(1), lighting.key.target.position.z.toFixed(1));
+// }
+
 // Force shadow update after TOD repositions lights
 _shadowDirtyOneShot = true;
 
