@@ -899,7 +899,8 @@ input[type=range]::-moz-range-thumb {
    ═══════════════════════════════════════════════════════════════════ */
 body.play-mode #playDockBtn,
 body.play-mode .panel,
-body.play-mode .panel-fab { display: none !important; }
+body.play-mode .panel-fab,
+body.play-mode .part-tooltip { display: none !important; }
 
 body.play-mode #fpHud { display: block; }
 body.play-mode #fpCrosshair { display: block; }
