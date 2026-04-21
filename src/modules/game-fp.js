@@ -519,7 +519,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   fpPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, fpPitch - stepY * 0.0022));
 
   // ── Movement ──────────────────────────────────────────────────────
-  const spd = fpKeys.shift ? 0.52 : 0.26;
+  const spd = fpKeys.shift ? 0.65 : 0.30;
   const fwd = _fwd.set(-Math.sin(fpYaw), 0, -Math.cos(fpYaw));
   const right = _right.set(fwd.z, 0, -fwd.x);
 
