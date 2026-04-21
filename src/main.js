@@ -215,6 +215,8 @@ let _selectedColor = 'charcoal';
 
 let _previewsInited = false;
 window._openCharSelect = () => {
+  // Release pointer lock if held
+  if (document.pointerLockElement) document.exitPointerLock();
   const cs = document.getElementById('charSelect');
   if (cs) cs.classList.add('open');
   // Init 3D previews on first open — defer to next frame so canvases have layout
@@ -280,7 +282,11 @@ window._exitFP = () => {
   // Close any overlays first
   const fin = document.getElementById('fpFinishOverlay');
   if (fin) fin.classList.remove('open');
-  gameFp.setPaused(false);
+  const pause = document.getElementById('fpPauseOverlay');
+  if (pause) pause.style.display = 'none';
+  // Release pointer lock
+  if (document.pointerLockElement) document.exitPointerLock();
+  gameFp.fpPaused = false;
   if (gameFp.fpMode) gameFp.toggleFirstPerson();
 };
 window._toggleMuteSfx = (checked) => gameFp.setSfxMuted(checked);
