@@ -847,9 +847,6 @@ input[type=range]::-moz-range-thumb {
 }
 .finishDlgBtn.danger:hover { background: rgba(255,95,110,0.25); }
 
-/* ── Old simple finish overlay (kept hidden — replaced by finish dialog) */
-#fpFinishOverlay { display: none !important; }
-
 /* ═══════════════════════════════════════════════════════════════════
    MOBILE CONTROLS
    ═══════════════════════════════════════════════════════════════════ */

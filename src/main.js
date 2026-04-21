@@ -416,13 +416,6 @@ window._setPlacement = (mode) => {
   markShadowsDirty();
 };
 
-// Airflow toggle
-window._toggleAirflow = () => {
-  const tog = document.getElementById('togAirflow');
-  if (tog) tog.classList.toggle('on');
-  particles.toggleAirflow();
-};
-
 // FPS toggle
 window._toggleFps = () => {
   const fpsEl = document.getElementById('fps');

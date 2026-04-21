@@ -450,6 +450,25 @@ function _getBoxes() {
     result.push({ xMin: 35, xMax: 43, zMin: -69.5, zMax: -66.5, yTop: topSurface + 3.5, yBottom: topSurface });
     // Switch tablet at world (39, _, -68): wider, thinner
     result.push({ xMin: 34, xMax: 44, zMin: -69, zMax: -67, yTop: topSurface + 5.5, yBottom: topSurface + 0.75 });
+
+    // Game stack (Switch games pile) — next to purifier, world ~(45, _, -58)
+    // Stack is ~6.75" wide, ~4" deep, ~8" tall pile of cases
+    result.push({ xMin: 42, xMax: 49, zMin: -60, zMax: -56, yTop: topSurface + 8, yBottom: topSurface });
+  }
+
+  // Closet bifold doors — thin wall at the closet opening (post-mirror X ≈ -50.5)
+  {
+    const cX = -50.5; // closet wall X (post-mirror)
+    const cZ = -50;   // closet center Z
+    const cW = 48;    // closet opening width
+    const cH = 66;    // closet door height
+    const fy = getFloorY();
+    // Thin wall spanning the full closet opening
+    result.push({
+      xMin: cX - 1.5, xMax: cX + 0.5,
+      zMin: cZ - cW / 2, zMax: cZ + cW / 2,
+      yTop: fy + cH, yBottom: fy, room: true
+    });
   }
 
   // MacBook open lid — thin wall matching the screen overlay mesh exactly
