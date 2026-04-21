@@ -871,10 +871,10 @@ export function createRoom(scene) {
     const interiorW=_closetInteriorW;
     const interiorH=_closetInteriorH; // full room-height interior, independent of door opening
     const wallBack=0.5; // rightWall thickness
-    // Side walls extend the full closet depth (including into the back wall)
-    // to avoid corner gaps from the 0.5" wall thicknesses not meeting.
+    // Side walls start at the inner face of the main wall (sideWallX+wallBack)
+    // and extend past the back wall center to eliminate corner gaps.
     const innerDepth=closetDepth;
-    const innerCx=sideWallX+innerDepth/2;
+    const innerCx=sideWallX+wallBack+innerDepth/2;
     const insideMat=new THREE.MeshStandardMaterial({color:0xe4dcce,roughness:0.85,metalness:0.0});
     // Back wall
     const closetBack=new THREE.Mesh(new THREE.BoxGeometry(0.5, interiorH, interiorW), insideMat);
