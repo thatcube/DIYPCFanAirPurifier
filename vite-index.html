@@ -156,8 +156,8 @@
     <div class="char-select-inner">
       <h2>Choose Your Cat</h2>
       <div class="char-grid">
-        <div class="char-card" data-model="classic" onclick="window._selectCat&&window._selectCat('classic',this)">
-          <div class="char-icon">🐱</div>
+        <div class="char-card selected" data-model="classic" onclick="window._selectCat&&window._selectCat('classic',this)">
+          <canvas class="char-preview" id="previewClassic"></canvas>
           <div class="char-name">Classic</div>
           <div class="char-colors" id="classicColors">
             <button class="color-dot on" data-color="charcoal" style="background:#0a0a12" onclick="event.stopPropagation();window._selectColor&&window._selectColor('charcoal',this)"></button>
@@ -167,12 +167,12 @@
           </div>
         </div>
         <div class="char-card" data-model="toon" onclick="window._selectCat&&window._selectCat('toon',this)">
-          <div class="char-icon">🧡</div>
+          <canvas class="char-preview" id="previewToon"></canvas>
           <div class="char-name">Toon</div>
           <div class="char-sub">Orange tabby</div>
         </div>
         <div class="char-card" data-model="bababooey" onclick="window._selectCat&&window._selectCat('bababooey',this)">
-          <div class="char-icon">👹</div>
+          <canvas class="char-preview" id="previewBababooey"></canvas>
           <div class="char-name">Bababooey</div>
           <div class="char-sub">Cursed energy</div>
         </div>
