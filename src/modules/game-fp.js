@@ -902,6 +902,17 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   // ── Coin counter HUD ──────────────────────────────────────────────
   const coinCountEl = document.getElementById('coinCount');
   if (coinCountEl) coinCountEl.textContent = coins.coinScore + '/' + coins.coinTotal;
+  // Secret coin counter — show only when at least one secret has been found
+  const secretHud = document.getElementById('secretCoinHud');
+  const secretCountEl = document.getElementById('secretCoinCount');
+  if (secretHud && secretCountEl) {
+    if (coins.coinSecretScore > 0) {
+      secretHud.style.display = '';
+      secretCountEl.textContent = coins.coinSecretScore;
+    } else {
+      secretHud.style.display = 'none';
+    }
+  }
 }
 
 // ── Input binding ───────────────────────────────────────────────────

@@ -338,6 +338,15 @@ input[type=range]::-moz-range-thumb {
   40% { transform: scale(1.15); }
   100% { transform: scale(1); }
 }
+#secretCoinHud {
+  position: fixed; top: 16px; left: 186px;
+  background: var(--glass-light); color: #4ab8ff;
+  border: 1px solid rgba(74,184,255,0.35); border-radius: var(--r-lg);
+  padding: 10px 16px; font-size: 18px; font-weight: 800;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  animation: coinBump 0.4s var(--spring);
+}
 #fpCrosshair {
   display: none; position: fixed; top: 50%; left: 50%;
   transform: translate(-50%,-50%);
