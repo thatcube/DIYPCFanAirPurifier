@@ -99,7 +99,10 @@ const purifierGroup = new THREE.Group();
 {
   const toMove = [];
   scene.children.forEach(c => {
+    // Skip lights, cameras, room objects, coins, cat, particles, and light targets
     if (c.isLight || c.isCamera || c._isRoom || c._isCoins || c === catAnimation.catGroup || c.isPoints) return;
+    if (c === lighting.key.target || c === lighting.windowSun.target) return;
+    if (c === lighting.ceilSpot?.target) return;
     toMove.push(c);
   });
   toMove.forEach(c => purifierGroup.add(c));
@@ -141,29 +144,6 @@ const todRefs = {
 
 // Apply initial time-of-day — default to 2:30 PM (matches monolith default)
 lighting.applyTimeOfDay(870, todRefs);
-
-// DEBUG: orbs at key light source and target, plus shadow camera helper
-{
-  const debugGeo = new THREE.SphereGeometry(4, 16, 12);
-  // Source orb — magenta
-  const srcMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true, transparent: true, opacity: 0.8 });
-  const srcOrb = new THREE.Mesh(debugGeo, srcMat);
-  srcOrb.position.copy(lighting.key.position);
-  scene.add(srcOrb);
-  // Target orb — cyan
-  const tgtMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, transparent: true, opacity: 0.8 });
-  const tgtOrb = new THREE.Mesh(new THREE.SphereGeometry(3, 12, 8), tgtMat);
-  tgtOrb.position.copy(lighting.key.target.position);
-  scene.add(tgtOrb);
-  // Shadow camera helper — shows the frustum
-  const helper = new THREE.CameraHelper(lighting.key.shadow.camera);
-  scene.add(helper);
-  window._debugSrcOrb = srcOrb;
-  window._debugTgtOrb = tgtOrb;
-  window._debugHelper = helper;
-  console.log('[DEBUG] Key light at:', lighting.key.position.x.toFixed(1), lighting.key.position.y.toFixed(1), lighting.key.position.z.toFixed(1));
-  console.log('[DEBUG] Key target at:', lighting.key.target.position.x.toFixed(1), lighting.key.target.position.y.toFixed(1), lighting.key.target.position.z.toFixed(1));
-}
 
 // Force shadow update after TOD repositions lights
 _shadowDirtyOneShot = true;
