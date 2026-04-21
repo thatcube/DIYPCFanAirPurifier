@@ -2508,7 +2508,6 @@ export function createPurifier(scene) {
     }
     updateTvGameStackPlacement();
   }
-  let _prePlacementFeet='bun'; // remember feet style before wall mode overrides it
   function syncFootSizeRows(){
     const show=(feetStyle==='bun');
     const dia=_el('footDiameterRow');
@@ -2558,71 +2557,10 @@ export function createPurifier(scene) {
   }
   syncFootSizeRows();
   
-  // ─── Placement presets ───
-  let currentPlacement='floor';
-  function setPlacement(mode){
-    if(mode===currentPlacement) return;
-    const prevMode=currentPlacement;
-    const prevOff=placementOffset;
-    const newOff=getPlacementOffset(mode);
-    const delta={x:newOff.x-prevOff.x, y:newOff.y-prevOff.y, z:newOff.z-prevOff.z};
-    currentPlacement=mode;
-    placementOffset={...newOff};
-    document.querySelectorAll('#btnPlaceFloor,#btnPlaceWall,#btnPlaceTv').forEach(b=>b.classList.remove('on'));
-    _el(mode==='floor'?'btnPlaceFloor':mode==='tv'?'btnPlaceTv':'btnPlaceWall').classList.add('on');
-    // Rotate purifier for Under TV / Wall mode, show/hide console props
-    if(mode==='tv'||mode==='wall'){
-      purifierGroup.rotation.y=90*Math.PI/180;
-      _el('turntableSlider').value=90;
-      _el('turntableLabel').textContent='90°';
-      showConsoleProps(mode==='tv');
-      showWallBracket(mode==='wall');
-    } else {
-      purifierGroup.rotation.y=0;
-      _el('turntableSlider').value=0;
-      _el('turntableLabel').textContent='0°';
-      showConsoleProps(false);
-      showWallBracket(false);
-    }
-    // Auto-toggle feet for wall mount
-    if(mode==='wall'){
-      if(feetStyle!=='none'){ _prePlacementFeet=feetStyle; }
-      setFeetStyle('none');
-    } else if(prevMode==='wall' && feetStyle==='none'){
-      setFeetStyle(_prePlacementFeet);
-    }
-    applyRoomDelta(delta);
-    updateNudgeLabel();
-    // Re-sync edge shells after placement rotation changes.
-    refreshPanelEdgeProfiles();
-    if(exploded) collapseView();
-  }
-  // Live placement offset — arrow keys nudge this in world space
-  let placementOffset={x:0,y:0,z:0};
-  let roomOffset={x:0,y:0,z:0};
+  // ─── Room delta (no-op in modular build) ───
   function applyRoomDelta(delta){
     // No-op — room geometry stays fixed. Foot height changes are handled
     // by updating state.bunFootH which adjusts getFloorY() for collision.
-  }
-  function nudgePlacement(dx,dy,dz){
-    const step=2; // 2 inches per press
-    const delta={x:dx*step, y:dy*step, z:dz*step};
-    placementOffset.x+=delta.x;
-    placementOffset.y+=delta.y;
-    placementOffset.z+=delta.z;
-    applyRoomDelta(delta);
-    updateNudgeLabel();
-  }
-  function updateNudgeLabel(){
-    const el=_el('nudgeLabel');
-    if(el) el.textContent='X:'+placementOffset.x.toFixed(0)+' Y:'+placementOffset.y.toFixed(0)+' Z:'+placementOffset.z.toFixed(0);
-  }
-  function getPlacementOffset(mode){
-    if(mode==='floor') return {x:0, y:0, z:0}; // default — floor
-    if(mode==='table') return {x:3.7, y:27, z:39.5}; // on nightstand (mirrored X)
-    if(mode==='wall') return {x:-17, y:28, z:-69.625}; // wall-mounted under mini split, 5" standoff for airflow
-    if(mode==='tv') return {x:45, y:0, z:-68}; // on floor under wall-mounted TV, centered
-    return {x:0,y:0,z:0};
   }
   
   function getPurifierFloorLocalY(){
