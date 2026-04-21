@@ -28,9 +28,9 @@ function _applyLoopPause(action, ts, pauseSeconds) {
 }
 
 const MODEL_MAP = {
-  classic:   { src: 'assets/cat.glb',           extraScale: 1, yOffset: 0 },
-  toon:      { src: 'assets/tooncat.glb',       extraScale: 1.25, yOffset: 1.0 },
-  bababooey: { src: 'assets/bababooey_cat.glb', extraScale: 1, yOffset: 0 },
+  classic:   { src: 'assets/cat.glb',           extraScale: 1, yOffset: 0.35 },
+  toon:      { src: 'assets/tooncat.glb',       extraScale: 1.25, yOffset: 1.6 },
+  bababooey: { src: 'assets/bababooey_cat.glb', extraScale: 1, yOffset: -0.35 },
 };
 
 /**
@@ -139,7 +139,7 @@ export function initPreviews() {
     const preset = CAT_MODEL_PRESETS[entry.key] || CAT_MODEL_PRESETS.classic;
 
     // Renderer
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power' });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;

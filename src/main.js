@@ -216,8 +216,11 @@ let _previewsInited = false;
 window._openCharSelect = () => {
   const cs = document.getElementById('charSelect');
   if (cs) cs.classList.add('open');
-  // Init 3D previews on first open
-  if (!_previewsInited) { initPreviews(); _previewsInited = true; }
+  // Init 3D previews on first open — defer to next frame so canvases have layout
+  if (!_previewsInited) {
+    _previewsInited = true;
+    requestAnimationFrame(() => initPreviews());
+  }
   // Pre-select classic
   document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
   const classicCard = document.querySelector('.char-card[data-model="classic"]');
