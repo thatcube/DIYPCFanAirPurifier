@@ -3184,7 +3184,7 @@ export function createPurifier(scene) {
         const bl = _bifoldLerps[i];
         const leaf = bl.leaf;
         leaf._leafAngle += (leaf._leafTarget - leaf._leafAngle) * aBifold;
-        const sign = leaf._leafSide === 'L' ? 1 : -1;
+        const sign = leaf._leafSide < 0 ? 1 : -1;
         leaf.rotation.y = sign * leaf._leafAngle;
         if (leaf._innerGroup) leaf._innerGroup.rotation.y = -2 * sign * leaf._leafAngle;
         if (Math.abs(leaf._leafAngle - leaf._leafTarget) < 0.005) {
