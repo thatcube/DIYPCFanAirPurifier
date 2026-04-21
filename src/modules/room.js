@@ -756,10 +756,12 @@ export function createRoom(scene) {
   roomBox(0.5, wallHeight, 0.5, 0xd8d4ce, sideWallX, floorY + wallHeight / 2, 48.75, 0, 0, 0);
 
   // Baseboard — break into two pieces so it doesn't cross the closet opening.
-  const sideBaseboard1=roomBox(0.6, 3, (_closetZ-_closetW/2) - (-15 - wallDepth/2), 0xc0bbb4,
-    sideWallX-0.5, floorY+1.5, (-15 - wallDepth/2 + (_closetZ-_closetW/2))/2, 0,0,0);
-  const sideBaseboard2=roomBox(0.6, 3, (-15 + wallDepth/2) - (_closetZ+_closetW/2), 0xc0bbb4,
-    sideWallX-0.5, floorY+1.5, (_closetZ+_closetW/2 + (-15 + wallDepth/2))/2, 0,0,0);
+  // Inset by trimW (2.5") to not stick past the door trim.
+  const bbTrimInset=2.5;
+  const sideBaseboard1=roomBox(0.6, 3, (_closetZ-_closetW/2-bbTrimInset) - (-15 - wallDepth/2), 0xc0bbb4,
+    sideWallX-0.5, floorY+1.5, (-15 - wallDepth/2 + (_closetZ-_closetW/2-bbTrimInset))/2, 0,0,0);
+  const sideBaseboard2=roomBox(0.6, 3, (-15 + wallDepth/2) - (_closetZ+_closetW/2+bbTrimInset), 0xc0bbb4,
+    sideWallX-0.5, floorY+1.5, (_closetZ+_closetW/2+bbTrimInset + (-15 + wallDepth/2))/2, 0,0,0);
   
   // ─── Bifold closet doors on right wall (becomes -X after flip) ───
   {
@@ -869,8 +871,10 @@ export function createRoom(scene) {
     const interiorW=_closetInteriorW;
     const interiorH=_closetInteriorH; // full room-height interior, independent of door opening
     const wallBack=0.5; // rightWall thickness
-    const innerDepth=closetDepth-wallBack;
-    const innerCx=sideWallX+wallBack+innerDepth/2;
+    // Side walls extend the full closet depth (including into the back wall)
+    // to avoid corner gaps from the 0.5" wall thicknesses not meeting.
+    const innerDepth=closetDepth;
+    const innerCx=sideWallX+innerDepth/2;
     const insideMat=new THREE.MeshStandardMaterial({color:0xe4dcce,roughness:0.85,metalness:0.0});
     // Back wall
     const closetBack=new THREE.Mesh(new THREE.BoxGeometry(0.5, interiorH, interiorW), insideMat);
