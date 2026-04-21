@@ -440,22 +440,34 @@ function _getBoxes() {
     result.push({ xMin: 34, xMax: 44, zMin: -69, zMax: -67, yTop: topSurface + 5.5, yBottom: topSurface + 0.75 });
   }
 
-  // MacBook — rotated OBB matching the GLB placement in room.js
-  // room.js: position (65.85, bedTopY, 13.35), rotation.y = PI + 25°
-  // The collision angle is just the 25° offset (PI component is facing direction, not footprint rotation)
-  {
-    const mbX = 65.85;
-    const mbZ = 13.35;
-    const fy = getFloorY();
-    const mbY = fy + BED_SLATS_FROM_FLOOR + 1 + 5 + 5 + 1.5;
-    // 14" wide × ~9" deep laptop footprint, rotated 25°
-    result.push({
-      cx: mbX, cz: mbZ,
-      hw: 7, hd: 4.5,           // half-width, half-depth
-      angle: 25 * Math.PI / 180, // rotation in radians
-      yTop: mbY + 0.5, yBottom: mbY,
-      obb: true
-    });
+  // MacBook open lid — thin wall matching the screen overlay mesh exactly
+  if (_roomRefs && _roomRefs.getMacbookScreenMesh) {
+    const scrMesh = _roomRefs.getMacbookScreenMesh();
+    if (scrMesh && scrMesh.parent) {
+      scrMesh.parent.updateMatrixWorld(true);
+      // Get screen world position and dimensions
+      const wp = new THREE.Vector3();
+      scrMesh.getWorldPosition(wp);
+      // The screen is a ShapeGeometry in local XY plane
+      // Screen has rotation.y = PI, parent has rotation.y = PI + 25°
+      // Combined world Y-rotation = parent.rot + screen.rot
+      const parentRotY = scrMesh.parent.rotation.y; // PI + 25°
+      const screenRotY = scrMesh.rotation.y;         // PI
+      const worldRotY = parentRotY + screenRotY;     // 2*PI + 25° ≡ 25°
+      // Screen dimensions (screen.scale = invScale cancels parent scale)
+      const bb = new THREE.Box3().setFromBufferAttribute(scrMesh.geometry.attributes.position);
+      const sz = bb.getSize(new THREE.Vector3());
+      const hw = sz.x / 2; // half-width (screen X = world horizontal)
+      const hh = sz.y / 2; // half-height (screen Y = world vertical)
+      // Thin wall OBB: the lid plane
+      result.push({
+        cx: wp.x, cz: wp.z,
+        hw: hw, hd: 0.3,           // 0.3" thin wall
+        angle: worldRotY,
+        yTop: wp.y + hh, yBottom: wp.y - hh,
+        obb: true
+      });
+    }
   }
 
   return result;
