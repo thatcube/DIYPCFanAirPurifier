@@ -26,6 +26,7 @@ import { createRoom } from './modules/room.js';
 import { createPurifier } from './modules/purifier.js';
 import { initInteractions, coinBump } from './modules/ui-interactions.js';
 import { initPreviews, recolorClassicPreview } from './modules/cat-preview.js';
+import { initToggleSwitches, initSegButtons, initDecorativeIcons, initClickableDivs, trapFocus, saveFocus } from './modules/a11y.js';
 import {
   SHADOW_UPDATE_INTERVAL_MS, IDLE_FRAME_MS
 } from './modules/constants.js';
@@ -237,11 +238,23 @@ let _selectedModel = 'classic';
 let _selectedColor = 'charcoal';
 
 let _previewsInited = false;
+let _charSelectFocusTrap = null;
+let _charSelectSavedFocus = null;
 window._openCharSelect = () => {
   // Release pointer lock if held
   if (document.pointerLockElement) document.exitPointerLock();
   const cs = document.getElementById('charSelect');
-  if (cs) cs.classList.add('open');
+  if (cs) {
+    cs.classList.add('open');
+    // Focus management
+    _charSelectSavedFocus = saveFocus();
+    _charSelectFocusTrap = trapFocus(cs);
+    // Focus the start button after layout
+    requestAnimationFrame(() => {
+      const startBtn = cs.querySelector('.char-start');
+      if (startBtn) startBtn.focus();
+    });
+  }
   // Init 3D previews on first open — defer to next frame so canvases have layout
   if (!_previewsInited) {
     _previewsInited = true;
@@ -274,6 +287,9 @@ window._selectColor = (color, el) => {
 window._startGame = () => {
   const cs = document.getElementById('charSelect');
   if (cs) cs.classList.remove('open');
+  // Release focus trap
+  if (_charSelectFocusTrap) { _charSelectFocusTrap.release(); _charSelectFocusTrap = null; }
+  if (_charSelectSavedFocus) { _charSelectSavedFocus.restore(); _charSelectSavedFocus = null; }
   // Apply cat selection
   catAppearance.setCatModelKeyRaw(_selectedModel);
   if (catAppearance.isColorable(_selectedModel)) {
@@ -683,6 +699,12 @@ animate(performance.now());
 
 // Init UI micro-interactions (bouncy buttons, press effects)
 initInteractions();
+
+// Accessibility: toggle-switch keyboard support + seg-button aria-pressed
+initToggleSwitches();
+initSegButtons();
+initDecorativeIcons();
+initClickableDivs();
 
 // Wire share button click
 const _shareBtn = document.getElementById('fpShareBtn');

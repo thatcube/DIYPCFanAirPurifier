@@ -8,6 +8,7 @@ import {
   sanitizeColorKey, sanitizeModelKey, sanitizeHairKey,
   CAT_COLOR_EMOJI, CAT_MODEL_EMOJI, CAT_MODEL_LABELS_SHORT
 } from './cat-appearance.js';
+import { trapFocus, saveFocus } from './a11y.js';
 import { CAT_COLOR_PRESETS } from './constants.js';
 
 // ── Config ──────────────────────────────────────────────────────────
@@ -319,6 +320,8 @@ let _nameDialogOpen = false;
 let _nameDialogAfterClose = null;
 let _nameDialogManualTyped = false;
 let _nameDialogOpenedAt = 0;
+let _nameDialogFocusTrap = null;
+let _nameDialogSavedFocus = null;
 
 export function isNameDialogOpen() { return _nameDialogOpen; }
 
@@ -337,7 +340,11 @@ export function openNameDialog(force, onAfterClose) {
   const overlay = document.getElementById('nameDialogOverlay');
   const input = document.getElementById('nameDialogInput');
   const hint = document.getElementById('nameDialogHint');
-  if (overlay) overlay.style.display = 'flex';
+  if (overlay) {
+    overlay.style.display = 'flex';
+    _nameDialogSavedFocus = saveFocus();
+    _nameDialogFocusTrap = trapFocus(overlay);
+  }
 
   const lastName = _readPlayerName();
   const prefill = lastName && lastName !== 'Player' ? lastName : '';
@@ -367,6 +374,8 @@ function _closeNameDialog() {
   _nameDialogOpen = false;
   const overlay = document.getElementById('nameDialogOverlay');
   if (overlay) overlay.style.display = 'none';
+  if (_nameDialogFocusTrap) { _nameDialogFocusTrap.release(); _nameDialogFocusTrap = null; }
+  if (_nameDialogSavedFocus) { _nameDialogSavedFocus.restore(); _nameDialogSavedFocus = null; }
   const input = document.getElementById('nameDialogInput');
   if (input) { input.value = ''; input.blur(); }
   const afterClose = _nameDialogAfterClose;
@@ -392,6 +401,8 @@ let _finishDialogOpen = false;
 let _finishDialogData = null;
 let _onPlayAgain = null;
 let _onExitGame = null;
+let _finishFocusTrap = null;
+let _finishSavedFocus = null;
 
 export function isFinishDialogOpen() { return _finishDialogOpen; }
 
@@ -407,7 +418,16 @@ export function openFinishDialog(data) {
   if (document.exitPointerLock && document.pointerLockElement) document.exitPointerLock();
 
   const overlay = document.getElementById('finishDialogOverlay');
-  if (overlay) overlay.style.display = 'flex';
+  if (overlay) {
+    overlay.style.display = 'flex';
+    _finishSavedFocus = saveFocus();
+    _finishFocusTrap = trapFocus(overlay);
+    // Focus first action after render
+    requestAnimationFrame(() => {
+      const btn = document.getElementById('finishDialogAgain');
+      if (btn) btn.focus();
+    });
+  }
   _renderFinishDialog();
 }
 
@@ -417,6 +437,8 @@ export function closeFinishDialog() {
   _finishDialogData = null;
   const overlay = document.getElementById('finishDialogOverlay');
   if (overlay) overlay.style.display = 'none';
+  if (_finishFocusTrap) { _finishFocusTrap.release(); _finishFocusTrap = null; }
+  if (_finishSavedFocus) { _finishSavedFocus.restore(); _finishSavedFocus = null; }
   const copyBtn = document.getElementById('finishDialogCopy');
   if (copyBtn) copyBtn.textContent = 'Copy result';
 }
@@ -498,7 +520,7 @@ function _createNameDialogDOM() {
   const overlay = document.createElement('div');
   overlay.id = 'nameDialogOverlay';
   overlay.innerHTML = `
-    <div class="name-dialog-card">
+    <div class="name-dialog-card" role="dialog" aria-modal="true" aria-label="Enter your name">
       <form id="nameDialogForm" autocomplete="off">
         <div class="name-dialog-body">What should we call this cat on the leaderboard?</div>
         <div class="name-dialog-input-row">
@@ -556,7 +578,7 @@ function _createFinishDialogDOM() {
   const overlay = document.createElement('div');
   overlay.id = 'finishDialogOverlay';
   overlay.innerHTML = `
-    <div id="finishDialogCard" role="dialog" aria-modal="true">
+    <div id="finishDialogCard" role="dialog" aria-modal="true" aria-label="Run complete">
       <div id="finishDialogHeader">
         <div id="finishDialogEyebrow">
           <span>RUN COMPLETE</span>

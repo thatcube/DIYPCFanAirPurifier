@@ -17,6 +17,7 @@ import {
 import { getBounds, acquireBox, resetBoxPool, easeAlpha, BODY_R, EYE_H, HEAD_EXTRA } from './game-collision.js';
 import * as coins from './coins.js';
 import * as leaderboard from './leaderboard.js';
+import { trapFocus, saveFocus } from './a11y.js';
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -652,6 +653,9 @@ function _respawn() {
 
 // ── Set paused ──────────────────────────────────────────────────────
 
+let _pauseFocusTrap = null;
+let _pauseSavedFocus = null;
+
 export function setPaused(paused) {
   if (!fpMode) return;
   fpPaused = !!paused;
@@ -672,6 +676,11 @@ export function setPaused(paused) {
     if (overlay && !finishOpen) {
       overlay.style.display = 'flex';
       leaderboard.renderLeaderboardPanel();
+      // Focus trap
+      _pauseSavedFocus = saveFocus();
+      _pauseFocusTrap = trapFocus(overlay);
+      const resumeBtn = overlay.querySelector('.pause-btn.primary');
+      if (resumeBtn) resumeBtn.focus();
     }
     if (crosshair) crosshair.style.opacity = '0.25';
 
@@ -689,6 +698,9 @@ export function setPaused(paused) {
     // Hide overlays
     if (overlay) overlay.style.display = 'none';
     if (crosshair) crosshair.style.opacity = '';
+    // Release focus trap
+    if (_pauseFocusTrap) { _pauseFocusTrap.release(); _pauseFocusTrap = null; }
+    if (_pauseSavedFocus) { _pauseSavedFocus.restore(); _pauseSavedFocus = null; }
 
     // Re-lock pointer (desktop only) — delay to avoid SecurityError
     if (_canvas && !state.isMobile) {
