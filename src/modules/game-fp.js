@@ -429,6 +429,51 @@ function _getBoxes() {
     result.push(b);
   }
 
+  // Console props collision (Xbox, Switch dock, Switch tablet on top of purifier)
+  // Only when console props are visible (TV placement mode)
+  const consoleVis = _purifierGroup && _purifierGroup.children.some(c => c.visible && c.children && c.children.some(cc => cc.visible));
+  if (px === 45) { // TV placement — console props visible
+    const topSurface = yTopPanel;
+    // Xbox Series X: 5.94×11.85×5.94 at local (0, topY+xbH/2, 8)
+    const xbW = 5.94, xbH = 11.85, xbD = 5.94;
+    localBoxes.length = 0;
+    localBoxes.push(
+      { lxMin: -xbW/2, lxMax: xbW/2, lzMin: 8-xbD/2, lzMax: 8+xbD/2, yTop: topSurface + xbH, yBottom: topSurface },
+      // Switch dock at local z=-6 (rotated -90° so local X→world Z)
+      { lxMin: -2.5/2, lxMax: 2.5/2, lzMin: -6-7.7/2, lzMax: -6+7.7/2, yTop: topSurface + 3.5, yBottom: topSurface },
+      // Switch tablet above dock
+      { lxMin: -0.55/2, lxMax: 0.55/2, lzMin: -6-10.5/2, lzMax: -6+10.5/2, yTop: topSurface + 5.45, yBottom: topSurface + 0.75 }
+    );
+    for (const lb of localBoxes) {
+      const b = acquireBox();
+      if (rotated) {
+        b.xMin = px - lb.lzMax; b.xMax = px - lb.lzMin;
+        b.zMin = pz + lb.lxMin; b.zMax = pz + lb.lxMax;
+      } else {
+        b.xMin = px + lb.lxMin; b.xMax = px + lb.lxMax;
+        b.zMin = pz + lb.lzMin; b.zMax = pz + lb.lzMax;
+      }
+      b.yTop = lb.yTop; b.yBottom = lb.yBottom;
+      result.push(b);
+    }
+  }
+
+  // MacBook collision (on the bed, always present)
+  {
+    const mbX = -(BED_X - 58/2 + 12); // post-mirror
+    const mbZ = BED_Z + 6;
+    const fy = getFloorY();
+    const slatY = fy + BED_SLATS_FROM_FLOOR;
+    const mattY = slatY + 1 + 5;
+    const mbY = mattY + 5 + 1.5; // bed top
+    // MacBook footprint ~12.3×8.7" closed, ~3" tall when open
+    result.push({
+      xMin: mbX - 7, xMax: mbX + 7,
+      zMin: mbZ - 5, zMax: mbZ + 5,
+      yTop: mbY + 6, yBottom: mbY,
+    });
+  }
+
   return result;
 }
 

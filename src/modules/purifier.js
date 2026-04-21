@@ -2534,7 +2534,7 @@ export function createPurifier(scene) {
     // (same slot width throughout), built as two parallel walls on the
     // front/back of the slot.
     const switchGroup=new THREE.Group();
-    switchGroup.rotation.y=-Math.PI/2; // face +Z direction
+    switchGroup.rotation.y=-Math.PI/2 + 5 * Math.PI / 180; // face +Z with 5° natural tilt
     switchGroup.position.z=-6; // shift along purifier length
     // Tablet dims (mirror the values defined below for slot sizing).
     const _swW_for_slot=10.5 - 2*1.4; // matches swW below
