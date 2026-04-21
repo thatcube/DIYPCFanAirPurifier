@@ -1468,20 +1468,30 @@ export function createRoom(scene) {
         if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o._isMacbook = true; }
       });
 
-      // Screen overlay plane
-      const scrW = localSize.x * 0.92;
-      const scrH = scrW * 0.65;
-      const scrGeo = new THREE.PlaneGeometry(scrW, scrH);
+      // Screen overlay plane — matches monolith's exact positioning knobs
+      const screenW = localSize.x * 0.96;
+      const screenH = screenW * 0.68;
+      const scrGeo = new THREE.PlaneGeometry(screenW, screenH);
       const scrMat = new THREE.MeshBasicMaterial({
         map: _macbookLogoTex, color: 0xffffff,
         toneMapped: false, side: THREE.DoubleSide
       });
       _macbookScreen = new THREE.Mesh(scrGeo, scrMat);
-      // Position on the lid face
-      const lidY = localBB.min.y + localSize.y * 0.62;
-      const lidZ = localBB.min.z + localSize.z * 0.15;
-      _macbookScreen.position.set(0, lidY, lidZ);
-      _macbookScreen.rotation.x = -0.12; // slight tilt back
+      _macbookScreen._isMacbook = true;
+
+      // The plane inherits root.scale, so pre-divide to get world inches
+      const invScale = 1 / (root.scale.x || 1);
+      _macbookScreen.scale.setScalar(invScale);
+
+      // Position using monolith's screen knobs (fractions of local bbox)
+      const screenX_frac = 0.5;
+      const screenY_frac = 0.525;
+      const screenZ_off = -0.19;
+      const cx = THREE.MathUtils.lerp(localBB.min.x, localBB.max.x, screenX_frac) * invScale;
+      const lidY = (localBB.min.y + localSize.y * screenY_frac) * invScale;
+      const frontZ = (localBB.min.z - screenZ_off) * invScale;
+      _macbookScreen.position.set(cx, lidY, frontZ);
+      _macbookScreen.rotation.y = Math.PI; // face toward player
       _macbookScreen.visible = false;
       root.add(_macbookScreen);
 
