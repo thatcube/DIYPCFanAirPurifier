@@ -3261,6 +3261,8 @@ export function createPurifier(scene) {
     toggleExplode,
     collapseView,
     toggleFilter,
+    isFilterOn() { return filterOn; },
+    areFiltersSlid() { return { left: filterLOut, right: filterROut }; },
     toggleGrills,
     setGrillColor,
     setStain,

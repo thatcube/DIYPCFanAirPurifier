@@ -87,6 +87,7 @@ let _placementOffset = null;
 let _markShadowsDirty = null;
 let _showToast = null;
 let _roomRefs = null;
+let _purifierRefs = null;
 let _fpHud = null;
 let _purifierGroup = null;
 
@@ -138,6 +139,7 @@ export function init(refs) {
   _markShadowsDirty = refs.markShadowsDirty || (() => {});
   _showToast = refs.showToast || (() => {});
   _roomRefs = refs.roomRefs || {};
+  _purifierRefs = refs.purifierRefs || null;
 
   // Build static collision boxes from room refs
   _buildStaticBoxes();
@@ -399,21 +401,28 @@ function _getBoxes() {
   // Detect rotation from the actual purifierGroup rotation
   const rotated = _purifierGroup ? Math.abs(_purifierGroup.rotation.y) > 0.1 : false;
 
-  // Build 4 wall AABBs (top, bottom, front, back) + 2 filter sides
+  // When filters are removed (toggled off) or slid out, skip their side walls
+  const filtersOn = _purifierRefs && _purifierRefs.isFilterOn ? _purifierRefs.isFilterOn() : true;
+  const filtersSlid = _purifierRefs && _purifierRefs.areFiltersSlid ? _purifierRefs.areFiltersSlid() : { left: false, right: false };
+  const leftOpen = !filtersOn || filtersSlid.left;
+  const rightOpen = !filtersOn || filtersSlid.right;
   const localBoxes = [
     // Top panel — standable
     { lxMin: -hwOuter, lxMax: hwOuter, lzMin: -hdOuter, lzMax: hdOuter, yTop: yTopPanel, yBottom: yTopPanel - ply },
-    // Bottom panel — solid floor, extends through feet
-    { lxMin: -hwOuter, lxMax: hwOuter, lzMin: -hdOuter, lzMax: hdOuter, yTop: yBotPanel + ply, yBottom: yBotFeet },
+    // Bottom panel — thin standable surface (player can stand on it inside)
+    { lxMin: -hwOuter, lxMax: hwOuter, lzMin: -hdOuter, lzMax: hdOuter, yTop: yBotPanel + ply, yBottom: yBotPanel },
     // Front wall (-Z face)
-    { lxMin: -hwOuter, lxMax: hwOuter, lzMin: -hdOuter, lzMax: -D / 2, yTop: yTopPanel, yBottom: yBotFeet },
+    { lxMin: -hwOuter, lxMax: hwOuter, lzMin: -hdOuter, lzMax: -D / 2, yTop: yTopPanel, yBottom: yBotPanel },
     // Back wall (+Z face)
-    { lxMin: -hwOuter, lxMax: hwOuter, lzMin: D / 2, lzMax: hdOuter, yTop: yTopPanel, yBottom: yBotFeet },
-    // Left filter side
-    { lxMin: -hwOuter, lxMax: -hwOuter + ft, lzMin: -D / 2, lzMax: D / 2, yTop: yTopPanel, yBottom: yBotFeet },
-    // Right filter side
-    { lxMin: hwOuter - ft, lxMax: hwOuter, lzMin: -D / 2, lzMax: D / 2, yTop: yTopPanel, yBottom: yBotFeet },
+    { lxMin: -hwOuter, lxMax: hwOuter, lzMin: D / 2, lzMax: hdOuter, yTop: yTopPanel, yBottom: yBotPanel },
   ];
+  // Only add filter side walls if filters are in place (not removed and not slid out)
+  if (!leftOpen) {
+    localBoxes.push({ lxMin: -hwOuter, lxMax: -hwOuter + ft, lzMin: -D / 2, lzMax: D / 2, yTop: yTopPanel, yBottom: yBotPanel });
+  }
+  if (!rightOpen) {
+    localBoxes.push({ lxMin: hwOuter - ft, lxMax: hwOuter, lzMin: -D / 2, lzMax: D / 2, yTop: yTopPanel, yBottom: yBotPanel });
+  }
 
   for (const lb of localBoxes) {
     const b = acquireBox();

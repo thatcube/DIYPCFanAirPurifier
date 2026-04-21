@@ -210,6 +210,7 @@ gameFp.init({
   scene,
   placementOffset,
   purifierGroup,
+  purifierRefs,
   markShadowsDirty,
   showToast,
   roomRefs
