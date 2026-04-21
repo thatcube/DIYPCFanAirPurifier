@@ -157,7 +157,8 @@ purifierRefs.setRoomRefs({
     const todLabel = document.getElementById('todLabel');
     if (todLabel) todLabel.textContent = lighting.formatTime(minutes);
     markShadowsDirty();
-  }
+  },
+  toggleMacbook: roomRefs.toggleMacbook
 });
 
 // ── Wire module cross-references ────────────────────────────────────

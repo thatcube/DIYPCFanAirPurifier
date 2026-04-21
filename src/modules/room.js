@@ -1430,6 +1430,18 @@ export function createRoom(scene) {
   // Return refs for other modules
   // ── MacBook on the bed ───────────────────────────────────────────
   // Load assets/macbook.glb, place on the duvet, tag as _isMacbook
+  let _macbookScreen = null;
+  let _macbookOn = false;
+  let _macbookAudio = null;
+  const _mbPlaylist = [
+    { name: 'Octodad Theme', src: 'assets/songs/Octodad (Nobody Suspects a Thing).mp3', volume: 0.28 },
+    { name: 'Escape from the City', src: 'assets/songs/Escape From The City ... for City Escape.mp3', volume: 0.28 },
+  ];
+  let _mbSongIdx = 0;
+
+  // Load screen texture
+  const _macbookLogoTex = new THREE.TextureLoader().load('assets/scummit-logo.webp');
+
   {
     const mbLoader = new GLTFLoader();
     const slatY = floorY + bedSlatsFromFloor;
@@ -1446,6 +1458,7 @@ export function createRoom(scene) {
       if (longest > 0) root.scale.setScalar(14 / longest);
       root.updateMatrixWorld(true);
       const localBB = new THREE.Box3().setFromObject(root);
+      const localSize = localBB.getSize(new THREE.Vector3());
       // Place on duvet (post-mirror coords)
       const rawX = bedX - mattW / 2 + 12;
       root.position.set(-rawX, bedTopY - localBB.min.y, bedZ + 6);
@@ -1454,8 +1467,55 @@ export function createRoom(scene) {
       root.traverse(o => {
         if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o._isMacbook = true; }
       });
+
+      // Screen overlay plane
+      const scrW = localSize.x * 0.92;
+      const scrH = scrW * 0.65;
+      const scrGeo = new THREE.PlaneGeometry(scrW, scrH);
+      const scrMat = new THREE.MeshBasicMaterial({
+        map: _macbookLogoTex, color: 0xffffff,
+        toneMapped: false, side: THREE.DoubleSide
+      });
+      _macbookScreen = new THREE.Mesh(scrGeo, scrMat);
+      // Position on the lid face
+      const lidY = localBB.min.y + localSize.y * 0.62;
+      const lidZ = localBB.min.z + localSize.z * 0.15;
+      _macbookScreen.position.set(0, lidY, lidZ);
+      _macbookScreen.rotation.x = -0.12; // slight tilt back
+      _macbookScreen.visible = false;
+      root.add(_macbookScreen);
+
       scene.add(root);
     });
+  }
+
+  // MacBook toggle function (called from purifier click handler via roomRefs)
+  function toggleMacbook() {
+    _macbookOn = !_macbookOn;
+    if (_macbookScreen) _macbookScreen.visible = _macbookOn;
+    if (_macbookOn) {
+      // Start music
+      if (!_macbookAudio) {
+        const song = _mbPlaylist[_mbSongIdx % _mbPlaylist.length];
+        _macbookAudio = new Audio(song.src);
+        _macbookAudio.volume = song.volume;
+        _macbookAudio.loop = false;
+        _macbookAudio.addEventListener('ended', () => {
+          _mbSongIdx++;
+          _macbookAudio = null;
+          if (_macbookOn) toggleMacbook(); // auto-play next
+          toggleMacbook();
+        });
+        _macbookAudio.play().catch(() => {});
+      }
+    } else {
+      // Stop music
+      if (_macbookAudio) {
+        _macbookAudio.pause();
+        _macbookAudio.currentTime = 0;
+        _macbookAudio = null;
+      }
+    }
   }
 
   return {
@@ -1477,6 +1537,7 @@ export function createRoom(scene) {
     lampShade: typeof lampShade !== 'undefined' ? lampShade : null,
     ceilSpot: typeof ceilSpot !== 'undefined' ? ceilSpot : null,
     ceilGlow: typeof ceilGlow !== 'undefined' ? ceilGlow : null,
-    leftWallX
+    leftWallX,
+    toggleMacbook
   };
 }
