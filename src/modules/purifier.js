@@ -3379,6 +3379,9 @@ export function createPurifier(scene) {
     if (refs.toggleMacbook) _toggleMacbook = refs.toggleMacbook;
   }
 
+  // Apply initial wood species (ash) so panels start with correct texture
+  applyCurrentStain();
+
   // Return purifier refs
   return {
     update,
