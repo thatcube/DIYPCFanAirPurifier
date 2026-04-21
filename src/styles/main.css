@@ -96,7 +96,7 @@ canvas#c { display: block; width: 100%; height: 100%; }
    ═══════════════════════════════════════════════════════════════════ */
 .panel {
   position: fixed; top: 12px; z-index: 200;
-  background: var(--glass);
+  background-color: var(--glass);
   border: 1px solid var(--glass-border);
   border-radius: var(--r-xl); padding: 0;
   backdrop-filter: var(--glass-blur);
@@ -157,7 +157,7 @@ canvas#c { display: block; width: 100%; height: 100%; }
 .panel-fab {
   position: fixed; top: 12px; left: 12px; z-index: 199;
   width: 48px; height: 48px; border-radius: var(--r-lg);
-  border: 1px solid var(--glass-border); background: var(--glass);
+  border: 1px solid var(--glass-border); background-color: var(--glass);
   color: var(--accent); font-size: 20px; cursor: pointer;
   display: none; backdrop-filter: var(--glass-blur);
   align-items: center; justify-content: center;
@@ -287,7 +287,7 @@ input[type=range]::-moz-range-thumb {
 /* ─── Part tooltip ───────────────────────────────────────────────── */
 .part-tooltip {
   position: fixed; z-index: 500; pointer-events: none;
-  background: var(--glass); border: 1px solid var(--glass-border);
+  background-color: var(--glass); border: 1px solid var(--glass-border);
   border-radius: var(--r-sm); padding: 8px 12px;
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -337,7 +337,7 @@ input[type=range]::-moz-range-thumb {
 }
 #coinHud {
   position: fixed; top: 16px; left: 16px;
-  background: var(--glass);
+  background-color: var(--glass);
   background-image: var(--glass-specular);
   color: var(--gold);
   border: 1px solid var(--gold-border); border-radius: var(--r-lg);
@@ -356,7 +356,7 @@ input[type=range]::-moz-range-thumb {
 }
 #secretCoinHud {
   position: fixed; top: 16px; left: 186px;
-  background: var(--glass);
+  background-color: var(--glass);
   background-image: var(--glass-specular);
   color: #4ab8ff;
   border: 1px solid rgba(74,184,255,0.3); border-radius: var(--r-lg);
@@ -408,7 +408,7 @@ input[type=range]::-moz-range-thumb {
 /* Controls panel (H key toggle) */
 #fpControlsPanel {
   position: fixed; right: 16px; bottom: 16px;
-  background: var(--glass);
+  background-color: var(--glass);
   background-image: var(--glass-specular);
   color: #e8eef7;
   border: 1px solid var(--glass-border); border-radius: var(--r-lg);
@@ -503,7 +503,7 @@ input[type=range]::-moz-range-thumb {
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 .pause-card {
-  background: var(--glass);
+  background-color: var(--glass);
   background-image: var(--glass-specular);
   border: 1px solid var(--glass-border);
   border-radius: var(--r-xl); padding: 0; overflow: hidden;
@@ -625,7 +625,7 @@ input[type=range]::-moz-range-thumb {
   font-family: system-ui, -apple-system, sans-serif;
 }
 .name-dialog-card {
-  background: var(--glass);
+  background-color: var(--glass);
   background-image: var(--glass-specular);
   border: 1px solid rgba(128,190,232,0.25);
   border-radius: var(--r-xl); padding: 24px 28px; max-width: 380px; width: 90%;
@@ -679,7 +679,7 @@ input[type=range]::-moz-range-thumb {
 #finishDialogCard {
   width: min(94vw, 520px); max-height: min(92vh, 780px);
   overflow: hidden; display: flex; flex-direction: column;
-  background: var(--glass);
+  background-color: var(--glass);
   background-image: var(--glass-specular);
   border: 1px solid rgba(128,190,232,0.3); border-radius: 22px;
   box-shadow: 0 24px 64px rgba(0,0,0,0.4),
@@ -882,7 +882,7 @@ body.play-mode #fpCrosshair { display: block; }
   gap: 12px; margin-bottom: 24px;
 }
 .char-card {
-  background: var(--glass);
+  background-color: var(--glass);
   border: 2px solid rgba(255,255,255,0.12);
   border-radius: var(--r-lg); padding: 12px 12px 14px;
   cursor: pointer; position: relative;
