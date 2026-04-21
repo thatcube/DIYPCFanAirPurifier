@@ -468,8 +468,18 @@ window._setFootDia = (val) => {
   markShadowsDirty();
 };
 
+const _initialBunFootH = state.bunFootH;
+let _footYOffset = 0; // tracks Y shift from foot height changes
+
 window._setFootHt = (val) => {
-  purifierRefs.setFootHeight(parseFloat(val));
+  const newH = parseFloat(val);
+  purifierRefs.setFootHeight(newH);
+  // Move the purifier group so the bottom stays on the floor
+  const newOffset = newH - _initialBunFootH;
+  const delta = newOffset - _footYOffset;
+  _footYOffset = newOffset;
+  purifierGroup.position.y += delta;
+  placementOffset.y += delta;
   markShadowsDirty();
 };
 
