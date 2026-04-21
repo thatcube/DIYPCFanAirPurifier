@@ -230,8 +230,8 @@ function _buildStaticBoxes() {
     yTop: fy + BED_CLEARANCE + hbH, room: true
   });
 
-  // Pillows — monolith: pillowW=22, pillowD=14, pillowH=4
-  const pillowW = 22, pillowD = 14, pillowH = 4;
+  // Pillows — visual pillowW=22 but collision trimmed to 18 so the cat fits between them
+  const pillowW = 18, pillowD = 14, pillowH = 4;
   const slatY = fy + BED_SLATS_FROM_FLOOR; // = fy + 10
   const mattH = 10;
   const mattY = slatY + 1 + mattH / 2; // = fy + 16
