@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { state } from './state.js';
 import { stdMat } from './materials.js';
 import { fpMode as _fpMode } from './game-fp.js';
-import { spawnSecretFanCoin, spawnSecretLampCoin, spawnSecretCeilingLightCoins, spawnSecretWindowCoin, spawnSecretDrawerCoin } from './coins.js';
+import { spawnSecretFanCoin, spawnSecretLampCoin, spawnSecretCeilingLightCoins, spawnSecretWindowCoin, spawnSecretDrawerCoin, spawnSecretMacbookCoin } from './coins.js';
 import { triggerNod as _triggerCatNod } from './cat-animation.js';
 
 export function createPurifier(scene) {
@@ -2012,8 +2012,7 @@ export function createPurifier(scene) {
     }
     // Clicked the MacBook → toggle screen + spawn secret coin on first click.
     if(obj._isMacbook){
-      console.log('[macbook] handleClickObject hit', obj);
-      if(typeof _triggerMacbookClick==='function') _triggerMacbookClick();
+      if(_fpMode) spawnSecretMacbookCoin();
       return;
     }
   }

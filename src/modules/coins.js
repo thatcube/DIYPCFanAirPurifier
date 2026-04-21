@@ -272,7 +272,10 @@ function _spawnSecretIfUntriggered(id, parent, pos, opts) {
   if (_secretTriggered[id]) return;
   _secretTriggered[id] = true;
   addCoin(parent, pos, { ...opts, secret: true, isDynamic: true, id: 'secret_' + id });
-  _showToast('Secret coin!');
+  // Make the just-spawned coin visible immediately (we're already in game mode)
+  const justAdded = coins[coins.length - 1];
+  if (justAdded) justAdded.mesh.visible = true;
+  _showToast('🔵 Secret coin!');
 }
 
 export function spawnSecretFanCoin() {
@@ -296,7 +299,11 @@ export function spawnSecretCeilingLightCoins() {
   addCoin(_coinGroup, new THREE.Vector3(pbX, fy + 6, pbZBase), { secret: true, isDynamic: true, id: 'secret_pb1' });
   addCoin(_coinGroup, new THREE.Vector3(pbX, fy + 14, pbZBase + pbStep), { secret: true, isDynamic: true, id: 'secret_pb2' });
   addCoin(_coinGroup, new THREE.Vector3(pbX, fy + 22, pbZBase + pbStep * 2), { secret: true, isDynamic: true, id: 'secret_pb3' });
-  _showToast('Secret coins!');
+  // Make all 3 visible immediately
+  for (let i = coins.length - 3; i < coins.length; i++) {
+    if (coins[i]) coins[i].mesh.visible = true;
+  }
+  _showToast('🔵 Secret coins!');
 }
 
 export function spawnSecretWindowCoin() {
@@ -309,6 +316,17 @@ export function spawnSecretDrawerCoin() {
   const fy = getFloorY();
   _spawnSecretIfUntriggered('drawer', _coinGroup,
     new THREE.Vector3(-BED_X, fy + BED_CLEARANCE - 1.8, BED_Z + BED_L / 2 - 8), {});
+}
+
+export function spawnSecretMacbookCoin() {
+  const fy = getFloorY();
+  // Float above the macbook on the bed
+  const mattH = 10, slatY = fy + BED_SLATS_FROM_FLOOR;
+  const mattY = slatY + 1 + mattH / 2;
+  const bedTopY = mattY + mattH / 2 + 1.5;
+  const rawX = BED_X - 58 / 2 + 12;
+  _spawnSecretIfUntriggered('macbook', _coinGroup,
+    new THREE.Vector3(-rawX, bedTopY + 9, BED_Z + 6), {});
 }
 
 // ── Full reset for new run ──────────────────────────────────────────
