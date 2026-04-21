@@ -228,8 +228,11 @@ export function spawnRoomCoins(roomRefs) {
   const tvCenterX = BED_X, tvCenterY = fy + 48;
   const tvW = 56.7, tvH = 31.9, tvD = 1.0, bezel = 0.3;
   const tvZ = OPP_WALL_Z + 0.5 + tvD / 2 + 0.1;
-  // Mini split vars
-  const msX = BED_X + BED_W / 2 + 12, msY = fy + 65, msH = 8, msD = 8, msZ = OPP_WALL_Z + 1;
+  // Mini split vars (must match room.js: msX=51-18-32/2=17 pre-mirror, msH=11, msD=8)
+  const msW_r = 32, msH_r = 11, msD_r = 8;
+  const msX_r = SIDE_WALL_X - 18 - msW_r / 2; // 17 pre-mirror → world -17
+  const msY_r = fy + 80 - 12 - msH_r / 2;     // = fy + 62.5
+  const msZ_r = OPP_WALL_Z + 0.5 + msD_r / 2; // = -73.5
   // Closet shelf vars
   const shelfCx = SIDE_WALL_X + CLOSET_DEPTH - 0.5 - 0.1 - 7;
   const secZ = CLOSET_Z - (CLOSET_INTERIOR_W - 1) / 2 + (CLOSET_INTERIOR_W - 1) * 0.125;
@@ -252,8 +255,8 @@ export function spawnRoomCoins(roomRefs) {
   addCoin(_coinGroup, new THREE.Vector3(35, fy + 3, 20), {});
   // 9. On closet shelf
   addCoin(_coinGroup, new THREE.Vector3(-(shelfCx), fy + 80 - 24 + 0.4 + 2.5, secZ), {});
-  // 10. On top of mini split (in front of wall, not behind it)
-  addCoin(_coinGroup, new THREE.Vector3(-msX, msY + msH / 2 + 2.2, msZ + msD / 2 + 1.5), {});
+  // 10. On top of mini split
+  addCoin(_coinGroup, new THREE.Vector3(-msX_r, msY_r + msH_r / 2 + 2.2, msZ_r), {});
   // 11. On top of TV
   addCoin(_coinGroup, new THREE.Vector3(-tvCenterX, tvCenterY + tvH / 2 + bezel + 2.2, tvZ - tvD / 2 + 1.2), {});
   // 12. Closet corner (floor)
