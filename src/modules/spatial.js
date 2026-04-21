@@ -90,7 +90,7 @@ export const PLACEMENT_OFFSETS = {
 // ── Player ──────────────────────────────────────────────────────────
 export const PLAYER_EYE_H = 4;       // camera height above _fpPos.y
 export const PLAYER_HEAD_EXTRA = -2;  // head collision below camera
-export const PLAYER_BODY_R = 2.2;    // collision radius
+export const PLAYER_BODY_R = 1.8;    // collision radius
 export const PLAYER_SPAWN_X = 4;
 export const PLAYER_SPAWN_Z = 22;
 
