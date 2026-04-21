@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { state } from './state.js';
 import { stdMat } from './materials.js';
 import { fpMode as _fpMode } from './game-fp.js';
+import { spawnSecretFanCoin, spawnSecretLampCoin, spawnSecretCeilingLightCoins, spawnSecretWindowCoin, spawnSecretDrawerCoin } from './coins.js';
 
 export function createPurifier(scene) {
   const canvas = document.getElementById('c');
@@ -1920,6 +1921,7 @@ export function createPurifier(scene) {
       _roomLampLight.intensity=_roomLampOn?1.2:0;
       if(_roomLampShade) _roomLampShade.material.emissiveIntensity=_roomLampOn?0.4:0;
       if(_roomLampBulb) _roomLampBulb.material.emissiveIntensity=_roomLampOn?1.2:0;
+      if(_fpMode) spawnSecretLampCoin();
       return;
     }
     // Clicked ceiling light → toggle
@@ -1929,6 +1931,7 @@ export function createPurifier(scene) {
       _roomCeilSpot.intensity=_roomCeilLightOn?0.95:0;
       if(_roomDomeMat) _roomDomeMat.emissiveIntensity=_roomCeilLightOn?0.8:0;
       if(_roomCeilGlow) _roomCeilGlow.intensity=_roomCeilLightOn?0.3:0;
+      if(_fpMode) spawnSecretCeilingLightCoins();
       return;
     }
     // Clicked window → toggle day/night
@@ -1949,13 +1952,14 @@ export function createPurifier(scene) {
         if(todSlider) todSlider.value=870;
       }
       _markShadowsDirty();
+      if(_fpMode) spawnSecretWindowCoin();
       return;
     }
     // Clicked a fan → toggle that individual fan's rotor (only if mesh has a _rotor ref) +
     // spawn secret Xbox-top Microsoft coin on the first fan interaction.
     if(obj._isFan && obj._rotor){
       obj._rotor.userData.spinning=!obj._rotor.userData.spinning;
-      if(typeof _spawnSecretXboxCoin==='function') _spawnSecretXboxCoin();
+      if(_fpMode) spawnSecretFanCoin();
       return;
     }
     // Clicked filter → toggle slide (ignore if already animating)
@@ -1986,7 +1990,7 @@ export function createPurifier(scene) {
       const targetZ=grp.position.z + deltaZ;
       grp._drawerSlide=newSlide;
       _drawerLerps.push({obj:grp, targetZ});
-      if(typeof _spawnSecretHeadboardUnderBedCoin==='function') _spawnSecretHeadboardUnderBedCoin();
+      if(_fpMode) spawnSecretDrawerCoin();
       return;
     }
     // Clicked a bifold closet leaf → toggle fold
