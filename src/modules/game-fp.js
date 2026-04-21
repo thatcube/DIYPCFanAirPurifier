@@ -708,7 +708,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     const chHits = _ray.intersectObjects(_scene.children, true);
     let aimingAt = false;
     for (const h of chHits) {
-      if (h.distance > 60) break;
+      if (h.distance > 220) break;
       let p = h.object;
       while (p) {
         if (p._isLamp || p._isCeilLight || p._isFan || p._isFilterL || p._isFilterR || p._isDrawer || p._isBifoldLeaf || p._isWindow) { aimingAt = true; break; }

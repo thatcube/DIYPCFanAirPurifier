@@ -1619,7 +1619,7 @@ export function createPurifier(scene) {
       let fpTarget = null;
       for (const h of fpHits) {
         if (!isAncestorVisible(h.object)) continue;
-        if (h.distance > 60) break; // interaction range
+        if (h.distance > 220) break; // interaction range
         fpTarget = getInteractiveTarget(h.object);
         if (fpTarget) break;
       }
