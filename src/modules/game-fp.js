@@ -587,13 +587,16 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     let dyC = -lookDir.y * camDist + camLift;
     let dzC = -lookDir.z * camDist + right.z * camShoulder;
 
-    // Wall/ceiling/floor clamp
-    const bnd = getBounds(new THREE.Vector3());
-    const m = 0.5;
-    const cyMin = floorY + 3, cyMax = (floorY + 80) - 3;
-    const maxDX = dxC > 0 ? (bnd.xMax - m - focal.x) : (focal.x - (bnd.xMin + m));
+    // Camera wall clamp — use actual room wall positions (tighter than player bounds)
+    // These are the hard wall faces the camera must never pass through
+    const camWallXMin = -SIDE_WALL_X + 1;   // right/closet wall inner face + buffer
+    const camWallXMax = -LEFT_WALL_X - 1;   // window wall inner face - buffer
+    const camWallZMin = OPP_WALL_Z + 1;     // TV wall inner face + buffer
+    const camWallZMax = 49 - 1;             // back wall inner face - buffer
+    const cyMin = floorY + 2, cyMax = (floorY + 80) - 2;
+    const maxDX = dxC > 0 ? (camWallXMax - focal.x) : (focal.x - camWallXMin);
     const maxDY = dyC > 0 ? (cyMax - focal.y) : (focal.y - cyMin);
-    const maxDZ = dzC > 0 ? (bnd.zMax - m - focal.z) : (focal.z - (bnd.zMin + m));
+    const maxDZ = dzC > 0 ? (camWallZMax - focal.z) : (focal.z - camWallZMin);
     const absDX = Math.abs(dxC), absDY = Math.abs(dyC), absDZ = Math.abs(dzC);
     let scale = 1;
     if (absDX > maxDX && absDX > 1e-4) scale = Math.min(scale, Math.max(0, maxDX) / absDX);
@@ -604,8 +607,10 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     let cxC = focal.x + dxC * scale;
     let cyC = focal.y + dyC * scale;
     let czC = focal.z + dzC * scale;
-    if (cyC > cyMax) cyC = cyMax;
-    else if (cyC < cyMin) cyC = cyMin;
+    // Hard clamp — camera must never leave the room
+    cxC = Math.max(camWallXMin, Math.min(camWallXMax, cxC));
+    cyC = Math.max(cyMin, Math.min(cyMax, cyC));
+    czC = Math.max(camWallZMin, Math.min(camWallZMax, czC));
 
     _camera.position.set(cxC, cyC, czC);
     _camera.lookAt(cxC + lookDir.x * 10, cyC + lookDir.y * 10, czC + lookDir.z * 10);

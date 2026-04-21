@@ -29,10 +29,10 @@ export function resetBoxPool() {
 // ── Bounds ──────────────────────────────────────────────────────────
 
 export const boundsBase = {
-  xMin: -(SIDE_WALL_X + CLOSET_DEPTH) + 2,
-  xMax: -(LEFT_WALL_X) - 2,
+  xMin: -(SIDE_WALL_X + CLOSET_DEPTH) + 0.25,  // closet back wall
+  xMax: -(LEFT_WALL_X) - 0.25,                   // window wall
   zMin: OPP_WALL_Z - CLOSET_INTERIOR_W / 2,
-  zMax: 49 - 0.25
+  zMax: 49 - 0.25                                 // back wall
 };
 
 export function getBounds(placementOffset) {
