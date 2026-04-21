@@ -46,14 +46,50 @@ const MUSIC_MUTE_KEY = 'diy_air_purifier_music_muted_v1';
 try { sfxMuted = localStorage.getItem(SFX_MUTE_KEY) === '1'; } catch (e) {}
 try { musicMuted = localStorage.getItem(MUSIC_MUTE_KEY) === '1'; } catch (e) {}
 
+function _syncAudioToggleUi() {
+  const sfxTog = document.getElementById('fpPauseMuteSfx');
+  const musicTog = document.getElementById('fpPauseMuteMusic');
+  const sfxState = document.getElementById('fpPauseMuteSfxState');
+  const musicState = document.getElementById('fpPauseMuteMusicState');
+
+  const sfxOn = !sfxMuted;
+  const musicOn = !musicMuted;
+
+  if (sfxTog) {
+    sfxTog.classList.toggle('on', sfxOn);
+    sfxTog.setAttribute('aria-checked', String(sfxOn));
+    sfxTog.setAttribute('aria-label', sfxOn ? 'SFX enabled' : 'SFX muted');
+  }
+  if (musicTog) {
+    musicTog.classList.toggle('on', musicOn);
+    musicTog.setAttribute('aria-checked', String(musicOn));
+    musicTog.setAttribute('aria-label', musicOn ? 'Music enabled' : 'Music muted');
+  }
+
+  if (sfxState) {
+    sfxState.textContent = sfxOn ? 'On' : 'Muted';
+    sfxState.classList.toggle('off', !sfxOn);
+  }
+  if (musicState) {
+    musicState.textContent = musicOn ? 'On' : 'Muted';
+    musicState.classList.toggle('off', !musicOn);
+  }
+}
+
+export function syncAudioToggleUi() {
+  _syncAudioToggleUi();
+}
+
 export function setSfxMuted(muted) {
   sfxMuted = !!muted;
   try { localStorage.setItem(SFX_MUTE_KEY, sfxMuted ? '1' : '0'); } catch (e) {}
+  _syncAudioToggleUi();
 }
 
 export function setMusicMuted(muted) {
   musicMuted = !!muted;
   try { localStorage.setItem(MUSIC_MUTE_KEY, musicMuted ? '1' : '0'); } catch (e) {}
+  _syncAudioToggleUi();
 }
 
 // ── Internal state ──────────────────────────────────────────────────
@@ -63,6 +99,15 @@ let _bobPhase = 0;
 let _lastPhysicsTs = 0;
 let _spaceHeld = 0;
 let _wasBonking = false;
+let _wasGroundedLast = true;
+let _wasAimingAtInteractable = false;
+let _lastAimToneTs = 0;
+let _lastFootstepTs = 0;
+let _wasFootstepMoving = false;
+let _lastUiInteractTs = 0;
+let _quickControlsVisible = false;
+
+const HUD_IDLE_CONTROLS_MS = 1400;
 
 const PITCH_MIN = -1.2;
 const PITCH_MAX = 1.55;
@@ -73,6 +118,7 @@ const _viewDir = new THREE.Vector3();
 const _lookTarget = new THREE.Vector3();
 const _ray = new THREE.Raycaster();
 const _rayCenter = new THREE.Vector2(0, 0);
+let _pointerLockRetryTimer = null;
 
 let _savedFov = 42;
 let _fpIgnorePointerUnlock = false;
@@ -94,11 +140,52 @@ let _purifierGroup = null;
 
 // Collision boxes from room (set during init)
 let _staticBoxes = [];
+const _dynWorldBox = new THREE.Box3();
+const _dynMin = new THREE.Vector3();
+const _dynMax = new THREE.Vector3();
+
+function _isObjectVisibleInWorld(obj) {
+  for (let n = obj; n; n = n.parent) {
+    if (n.visible === false) return false;
+  }
+  return true;
+}
+
+function _pushWorldAabbBox(result, obj, padXZ = 0) {
+  if (!obj || !obj.isObject3D || !_isObjectVisibleInWorld(obj)) return;
+  obj.updateWorldMatrix(true, true);
+  _dynWorldBox.setFromObject(obj);
+  if (_dynWorldBox.isEmpty()) return;
+
+  _dynMin.copy(_dynWorldBox.min);
+  _dynMax.copy(_dynWorldBox.max);
+
+  const b = acquireBox();
+  b.xMin = _dynMin.x - padXZ;
+  b.xMax = _dynMax.x + padXZ;
+  b.zMin = _dynMin.z - padXZ;
+  b.zMax = _dynMax.z + padXZ;
+  b.yTop = _dynMax.y;
+  b.yBottom = _dynMin.y;
+  result.push(b);
+}
 
 // ── Bonk SFX ────────────────────────────────────────────────────────
 
 let _bonkBuffer = null;
 let _bonkAC = null;
+
+function _ensureSfxAudioCtx() {
+  let ac = _bonkAC || coins.getAudioCtx();
+  if (!ac) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) ac = new AC();
+    if (ac && coins.setAudioCtx) coins.setAudioCtx(ac);
+  }
+  if (ac && ac.state === 'suspended' && ac.resume) ac.resume();
+  _bonkAC = ac;
+  return ac;
+}
 
 function _ensureBonkBuffer(ac) {
   if (_bonkBuffer || !ac) return;
@@ -115,7 +202,7 @@ function _ensureBonkBuffer(ac) {
 }
 
 function _playBonk(intensity) {
-  const ac = _bonkAC || coins.getAudioCtx();
+  const ac = _ensureSfxAudioCtx();
   if (!ac || sfxMuted) return;
   _ensureBonkBuffer(ac);
   if (!_bonkBuffer) return;
@@ -125,6 +212,88 @@ function _playBonk(intensity) {
   gain.gain.value = Math.min(1, intensity * 0.6);
   src.connect(gain).connect(ac.destination);
   src.start();
+}
+
+function _playTone({ freq, endFreq, dur = 0.06, gain = 0.02, type = 'sine' }) {
+  const ac = _ensureSfxAudioCtx();
+  if (!ac || sfxMuted) return;
+  const now = ac.currentTime;
+  const src = ac.createOscillator();
+  const g = ac.createGain();
+  src.type = type;
+  src.frequency.setValueAtTime(Math.max(40, Number(freq) || 440), now);
+  if (Number.isFinite(endFreq) && endFreq > 0) {
+    src.frequency.exponentialRampToValueAtTime(Math.max(40, endFreq), now + dur);
+  }
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.linearRampToValueAtTime(gain, now + Math.min(0.012, dur * 0.3));
+  g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+  src.connect(g).connect(ac.destination);
+  src.start(now);
+  src.stop(now + dur + 0.02);
+}
+
+function _playModeCue(entering) {
+  if (entering) {
+    _playTone({ freq: 420, endFreq: 560, dur: 0.075, gain: 0.016, type: 'sine' });
+  } else {
+    _playTone({ freq: 560, endFreq: 390, dur: 0.075, gain: 0.016, type: 'sine' });
+  }
+}
+
+function _playPauseCue(pausing) {
+  if (pausing) {
+    _playTone({ freq: 520, endFreq: 450, dur: 0.05, gain: 0.014, type: 'triangle' });
+  } else {
+    _playTone({ freq: 450, endFreq: 520, dur: 0.05, gain: 0.014, type: 'triangle' });
+  }
+}
+
+function _playJumpCue(chargeNorm) {
+  const n = Math.max(0, Math.min(1, chargeNorm));
+  _playTone({
+    freq: 300 + n * 120,
+    endFreq: 500 + n * 180,
+    dur: 0.065,
+    gain: 0.016 + n * 0.01,
+    type: 'triangle'
+  });
+}
+
+function _playLandCue(impactNorm) {
+  const n = Math.max(0, Math.min(1, impactNorm));
+  if (n < 0.12) return;
+  _playTone({
+    freq: 170 - n * 35,
+    endFreq: 115 - n * 25,
+    dur: 0.075,
+    gain: 0.011 + n * 0.012,
+    type: 'sine'
+  });
+}
+
+function _playAimCue() {
+  _playTone({ freq: 900, endFreq: 760, dur: 0.03, gain: 0.009, type: 'sine' });
+}
+
+function _playFootstepCue(speedNorm, sprinting) {
+  const n = Math.max(0, Math.min(1, speedNorm));
+  const base = sprinting ? 160 : 145;
+  const jitter = (Math.random() - 0.5) * 16;
+  _playTone({
+    freq: base + jitter,
+    endFreq: base - 34 + jitter * 0.4,
+    dur: sprinting ? 0.06 : 0.052,
+    gain: 0.007 + n * 0.006,
+    type: 'triangle'
+  });
+  _playTone({
+    freq: 520 + Math.random() * 120,
+    endFreq: 390 + Math.random() * 30,
+    dur: 0.02,
+    gain: 0.0025 + n * 0.0015,
+    type: 'sine'
+  });
 }
 
 // ── Init ────────────────────────────────────────────────────────────
@@ -147,6 +316,72 @@ export function init(refs) {
 
   // Bind input
   _bindInputs();
+  _syncAudioToggleUi();
+}
+
+function _setQuickControlsVisible(visible) {
+  const next = !!visible;
+  if (_quickControlsVisible === next) return;
+  _quickControlsVisible = next;
+  const dock = document.getElementById('fpQuickControls');
+  if (dock) dock.classList.toggle('is-hidden', !next);
+}
+
+function _clearPointerLockRetry() {
+  if (_pointerLockRetryTimer) {
+    clearTimeout(_pointerLockRetryTimer);
+    _pointerLockRetryTimer = null;
+  }
+}
+
+function _isPointerLockCooldownError(err) {
+  if (!err) return false;
+  if (err.name === 'SecurityError') return true;
+  const msg = String(err.message || err);
+  return /pointer lock cannot be acquired immediately after the user has exited the lock/i.test(msg);
+}
+
+function _requestPointerLockWithRetry(retries = 2, delayMs = 0) {
+  const attempt = () => {
+    if (!_canvas || !fpMode || fpPaused || document.pointerLockElement) return;
+    let req;
+    try {
+      req = _canvas.requestPointerLock();
+    } catch (err) {
+      if (_isPointerLockCooldownError(err) && retries > 0) {
+        _clearPointerLockRetry();
+        _pointerLockRetryTimer = setTimeout(() => {
+          _pointerLockRetryTimer = null;
+          _requestPointerLockWithRetry(retries - 1, 0);
+        }, 260);
+      }
+      return;
+    }
+
+    // Safari/modern browsers may return a Promise; always handle rejection.
+    if (req && typeof req.then === 'function') {
+      req.catch(err => {
+        if (_isPointerLockCooldownError(err) && retries > 0) {
+          _clearPointerLockRetry();
+          _pointerLockRetryTimer = setTimeout(() => {
+            _pointerLockRetryTimer = null;
+            _requestPointerLockWithRetry(retries - 1, 0);
+          }, 260);
+        }
+      });
+    }
+  };
+
+  if (delayMs > 0) {
+    _clearPointerLockRetry();
+    _pointerLockRetryTimer = setTimeout(() => {
+      _pointerLockRetryTimer = null;
+      attempt();
+    }, delayMs);
+    return;
+  }
+
+  attempt();
 }
 
 // ── Static collision boxes ──────────────────────────────────────────
@@ -165,6 +400,27 @@ function _buildStaticBoxes() {
     zMin: BED_Z - BED_L / 2, zMax: BED_Z + BED_L / 2,
     yTop: bedTop, yBottom: fy + BED_CLEARANCE, room: true
   });
+
+  // Bed legs — corner posts from floor up to frame clearance.
+  const bedLegR = 1.2;
+  const bedLegH = BED_CLEARANCE;
+  for (const [lx, lz] of [
+    [BED_X - BED_W / 2 + 3, BED_Z - BED_L / 2 + 3],
+    [BED_X + BED_W / 2 - 3, BED_Z - BED_L / 2 + 3],
+    [BED_X - BED_W / 2 + 3, BED_Z + BED_L / 2 - 3],
+    [BED_X + BED_W / 2 - 3, BED_Z + BED_L / 2 - 3],
+  ]) {
+    const wx = -lx; // room meshes are mirrored on X in createRoom()
+    _staticBoxes.push({
+      xMin: wx - bedLegR,
+      xMax: wx + bedLegR,
+      zMin: lz - bedLegR,
+      zMax: lz + bedLegR,
+      yTop: fy + bedLegH,
+      yBottom: fy,
+      room: true
+    });
+  }
 
   // Nightstand — top slab (drawer holes below are walk-through when open)
   _staticBoxes.push({
@@ -446,19 +702,32 @@ function _getBoxes() {
     result.push(b);
   }
 
-  // Console props collision — world-space for TV placement
-  if (px === 45) {
-    const topSurface = yTopPanel;
-    // Xbox at world (53, _, -68): 5.94×5.94 footprint, 11.85 tall
-    result.push({ xMin: 50, xMax: 56, zMin: -71, zMax: -65, yTop: topSurface + 11.85, yBottom: topSurface });
-    // Switch dock at world (39, _, -68): ~8×3 footprint, 3.5 tall
-    result.push({ xMin: 35, xMax: 43, zMin: -69.5, zMax: -66.5, yTop: topSurface + 3.5, yBottom: topSurface });
-    // Switch tablet at world (39, _, -68): wider, thinner
-    result.push({ xMin: 34, xMax: 44, zMin: -69, zMax: -67, yTop: topSurface + 5.5, yBottom: topSurface + 0.75 });
+  // Console props collision — use live mesh bounds so hitboxes always align.
+  if (_purifierRefs && _purifierRefs.getConsoleCollisionBoxes) {
+    const consoleBoxes = _purifierRefs.getConsoleCollisionBoxes();
+    if (Array.isArray(consoleBoxes)) {
+      for (const src of consoleBoxes) {
+        if (!src) continue;
+        const b = acquireBox();
+        b.xMin = src.xMin;
+        b.xMax = src.xMax;
+        b.zMin = src.zMin;
+        b.zMax = src.zMax;
+        b.yTop = src.yTop;
+        b.yBottom = src.yBottom;
+        result.push(b);
+      }
+    }
+  }
 
-    // Game stack (Switch games pile) — next to purifier, world ~(45, _, -58)
-    // Stack is ~6.75" wide, ~4" deep, ~8" tall pile of cases
-    result.push({ xMin: 42, xMax: 49, zMin: -60, zMax: -56, yTop: topSurface + 8, yBottom: topSurface });
+  // Purifier feet/legs collision — derived from current leg meshes so
+  // style/diameter/height changes stay in sync with physics.
+  const purifierLegGroup = _purifierRefs && _purifierRefs.parts && _purifierRefs.parts.legs;
+  if (purifierLegGroup && Array.isArray(purifierLegGroup.children)) {
+    for (const legMesh of purifierLegGroup.children) {
+      if (!legMesh || !legMesh.isMesh) continue;
+      _pushWorldAabbBox(result, legMesh, 0.04);
+    }
   }
 
   // Closet bifold doors — dynamic collision based on door state
@@ -664,6 +933,15 @@ export function toggleFirstPerson() {
   if (crosshair) crosshair.style.display = fpMode ? 'block' : 'none';
 
   if (fpMode) {
+    // Reset help panel state on new run for a cleaner HUD start.
+    _toggleHelp(false);
+    _lastUiInteractTs = performance.now() - HUD_IDLE_CONTROLS_MS;
+    _setQuickControlsVisible(true);
+    _wasAimingAtInteractable = false;
+    _wasGroundedLast = true;
+    _lastFootstepTs = 0;
+    _wasFootstepMoving = false;
+
     // Enter FP
     _savedFov = _camera.fov;
     _camera.fov = 75;
@@ -672,7 +950,7 @@ export function toggleFirstPerson() {
     // Request pointer lock
     _fpIgnorePointerUnlock = true;
     setTimeout(() => { _fpIgnorePointerUnlock = false; }, 300);
-    if (_canvas) try { _canvas.requestPointerLock(); } catch (e) {}
+    _requestPointerLockWithRetry(3, 0);
 
     // Disable orbit controls
     if (_controls) _controls.enabled = false;
@@ -694,8 +972,16 @@ export function toggleFirstPerson() {
 
     if (_markShadowsDirty) _markShadowsDirty();
     document.body.classList.add('play-mode');
+    _playModeCue(true);
     if (_showToast) _showToast('Game mode! WASD to move, Space to jump');
   } else {
+    _toggleHelp(false);
+    _setQuickControlsVisible(false);
+    _wasAimingAtInteractable = false;
+    _wasGroundedLast = true;
+    _lastFootstepTs = 0;
+    _wasFootstepMoving = false;
+
     // Exit FP
     _camera.fov = _savedFov;
     _camera.updateProjectionMatrix();
@@ -731,6 +1017,7 @@ export function toggleFirstPerson() {
 
     if (_markShadowsDirty) _markShadowsDirty();
     document.body.classList.remove('play-mode');
+    _playModeCue(false);
   }
 }
 
@@ -766,6 +1053,7 @@ export function clearPauseState() {
 export function setPaused(paused) {
   if (!fpMode) return;
   fpPaused = !!paused;
+  _playPauseCue(fpPaused);
 
   const overlay = document.getElementById('fpPauseOverlay');
   const crosshair = document.getElementById('fpCrosshair');
@@ -791,13 +1079,11 @@ export function setPaused(paused) {
     }
     if (crosshair) crosshair.style.opacity = '0.25';
 
-    // Sync mute toggle states
-    const sfxTog = document.getElementById('fpPauseMuteSfx');
-    const musicTog = document.getElementById('fpPauseMuteMusic');
-    if (sfxTog) sfxTog.classList.toggle('on', !sfxMuted);
-    if (musicTog) musicTog.classList.toggle('on', !musicMuted);
+    _setQuickControlsVisible(true);
+    _syncAudioToggleUi();
 
     // Release pointer lock
+    _clearPointerLockRetry();
     _fpIgnorePointerUnlock = true;
     if (document.pointerLockElement) document.exitPointerLock();
     setTimeout(() => { _fpIgnorePointerUnlock = false; }, 300);
@@ -808,12 +1094,14 @@ export function setPaused(paused) {
     // Release focus trap
     if (_pauseFocusTrap) { _pauseFocusTrap.release(); _pauseFocusTrap = null; }
     if (_pauseSavedFocus) { _pauseSavedFocus.restore(); _pauseSavedFocus = null; }
+    _lastUiInteractTs = performance.now();
+    _setQuickControlsVisible(false);
 
     // Re-lock pointer (desktop only) — delay to avoid SecurityError
     if (_canvas && !state.isMobile) {
       _fpIgnorePointerUnlock = true;
       setTimeout(() => {
-        try { _canvas.requestPointerLock(); } catch (e) {}
+        _requestPointerLockWithRetry(4, 0);
         setTimeout(() => { _fpIgnorePointerUnlock = false; }, 300);
       }, 200);
     }
@@ -823,12 +1111,17 @@ export function setPaused(paused) {
 // ── Help panel toggle ───────────────────────────────────────────────
 
 let _helpOpen = false;
-function _toggleHelp() {
-  _helpOpen = !_helpOpen;
+function _toggleHelp(open) {
+  if (typeof open === 'boolean') _helpOpen = open;
+  else _helpOpen = !_helpOpen;
+
   const panel = document.getElementById('fpControlsPanel');
   const hint = document.getElementById('fpControlsHint');
+  const quickHelp = document.getElementById('fpQuickHelpBtn');
   if (panel) panel.style.display = _helpOpen ? 'block' : 'none';
   if (hint) hint.style.display = _helpOpen ? 'none' : '';
+  if (quickHelp) quickHelp.classList.toggle('on', _helpOpen);
+  if (_helpOpen) _setQuickControlsVisible(true);
 }
 // Expose for HTML onclick
 window._toggleHelp = _toggleHelp;
@@ -838,6 +1131,10 @@ window._toggleHelp = _toggleHelp;
 export function setCamMode(mode) {
   fpCamMode = mode || (fpCamMode === 'first' ? 'third' : 'first');
   if (_catGroup) _catGroup.visible = fpMode && fpCamMode === 'third';
+}
+
+export function getJumpHoldFrames() {
+  return _spaceHeld;
 }
 
 // ── Physics tick ────────────────────────────────────────────────────
@@ -880,6 +1177,16 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   // Lower dead zone so momentum carries further before stopping
   if (!inputActive && Math.hypot(_velX, _velZ) < 0.002) { _velX = 0; _velZ = 0; }
 
+  const isInteracting = inputActive
+    || fpKeys.space
+    || fpKeys.shift
+    || Math.abs(stepX) > 0
+    || Math.abs(stepY) > 0
+    || _spaceHeld > 0;
+  if (isInteracting) _lastUiInteractTs = ts;
+  const showQuickControls = _helpOpen || (ts - _lastUiInteractTs >= HUD_IDLE_CONTROLS_MS);
+  _setQuickControlsVisible(showQuickControls);
+
   const moveX = _velX * frameScale;
   const moveZ = _velZ * frameScale;
 
@@ -891,14 +1198,25 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     const charge = Math.min(_spaceHeld, 60);
     const power = 0.4 + charge * 0.025;
     fpVy = power;
+    _playJumpCue(charge / 60);
     _spaceHeld = 0;
   }
   if (!fpKeys.space) _spaceHeld = 0;
 
   // Charge bar UI
+  const chargePct = _spaceHeld > 0 ? Math.min(_spaceHeld / 60, 1) : 0;
+  const cbBar = document.getElementById('fpChargeBar');
   const cbFill = document.getElementById('fpChargeFill');
+  const cbValue = document.getElementById('fpChargeValue');
   if (cbFill) {
-    cbFill.style.width = _spaceHeld > 0 ? Math.min(_spaceHeld / 60 * 100, 100) + '%' : '0%';
+    cbFill.style.width = `${Math.round(chargePct * 100)}%`;
+  }
+  if (cbBar) {
+    cbBar.classList.toggle('charging', chargePct > 0);
+    cbBar.classList.toggle('charged', chargePct >= 0.95);
+  }
+  if (cbValue) {
+    cbValue.textContent = chargePct > 0 ? `${Math.round(chargePct * 100)}%` : 'Ready';
   }
 
   // ── Gravity ───────────────────────────────────────────────────────
@@ -1010,6 +1328,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   fpPos.x = nx;
   fpPos.z = nz;
   fpPos.y = newY;
+  const impactVy = fpVy;
   if (fpPos.y < groundY) { fpPos.y = groundY; fpVy = 0; }
 
   // Ceiling
@@ -1023,7 +1342,25 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
   // ── Headbob ───────────────────────────────────────────────────────
   const grounded = Math.abs(fpPos.y - groundY) < 0.05;
+  if (grounded && !_wasGroundedLast && impactVy < -0.06) {
+    _playLandCue(Math.min(1, (-impactVy) / 0.8));
+  }
+  _wasGroundedLast = grounded;
   const horizSpd = Math.hypot(_velX, _velZ);
+  const movingOnGround = grounded && horizSpd > 0.03;
+  if (movingOnGround) {
+    const sprintingStep = fpKeys.shift && horizSpd > 0.08;
+    const speedNorm = Math.min(1, horizSpd / (sprintingStep ? 0.65 : 0.35));
+    const intervalMs = sprintingStep ? 185 : 255;
+    if (!_wasFootstepMoving) _lastFootstepTs = ts - intervalMs * 0.55;
+    if (ts - _lastFootstepTs >= intervalMs) {
+      _playFootstepCue(speedNorm, sprintingStep);
+      _lastFootstepTs = ts;
+    }
+  } else {
+    _lastFootstepTs = ts;
+  }
+  _wasFootstepMoving = movingOnGround;
   if (grounded && horizSpd > 0.02) {
     _bobPhase += horizSpd * 0.6 * frameScale;
   }
@@ -1112,6 +1449,11 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       }
       if (aimingAt) break;
     }
+    if (aimingAt && !_wasAimingAtInteractable && ts - _lastAimToneTs > 220) {
+      _playAimCue();
+      _lastAimToneTs = ts;
+    }
+    _wasAimingAtInteractable = aimingAt;
     crosshair.style.background = aimingAt ? '#91deff' : 'rgba(255,255,255,0.8)';
     crosshair.style.transform = aimingAt ? 'translate(-50%,-50%) scale(1.5)' : 'translate(-50%,-50%) scale(1)';
   }
@@ -1195,7 +1537,7 @@ function _bindInputs() {
   if (_canvas) {
     _canvas.addEventListener('click', () => {
       if (fpMode && !fpPaused && !document.pointerLockElement) {
-        try { _canvas.requestPointerLock(); } catch (e) {}
+        _requestPointerLockWithRetry(2, 0);
       }
     });
   }

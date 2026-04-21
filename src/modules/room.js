@@ -1580,11 +1580,33 @@ export function createRoom(scene) {
   let _macbookScreen = null;
   let _macbookOn = false;
   let _macbookAudio = null;
+  const MUSIC_MUTE_KEY = 'diy_air_purifier_music_muted_v1';
+  let _macbookMuted = false;
+  try { _macbookMuted = localStorage.getItem(MUSIC_MUTE_KEY) === '1'; } catch (e) {}
   const _mbPlaylist = [
     { name: 'Octodad Theme', src: 'assets/songs/Octodad (Nobody Suspects a Thing).mp3', volume: 0.28 },
     { name: 'Escape from the City', src: 'assets/songs/Escape From The City ... for City Escape.mp3', volume: 0.28 },
   ];
   let _mbSongIdx = 0;
+
+  function _playMacbookTrack() {
+    if (!_macbookOn) return;
+    const song = _mbPlaylist[_mbSongIdx % _mbPlaylist.length];
+    const audio = new Audio(song.src);
+    audio.volume = song.volume;
+    audio.muted = _macbookMuted;
+    audio.loop = false;
+    audio.addEventListener('ended', () => {
+      if (_macbookAudio !== audio) return;
+      _mbSongIdx = (_mbSongIdx + 1) % _mbPlaylist.length;
+      _macbookAudio = null;
+      if (_macbookOn) _playMacbookTrack();
+    });
+    _macbookAudio = audio;
+    audio.play().catch(() => {
+      if (_macbookAudio === audio) _macbookAudio = null;
+    });
+  }
 
   // Load screen texture
   const _macbookLogoTex = new THREE.TextureLoader().load('assets/scummit-logo.webp');
@@ -1687,19 +1709,7 @@ export function createRoom(scene) {
     if (_macbookScreen) _macbookScreen.visible = _macbookOn;
     if (_macbookOn) {
       // Start music
-      if (!_macbookAudio) {
-        const song = _mbPlaylist[_mbSongIdx % _mbPlaylist.length];
-        _macbookAudio = new Audio(song.src);
-        _macbookAudio.volume = song.volume;
-        _macbookAudio.loop = false;
-        _macbookAudio.addEventListener('ended', () => {
-          _mbSongIdx++;
-          _macbookAudio = null;
-          if (_macbookOn) toggleMacbook(); // auto-play next
-          toggleMacbook();
-        });
-        _macbookAudio.play().catch(() => {});
-      }
+      if (!_macbookAudio) _playMacbookTrack();
     } else {
       // Stop music
       if (_macbookAudio) {
@@ -1708,6 +1718,12 @@ export function createRoom(scene) {
         _macbookAudio = null;
       }
     }
+  }
+
+  function setMacbookMuted(muted) {
+    _macbookMuted = !!muted;
+    try { localStorage.setItem(MUSIC_MUTE_KEY, _macbookMuted ? '1' : '0'); } catch (e) {}
+    if (_macbookAudio) _macbookAudio.muted = _macbookMuted;
   }
 
   return {
@@ -1734,6 +1750,7 @@ export function createRoom(scene) {
     getCornerDoorPanelMesh: () => doorPanel,
     getCornerDoorAngle: () => _cornerDoorAngle,
     toggleMacbook,
+    setMacbookMuted,
     getMacbookScreenMesh: () => _macbookScreen,
     drawers
   };

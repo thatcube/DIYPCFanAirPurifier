@@ -31,6 +31,15 @@ let _bonkBuffer = null;
 let _showToast = () => {};
 export function setToastFn(fn) { _showToast = fn; }
 
+const SFX_MUTE_KEY = 'diy_air_purifier_muted_v1';
+let _sfxMuted = false;
+try { _sfxMuted = localStorage.getItem(SFX_MUTE_KEY) === '1'; } catch (e) {}
+
+export function setSfxMuted(muted) {
+  _sfxMuted = !!muted;
+  try { localStorage.setItem(SFX_MUTE_KEY, _sfxMuted ? '1' : '0'); } catch (e) {}
+}
+
 // ── Coin factory ────────────────────────────────────────────────────
 
 export function makeCoin(opts) {
@@ -112,6 +121,7 @@ export function resetScores() {
  */
 export function playChime(isSecret) {
   try {
+    if (_sfxMuted) return;
     const ac = _ensureAC();
     if (!ac) return;
     if (isSecret) {
@@ -162,6 +172,7 @@ export function ensureBonkBuffer(ac) {
 
 export function playBonk(intensity) {
   try {
+    if (_sfxMuted) return;
     const ac = _ensureAC();
     if (!ac || !_bonkBuffer) return;
     const src = ac.createBufferSource();

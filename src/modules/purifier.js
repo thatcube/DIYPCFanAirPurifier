@@ -7,8 +7,17 @@
 import * as THREE from 'three';
 import { state } from './state.js';
 import { stdMat } from './materials.js';
-import { fpMode as _fpMode } from './game-fp.js';
-import { spawnSecretCornerDoorCoin, spawnSecretLampCoin, spawnSecretCeilingLightCoins, spawnSecretWindowCoin, spawnSecretDrawerCoin, spawnSecretMacbookCoin } from './coins.js';
+import { fpMode as _fpMode, sfxMuted as _sfxMuted } from './game-fp.js';
+import {
+  spawnSecretCornerDoorCoin,
+  spawnSecretLampCoin,
+  spawnSecretCeilingLightCoins,
+  spawnSecretWindowCoin,
+  spawnSecretDrawerCoin,
+  spawnSecretMacbookCoin,
+  getAudioCtx as _getAudioCtx,
+  setAudioCtx as _setAudioCtx
+} from './coins.js';
 import { triggerNod as _triggerCatNod } from './cat-animation.js';
 
 export function createPurifier(scene) {
@@ -30,6 +39,40 @@ export function createPurifier(scene) {
   let _applyTimeOfDay = null;
   let _toggleMacbook = null;
   let _toggleCornerDoor = null;
+  let _uiSfxAC = null;
+
+  function _ensureUiSfxAC() {
+    let ac = _uiSfxAC || _getAudioCtx();
+    if (!ac) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) ac = new AC();
+      if (ac) _setAudioCtx(ac);
+    }
+    if (ac && ac.state === 'suspended' && ac.resume) ac.resume();
+    _uiSfxAC = ac;
+    return ac;
+  }
+
+  function _playDrawerCue(opening) {
+    if (_sfxMuted) return;
+    const ac = _ensureUiSfxAC();
+    if (!ac) return;
+    const now = ac.currentTime;
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.type = 'triangle';
+    const startF = opening ? 170 : 215;
+    const endF = opening ? 240 : 150;
+    const dur = 0.07;
+    osc.frequency.setValueAtTime(startF, now);
+    osc.frequency.exponentialRampToValueAtTime(endF, now + dur);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(0.0095, now + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    osc.connect(gain).connect(ac.destination);
+    osc.start(now);
+    osc.stop(now + dur + 0.02);
+  }
 
   // W, H, D, ply, ft declared in header from state
   // panelW declared in header from state
@@ -536,12 +579,14 @@ export function createPurifier(scene) {
       allFanMats.push(frameMat);
       const frame=new THREE.Mesh(frameGeo,frameMat);
       frame.position.set(0,fy,fanZ);
+      frame._isFan=true;
       g.add(frame);
   
       // Rotor group (hub + blades) — spins as a unit
       const rotor=new THREE.Group();
       rotor.position.set(0,fy,fanZ);
       rotor.userData.axis=new THREE.Vector3(0,0,inDir);
+      frame._rotor=rotor;
   
       // Hub
       const hubMat=stdMat({color:0x111111,shininess:40});
@@ -551,6 +596,8 @@ export function createPurifier(scene) {
         hubMat
       );
       hub.rotation.x=Math.PI/2;
+      hub._isFan=true;
+      hub._rotor=rotor;
       rotor.add(hub);
   
       // Hub cap
@@ -562,6 +609,8 @@ export function createPurifier(scene) {
       );
       cap.rotation.x=Math.PI/2;
       cap.position.set(0,0,-inDir*fanDepth*0.4);
+      cap._isFan=true;
+      cap._rotor=rotor;
       rotor.add(cap);
   
       // Swept fan blades (7 blades) — P12 Pro sickle-shaped, wide with minimal gaps
@@ -632,8 +681,8 @@ export function createPurifier(scene) {
         new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false})
       );
       clickBox.position.set(0, fy, fanZ);
-      clickBox._isFan=true;
-      clickBox._rotor=rotor;
+      clickBox._isFanHitbox=true;
+      clickBox.raycast=function(){};
       g.add(clickBox);
   
       // Back support brace — 4 spokes, pinwheel offset (each arm misses center)
@@ -780,6 +829,7 @@ export function createPurifier(scene) {
       allFanMats.push(frameMat);
       const frame=new THREE.Mesh(frameGeo,frameMat);
       frame.position.set(0,fanYPos,fz);
+      frame._isFan=true;
       g.add(frame);
   
       // Rotor
@@ -787,11 +837,14 @@ export function createPurifier(scene) {
       rotor.position.set(0,fanYPos,fz);
       rotor.userData.axis=new THREE.Vector3(0,0,-1); // spin around local Z (= world Y after rotateX PI/2)
       rotor.rotation.x=Math.PI/2; // orient blades horizontally, facing down
+      frame._rotor=rotor;
   
       const hubMat=stdMat({color:0x111111,shininess:40});
       allFanMats.push(hubMat);
       const hub=new THREE.Mesh(new THREE.CylinderGeometry(hubR,hubR,fanDepth*0.85,24),hubMat);
       hub.rotation.x=Math.PI/2;
+      hub._isFan=true;
+      hub._rotor=rotor;
       rotor.add(hub);
   
       const capMat=stdMat({color:0x181818,shininess:50});
@@ -799,6 +852,8 @@ export function createPurifier(scene) {
       const cap=new THREE.Mesh(new THREE.CylinderGeometry(hubR*1.15,hubR*1.15,fanDepth*0.08,24),capMat);
       cap.rotation.x=Math.PI/2;
       cap.position.set(0,0,-fanDepth*0.4);
+      cap._isFan=true;
+      cap._rotor=rotor;
       rotor.add(cap);
   
       const fanBlades2=[];
@@ -849,8 +904,8 @@ export function createPurifier(scene) {
         new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false})
       );
       clickBox2.position.set(0, fanYPos, fz);
-      clickBox2._isFan=true;
-      clickBox2._rotor=rotor;
+      clickBox2._isFanHitbox=true;
+      clickBox2.raycast=function(){};
       g.add(clickBox2);
   
       // Back support brace — 4 spokes, pinwheel offset (top-mount: exhaust is UP/+Y)
@@ -1822,29 +1877,18 @@ export function createPurifier(scene) {
   
   // ─── Interactive click: tap fans to toggle spin, tap filters to slide in/out ───
   // Tag interactive groups
-  [front3,front4,back3,back4,altTop4].forEach(g=>g.traverse(o=>{o._isFan=true;}));
-  // Tag each rotor's children with a reference to that rotor for per-fan click
+  // Tag each rotor's children with a reference to that rotor for per-fan click.
+  // Only explicit fan meshes are interactive; panel/wall meshes are not.
   for(const rotor of allRotors){
     rotor.userData.spinning=true;
     rotor.userData.spinSpeed=0.125; // start spinning immediately (50% of SPIN_MAX)
-    rotor.traverse(o=>{o._rotor=rotor;});
-  }
-  // Also tag frame/brace meshes — find the nearest rotor in the same group
-  [front3,front4,back3,back4,altTop4].forEach(g=>{
-    const rotorsInGroup=[];
-    g.traverse(o=>{if(o.isGroup && o.userData.axis) rotorsInGroup.push(o);});
-    g.traverse(o=>{
-      if(o.isMesh && o._isFan && !o._rotor && rotorsInGroup.length>0){
-        // Find closest rotor by Y position
-        let best=rotorsInGroup[0], bestD=Infinity;
-        for(const r of rotorsInGroup){
-          const d=Math.abs(o.position.y-r.position.y)+Math.abs(o.position.z-r.position.z);
-          if(d<bestD){bestD=d;best=r;}
-        }
-        o._rotor=best;
+    rotor.traverse(o=>{
+      if(o.isMesh){
+        o._isFan=true;
+        o._rotor=rotor;
       }
     });
-  });
+  }
   filterL.traverse(o=>{o._isFilterL=true;});
   filterR.traverse(o=>{o._isFilterR=true;});
   
@@ -1983,6 +2027,7 @@ export function createPurifier(scene) {
       if(!grp) return;
       if(_drawerLerps.some(dl=>dl.obj===grp)) return;
       grp._drawerOpen=!grp._drawerOpen;
+      _playDrawerCue(grp._drawerOpen);
       // slide=0 closed, slide=slideMax fully out (-Z direction).
       const newSlide=grp._drawerOpen ? grp._drawerSlideMax : 0;
       const deltaZ=-(newSlide - grp._drawerSlide); // change to apply to current Z
@@ -2602,6 +2647,11 @@ export function createPurifier(scene) {
   // ─── Console props (shown in Under TV mode) ───
   const consoleProps=new THREE.Group();
   consoleProps.visible=false;
+  let _consoleXboxMesh=null;
+  let _consoleSwitchGroup=null;
+  const _consoleCollisionWorldBox=new THREE.Box3();
+  const _consoleCollisionMin=new THREE.Vector3();
+  const _consoleCollisionMax=new THREE.Vector3();
   parts.console=consoleProps;
   origins.console=consoleProps.position.clone();
   {
@@ -2615,6 +2665,7 @@ export function createPurifier(scene) {
     // Sits on top of purifier, toward the right end
     xbox.position.set(0, topY+xbH/2, 8);
     xbox.rotation.y = -7 * Math.PI / 180; // slight 5° rotation
+    _consoleXboxMesh=xbox;
     consoleProps.add(xbox);
     // Green accent vent on top
     const ventMat=stdMat({color:0x107c10,roughness:0.6});
@@ -2626,6 +2677,7 @@ export function createPurifier(scene) {
     // (same slot width throughout), built as two parallel walls on the
     // front/back of the slot.
     const switchGroup=new THREE.Group();
+    _consoleSwitchGroup=switchGroup;
     switchGroup.rotation.y=-Math.PI/2 + 5 * Math.PI / 180; // face +Z with 5° natural tilt
     switchGroup.position.z=-6; // shift along purifier length
     // Tablet dims (mirror the values defined below for slot sizing).
@@ -3121,6 +3173,41 @@ export function createPurifier(scene) {
     updateTvGameStackPlacement();
     _markShadowsDirty();
   }
+
+  function _isObjectVisibleInWorld(obj){
+    for(let n=obj;n;n=n.parent){
+      if(n.visible===false) return false;
+    }
+    return true;
+  }
+
+  function _getWorldAabbFromObject(obj,padXZ=0){
+    if(!obj || !_isObjectVisibleInWorld(obj)) return null;
+    obj.updateWorldMatrix(true,true);
+    _consoleCollisionWorldBox.setFromObject(obj);
+    if(_consoleCollisionWorldBox.isEmpty()) return null;
+    _consoleCollisionMin.copy(_consoleCollisionWorldBox.min);
+    _consoleCollisionMax.copy(_consoleCollisionWorldBox.max);
+    return {
+      xMin:_consoleCollisionMin.x-padXZ,
+      xMax:_consoleCollisionMax.x+padXZ,
+      zMin:_consoleCollisionMin.z-padXZ,
+      zMax:_consoleCollisionMax.z+padXZ,
+      yTop:_consoleCollisionMax.y,
+      yBottom:_consoleCollisionMin.y
+    };
+  }
+
+  function getConsoleCollisionBoxes(){
+    const boxes=[];
+    const xboxBox=_getWorldAabbFromObject(_consoleXboxMesh,0.12);
+    if(xboxBox) boxes.push(xboxBox);
+    const switchBox=_getWorldAabbFromObject(_consoleSwitchGroup,0.1);
+    if(switchBox) boxes.push(switchBox);
+    const gameStackBox=_getWorldAabbFromObject(tvGameStackProps,0.08);
+    if(gameStackBox) boxes.push(gameStackBox);
+    return boxes;
+  }
   
   // ─── Wall-mount bracket (shown in Wall placement mode) ───
   const wallBracketGroup=new THREE.Group();
@@ -3383,6 +3470,7 @@ export function createPurifier(scene) {
     toggleFanRGB,
     showWallBracket,
     showConsoleProps,
+    getConsoleCollisionBoxes,
     setRoomRefs,
   };
 }
