@@ -143,6 +143,22 @@ lighting.applyTimeOfDay(870, todRefs);
 // Force shadow update after TOD repositions lights
 _shadowDirtyOneShot = true;
 
+// Wire room refs into purifier for click interactions (lamp, ceiling light, window)
+purifierRefs.setRoomRefs({
+  lampLight: roomRefs.lampLight,
+  lampShade: roomRefs.lampShade,
+  ceilSpot: roomRefs.ceilSpot,
+  domeMat: roomRefs.domeMat,
+  ceilGlow: roomRefs.ceilGlow,
+  outdoor: roomRefs.outdoor,
+  applyTimeOfDay: (minutes) => {
+    lighting.applyTimeOfDay(minutes, todRefs);
+    const todLabel = document.getElementById('todLabel');
+    if (todLabel) todLabel.textContent = lighting.formatTime(minutes);
+    markShadowsDirty();
+  }
+});
+
 // ── Wire module cross-references ────────────────────────────────────
 
 music.setToastFn(showToast);

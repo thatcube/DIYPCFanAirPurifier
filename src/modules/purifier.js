@@ -20,6 +20,13 @@ export function createPurifier(scene) {
   const { H, W, D, ply, ft, bunFootH, bunFootR, panelW } = state;
   const _boardThickness = ply === 0.75 ? '34' : 'half';
 
+  // Room refs — set after both room and purifier are built via setRoomRefs()
+  let _roomLampOn = true, _roomLampLight = null, _roomLampShade = null, _roomLampBulb = null;
+  let _roomCeilLightOn = true, _roomCeilSpot = null, _roomDomeMat = null, _roomCeilGlow = null;
+  let _roomOutdoorMat = null, _roomOutdoorDayTex = null, _roomOutdoorNightTex = null;
+  let _windowIsNight = false;
+  let _applyTimeOfDay = null; // function(minuteOfDay) from main.js
+
   // W, H, D, ply, ft declared in header from state
   // panelW declared in header from state
   
@@ -1895,42 +1902,42 @@ export function createPurifier(scene) {
   
   function handleClickObject(obj){
     if(!obj) return;
-    // Clicked lamp → toggle light + spawn secret lamp-shade crown coin on first click.
+    // Clicked lamp → toggle light
     if(obj._isLamp){
-      lampOn=!lampOn;
-      lampLight.intensity=lampOn?1.2:0;
-      lampShade.material.emissiveIntensity=lampOn?0.4:0;
-      if(lampBulb) lampBulb.material.emissiveIntensity=lampOn?1.2:0;
-      if(typeof _spawnSecretLampCoin==='function') _spawnSecretLampCoin();
+      if(!_roomLampLight) return;
+      _roomLampOn=!_roomLampOn;
+      _roomLampLight.intensity=_roomLampOn?1.2:0;
+      if(_roomLampShade) _roomLampShade.material.emissiveIntensity=_roomLampOn?0.4:0;
+      if(_roomLampBulb) _roomLampBulb.material.emissiveIntensity=_roomLampOn?1.2:0;
       return;
     }
-    // Clicked ceiling light → toggle + spawn secret Power BI bar-chart coins on first click.
+    // Clicked ceiling light → toggle
     if(obj._isCeilLight){
-      ceilLightOn=!ceilLightOn;
-      ceilSpot.intensity=ceilLightOn?0.95:0;
-      domeMat.emissiveIntensity=ceilLightOn?0.8:0;
-      if(ceilGlow) ceilGlow.intensity=ceilLightOn?0.3:0;
-      if(typeof _spawnSecretPowerBICoins==='function') _spawnSecretPowerBICoins();
+      if(!_roomCeilSpot) return;
+      _roomCeilLightOn=!_roomCeilLightOn;
+      _roomCeilSpot.intensity=_roomCeilLightOn?0.95:0;
+      if(_roomDomeMat) _roomDomeMat.emissiveIntensity=_roomCeilLightOn?0.8:0;
+      if(_roomCeilGlow) _roomCeilGlow.intensity=_roomCeilLightOn?0.3:0;
       return;
     }
-    // Clicked window → toggle day/night + spawn secret moon coin on first click.
+    // Clicked window → toggle day/night
     if(obj._isWindow){
+      if(!_roomOutdoorMat || !_applyTimeOfDay) return;
       _windowIsNight=!_windowIsNight;
-      // Swap outdoor backdrop texture
-      outdoorMat.map=_windowIsNight?_outdoorNightTex:_outdoorDayTex;
-      outdoorMat.color.setHex(_windowIsNight?0x445566:0xfff0d4);
-      outdoorMat.needsUpdate=true;
-      // Apply matching time of day
+      if(_roomOutdoorNightTex && _roomOutdoorDayTex) {
+        _roomOutdoorMat.map=_windowIsNight?_roomOutdoorNightTex:_roomOutdoorDayTex;
+        _roomOutdoorMat.color.setHex(_windowIsNight?0x445566:0xfff0d4);
+        _roomOutdoorMat.needsUpdate=true;
+      }
       const todSlider=_el('todSlider');
       if(_windowIsNight){
-        applyTimeOfDay(1320); // 10 PM
+        _applyTimeOfDay(1320);
         if(todSlider) todSlider.value=1320;
       } else {
-        applyTimeOfDay(870); // 2:30 PM
+        _applyTimeOfDay(870);
         if(todSlider) todSlider.value=870;
       }
       _markShadowsDirty();
-      if(typeof _spawnSecretWindowCoin==='function') _spawnSecretWindowCoin();
       return;
     }
     // Clicked a fan → toggle that individual fan's rotor (only if mesh has a _rotor ref) +
@@ -3066,6 +3073,10 @@ export function createPurifier(scene) {
   let spinning = true;
   let spinTarget = SPIN_MAX * (fanSpeedPct / 100);
 
+  let _rgbTime = 0;
+  const _rgbColor = new THREE.Color();
+  let currentRGB = 'rainbow'; // 'rainbow', 'custom', 'off'
+
   function update(dtSec, animFrameScale) {
     // Fan rotor spinning
     const globalTarget = spinning ? SPIN_MAX * (fanSpeedPct / 100) : 0;
@@ -3077,6 +3088,24 @@ export function createPurifier(scene) {
       if (Math.abs(spd) > 0.0001) {
         const axis = rotor.userData.axis || 'z';
         rotor.rotation[axis] += spd * animFrameScale;
+      }
+    }
+
+    // RGB rainbow cycling — hue rotation across all fan blades
+    if (fansRGB && currentRGB === 'rainbow') {
+      _rgbTime += dtSec;
+      const breathe = Math.sin(_rgbTime * 1.2) * 0.5 + 0.5;
+      const hueBase = _rgbTime * 0.06 + breathe * 0.1;
+      let fanIdx = 0;
+      for (const blades of allBladeMatsPerFan) {
+        const fanHueOffset = fanIdx * 0.12;
+        for (let j = 0; j < blades.length; j++) {
+          const bladeHue = (hueBase + fanHueOffset + j * 0.08) % 1;
+          _rgbColor.setHSL(bladeHue, 0.9, 0.55);
+          blades[j].emissive.copy(_rgbColor);
+          blades[j].emissiveIntensity = 0.6 + breathe * 0.3;
+        }
+        fanIdx++;
       }
     }
 
@@ -3174,7 +3203,31 @@ export function createPurifier(scene) {
   }
   function toggleFanRGB() {
     fansRGB = !fansRGB;
+    if (fansRGB) currentRGB = 'rainbow';
     applyBladeStyle();
+    // Clear emissive when turning off
+    if (!fansRGB) {
+      for (const blades of allBladeMatsPerFan) {
+        for (const blade of blades) {
+          blade.emissive.setHex(0x000000);
+          blade.emissiveIntensity = 0;
+        }
+      }
+    }
+  }
+
+  // Set room refs for click interactions (called by main.js after room is built)
+  function setRoomRefs(refs) {
+    if (refs.lampLight) _roomLampLight = refs.lampLight;
+    if (refs.lampShade) _roomLampShade = refs.lampShade;
+    if (refs.lampBulb) _roomLampBulb = refs.lampBulb;
+    if (refs.ceilSpot) _roomCeilSpot = refs.ceilSpot;
+    if (refs.domeMat) _roomDomeMat = refs.domeMat;
+    if (refs.ceilGlow) _roomCeilGlow = refs.ceilGlow;
+    if (refs.outdoor && refs.outdoor.material) _roomOutdoorMat = refs.outdoor.material;
+    if (refs.outdoorDayTex) _roomOutdoorDayTex = refs.outdoorDayTex;
+    if (refs.outdoorNightTex) _roomOutdoorNightTex = refs.outdoorNightTex;
+    if (refs.applyTimeOfDay) _applyTimeOfDay = refs.applyTimeOfDay;
   }
 
   // Return purifier refs
@@ -3200,5 +3253,6 @@ export function createPurifier(scene) {
     toggleFanRGB,
     showWallBracket,
     showConsoleProps,
+    setRoomRefs,
   };
 }

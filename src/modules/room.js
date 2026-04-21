@@ -1443,6 +1443,9 @@ export function createRoom(scene) {
     wallMeshes, baseMeshes,
     tvCenterX, tvCenterY, tvZ, tvD,
     lampLight, lampOn,
+    lampShade: typeof lampShade !== 'undefined' ? lampShade : null,
+    ceilSpot: typeof ceilSpot !== 'undefined' ? ceilSpot : null,
+    ceilGlow: typeof ceilGlow !== 'undefined' ? ceilGlow : null,
     leftWallX
   };
 }
