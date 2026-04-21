@@ -97,6 +97,12 @@ export function addCoin(parent, localPos, opts) {
 export function resetScores() {
   coinScore = 0;
   coinSecretScore = 0;
+  // Un-collect all coins so they reappear on the next run
+  for (const c of coins) {
+    c.collected = false;
+    c.mesh.visible = true;
+    c.mesh.position.copy(c.basePos);
+  }
 }
 
 /**
