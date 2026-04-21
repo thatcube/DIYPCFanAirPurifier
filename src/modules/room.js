@@ -447,7 +447,7 @@ export function createRoom(scene) {
     // Bulb visible inside shade
     const bulbMat=new THREE.MeshStandardMaterial({color:0xffffcc,emissive:0xffeedd,emissiveIntensity:1.2,roughness:0.3});
     lampBulb=new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), bulbMat);
-    lampBulb.position.set(lampX, lampBaseY+0.8+stemH+3, lampZ);
+    lampBulb.position.set(lampX, lampBaseY+0.8+stemH+1, lampZ);
     lampBulb._isRoom=true; lampBulb._isLamp=true; addRoom(lampBulb);
   }
   
