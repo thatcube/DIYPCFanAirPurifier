@@ -14,17 +14,13 @@
   --glass-soft: rgba(255, 255, 255, 0.04);
   --glass-stroke-soft: rgba(255, 255, 255, 0.07);
 
-  /* Liquid Glass specular — multi-color iridescent highlight (MS brand tints) */
-  --glass-specular: linear-gradient(
-    165deg,
-    rgba(242, 80, 34, 0.06) 0%,
-    rgba(127, 186, 0, 0.04) 15%,
-    rgba(255, 255, 255, 0.2) 25%,
-    rgba(0, 164, 239, 0.06) 40%,
-    rgba(255, 255, 255, 0.04) 55%,
-    rgba(255, 185, 0, 0.04) 70%,
-    rgba(255, 255, 255, 0.0) 85%
-  );
+  /* Liquid Glass specular — MS logo quadrant tints over white highlight */
+  --glass-specular:
+    radial-gradient(ellipse at 25% 25%, rgba(242, 80, 34, 0.07) 0%, transparent 50%),
+    radial-gradient(ellipse at 75% 25%, rgba(127, 186, 0, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 25% 75%, rgba(0, 164, 239, 0.07) 0%, transparent 50%),
+    radial-gradient(ellipse at 75% 75%, rgba(255, 185, 0, 0.06) 0%, transparent 50%),
+    linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.03) 40%, transparent 60%);
 
   /* Accent — richer multi-stop gradient */
   --accent: #91deff;
