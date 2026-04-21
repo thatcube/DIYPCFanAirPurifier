@@ -324,7 +324,7 @@ export function spawnSecretMacbookCoin() {
   const mattH = 10, slatY = fy + BED_SLATS_FROM_FLOOR;
   const mattY = slatY + 1 + mattH / 2;
   const bedTopY = mattY + mattH / 2 + 1.5;
-  const rawX = BED_X - 58 / 2 + 12;
+  const rawX = BED_X - 58 / 2 + 12 + 24;
   _spawnSecretIfUntriggered('macbook', _coinGroup,
     new THREE.Vector3(-rawX, bedTopY + 9, BED_Z + 6), {});
 }
