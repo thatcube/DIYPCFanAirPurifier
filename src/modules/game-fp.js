@@ -587,9 +587,8 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     let dyC = -lookDir.y * camDist + camLift;
     let dzC = -lookDir.z * camDist + right.z * camShoulder;
 
-    // Camera wall clamp — use actual room wall positions (tighter than player bounds)
-    // These are the hard wall faces the camera must never pass through
-    const camWallXMin = -SIDE_WALL_X + 1;   // right/closet wall inner face + buffer
+    // Camera wall clamp — include closet area so player can walk in
+    const camWallXMin = -(SIDE_WALL_X + CLOSET_DEPTH) + 1; // closet back wall + buffer
     const camWallXMax = -LEFT_WALL_X - 1;   // window wall inner face - buffer
     const camWallZMin = OPP_WALL_Z + 1;     // TV wall inner face + buffer
     const camWallZMax = 49 - 1;             // back wall inner face - buffer
