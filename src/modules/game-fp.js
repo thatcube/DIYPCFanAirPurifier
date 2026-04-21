@@ -185,23 +185,76 @@ function _buildStaticBoxes() {
     { xMin: -(SIDE_WALL_X + 0.5), xMax: -SIDE_WALL_X, zMin: CLOSET_Z + CLOSET_W / 2, zMax: 49, yTop: fy + WALL_HEIGHT, room: true }
   );
 
+  // ── Closet collision (exact match to monolith _fpBoxesBase) ──
+
+  const cZ = CLOSET_Z;        // -50
+  const cW = CLOSET_W;        // 48
+  const cD = CLOSET_DEPTH;    // 36
+  const cIW = CLOSET_INTERIOR_W; // 78
+  const cH = 66;              // CLOSET_H (opening height)
+  const cIH = WALL_HEIGHT;    // 80 (interior height = wall height)
+
   // Closet back wall
   _staticBoxes.push({
-    xMin: -(SIDE_WALL_X + CLOSET_DEPTH + 0.25), xMax: -(SIDE_WALL_X + CLOSET_DEPTH - 0.25),
-    zMin: CLOSET_Z - CLOSET_INTERIOR_W / 2, zMax: CLOSET_Z + CLOSET_INTERIOR_W / 2,
-    yTop: fy + WALL_HEIGHT, room: true
+    xMin: -(SIDE_WALL_X + cD + 0.25), xMax: -(SIDE_WALL_X + cD - 0.25),
+    zMin: cZ - cIW / 2, zMax: cZ + cIW / 2,
+    yTop: fy + cIH, room: true
   });
-  // Closet side walls
+  // Closet +Z side wall
   _staticBoxes.push({
-    xMin: -(SIDE_WALL_X + CLOSET_DEPTH), xMax: -(SIDE_WALL_X + 0.5),
-    zMin: CLOSET_Z + CLOSET_INTERIOR_W / 2 - 0.25, zMax: CLOSET_Z + CLOSET_INTERIOR_W / 2 + 0.25,
-    yTop: fy + WALL_HEIGHT, room: true
+    xMin: -(SIDE_WALL_X + cD), xMax: -(SIDE_WALL_X + 0.5),
+    zMin: cZ + cIW / 2 - 0.25, zMax: cZ + cIW / 2 + 0.25,
+    yTop: fy + cIH, room: true
   });
+  // Closet -Z side wall
   _staticBoxes.push({
-    xMin: -(SIDE_WALL_X + CLOSET_DEPTH), xMax: -(SIDE_WALL_X + 0.5),
-    zMin: CLOSET_Z - CLOSET_INTERIOR_W / 2 - 0.25, zMax: CLOSET_Z - CLOSET_INTERIOR_W / 2 + 0.25,
-    yTop: fy + WALL_HEIGHT, room: true
+    xMin: -(SIDE_WALL_X + cD), xMax: -(SIDE_WALL_X + 0.5),
+    zMin: cZ - cIW / 2 - 0.25, zMax: cZ - cIW / 2 + 0.25,
+    yTop: fy + cIH, room: true
   });
+  // Wings between opening edges and wider interior side walls
+  // +Z wing
+  _staticBoxes.push({
+    xMin: -(SIDE_WALL_X + 0.5), xMax: -SIDE_WALL_X,
+    zMin: cZ + cW / 2, zMax: cZ + cIW / 2,
+    yTop: fy + cIH, room: true
+  });
+  // -Z wing
+  _staticBoxes.push({
+    xMin: -(SIDE_WALL_X + 0.5), xMax: -SIDE_WALL_X,
+    zMin: cZ - cIW / 2, zMax: cZ - cW / 2,
+    yTop: fy + cIH, room: true
+  });
+  // Closet door header trim
+  _staticBoxes.push({
+    xMin: -SIDE_WALL_X, xMax: -(SIDE_WALL_X - 1),
+    zMin: cZ - cW / 2 - 2.5, zMax: cZ + cW / 2 + 2.5,
+    yTop: fy + cH + 4, yBottom: fy + cH, room: true
+  });
+  // Solid wall above closet door opening
+  _staticBoxes.push({
+    xMin: -(SIDE_WALL_X + 0.5), xMax: -SIDE_WALL_X,
+    zMin: cZ - cW / 2, zMax: cZ + cW / 2,
+    yTop: fy + WALL_HEIGHT, yBottom: fy + cH, room: true
+  });
+  // Closet shelf
+  {
+    const shelfCx = SIDE_WALL_X + cD - 0.5 - 0.1 - 7; // 79.4
+    _staticBoxes.push({
+      xMin: -(shelfCx + 7), xMax: -(shelfCx - 7),
+      zMin: cZ - (cIW - 1) / 2, zMax: cZ + (cIW - 1) / 2,
+      yTop: fy + cIH - 24 + 0.4, yBottom: fy + cIH - 24 - 0.4, room: true
+    });
+  }
+  // Clothes rod
+  {
+    const rodCx = (SIDE_WALL_X + 0.5) + (cD - 0.5) / 2; // 69.25
+    _staticBoxes.push({
+      xMin: -(rodCx + 0.4), xMax: -(rodCx - 0.4),
+      zMin: cZ - (cIW - 2) / 2, zMax: cZ + (cIW - 2) / 2,
+      yTop: fy + cIH - 30 + 0.4, yBottom: fy + cIH - 30 - 0.4, room: true
+    });
+  }
 
   // Opposite wall (TV wall)
   _staticBoxes.push({
@@ -590,7 +643,8 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     // Camera wall clamp — include closet area so player can walk in
     const camWallXMin = -(SIDE_WALL_X + CLOSET_DEPTH) + 1; // closet back wall + buffer
     const camWallXMax = -LEFT_WALL_X - 1;   // window wall inner face - buffer
-    const camWallZMin = OPP_WALL_Z + 1;     // TV wall inner face + buffer
+    // Z bounds must include closet interior (extends to cZ - cIW/2 = -89)
+    const camWallZMin = CLOSET_Z - CLOSET_INTERIOR_W / 2 + 1; // closet -Z side wall
     const camWallZMax = 49 - 1;             // back wall inner face - buffer
     const cyMin = floorY + 2, cyMax = (floorY + 80) - 2;
     const maxDX = dxC > 0 ? (camWallXMax - focal.x) : (focal.x - camWallXMin);
