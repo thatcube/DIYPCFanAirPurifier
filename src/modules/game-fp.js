@@ -754,8 +754,8 @@ export function setPaused(paused) {
     // Sync mute toggle states
     const sfxTog = document.getElementById('fpPauseMuteSfx');
     const musicTog = document.getElementById('fpPauseMuteMusic');
-    if (sfxTog) sfxTog.classList.toggle('on', sfxMuted);
-    if (musicTog) musicTog.classList.toggle('on', musicMuted);
+    if (sfxTog) sfxTog.classList.toggle('on', !sfxMuted);
+    if (musicTog) musicTog.classList.toggle('on', !musicMuted);
 
     // Release pointer lock
     _fpIgnorePointerUnlock = true;

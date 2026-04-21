@@ -565,14 +565,12 @@ input[type=range]::-moz-range-thumb {
 .pause-sub { color: var(--text-dim); font-size: 11px; margin-bottom: 16px; }
 .pause-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
 .pause-btn {
-  border: 1px solid var(--glass-border); border-radius: var(--r-md);
+  border-radius: var(--r-md);
   padding: 12px 20px; font-size: 14px; font-weight: 700;
   cursor: pointer; font-family: inherit;
-  transition: all var(--dur-med) var(--spring);
-  backdrop-filter: blur(12px);
+  transition: all 0.35s var(--ease-out-expo);
 }
-.pause-btn:hover { transform: scale(1.03) translateY(-1px); }
-.pause-btn:active { transform: scale(0.96); }
+.pause-btn:active { transform: translateY(1px); }
 .pause-btn.primary {
   background-color: var(--glass);
   background-image:
