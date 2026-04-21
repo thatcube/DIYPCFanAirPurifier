@@ -260,8 +260,8 @@ export function spawnRoomCoins(roomRefs) {
   addCoin(_coinGroup, new THREE.Vector3(-(SIDE_WALL_X + 2.0), fy + 2.5, CLOSET_Z + CLOSET_INTERIOR_W / 2 - 1.2), {});
   // 13. On top of lamp shade
   addCoin(_coinGroup, new THREE.Vector3(-(TBL_X + TBL_W / 2 - 6), fy + TBL_H + 28.5, TBL_Z + TBL_D / 2 - 6), {});
-  // 14. Inside the purifier
-  addCoin(_coinGroup, new THREE.Vector3(0, fy + 3, -68), { insidePurifier: true });
+  // 14. Inside the purifier (purifier group is at x=45, z=-68)
+  addCoin(_coinGroup, new THREE.Vector3(45, fy + 3, -68), { insidePurifier: true });
 }
 
 // ── Secret coin system ──────────────────────────────────────────────

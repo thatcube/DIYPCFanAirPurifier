@@ -970,24 +970,25 @@ export function createRoom(scene) {
   // Window sill
   roomBox(0.8, 0.5, winW+2, 0xc8c4be, leftWallX+0.4, winBottom-0.25, winCenterZ, 0,0,0);
   
-  // Window frame (thin white trim)
+  // Window frame (thin white trim) — offset 0.3" in front of wall to avoid z-fighting
   const frameMat=stdMat({color:0xf5f5f0,shininess:10});
   const frameT=0.8, frameD=0.6;
+  const trimX = leftWallX + frameD / 2 + 0.05; // sit proud of the wall surface
   // Top
   const wft=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT, winW+frameT*2), frameMat);
-  wft.position.set(leftWallX, winTop+frameT/2, winCenterZ); wft._isRoom=true; wft._isWindow=true; addRoom(wft);
+  wft.position.set(trimX, winTop+frameT/2, winCenterZ); wft._isRoom=true; wft._isWindow=true; addRoom(wft);
   // Bottom
   const wfb=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT, winW+frameT*2), frameMat);
-  wfb.position.set(leftWallX, winBottom-frameT/2, winCenterZ); wfb._isRoom=true; wfb._isWindow=true; addRoom(wfb);
+  wfb.position.set(trimX, winBottom-frameT/2, winCenterZ); wfb._isRoom=true; wfb._isWindow=true; addRoom(wfb);
   // Left (toward outside)
   const wfl=new THREE.Mesh(new THREE.BoxGeometry(frameD, winH, frameT), frameMat);
-  wfl.position.set(leftWallX, winCenterY, winFront-frameT/2); wfl._isRoom=true; wfl._isWindow=true; addRoom(wfl);
+  wfl.position.set(trimX, winCenterY, winFront-frameT/2); wfl._isRoom=true; wfl._isWindow=true; addRoom(wfl);
   // Right (toward inside)
   const wfr=new THREE.Mesh(new THREE.BoxGeometry(frameD, winH, frameT), frameMat);
-  wfr.position.set(leftWallX, winCenterY, winBack+frameT/2); wfr._isRoom=true; wfr._isWindow=true; addRoom(wfr);
+  wfr.position.set(trimX, winCenterY, winBack+frameT/2); wfr._isRoom=true; wfr._isWindow=true; addRoom(wfr);
   // Horizontal mullion (center bar)
   const wfm=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT*0.6, winW), frameMat);
-  wfm.position.set(leftWallX, winCenterY, winCenterZ); wfm._isRoom=true; wfm._isWindow=true; addRoom(wfm);
+  wfm.position.set(trimX, winCenterY, winCenterZ); wfm._isRoom=true; wfm._isWindow=true; addRoom(wfm);
   
   // Outdoor scene visible through window — canvas-painted backdrop
   const outdoorCvs=document.createElement('canvas');
