@@ -1571,9 +1571,10 @@ export function createPurifier(scene) {
   },{passive:false});
   window.addEventListener('mouseup',e=>{
     drag=false;
-    // Restore cursor based on what we're hovering
     canvas.style.cursor=_hoverInteractive?'pointer':'grab';
     const wasDragging=_dragFilter && !_pendingFilterDrag;
+    const dx=Math.abs(e.clientX-_clickStartX), dy=Math.abs(e.clientY-_clickStartY);
+    console.log('[purifier] mouseup dx='+dx+' dy='+dy+' wasDrag='+wasDragging+' fpMode='+_fpMode);
     if(wasDragging){
       handleDragEnd();
     } else {
@@ -1614,7 +1615,20 @@ export function createPurifier(scene) {
           _ch.style.boxShadow='0 0 0 2px rgba(9,14,20,0.6),0 0 10px rgba(0,0,0,0.35)';
         }, 140);
       }
-      if(window._fpLookTarget) handleClickObject(window._fpLookTarget);
+      // In FP mode, raycast from screen center to find interactive target
+      _raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+      const fpHits = _raycaster.intersectObjects(scene.children, true);
+      let fpTarget = null;
+      for (const h of fpHits) {
+        if (!isAncestorVisible(h.object)) continue;
+        if (h.distance > 60) break; // interaction range
+        fpTarget = getInteractiveTarget(h.object);
+        if (fpTarget) break;
+      }
+      if (fpTarget) {
+        console.log('[purifier] FP click:', fpTarget._isLamp?'LAMP':fpTarget._isCeilLight?'CEIL':fpTarget._isWindow?'WIN':fpTarget._isFan?'FAN':'OTHER');
+        handleClickObject(fpTarget);
+      }
     }
   });
   window.addEventListener('touchend',e=>{
