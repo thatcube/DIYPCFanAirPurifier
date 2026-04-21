@@ -1396,31 +1396,16 @@ export function createRoom(scene) {
     bpBody.castShadow = true; bpBody.receiveShadow = true; bpBody._isRoom = true;
     addRoom(bpBody);
 
-    // Straps — drape from top of bag, curving down to floor and trailing out
+    // Straps — flat ribbons laying on the floor, extending out from one end of the bag
     const strapMat = new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.88 });
-    const strapTopY = bpY + bpThick / 2; // top of bag
     for (const sz of [-1, 1]) {
-      // Build strap as a curve from bag top down to floor
-      const strapLen = 18;
-      const strapGeo = new THREE.BoxGeometry(strapLen, 0.35, 1.5, 14, 1, 1);
-      const sp = strapGeo.attributes.position;
-      for (let si = 0; si < sp.count; si++) {
-        let sx = sp.getX(si), sy = sp.getY(si);
-        // Normalized position along strap (0 = attached end, 1 = trailing end)
-        const t = (sx + strapLen / 2) / strapLen;
-        // Arc: starts at bag-top height, curves down to floor
-        const dropHeight = strapTopY - floorY - 0.3;
-        // Smooth ease-out curve for natural drape
-        const drape = dropHeight * (1 - Math.pow(1 - t, 2));
-        sy -= drape;
-        // Slight sag in the middle of the trailing section
-        if (t > 0.5) sy -= Math.sin((t - 0.5) * 2 * Math.PI) * 0.3;
-        sp.setXY(si, sx, sy);
-      }
-      strapGeo.computeVertexNormals();
-      const strap = new THREE.Mesh(strapGeo, strapMat);
-      strap.position.set(bpX + bpL / 2 - 2, strapTopY, bpZ + sz * 3);
-      strap.rotation.y = bpAngle + sz * 0.12;
+      const strap = new THREE.Mesh(
+        new THREE.BoxGeometry(10, 0.2, 1.5),
+        strapMat
+      );
+      // Lay flat on floor, extending out from the narrow end of the bag
+      strap.position.set(bpX + bpL / 2 + 4, floorY + 0.15, bpZ + sz * 2.8);
+      strap.rotation.y = bpAngle + sz * 0.2;
       strap.castShadow = true; strap.receiveShadow = true; strap._isRoom = true;
       addRoom(strap);
     }
