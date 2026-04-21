@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { state } from './state.js';
 import { stdMat } from './materials.js';
 import { fpMode as _fpMode } from './game-fp.js';
-import { spawnSecretFanCoin, spawnSecretLampCoin, spawnSecretCeilingLightCoins, spawnSecretWindowCoin, spawnSecretDrawerCoin, spawnSecretMacbookCoin } from './coins.js';
+import { spawnSecretCornerDoorCoin, spawnSecretLampCoin, spawnSecretCeilingLightCoins, spawnSecretWindowCoin, spawnSecretDrawerCoin, spawnSecretMacbookCoin } from './coins.js';
 import { triggerNod as _triggerCatNod } from './cat-animation.js';
 
 export function createPurifier(scene) {
@@ -29,6 +29,7 @@ export function createPurifier(scene) {
   let _windowIsNight = false;
   let _applyTimeOfDay = null;
   let _toggleMacbook = null;
+  let _toggleCornerDoor = null;
 
   // W, H, D, ply, ft declared in header from state
   // panelW declared in header from state
@@ -1670,7 +1671,7 @@ export function createPurifier(scene) {
   function getInteractiveTarget(obj){
     let p=obj;
     while(p){
-      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isMacbook||p._isWindow) return p;
+      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isCornerDoorHandle||p._isMacbook||p._isWindow) return p;
       p=p.parent;
     }
     return null;
@@ -1906,6 +1907,12 @@ export function createPurifier(scene) {
   
   function handleClickObject(obj){
     if(!obj) return;
+    // Clicked corner door handle (door by the nightstand) → open/close
+    if(obj._isCornerDoorHandle){
+      if(_toggleCornerDoor) _toggleCornerDoor();
+      if(_fpMode) spawnSecretCornerDoorCoin();
+      return;
+    }
     // Clicked lamp → toggle light
     if(obj._isLamp){
       if(!_roomLampLight) return;
@@ -1947,11 +1954,9 @@ export function createPurifier(scene) {
       if(_fpMode) spawnSecretWindowCoin();
       return;
     }
-    // Clicked a fan → toggle that individual fan's rotor (only if mesh has a _rotor ref) +
-    // spawn secret Xbox-top Microsoft coin on the first fan interaction.
+    // Clicked a fan → toggle that individual fan's rotor (only if mesh has a _rotor ref).
     if(obj._isFan && obj._rotor){
       obj._rotor.userData.spinning=!obj._rotor.userData.spinning;
-      if(_fpMode) spawnSecretFanCoin();
       return;
     }
     // Clicked filter → toggle slide (ignore if already animating)
@@ -2339,30 +2344,57 @@ export function createPurifier(scene) {
       if (sw) sw.style.background = s.swatch;
     }
   }
+
+  let xrayOn=false;
   
   function applyXrayToObject(root,on){
+    if(!root) return;
     root.traverse(obj=>{
       if(!obj.isMesh || obj._isRoom) return;
-      const mat=obj.material;
-      if(!mat) return;
-      if(on){
-        if(mat._origOpacity===undefined) mat._origOpacity=mat.opacity;
-        if(mat._origTransp===undefined) mat._origTransp=mat.transparent;
-        if(mat._origDepthW===undefined) mat._origDepthW=mat.depthWrite;
-        mat.transparent=true;
-        mat.opacity=0.35;
-        mat.depthWrite=false;
-        mat.needsUpdate=true;
-      } else if(mat._origOpacity!==undefined){
-        mat.opacity=mat._origOpacity;
-        mat.transparent=mat._origTransp;
-        mat.depthWrite=mat._origDepthW;
-        delete mat._origOpacity;
-        delete mat._origTransp;
-        delete mat._origDepthW;
-        mat.needsUpdate=true;
+      const mats=Array.isArray(obj.material)?obj.material:[obj.material];
+      for(const mat of mats){
+        if(!mat) continue;
+        if(on){
+          if(mat._origOpacity===undefined) mat._origOpacity=mat.opacity;
+          if(mat._origTransp===undefined) mat._origTransp=mat.transparent;
+          if(mat._origDepthW===undefined) mat._origDepthW=mat.depthWrite;
+          mat.transparent=true;
+          mat.opacity=0.35;
+          mat.depthWrite=false;
+          mat.needsUpdate=true;
+        } else if(mat._origOpacity!==undefined){
+          mat.opacity=mat._origOpacity;
+          mat.transparent=mat._origTransp;
+          mat.depthWrite=mat._origDepthW;
+          delete mat._origOpacity;
+          delete mat._origTransp;
+          delete mat._origDepthW;
+          mat.needsUpdate=true;
+        }
       }
     });
+  }
+
+  function applyXrayToPurifier(){
+    const roots=new Set();
+    for(const root of Object.values(parts)){
+      if(!root || roots.has(root)) continue;
+      roots.add(root);
+      applyXrayToObject(root,xrayOn);
+    }
+    if(wallBracketGroup && !roots.has(wallBracketGroup)){
+      applyXrayToObject(wallBracketGroup,xrayOn);
+    }
+  }
+
+  function toggleXray(force){
+    xrayOn=(typeof force==='boolean')?force:!xrayOn;
+    applyXrayToPurifier();
+    return xrayOn;
+  }
+
+  function isXrayOn(){
+    return xrayOn;
   }
   
   function rebuildTopPanel(){
@@ -2402,8 +2434,7 @@ export function createPurifier(scene) {
     tagPart(parts.top, 'Top Panel', panelW.toFixed(1)+'″ × '+(D+2*ply).toFixed(1)+'″ × '+ply+'″ birch plywood');
     tagPart(parts.bot, 'Bottom Panel', panelW.toFixed(1)+'″ × '+(D+2*ply).toFixed(1)+'″ × '+ply+'″ birch plywood');
     applyCurrentStain();
-    applyXrayToObject(newTop, xrayOn);
-    applyXrayToObject(newBot, xrayOn);
+    applyXrayToPurifier();
     applyVisibility();
   }
   
@@ -2442,6 +2473,7 @@ export function createPurifier(scene) {
     altBackGroup.visible=!isFB;
     // Alt top fan panel (always 4 fans, only visible in FT mode)
     altTop4.visible=!isFB;
+    applyXrayToPurifier();
     // Geometry visibility changed — shadow map needs one refresh.
     _markShadowsDirty();
   }
@@ -3316,6 +3348,7 @@ export function createPurifier(scene) {
     if (refs.outdoorNightTex) _roomOutdoorNightTex = refs.outdoorNightTex;
     if (refs.applyTimeOfDay) _applyTimeOfDay = refs.applyTimeOfDay;
     if (refs.toggleMacbook) _toggleMacbook = refs.toggleMacbook;
+    if (refs.toggleCornerDoor) _toggleCornerDoor = refs.toggleCornerDoor;
   }
 
   // Apply initial wood species (ash) so panels start with correct texture
@@ -3344,6 +3377,8 @@ export function createPurifier(scene) {
     setFootDiameter,
     setFootHeight,
     toggleDimensions,
+    toggleXray,
+    isXrayOn,
     setFanColor,
     toggleFanRGB,
     showWallBracket,

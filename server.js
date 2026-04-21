@@ -396,10 +396,14 @@ setInterval(() => {
   }
 }, 60 * 1000).unref();
 
-app.use(express.static(__dirname));
+app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'vite-index.html')));
+app.get('/index.html', (_req, res) => res.sendFile(path.join(__dirname, 'vite-index.html')));
+app.get('/play', (_req, res) => res.sendFile(path.join(__dirname, 'vite-index.html')));
+app.get('/legacy', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+
+app.use(express.static(__dirname, { index: false }));
 
 app.get('/admin', (_req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
-app.get('/play', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/leaderboard', (_req, res) => res.sendFile(path.join(__dirname, 'leaderboard.html')));
 
 app.get('/healthz', (_req, res) => {

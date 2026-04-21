@@ -494,24 +494,44 @@ export function createRoom(scene) {
   const doorColor=0xf0ebe4; // warm off-white painted door
   const doorFrameColor=0xf5f5f0;
   
-  // Door panel — on room-facing side of extrusion front wall
+  // Door panel — hinged so it can swing open from the handle click.
   const doorPanelZ=recessZ-doorThick/2;
-  const doorPanel=roomBox(doorW-1, doorH-0.5, doorThick, doorColor,
-    doorCenterX, floorY+doorH/2, doorPanelZ, 0,0,0);
-  doorPanel.material.roughness=0.5;
+  const doorPanelW=doorW-1;
+  const doorPanelH=doorH-0.5;
+  const cornerDoorPivot=new THREE.Group();
+  cornerDoorPivot.position.set(doorCenterX-doorPanelW/2, floorY+doorH/2, doorPanelZ);
+  cornerDoorPivot._isRoom=true;
+  addRoom(cornerDoorPivot);
+
+  const doorPanelMat=new THREE.MeshStandardMaterial({color:doorColor, roughness:0.5, metalness:0.05});
+  const doorPanel=new THREE.Mesh(new THREE.BoxGeometry(doorPanelW, doorPanelH, doorThick), doorPanelMat);
+  doorPanel.position.set(doorPanelW/2, 0, 0);
   doorPanel.castShadow=true;
+  doorPanel.receiveShadow=true;
+  doorPanel._isRoom=true;
+  doorPanel._isCornerDoor=true;
+  cornerDoorPivot.add(doorPanel);
   
-  // Six-panel door detail — raised panels (room-facing side)
+  // Six-panel door detail — raised panels on both faces.
   const dpInset=0.3, dpW=doorW*0.35, dpH1=doorH*0.22, dpH2=doorH*0.30;
-  const dpY=[floorY+doorH*0.14, floorY+doorH*0.42, floorY+doorH*0.74]; // centers of 3 rows
+  const dpY=[doorH*0.14-doorH/2, doorH*0.42-doorH/2, doorH*0.74-doorH/2]; // centers of 3 rows (door-local)
   const dpHArr=[dpH1, dpH2, dpH1];
   const dpMat=new THREE.MeshStandardMaterial({color:0xe8e3dc,roughness:0.45,metalness:0.02});
-  [-1,1].forEach(side=>{
-    dpHArr.forEach((ph,ri)=>{
-      const pg=new THREE.BoxGeometry(dpW, ph, dpInset);
-      const pm=new THREE.Mesh(pg, dpMat);
-      pm.position.set(doorCenterX+side*(doorW*0.2), dpY[ri], doorPanelZ-doorThick/2-dpInset/2-0.01);
-      pm.castShadow=false; pm._isRoom=true; addRoom(pm);
+  [-1, 1].forEach(faceSign=>{
+    [-1,1].forEach(side=>{
+      dpHArr.forEach((ph,ri)=>{
+        const pg=new THREE.BoxGeometry(dpW, ph, dpInset);
+        const pm=new THREE.Mesh(pg, dpMat);
+        pm.position.set(
+          doorPanelW/2+side*(doorW*0.2),
+          dpY[ri],
+          faceSign*(doorThick/2+dpInset/2+0.01)
+        );
+        pm.castShadow=false;
+        pm._isRoom=true;
+        pm._isCornerDoor=true;
+        cornerDoorPivot.add(pm);
+      });
     });
   });
   
@@ -531,19 +551,60 @@ export function createRoom(scene) {
   dfh.position.set(doorCenterX, floorY+doorH+doorFrameW/2-0.5, frameZ);
   dfh.castShadow=false; dfh._isRoom=true; addRoom(dfh);
   
-  // Door knob (round, brushed nickel — room-facing side)
+  // Door knob + plate (interactive) — front and back so both sides match.
   const knobMat=new THREE.MeshStandardMaterial({color:0xaaaaaa,roughness:0.25,metalness:0.8});
   const knobGeo=new THREE.SphereGeometry(1.2, 16, 12);
   const knob=new THREE.Mesh(knobGeo, knobMat);
-  knob.position.set(doorCenterX+doorW*0.35, floorY+36, doorPanelZ-doorThick/2-1.2);
-  knob.castShadow=false; knob._isRoom=true; addRoom(knob);
+  knob.position.set(doorPanelW/2+doorW*0.35, 36-doorH/2, -doorThick/2-1.2);
+  knob.castShadow=false;
+  knob._isRoom=true;
+  knob._isCornerDoorHandle=true;
+  cornerDoorPivot.add(knob);
+  const knobBack=new THREE.Mesh(knobGeo, knobMat);
+  knobBack.position.set(doorPanelW/2+doorW*0.35, 36-doorH/2, doorThick/2+1.2);
+  knobBack.castShadow=false;
+  knobBack._isRoom=true;
+  knobBack._isCornerDoorHandle=true;
+  cornerDoorPivot.add(knobBack);
   // Knob base plate
   const plateMat=new THREE.MeshStandardMaterial({color:0xbbbbbb,roughness:0.3,metalness:0.7});
   const plateGeo=new THREE.CylinderGeometry(1.8, 1.8, 0.3, 16);
   plateGeo.rotateX(Math.PI/2);
   const plate=new THREE.Mesh(plateGeo, plateMat);
-  plate.position.set(doorCenterX+doorW*0.35, floorY+36, doorPanelZ-doorThick/2-0.2);
-  plate.castShadow=false; plate._isRoom=true; addRoom(plate);
+  plate.position.set(doorPanelW/2+doorW*0.35, 36-doorH/2, -doorThick/2-0.2);
+  plate.castShadow=false;
+  plate._isRoom=true;
+  plate._isCornerDoorHandle=true;
+  cornerDoorPivot.add(plate);
+  const plateBack=new THREE.Mesh(plateGeo, plateMat);
+  plateBack.position.set(doorPanelW/2+doorW*0.35, 36-doorH/2, doorThick/2+0.2);
+  plateBack.castShadow=false;
+  plateBack._isRoom=true;
+  plateBack._isCornerDoorHandle=true;
+  cornerDoorPivot.add(plateBack);
+
+  // Simple smooth hinge animation for the corner door.
+  let _cornerDoorOpen=false;
+  let _cornerDoorAngle=0;
+  let _cornerDoorAnim=0;
+  const _cornerDoorOpenAngle=72*Math.PI/180;
+  function _stepCornerDoor(){
+    const target=_cornerDoorOpen?_cornerDoorOpenAngle:0;
+    _cornerDoorAngle += (target-_cornerDoorAngle)*0.22;
+    cornerDoorPivot.rotation.y=_cornerDoorAngle;
+    if(Math.abs(target-_cornerDoorAngle)>0.001){
+      _cornerDoorAnim=requestAnimationFrame(_stepCornerDoor);
+    } else {
+      _cornerDoorAngle=target;
+      cornerDoorPivot.rotation.y=_cornerDoorAngle;
+      _cornerDoorAnim=0;
+    }
+  }
+  function toggleCornerDoor(forceOpen){
+    _cornerDoorOpen = (typeof forceOpen==='boolean') ? forceOpen : !_cornerDoorOpen;
+    if(_cornerDoorAnim) cancelAnimationFrame(_cornerDoorAnim);
+    _cornerDoorAnim=requestAnimationFrame(_stepCornerDoor);
+  }
   
   // Collect all back wall + recess meshes for fading
   const backWallParts=[wallMeshL,returnWallL,
@@ -1691,6 +1752,9 @@ export function createRoom(scene) {
     ceilSpot: typeof ceilSpot !== 'undefined' ? ceilSpot : null,
     ceilGlow: typeof ceilGlow !== 'undefined' ? ceilGlow : null,
     leftWallX,
+    toggleCornerDoor,
+    getCornerDoorPanelMesh: () => doorPanel,
+    getCornerDoorAngle: () => _cornerDoorAngle,
     toggleMacbook,
     getMacbookScreenMesh: () => _macbookScreen,
     drawers

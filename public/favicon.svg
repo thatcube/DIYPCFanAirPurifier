@@ -1,33 +1,34 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- Cat head favicon - dark gray top / white bottom -->
-  <!-- Left ear -->
-  <polygon points="5,12 8,3 12,10" fill="#4a4a4a"/>
-  <polygon points="7,10 8.5,5 10.5,9" fill="#6a6a6a"/>
-  <!-- Right ear -->
-  <polygon points="20,10 24,3 27,12" fill="#4a4a4a"/>
-  <polygon points="21.5,9 23.5,5 25,10" fill="#6a6a6a"/>
-  <!-- Head shape - top half dark gray -->
-  <ellipse cx="16" cy="17" rx="12" ry="11" fill="#4a4a4a"/>
-  <!-- Bottom half white overlay -->
-  <clipPath id="bottom">
-    <rect x="0" y="17" width="32" height="16"/>
-  </clipPath>
-  <ellipse cx="16" cy="17" rx="12" ry="11" fill="#f0f0f0" clip-path="url(#bottom)"/>
-  <!-- Muzzle bump -->
-  <ellipse cx="16" cy="21" rx="5" ry="3.5" fill="#f0f0f0"/>
-  <!-- Eyes -->
-  <ellipse cx="11.5" cy="16" rx="2.2" ry="2.4" fill="#1a1a1a"/>
-  <ellipse cx="20.5" cy="16" rx="2.2" ry="2.4" fill="#1a1a1a"/>
-  <!-- Eye shine -->
-  <circle cx="12.3" cy="15.2" r="0.8" fill="#c8e4ff"/>
-  <circle cx="21.3" cy="15.2" r="0.8" fill="#c8e4ff"/>
-  <!-- Nose -->
-  <ellipse cx="16" cy="20" rx="1.2" ry="0.8" fill="#e0888a"/>
-  <!-- Mouth -->
-  <path d="M14.5,21 Q16,23 17.5,21" fill="none" stroke="#c07070" stroke-width="0.6"/>
-  <!-- Whiskers -->
-  <line x1="4" y1="19" x2="12" y2="19.5" stroke="#888" stroke-width="0.4"/>
-  <line x1="4" y1="21" x2="12" y2="20.5" stroke="#888" stroke-width="0.4"/>
-  <line x1="20" y1="19.5" x2="28" y2="19" stroke="#888" stroke-width="0.4"/>
-  <line x1="20" y1="20.5" x2="28" y2="21" stroke="#888" stroke-width="0.4"/>
+  <!-- ears -->
+  <polygon points="4.2,13.8 8.4,1.8 13.3,11.4" fill="#3f454d"/>
+  <polygon points="6.3,11.4 8.6,5 11.2,10.5" fill="#2f343b"/>
+  <polygon points="18.7,11.4 23.6,1.8 27.8,13.8" fill="#3f454d"/>
+  <polygon points="20.8,10.5 23.4,5 25.7,11.4" fill="#2f343b"/>
+
+  <!-- head -->
+  <ellipse cx="16" cy="17" rx="11.7" ry="10.8" fill="#4a5159"/>
+
+  <!-- white blaze + muzzle -->
+  <path d="M14.8,7.2 C16.4,6.7 17.9,7.8 17.9,9.5 C17.9,11.2 17.6,12.5 18.1,14 C18.6,15.5 18.6,17.6 17.8,19.2 C17.1,20.6 14.9,20.6 14.2,19.2 C13.4,17.6 13.4,15.5 13.9,14 C14.4,12.5 14.1,11.2 14.1,9.5 C14.1,8.3 14.3,7.6 14.8,7.2 Z" fill="#f6f4ef"/>
+  <ellipse cx="16" cy="20" rx="6.3" ry="4.7" fill="#f9f7f2"/>
+
+  <!-- eyes -->
+  <ellipse cx="12" cy="15.6" rx="2.5" ry="1.9" fill="#b6c979"/>
+  <ellipse cx="20" cy="15.6" rx="2.5" ry="1.9" fill="#b6c979"/>
+  <ellipse cx="12.5" cy="15.7" rx="0.55" ry="1.35" fill="#151617"/>
+  <ellipse cx="19.5" cy="15.7" rx="0.55" ry="1.35" fill="#151617"/>
+
+  <!-- nose and mouth -->
+  <path d="M14.6,19.1 C15.2,18.35 16.8,18.35 17.4,19.1 C17.4,19.9 16.9,20.35 16,20.35 C15.1,20.35 14.6,19.9 14.6,19.1 Z" fill="#d79a93"/>
+  <path d="M16,20.35 L16,21.4" stroke="#7a6a66" stroke-width="0.42" stroke-linecap="round"/>
+  <path d="M16,21.4 C14.95,22.2 13.6,22.3 12.3,21.9" stroke="#7a6a66" stroke-width="0.42" fill="none" stroke-linecap="round"/>
+  <path d="M16,21.4 C17.05,22.2 18.4,22.3 19.7,21.9" stroke="#7a6a66" stroke-width="0.42" fill="none" stroke-linecap="round"/>
+
+  <!-- whiskers -->
+  <g stroke="#ececec" stroke-width="0.38" stroke-linecap="round" opacity="0.95">
+    <line x1="10" y1="19.2" x2="3.1" y2="18.3"/>
+    <line x1="10" y1="20.2" x2="2.8" y2="20.8"/>
+    <line x1="22" y1="19.2" x2="28.9" y2="18.3"/>
+    <line x1="22" y1="20.2" x2="29.2" y2="20.8"/>
+  </g>
 </svg>

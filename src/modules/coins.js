@@ -212,7 +212,7 @@ export function setCoinsVisible(vis) {
 import {
   BED_X, BED_Z, BED_W, BED_L, BED_CLEARANCE, BED_SLATS_FROM_FLOOR,
   TBL_X, TBL_Z, TBL_W, TBL_D, TBL_H,
-  SIDE_WALL_X, LEFT_WALL_X, OPP_WALL_Z, CLOSET_DEPTH, CLOSET_INTERIOR_W, CLOSET_Z,
+  SIDE_WALL_X, LEFT_WALL_X, OPP_WALL_Z, BACK_WALL_Z, CLOSET_DEPTH, CLOSET_INTERIOR_W, CLOSET_Z,
   getFloorY, getWinCenterY, WIN_W, WIN_H, WIN_CENTER_Z
 } from './spatial.js';
 
@@ -265,7 +265,7 @@ export function spawnRoomCoins(roomRefs) {
   // 13. On top of lamp shade
   addCoin(_coinGroup, new THREE.Vector3(-(TBL_X + TBL_W / 2 - 6), fy + TBL_H + 28.5, TBL_Z + TBL_D / 2 - 6), {});
   // 14. Inside the purifier (purifier group is at x=45, z=-68)
-  addCoin(_coinGroup, new THREE.Vector3(45, fy + 3, -68), { insidePurifier: true });
+  addCoin(_coinGroup, new THREE.Vector3(45, fy + 8, -68), { insidePurifier: true });
 
   // 15. Hidden inside a random nightstand drawer (moves with the drawer when opened)
   if (roomRefs && roomRefs.drawers && roomRefs.drawers.length > 0) {
@@ -316,9 +316,11 @@ function _spawnSecretIfUntriggered(id, parent, pos, opts) {
   _showToast('🔵 Secret coin!');
 }
 
-export function spawnSecretFanCoin() {
+export function spawnSecretCornerDoorCoin() {
   const fy = getFloorY();
-  _spawnSecretIfUntriggered('xbox', _coinGroup, new THREE.Vector3(45, fy + 15, -68), {});
+  // Behind the corner door by the nightstand (same door in the back-right recess).
+  _spawnSecretIfUntriggered('cornerDoor', _coinGroup,
+    new THREE.Vector3(-(SIDE_WALL_X - 12), fy + 8, BACK_WALL_Z - 28), {});
 }
 
 export function spawnSecretLampCoin() {
