@@ -6,8 +6,8 @@
 /* ─── Design Tokens ──────────────────────────────────────────────── */
 :root {
   /* Liquid Glass surfaces */
-  --glass: rgba(8, 12, 18, 0.88);
-  --glass-light: rgba(8, 12, 18, 0.78);
+  --glass: rgba(8, 12, 18, 0.72);
+  --glass-light: rgba(8, 12, 18, 0.6);
   --glass-border: rgba(255, 255, 255, 0.15);
   --glass-border-strong: rgba(255, 255, 255, 0.3);
   --glass-blur: blur(40px) saturate(1.8) brightness(1.05);
