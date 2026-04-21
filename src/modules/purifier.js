@@ -1247,7 +1247,7 @@ export function createPurifier(scene) {
     pts.push(new THREE.Vector2(radius-0.12, hH));
     return new THREE.LatheGeometry(pts, 20);
   }
-  let bunGeo=makeBunGeo(bunFootR);
+  let bunGeo=makeBunGeo(bunFootR, bunFootH);
   
   let currentFeetH=bunFootH;
   let feetStyle='bun';
@@ -2342,15 +2342,11 @@ export function createPurifier(scene) {
   }
   
   // ─── Feet style (peg / round bun / rubber) ───
-  const FEET_H={peg:0.75, bun:2.5, rubber:0.75, none:0};
-  let currentFootDiameter=1.1; // diameter in inches
-  let currentBunH=2.5; // bun foot height in inches
+  const FEET_H={peg:0.75, bun:3.5, rubber:0.75, none:0};
+  let currentFootDiameter=1.5; // diameter in inches
+  let currentBunH=3.5; // bun foot height in inches
   function setFootDiameter(d){
     currentFootDiameter=d;
-    document.querySelectorAll('#btnFootD1,#btnFootD2,#btnFootD3').forEach(b=>b.classList.remove('on'));
-    if(d===1.1) _el('btnFootD1').classList.add('on');
-    else if(d===1.0) _el('btnFootD2').classList.add('on');
-    else _el('btnFootD3').classList.add('on');
     bunGeo=makeBunGeo(d/2, currentBunH);
     if(feetStyle==='bun'){
       for(const leg of allLegMeshes){
@@ -2362,10 +2358,6 @@ export function createPurifier(scene) {
     }
   }
   function setFootHeight(h){
-    document.querySelectorAll('#btnFootH25,#btnFootH35,#btnFootH45').forEach(b=>b.classList.remove('on'));
-    if(h===2.5) _el('btnFootH25').classList.add('on');
-    else if(h===3.5) _el('btnFootH35').classList.add('on');
-    else _el('btnFootH45').classList.add('on');
     const oldH=currentFeetH;
     currentBunH=h;
     FEET_H.bun=h;
@@ -3278,6 +3270,8 @@ export function createPurifier(scene) {
     setLayout,
     setFanCount,
     setFeetStyle,
+    setFootDiameter,
+    setFootHeight,
     toggleDimensions,
     setFanColor,
     toggleFanRGB,
