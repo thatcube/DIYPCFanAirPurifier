@@ -201,10 +201,43 @@
 
   <!-- Pause overlay -->
   <div id="fpPauseOverlay">
-    <h2>Paused</h2>
-    <button onclick="window._resumeFP&&window._resumeFP()">Resume</button>
-    <button onclick="window._resetFP&&window._resetFP()">Reset Run</button>
-    <button onclick="window._exitFP&&window._exitFP()">Exit Game</button>
+    <div class="pause-card">
+      <h2>Paused</h2>
+      <p class="pause-sub">Timer keeps running...</p>
+      <div class="pause-grid">
+        <button class="pause-btn primary" onclick="window._resumeFP&&window._resumeFP()">▶ Resume</button>
+        <button class="pause-btn danger" onclick="window._exitFP&&window._exitFP()">✕ Exit</button>
+      </div>
+      <div class="pause-toggles">
+        <label class="pause-toggle"><input type="checkbox" id="fpPauseMuteSfx" onchange="window._toggleMuteSfx&&window._toggleMuteSfx(this.checked)"> Mute SFX</label>
+        <label class="pause-toggle"><input type="checkbox" id="fpPauseMuteMusic" onchange="window._toggleMuteMusic&&window._toggleMuteMusic(this.checked)"> Mute Music</label>
+      </div>
+      <div class="pause-actions">
+        <button class="pause-pill" onclick="window._resetFP&&window._resetFP()">⟳ Reset Run</button>
+        <button class="pause-pill" onclick="window._switchCamFP&&window._switchCamFP()">📷 Switch Camera</button>
+      </div>
+      <div class="pause-controls">
+        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
+        <div><kbd>Space</kbd> Jump (hold to charge)</div>
+        <div><kbd>Shift</kbd> Sprint</div>
+        <div><kbd>V</kbd> Switch camera</div>
+        <div><kbd>R</kbd> Reset run</div>
+        <div><kbd>Esc</kbd> Resume</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Finish overlay (all coins collected) -->
+  <div id="fpFinishOverlay">
+    <div class="finish-card">
+      <h2>🎉 Run Complete!</h2>
+      <div class="finish-time" id="finishTime">0:00.0</div>
+      <div class="finish-coins" id="finishCoins">14/14 coins</div>
+      <div class="finish-actions">
+        <button class="pause-btn primary" onclick="window._playAgain&&window._playAgain()">▶ Play Again</button>
+        <button class="pause-btn danger" onclick="window._exitFP&&window._exitFP()">Exit</button>
+      </div>
+    </div>
   </div>
 
   <!-- Mobile controls -->

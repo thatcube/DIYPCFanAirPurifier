@@ -272,10 +272,28 @@ window._toggleFP = () => {
 };
 window._resumeFP = () => gameFp.setPaused(false);
 window._resetFP = () => {
+  gameFp.setPaused(false);
   gameFp.toggleFirstPerson();
   setTimeout(() => gameFp.toggleFirstPerson(), 100);
 };
-window._exitFP = () => { if (gameFp.fpMode) gameFp.toggleFirstPerson(); };
+window._exitFP = () => {
+  // Close any overlays first
+  const fin = document.getElementById('fpFinishOverlay');
+  if (fin) fin.classList.remove('open');
+  gameFp.setPaused(false);
+  if (gameFp.fpMode) gameFp.toggleFirstPerson();
+};
+window._toggleMuteSfx = (checked) => gameFp.setSfxMuted(checked);
+window._toggleMuteMusic = (checked) => gameFp.setMusicMuted(checked);
+window._switchCamFP = () => gameFp.setCamMode();
+window._playAgain = () => {
+  const fin = document.getElementById('fpFinishOverlay');
+  if (fin) fin.classList.remove('open');
+  gameFp.setPaused(false);
+  // Reset and restart
+  gameFp.toggleFirstPerson();
+  setTimeout(() => window._openCharSelect(), 100);
+};
 
 // ── Panel control bridges ───────────────────────────────────────────
 
@@ -475,6 +493,21 @@ function animate(ts) {
     leaderboard.tickTimer(ts);
     const timerEl = document.getElementById('runTimerText');
     if (timerEl) timerEl.textContent = leaderboard.formatRunTime(leaderboard.getElapsed());
+    // Check for run completion (all regular coins collected)
+    if (coins.coinScore >= coins.coinTotal && coins.coinTotal > 0 && !leaderboard.isFinished()) {
+      leaderboard.stopTimer();
+      const finalTime = leaderboard.getElapsed();
+      const finEl = document.getElementById('finishTime');
+      const finCoins = document.getElementById('finishCoins');
+      const finOverlay = document.getElementById('fpFinishOverlay');
+      if (finEl) finEl.textContent = leaderboard.formatRunTime(finalTime);
+      if (finCoins) finCoins.textContent = coins.coinScore + '/' + coins.coinTotal + ' coins';
+      if (finOverlay) finOverlay.classList.add('open');
+      gameFp.setPaused(true);
+      // Hide the regular pause overlay (finish takes precedence)
+      const pauseOv = document.getElementById('fpPauseOverlay');
+      if (pauseOv) pauseOv.style.display = 'none';
+    }
   }
 
   // Cat animation mixer + walk/idle blend
