@@ -429,50 +429,24 @@ function _getBoxes() {
     result.push(b);
   }
 
-  // Console props collision (Xbox, Switch dock, Switch tablet on top of purifier)
-  // Only when console props are visible (TV placement mode)
-  const consoleVis = _purifierGroup && _purifierGroup.children.some(c => c.visible && c.children && c.children.some(cc => cc.visible));
-  if (px === 45) { // TV placement — console props visible
+  // Console props collision — hardcoded world-space for TV placement
+  if (px === 45) {
     const topSurface = yTopPanel;
-    // Xbox Series X at local z=8: 5.94×11.85×5.94
-    const xbW = 5.94, xbH = 11.85, xbD = 5.94;
-    localBoxes.length = 0;
-    localBoxes.push(
-      // Xbox at z=8
-      { lxMin: -xbD/2, lxMax: xbD/2, lzMin: 8-xbW/2, lzMax: 8+xbW/2, yTop: topSurface + xbH, yBottom: topSurface },
-      // Switch dock at z=-6: 7.7 wide, 2.5 deep, 3.5 tall (already rotated -90° so dims swap)
-      { lxMin: -7.7/2, lxMax: 7.7/2, lzMin: -6-2.5/2, lzMax: -6+2.5/2, yTop: topSurface + 3.5, yBottom: topSurface },
-      // Switch tablet above dock: 10.5 wide, 0.55 deep
-      { lxMin: -10.5/2, lxMax: 10.5/2, lzMin: -6-0.55/2, lzMax: -6+0.55/2, yTop: topSurface + 5.45, yBottom: topSurface + 0.75 }
-    );
-    for (const lb of localBoxes) {
-      const b = acquireBox();
-      if (rotated) {
-        b.xMin = px - lb.lzMax; b.xMax = px - lb.lzMin;
-        b.zMin = pz + lb.lxMin; b.zMax = pz + lb.lxMax;
-      } else {
-        b.xMin = px + lb.lxMin; b.xMax = px + lb.lxMax;
-        b.zMin = pz + lb.lzMin; b.zMax = pz + lb.lzMax;
-      }
-      b.yTop = lb.yTop; b.yBottom = lb.yBottom;
-      result.push(b);
-    }
+    // Xbox: tall upright box at world ~(37, _, -68)
+    result.push({ xMin: 34, xMax: 40, zMin: -71, zMax: -65, yTop: topSurface + 11.85, yBottom: topSurface });
+    // Switch dock: flat wide box at world ~(51, _, -68)
+    result.push({ xMin: 47, xMax: 55, zMin: -69.5, zMax: -66.5, yTop: topSurface + 3.5, yBottom: topSurface });
+    // Switch tablet in dock
+    result.push({ xMin: 46, xMax: 56, zMin: -69, zMax: -67, yTop: topSurface + 5.5, yBottom: topSurface + 0.75 });
   }
 
-  // MacBook collision — thin slab for the open lid/screen only
+  // MacBook — just the keyboard base (thin flat slab on the bed)
   {
-    const mbX = -(BED_X - 58/2 + 12); // post-mirror
+    const mbX = -(BED_X - 58/2 + 12);
     const mbZ = BED_Z + 6;
     const fy = getFloorY();
-    const slatY = fy + BED_SLATS_FROM_FLOOR;
-    const mattY = slatY + 1 + 5;
-    const mbY = mattY + 5 + 1.5; // bed top
-    // Thin collision slab (~10" wide, ~1" deep, ~4" tall for the open screen)
-    result.push({
-      xMin: mbX - 5, xMax: mbX + 5,
-      zMin: mbZ - 0.5, zMax: mbZ + 0.5,
-      yTop: mbY + 4, yBottom: mbY,
-    });
+    const mbY = fy + BED_SLATS_FROM_FLOOR + 1 + 5 + 5 + 1.5;
+    result.push({ xMin: mbX - 6, xMax: mbX + 6, zMin: mbZ - 4, zMax: mbZ + 4, yTop: mbY + 0.5, yBottom: mbY });
   }
 
   return result;
