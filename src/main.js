@@ -142,22 +142,27 @@ const todRefs = {
 // Apply initial time-of-day — default to 2:30 PM (matches monolith default)
 lighting.applyTimeOfDay(870, todRefs);
 
-// DEBUG: rainbow orb at key light source position
+// DEBUG: orbs at key light source and target, plus shadow camera helper
 {
   const debugGeo = new THREE.SphereGeometry(4, 16, 12);
-  const debugMat = new THREE.MeshBasicMaterial({
-    color: 0xff00ff,
-    wireframe: true,
-    transparent: true,
-    opacity: 0.8
-  });
-  const debugOrb = new THREE.Mesh(debugGeo, debugMat);
-  debugOrb.position.copy(lighting.key.position);
-  scene.add(debugOrb);
-  // Update each frame to track light position
-  window._debugLightOrb = debugOrb;
-  console.log('[DEBUG] Key light at:', lighting.key.position.x, lighting.key.position.y, lighting.key.position.z);
-  console.log('[DEBUG] Key target at:', lighting.key.target.position.x, lighting.key.target.position.y, lighting.key.target.position.z);
+  // Source orb — magenta
+  const srcMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true, transparent: true, opacity: 0.8 });
+  const srcOrb = new THREE.Mesh(debugGeo, srcMat);
+  srcOrb.position.copy(lighting.key.position);
+  scene.add(srcOrb);
+  // Target orb — cyan
+  const tgtMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, transparent: true, opacity: 0.8 });
+  const tgtOrb = new THREE.Mesh(new THREE.SphereGeometry(3, 12, 8), tgtMat);
+  tgtOrb.position.copy(lighting.key.target.position);
+  scene.add(tgtOrb);
+  // Shadow camera helper — shows the frustum
+  const helper = new THREE.CameraHelper(lighting.key.shadow.camera);
+  scene.add(helper);
+  window._debugSrcOrb = srcOrb;
+  window._debugTgtOrb = tgtOrb;
+  window._debugHelper = helper;
+  console.log('[DEBUG] Key light at:', lighting.key.position.x.toFixed(1), lighting.key.position.y.toFixed(1), lighting.key.position.z.toFixed(1));
+  console.log('[DEBUG] Key target at:', lighting.key.target.position.x.toFixed(1), lighting.key.target.position.y.toFixed(1), lighting.key.target.position.z.toFixed(1));
 }
 
 // Force shadow update after TOD repositions lights
