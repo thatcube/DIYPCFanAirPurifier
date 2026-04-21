@@ -1396,18 +1396,45 @@ export function createRoom(scene) {
     bpBody.castShadow = true; bpBody.receiveShadow = true; bpBody._isRoom = true;
     addRoom(bpBody);
 
-    // Straps — flat ribbons laying on the floor, extending out from one end of the bag
+    // Shoulder straps — arched loops on top of the bag (backpack is face-down)
     const strapMat = new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.88 });
+    const bagTop = bpY + bpThick / 2;
     for (const sz of [-1, 1]) {
-      const strap = new THREE.Mesh(
-        new THREE.BoxGeometry(10, 0.2, 1.5),
-        strapMat
-      );
-      // Lay flat on floor, extending out from the narrow end of the bag
-      strap.position.set(bpX + bpL / 2 + 4, floorY + 0.15, bpZ + sz * 2.8);
-      strap.rotation.y = bpAngle + sz * 0.2;
+      // Build a curved strap using CatmullRomCurve3
+      const pts = [];
+      const strapZ = bpZ + sz * 3.5;
+      // Strap runs along the length of the bag, arching up in the middle
+      for (let t = 0; t <= 1; t += 0.1) {
+        const lx = bpX + (t - 0.5) * (bpL - 4); // along bag length
+        const ly = bagTop + Math.sin(t * Math.PI) * 1.8; // arch up
+        const lz = strapZ;
+        pts.push(new THREE.Vector3(lx, ly, lz));
+      }
+      const curve = new THREE.CatmullRomCurve3(pts);
+      const tubeGeo = new THREE.TubeGeometry(curve, 12, 0.4, 6, false);
+      const strap = new THREE.Mesh(tubeGeo, strapMat);
+      strap.rotation.y = bpAngle;
       strap.castShadow = true; strap.receiveShadow = true; strap._isRoom = true;
       addRoom(strap);
+    }
+
+    // Handle/grab loop at the top end
+    {
+      const handlePts = [];
+      const hx = bpX + bpL / 2 - 1;
+      for (let t = 0; t <= 1; t += 0.1) {
+        handlePts.push(new THREE.Vector3(
+          hx + Math.sin(t * Math.PI) * 1.5,
+          bagTop + Math.sin(t * Math.PI) * 2.5,
+          bpZ
+        ));
+      }
+      const handleCurve = new THREE.CatmullRomCurve3(handlePts);
+      const handleGeo = new THREE.TubeGeometry(handleCurve, 8, 0.3, 5, false);
+      const handle = new THREE.Mesh(handleGeo, strapMat);
+      handle.rotation.y = bpAngle;
+      handle.castShadow = true; handle.receiveShadow = true; handle._isRoom = true;
+      addRoom(handle);
     }
 
     // Logos — render SVGs to canvas since Three.js r128 can't load SVGs as textures
