@@ -22,6 +22,7 @@ import * as leaderboard from './modules/leaderboard.js';
 import * as collision from './modules/game-collision.js';
 import * as spatial from './modules/spatial.js';
 import * as gameFp from './modules/game-fp.js';
+import * as wallFade from './modules/wall-fade.js';
 import { createRoom } from './modules/room.js';
 import { createPurifier } from './modules/purifier.js';
 import { initInteractions, coinBump } from './modules/ui-interactions.js';
@@ -192,6 +193,10 @@ catAnimation.loadGameplayCat({
 
 particles.init();
 
+// ── Wall auto-fade ──────────────────────────────────────────────────
+
+wallFade.init(scene, roomRefs);
+
 // ── Leaderboard + finish dialog ──────────────────────────────────────
 
 leaderboard.init();
@@ -271,6 +276,7 @@ window._startGame = () => {
   });
   // Enter game mode
   gameFp.toggleFirstPerson();
+  wallFade.resetAll();
 };
 
 // G key opens character select instead of directly entering game
@@ -284,6 +290,7 @@ window._toggleFP = () => {
 window._resumeFP = () => gameFp.setPaused(false);
 window._resetFP = () => {
   leaderboard.closeFinishDialog();
+  leaderboard.hideShareButton();
   gameFp.setPaused(false);
   gameFp.resetTimer();
   coins.fullReset();
@@ -293,6 +300,7 @@ window._resetFP = () => {
 window._exitFP = () => {
   // Close any overlays first
   leaderboard.closeFinishDialog();
+  leaderboard.hideShareButton();
   const pause = document.getElementById('fpPauseOverlay');
   if (pause) pause.style.display = 'none';
   // Release pointer lock
@@ -311,6 +319,7 @@ window._toggleMuteMusic = (checked) => {
 window._switchCamFP = () => gameFp.setCamMode();
 window._playAgain = () => {
   leaderboard.closeFinishDialog();
+  leaderboard.hideShareButton();
   gameFp.setPaused(false);
   gameFp.toggleFirstPerson();
   setTimeout(() => window._openCharSelect(), 100);
@@ -483,6 +492,25 @@ window._toggleIsolate = () => {
   markShadowsDirty();
 };
 
+// ── Orbit mode WASD panning ─────────────────────────────────────────
+
+const _camKeys = { w: false, a: false, s: false, d: false };
+document.addEventListener('keydown', e => {
+  if (gameFp.fpMode) return;
+  if (leaderboard.isNameDialogOpen()) return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+  const k = e.key.toLowerCase();
+  if (k === 'w' || k === 'a' || k === 's' || k === 'd') {
+    _camKeys[k] = true;
+    e.preventDefault();
+  }
+});
+document.addEventListener('keyup', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'w' || k === 'a' || k === 's' || k === 'd') _camKeys[k] = false;
+});
+
 // ── Render loop ─────────────────────────────────────────────────────
 
 let _lastFrameTs = 0;
@@ -500,7 +528,23 @@ function animate(ts) {
   const animFrameScale = dtSec * 60;
 
   // Controls (only in orbit mode)
-  if (!gameFp.fpMode) controls.update();
+  if (!gameFp.fpMode) {
+    controls.update();
+    // WASD orbit pan
+    if (_camKeys.w || _camKeys.a || _camKeys.s || _camKeys.d) {
+      const azimuth = controls.getAzimuthalAngle();
+      const spd = 0.4;
+      const fwdX = -Math.sin(azimuth), fwdZ = -Math.cos(azimuth);
+      const rightX = Math.cos(azimuth), rightZ = -Math.sin(azimuth);
+      let dx = 0, dz = 0;
+      if (_camKeys.w) { dx += fwdX * spd; dz += fwdZ * spd; }
+      if (_camKeys.s) { dx -= fwdX * spd; dz -= fwdZ * spd; }
+      if (_camKeys.a) { dx -= rightX * spd; dz -= rightZ * spd; }
+      if (_camKeys.d) { dx += rightX * spd; dz += rightZ * spd; }
+      controls.target.x += dx;
+      controls.target.z += dz;
+    }
+  }
 
   // Game mode physics
   gameFp.updatePhysics(ts, dtSec, animFrameScale);
@@ -526,6 +570,7 @@ function animate(ts) {
       leaderboard.openNameDialog(false, () => {
         const runData = leaderboard.recordRun(finalTime, coins.coinTotal, coins.coinSecretScore);
         leaderboard.renderLeaderboardPanel();
+        leaderboard.showShareButton(runData);
         leaderboard.openFinishDialog(runData);
       });
     }
@@ -574,6 +619,11 @@ function animate(ts) {
   particles.updateSpinSpeed(animFrameScale);
   particles.update(animFrameScale);
 
+  // Wall auto-fade (only in orbit mode — FP resets to opaque)
+  if (!gameFp.fpMode) {
+    wallFade.update(camera);
+  }
+
   // Shadow throttle — update on dirty flag OR periodically
   if (_shadowDirtyOneShot || (ts - _lastShadowUpdateTs) >= SHADOW_UPDATE_INTERVAL_MS) {
     renderer.shadowMap.needsUpdate = true;
@@ -614,5 +664,9 @@ animate(performance.now());
 
 // Init UI micro-interactions (bouncy buttons, press effects)
 initInteractions();
+
+// Wire share button click
+const _shareBtn = document.getElementById('fpShareBtn');
+if (_shareBtn) _shareBtn.addEventListener('click', () => leaderboard.copyLastResult());
 
 console.log('[main] Render loop started');

@@ -282,6 +282,37 @@ async function _copyTextToClipboard(text) {
   ta.remove();
 }
 
+// ── HUD Share button ────────────────────────────────────────────────
+
+let _lastRunData = null;
+
+export function showShareButton(data) {
+  _lastRunData = data || null;
+  const row = document.getElementById('fpShareRow');
+  if (row) row.style.display = _lastRunData ? '' : 'none';
+}
+
+export function hideShareButton() {
+  _lastRunData = null;
+  const row = document.getElementById('fpShareRow');
+  if (row) row.style.display = 'none';
+}
+
+export async function copyLastResult() {
+  if (!_lastRunData) return false;
+  const btn = document.getElementById('fpShareBtn');
+  try {
+    await _copyTextToClipboard(_buildShareText(_lastRunData));
+    if (btn) btn.textContent = 'Copied!';
+    setTimeout(() => { if (btn) btn.textContent = 'Copy result'; }, 1300);
+    return true;
+  } catch (err) {
+    if (btn) btn.textContent = 'Copy failed';
+    setTimeout(() => { if (btn) btn.textContent = 'Copy result'; }, 1500);
+    return false;
+  }
+}
+
 // ── Name dialog ─────────────────────────────────────────────────────
 
 let _nameDialogOpen = false;

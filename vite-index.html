@@ -188,11 +188,24 @@
     <div id="coinHud"><i class="ph-fill ph-coins" style="color:#ffd700"></i> <span id="coinCount">0/0</span></div>
     <div id="secretCoinHud" style="display:none"><i class="ph-fill ph-coin" style="color:#4ab8ff"></i> <span id="secretCoinCount">0</span></div>
     <div id="runTimerHud"><span id="runTimerText">0:00.0</span> <span id="runTimerState"></span></div>
+    <div id="fpShareRow" style="display:none"><button id="fpShareBtn" type="button"><i class="ph ph-copy"></i> Copy result</button></div>
   </div>
   <div id="fpCrosshair"></div>
-  <div id="fpControls">
-    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move · <kbd>Space</kbd> Jump (hold)<br>
-    <kbd>Shift</kbd> Sprint · <kbd>V</kbd> Camera · <kbd>G</kbd> Exit · <kbd>Esc</kbd> Pause
+  <div id="fpControlsHint">Press <kbd>H</kbd> for controls</div>
+  <div id="fpControlsPanel" style="display:none">
+    <div class="fp-panel-header"><span>Controls</span><button onclick="window._toggleHelp&&window._toggleHelp()" class="fp-panel-close">&times;</button></div>
+    <div class="fp-panel-grid">
+      <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
+      <div><kbd>Space</kbd> Jump (hold to charge)</div>
+      <div><kbd>Shift</kbd> Sprint</div>
+      <div><kbd>V</kbd> Switch camera</div>
+      <div><kbd>R</kbd> Reset run</div>
+      <div><kbd>H</kbd> Toggle this panel</div>
+      <div><kbd>G</kbd> Exit game</div>
+      <div><kbd>Esc</kbd> Pause / resume</div>
+      <div>Click interactive objects</div>
+      <div>Crosshair turns blue on hover</div>
+    </div>
   </div>
   <div id="fpChargeBar"><div id="fpChargeFill"></div></div>
 
