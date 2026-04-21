@@ -1097,6 +1097,11 @@ body.play-mode #runTimerHud { display: block; }
 }
 
 /* ─── Focus-visible ring (keyboard-only, shared style) ───────────── */
+/* Suppress all focus outlines on mouse/touch — only show on keyboard nav */
+:focus:not(:focus-visible) {
+  outline: none !important;
+  box-shadow: none;
+}
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
