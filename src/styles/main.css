@@ -1121,6 +1121,21 @@ body.play-mode #runTimerHud { display: block; }
 /* Show shine on hover */
 *:hover > .glass-shine { opacity: 1; }
 
+/* Cursor-following glow — soft colored halo (overlay, not box-shadow) */
+.glass-glow {
+  position: absolute; top: -40%; left: -40%; right: -40%; bottom: -40%;
+  pointer-events: none; z-index: 0;
+  background: radial-gradient(
+    circle 160px at var(--glow-x, 50%) var(--glow-y, 50%),
+    rgba(140,190,255,0.2) 0%,
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  border-radius: inherit;
+}
+*:hover > .glass-glow { opacity: 1; }
+
 /* Click ripple — expanding ring from click point */
 .glass-ripple {
   position: absolute; border-radius: 50%;
