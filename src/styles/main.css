@@ -123,11 +123,7 @@ canvas#c { display: block; width: 100%; height: 100%; }
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 .panel-l { left: 12px; width: 290px; }
-.panel-l::after {
-  content: ''; position: absolute; inset: 0; z-index: -1;
-  background: rgba(0,0,0,0.35); pointer-events: none;
-  border-radius: inherit;
-}
+
 
 .panel-header {
   padding: 12px 14px 8px;
@@ -137,6 +133,7 @@ canvas#c { display: block; width: 100%; height: 100%; }
 .panel-header h3 {
   font-size: 14px; font-weight: 800; letter-spacing: 0.3px;
   color: #fff;
+  text-shadow: var(--text-shadow);
 }
 .panel-close {
   width: 30px; height: 30px; border-radius: var(--r-sm); border: none;
@@ -183,11 +180,12 @@ canvas#c { display: block; width: 100%; height: 100%; }
 .section-group:last-child { margin-bottom: 0; }
 .section-group h4 {
   font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px;
-  color: rgba(255,255,255,0.85); margin: 0;
+  color: rgba(255,255,255,0.9); margin: 0;
   font-weight: 700; padding: 8px 10px; cursor: pointer; user-select: none;
   display: flex; align-items: center; gap: 6px;
   transition: background 0.15s;
   border-radius: var(--r-md);
+  text-shadow: var(--text-shadow);
 }
 .section-group h4 i { font-size: 13px; opacity: 0.7; }
 .section-group h4:hover { background: rgba(255,255,255,0.04); }
@@ -197,7 +195,7 @@ canvas#c { display: block; width: 100%; height: 100%; }
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 2px; min-height: 28px; padding: 2px 10px;
 }
-.ctrl-row label { font-size: 11px; color: rgba(255,255,255,0.85); font-weight: 600; display: flex; align-items: center; gap: 5px; }
+.ctrl-row label { font-size: 11px; color: rgba(255,255,255,0.9); font-weight: 600; display: flex; align-items: center; gap: 5px; text-shadow: var(--text-shadow); }
 .ctrl-row label i { font-size: 13px; opacity: 0.6; flex-shrink: 0; }
 
 /* ─── Segmented buttons ──────────────────────────────────────────── */
@@ -208,11 +206,12 @@ canvas#c { display: block; width: 100%; height: 100%; }
 .seg button {
   flex: 1;
   background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
-  border-radius: var(--r-xs); color: rgba(255,255,255,0.75);
+  border-radius: var(--r-xs); color: rgba(255,255,255,0.8);
   padding: 6px 10px; font-size: 9.5px; font-weight: 600;
   cursor: pointer; position: relative; z-index: 1;
   transition: all var(--dur-med) var(--spring);
   letter-spacing: 0.2px; font-family: inherit;
+  text-shadow: var(--text-shadow);
 }
 .seg button.on {
   background: rgba(255,255,255,0.2);
@@ -259,8 +258,8 @@ canvas#c { display: block; width: 100%; height: 100%; }
 
 /* ─── Sliders ────────────────────────────────────────────────────── */
 .slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; padding: 2px 10px; }
-.slider-row label { font-size: 10px; color: rgba(255,255,255,0.6); min-width: 50px; font-weight: 600; }
-.slider-row span { font-size: 10px; color: var(--text-dim); min-width: 42px; text-align: right; font-variant-numeric: tabular-nums; }
+.slider-row label { font-size: 10px; color: rgba(255,255,255,0.9); min-width: 50px; font-weight: 600; text-shadow: var(--text-shadow); }
+.slider-row span { font-size: 10px; color: var(--text-dim); min-width: 42px; text-align: right; font-variant-numeric: tabular-nums; text-shadow: var(--text-shadow); }
 
 input[type=range] {
   -webkit-appearance: none; appearance: none;
@@ -295,13 +294,14 @@ input[type=range]::-moz-range-thumb {
 /* ─── Part tooltip ───────────────────────────────────────────────── */
 .part-tooltip {
   position: fixed; z-index: 500; pointer-events: none;
-  background-color: var(--glass); border: 1px solid var(--glass-border);
+  background-color: var(--glass);
   border-radius: var(--r-sm); padding: 8px 12px;
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   opacity: 0; transition: opacity 0.2s var(--ease-out-expo);
   font-size: 11px; color: var(--text);
+  text-shadow: var(--text-shadow);
 }
 .part-tooltip.visible { opacity: 1; }
 .tip-name { font-weight: 700; font-size: 12px; margin-bottom: 2px; }
