@@ -635,6 +635,11 @@ function _updateNameDialogCount() {
 
 let _finishDialogOpen = false;
 let _finishDialogData = null;
+let _finishPendingRun = null;
+let _finishSubmitting = false;
+let _finishSubmitPromise = null;
+let _finishNameDirty = false;
+let _finishSaveStatus = 'idle';
 let _onPlayAgain = null;
 let _onExitGame = null;
 let _finishFocusTrap = null;
@@ -647,8 +652,7 @@ export function setCallbacks(opts) {
   _onExitGame = opts.onExitGame || null;
 }
 
-export function openFinishDialog(data) {
-  _finishDialogData = data || null;
+function _openFinishDialogOverlay(focusNameInput = false) {
   _finishDialogOpen = true;
 
   if (document.exitPointerLock && document.pointerLockElement) document.exitPointerLock();
@@ -658,19 +662,71 @@ export function openFinishDialog(data) {
     overlay.style.display = 'flex';
     _finishSavedFocus = saveFocus();
     _finishFocusTrap = trapFocus(overlay);
-    // Focus first action after render
-    requestAnimationFrame(() => {
-      const btn = document.getElementById('finishDialogAgain');
-      if (btn) btn.focus();
-    });
   }
   _renderFinishDialog();
+  // Focus relevant control after render
+  requestAnimationFrame(() => {
+    const target = focusNameInput
+      ? document.getElementById('finishDialogNameInput')
+      : document.getElementById('finishDialogAgain');
+    if (!target) return;
+    target.focus();
+    if (focusNameInput && typeof target.setSelectionRange === 'function') {
+      const len = String(target.value || '').length;
+      try { target.setSelectionRange(len, len); } catch (e) { /* ignore */ }
+    }
+  });
+}
+
+export function openFinishDialog(data) {
+  _finishDialogData = data || null;
+  _finishPendingRun = null;
+  _finishSubmitting = false;
+  _finishSubmitPromise = null;
+  _finishNameDirty = false;
+  _finishSaveStatus = 'saved';
+  _openFinishDialogOverlay(false);
+}
+
+export function openFinishDialogForRun(timeMs, coinTotal, secretCoins) {
+  const safeTime = Math.max(1, Math.floor(Number(timeMs) || 0));
+  const safeCoins = Math.max(0, Math.floor(Number(coinTotal) || 0));
+  const safeSecret = Math.max(0, Math.floor(Number(secretCoins) || 0));
+  const fallbackName = _sanitizePlayerName(_readPlayerName() || _playerName || 'Player') || 'Player';
+
+  setPlayerName(fallbackName, true);
+  hideShareButton();
+
+  _finishPendingRun = { timeMs: safeTime, coinTotal: safeCoins, secretCoins: safeSecret };
+  _finishSubmitting = false;
+  _finishSubmitPromise = null;
+  _finishNameDirty = false;
+  _finishSaveStatus = 'idle';
+  _finishDialogData = {
+    entryId: '',
+    rank: 0,
+    name: fallbackName,
+    timeMs: safeTime,
+    coins: safeCoins,
+    coinTotal: safeCoins,
+    secretCoins: safeSecret,
+    catColor: sanitizeColorKey(catColorKey),
+    catHair: sanitizeHairKey(catHairKey),
+    catModel: sanitizeModelKey(catModelKey)
+  };
+
+  _openFinishDialogOverlay(true);
 }
 
 export function closeFinishDialog() {
   if (!_finishDialogOpen) return;
   _finishDialogOpen = false;
   _finishDialogData = null;
+  _finishPendingRun = null;
+  _finishSubmitting = false;
+  _finishSubmitPromise = null;
+  _finishNameDirty = false;
+  _finishSaveStatus = 'idle';
   const overlay = document.getElementById('finishDialogOverlay');
   if (overlay) overlay.style.display = 'none';
   if (_finishFocusTrap) { _finishFocusTrap.release(); _finishFocusTrap = null; }
@@ -679,22 +735,103 @@ export function closeFinishDialog() {
   if (copyBtn) copyBtn.textContent = 'Copy result';
 }
 
+function _updateFinishNameCount() {
+  const input = document.getElementById('finishDialogNameInput');
+  const counter = document.getElementById('finishDialogNameCount');
+  if (!input || !counter) return;
+  const max = Number(input.getAttribute('maxlength')) || 24;
+  const len = (input.value || '').length;
+  counter.textContent = `${len}/${max}`;
+  counter.classList.toggle('on', len >= Math.ceil(max * 0.75));
+  counter.classList.toggle('warn', len >= Math.ceil(max * 0.9) && len < max);
+  counter.classList.toggle('max', len >= max);
+}
+
+function _submitPendingFinishRun() {
+  if (!_finishPendingRun) return Promise.resolve(_finishDialogData);
+  if (_finishSubmitting && _finishSubmitPromise) return _finishSubmitPromise;
+
+  const input = document.getElementById('finishDialogNameInput');
+  const typedName = _sanitizePlayerName(input ? input.value : '');
+  const fallbackName = _sanitizePlayerName(_readPlayerName() || _playerName || 'Player') || 'Player';
+  const name = typedName || fallbackName;
+
+  if (input && !typedName) input.value = name;
+
+  setPlayerName(name, true);
+  _finishDialogData = { ...(_finishDialogData || {}), name };
+  _finishSubmitting = true;
+  _finishNameDirty = false;
+  _finishSaveStatus = 'saving';
+  if (input) input.disabled = true;
+  _renderFinishDialog();
+
+  const job = (async () => {
+    try {
+      const pending = _finishPendingRun;
+      const runData = await recordRun(pending.timeMs, pending.coinTotal, pending.secretCoins);
+      _finishPendingRun = null;
+      _finishSubmitting = false;
+      _finishSaveStatus = 'saved';
+      _finishDialogData = runData || null;
+      renderLeaderboardPanel();
+      showShareButton(runData);
+      _renderFinishDialog();
+      return runData;
+    } catch (e) {
+      _finishSubmitting = false;
+      _finishSaveStatus = 'error';
+      if (input) input.disabled = false;
+      _renderFinishDialog();
+      return null;
+    }
+  })();
+
+  _finishSubmitPromise = job.finally(() => {
+    _finishSubmitPromise = null;
+  });
+  return _finishSubmitPromise;
+}
+
 function _renderFinishDialog() {
   const data = _finishDialogData || {};
+  const pending = !!_finishPendingRun;
   const timeEl = document.getElementById('finishDialogTime');
   const nameEl = document.getElementById('finishDialogName');
   const rankHero = document.getElementById('finishDialogRankHero');
   const rankNum = document.getElementById('finishDialogRankNum');
   const rankText = document.getElementById('finishDialogRankText');
   const coinBadge = document.getElementById('finishDialogCoinBadge');
+  const nameInput = document.getElementById('finishDialogNameInput');
+  const saveHint = document.getElementById('finishDialogSaveHint');
+  const copyBtn = document.getElementById('finishDialogCopy');
   const list = document.getElementById('finishDialogList');
 
-  if (timeEl) timeEl.textContent = formatRunTime(data.timeMs || 0);
+  if (timeEl) timeEl.textContent = formatRunTime(data.timeMs || _finishPendingRun?.timeMs || 0);
   if (nameEl) nameEl.textContent = data.name || _playerName || 'Player';
+  if (nameInput) {
+    if (!_finishNameDirty || document.activeElement !== nameInput) {
+      nameInput.value = data.name || _playerName || 'Player';
+    }
+    nameInput.disabled = !pending || _finishSubmitting;
+    _updateFinishNameCount();
+  }
+  if (saveHint) {
+    if (pending) {
+      if (_finishSaveStatus === 'saving') saveHint.textContent = 'Saving...';
+      else if (_finishSaveStatus === 'error') saveHint.textContent = 'Save failed. Retry by leaving the field again.';
+      else saveHint.textContent = 'Autosaves when you leave the name field.';
+    } else if (Math.floor(Number(data.rank) || 0) > 0 || _finishSaveStatus === 'saved') {
+      saveHint.textContent = 'Saved.';
+    } else {
+      saveHint.textContent = '';
+    }
+  }
+  if (copyBtn) copyBtn.style.display = pending ? 'none' : '';
 
   const rank = Math.floor(Number(data.rank) || 0);
   if (rankHero && rankNum) {
-    if (rank > 0) {
+    if (!pending && rank > 0) {
       rankHero.classList.add('on');
       rankHero.classList.toggle('medal', rank <= 3);
       rankNum.textContent = `#${rank}`;
@@ -709,8 +846,8 @@ function _renderFinishDialog() {
     }
   }
   if (coinBadge) {
-    const c = Math.floor(Number(data.coins) || 0);
-    const t = Math.floor(Number(data.coinTotal) || 0);
+    const c = Math.floor(Number(data.coins) || Number(data.coinTotal) || Number(_finishPendingRun?.coinTotal) || 0);
+    const t = Math.floor(Number(data.coinTotal) || Number(_finishPendingRun?.coinTotal) || 0);
     coinBadge.textContent = `${c} / ${t} coins`;
   }
   if (list) {
@@ -735,7 +872,7 @@ function _renderFinishDialog() {
   }
 
   // Update timer state indicator
-  _setTimerHudState(rank > 0 ? `Finished #${rank}` : 'Finished', 'finished');
+  _setTimerHudState(!pending && rank > 0 ? `Finished #${rank}` : 'Finished', 'finished');
 }
 
 // ── Initialize: create DOM, bind events ─────────────────────────────
@@ -822,6 +959,14 @@ function _createFinishDialogDOM() {
           <span class="tag" id="finishDialogCoinBadge">0 / 0 coins</span>
         </div>
         <div id="finishDialogTime">00:00.000</div>
+        <div id="finishDialogNameRow">
+          <label for="finishDialogNameInput">Name for this run</label>
+          <div class="finishDialogNameControls">
+            <input type="text" id="finishDialogNameInput" maxlength="24" autocomplete="off" spellcheck="false" />
+            <span id="finishDialogNameCount" class="name-dialog-count">0/24</span>
+          </div>
+          <div id="finishDialogSaveHint"></div>
+        </div>
         <div id="finishDialogRankHero">
           <span class="rankNum" id="finishDialogRankNum">#—</span>
           <span class="rankTag">
@@ -843,11 +988,15 @@ function _createFinishDialogDOM() {
   `;
   document.body.appendChild(overlay);
 
-  document.getElementById('finishDialogExit').addEventListener('click', () => {
+  document.getElementById('finishDialogExit').addEventListener('click', async () => {
+    await _submitPendingFinishRun();
+    if (_finishPendingRun) return;
     closeFinishDialog();
     if (_onExitGame) _onExitGame();
   });
-  document.getElementById('finishDialogAgain').addEventListener('click', () => {
+  document.getElementById('finishDialogAgain').addEventListener('click', async () => {
+    await _submitPendingFinishRun();
+    if (_finishPendingRun) return;
     closeFinishDialog();
     if (_onPlayAgain) _onPlayAgain();
   });
@@ -863,12 +1012,40 @@ function _createFinishDialogDOM() {
       setTimeout(() => { if (btn) btn.textContent = 'Copy result'; }, 1500);
     }
   });
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) closeFinishDialog();
+  const nameInput = document.getElementById('finishDialogNameInput');
+  if (nameInput) {
+    nameInput.addEventListener('input', () => {
+      _finishNameDirty = true;
+      _finishSaveStatus = 'idle';
+      _updateFinishNameCount();
+    });
+    nameInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        void _submitPendingFinishRun();
+      }
+      e.stopPropagation();
+    });
+    nameInput.addEventListener('blur', () => {
+      void _submitPendingFinishRun();
+    });
+  }
+  overlay.addEventListener('click', async e => {
+    if (e.target !== overlay) return;
+    await _submitPendingFinishRun();
+    if (_finishPendingRun) return;
+    closeFinishDialog();
   });
   overlay.addEventListener('keydown', e => e.stopPropagation());
   document.addEventListener('keydown', e => {
     if (!_finishDialogOpen) return;
-    if (e.key === 'Escape') { e.preventDefault(); closeFinishDialog(); }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      void (async () => {
+        await _submitPendingFinishRun();
+        if (_finishPendingRun) return;
+        closeFinishDialog();
+      })();
+    }
   });
 }
