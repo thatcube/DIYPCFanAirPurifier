@@ -61,11 +61,15 @@ function _onPointerDown(e) {
   ripple.addEventListener('animationend', () => ripple.remove());
 
   // Press spring — quick scale down then bounce back via CSS
+  el.classList.remove('glass-pressed');
+  void el.offsetWidth; // force reflow to restart animation
   el.classList.add('glass-pressed');
-  el.addEventListener('animationend', function onEnd() {
+  const onEnd = (evt) => {
+    if (evt.target !== el) return; // ignore child animations (ripple)
     el.classList.remove('glass-pressed');
     el.removeEventListener('animationend', onEnd);
-  }, { once: true });
+  };
+  el.addEventListener('animationend', onEnd);
 }
 
 // ── Init ─────────────────────────────────────────────────────────────
