@@ -460,6 +460,17 @@ window._setFeet = (style) => {
   const id = style === 'peg' ? 'btnFeetPeg' : style === 'bun' ? 'btnFeetBun' : style === 'rubber' ? 'btnFeetRubber' : 'btnFeetNone';
   const btn = document.getElementById(id);
   if (btn) btn.classList.add('on');
+  markShadowsDirty();
+};
+
+window._setFootDia = (val) => {
+  purifierRefs.setFootDiameter(parseFloat(val));
+  markShadowsDirty();
+};
+
+window._setFootHt = (val) => {
+  purifierRefs.setFootHeight(parseFloat(val));
+  markShadowsDirty();
 };
 
 window._setFanColor = (mode) => {

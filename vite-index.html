@@ -78,6 +78,12 @@
             <button id="btnFeetNone" onclick="window._setFeet&&window._setFeet('none')">None</button>
           </div>
         </div>
+        <div class="ctrl-row" id="footDiameterRow"><label>Foot diameter <span id="footDiaLabel">1.5″</span></label>
+          <input type="range" class="slider" min="0" max="2" step="0.1" value="1.5" oninput="window._setFootDia&&window._setFootDia(this.value);document.getElementById('footDiaLabel').textContent=parseFloat(this.value).toFixed(1)+'″'" />
+        </div>
+        <div class="ctrl-row" id="footHeightRow"><label>Foot height <span id="footHtLabel">3.5″</span></label>
+          <input type="range" class="slider" min="0" max="4" step="0.25" value="3.5" oninput="window._setFootHt&&window._setFootHt(this.value);document.getElementById('footHtLabel').textContent=parseFloat(this.value).toFixed(2)+'″'" />
+        </div>
       </div>
 
       <!-- Placement -->

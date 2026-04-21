@@ -32,8 +32,8 @@ export const state = {
     catch (e) { return 0.5; }
   })(),
   ft: 0.78,    // filter thickness
-  bunFootH: 2.5,
-  bunFootR: 0.55,
+  bunFootH: 3.5,
+  bunFootR: 0.75,
 
   // Derived
   get panelW() { return this.W + 2 * this.ft; },
