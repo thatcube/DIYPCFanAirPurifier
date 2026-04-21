@@ -1573,8 +1573,6 @@ export function createPurifier(scene) {
     drag=false;
     canvas.style.cursor=_hoverInteractive?'pointer':'grab';
     const wasDragging=_dragFilter && !_pendingFilterDrag;
-    const dx=Math.abs(e.clientX-_clickStartX), dy=Math.abs(e.clientY-_clickStartY);
-    console.log('[purifier] mouseup dx='+dx+' dy='+dy+' wasDrag='+wasDragging+' fpMode='+_fpMode);
     if(wasDragging){
       handleDragEnd();
     } else {
@@ -1626,7 +1624,6 @@ export function createPurifier(scene) {
         if (fpTarget) break;
       }
       if (fpTarget) {
-        console.log('[purifier] FP click:', fpTarget._isLamp?'LAMP':fpTarget._isCeilLight?'CEIL':fpTarget._isWindow?'WIN':fpTarget._isFan?'FAN':'OTHER');
         handleClickObject(fpTarget);
       }
     }
@@ -2027,8 +2024,6 @@ export function createPurifier(scene) {
       const target=getInteractiveTarget(h.object);
       if(target){ obj=target; break; }
     }
-    if(obj) console.log('[purifier] clicked interactive:', obj._isLamp?'LAMP':obj._isCeilLight?'CEIL':obj._isWindow?'WIN':obj._isFan?'FAN':'OTHER');
-    else console.log('[purifier] no interactive target. hits:', hits.length, 'first:', hits[0]?.object?.uuid?.slice(0,8), 'parent:', hits[0]?.object?.parent?.constructor?.name);
     handleClickObject(obj);
   }
   
