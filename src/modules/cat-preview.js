@@ -28,9 +28,9 @@ function _applyLoopPause(action, ts, pauseSeconds) {
 }
 
 const MODEL_MAP = {
-  classic:   { src: 'assets/cat.glb',           camZ: 12, camY: 2 },
-  toon:      { src: 'assets/tooncat.glb',       camZ: 14, camY: 2.5 },
-  bababooey: { src: 'assets/bababooey_cat.glb', camZ: 14, camY: 2.5 },
+  classic:   { src: 'assets/cat.glb' },
+  toon:      { src: 'assets/tooncat.glb' },
+  bababooey: { src: 'assets/bababooey_cat.glb' },
 };
 
 /**
@@ -85,16 +85,17 @@ function _processLoadedModel(preview, entry, gltf, preset) {
   // Strip bababooey backdrop
   if (entry.key === 'bababooey') _stripBababooeyBackdrop(model);
 
-  // Auto-fit: scale to consistent height, center XZ, sit on ground
+  // Scale to consistent HEIGHT (3 units) so all cats are the same size
+  const TARGET_H = 3;
   const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
-  const center = box.getCenter(new THREE.Vector3());
-  const maxDim = Math.max(size.x, size.y, size.z);
-  const s = 4 / maxDim;
+  const h = Math.max(size.y, 0.001);
+  const s = TARGET_H / h;
   model.scale.setScalar(s);
-  // Re-center after scaling
+
+  // Re-center: XZ centered, feet on ground (y=0)
   box.setFromObject(model);
-  box.getCenter(center);
+  const center = box.getCenter(new THREE.Vector3());
   model.position.x -= center.x;
   model.position.z -= center.z;
   model.position.y -= box.min.y;
@@ -147,10 +148,10 @@ export function initPreviews() {
     // Scene
     const scene = new THREE.Scene();
 
-    // Camera
-    const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 200);
-    camera.position.set(0, cfg.camY, cfg.camZ);
-    camera.lookAt(0, 1, 0);
+    // Camera — same for all models (cats are normalized to 3 units tall, feet at y=0)
+    const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
+    camera.position.set(0, 1.5, 10);
+    camera.lookAt(0, 1.2, 0);
 
     // Lights
     scene.add(new THREE.AmbientLight(0xffffff, 0.6));
