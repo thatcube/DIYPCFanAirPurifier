@@ -2644,6 +2644,7 @@ export function createPurifier(scene) {
     // Rotated 90° so when purifierGroup rotates, Xbox is oriented correctly
     // Sits on top of purifier, toward the right end
     xbox.position.set(0, topY+xbH/2, 8);
+    xbox.rotation.y = 5 * Math.PI / 180; // slight 5° rotation
     consoleProps.add(xbox);
     // Green accent vent on top
     const ventMat=stdMat({color:0x107c10,roughness:0.6});
