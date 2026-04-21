@@ -14,7 +14,6 @@ import { stdMat } from './modules/materials.js';
 import * as lighting from './modules/lighting.js';
 import * as music from './modules/music.js';
 import * as particles from './modules/particles.js';
-import * as secrets from './modules/secrets.js';
 import * as catAppearance from './modules/cat-appearance.js';
 import * as catAnimation from './modules/cat-animation.js';
 import * as coins from './modules/coins.js';
@@ -189,15 +188,6 @@ coins.setToastFn(showToast);
 // Create coin group + spawn room coins
 const coinGroup = coins.createCoinGroup(scene);
 coins.spawnRoomCoins(roomRefs);
-
-secrets.setRefs({
-  addCoin: coins.addCoin,
-  coinGroup,
-  purifierGroup: null,
-  coins: coins.coins,
-  setCoinsVisible: coins.setCoinsVisible,
-  showToast
-});
 
 // ── Cat ─────────────────────────────────────────────────────────────
 
