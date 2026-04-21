@@ -25,6 +25,7 @@ import * as gameFp from './modules/game-fp.js';
 import { createRoom } from './modules/room.js';
 import { createPurifier } from './modules/purifier.js';
 import { initInteractions, coinBump } from './modules/ui-interactions.js';
+import { initPreviews } from './modules/cat-preview.js';
 import {
   SHADOW_UPDATE_INTERVAL_MS, IDLE_FRAME_MS
 } from './modules/constants.js';
@@ -211,9 +212,12 @@ gameFp.init({
 let _selectedModel = 'classic';
 let _selectedColor = 'charcoal';
 
+let _previewsInited = false;
 window._openCharSelect = () => {
   const cs = document.getElementById('charSelect');
   if (cs) cs.classList.add('open');
+  // Init 3D previews on first open
+  if (!_previewsInited) { initPreviews(); _previewsInited = true; }
   // Pre-select classic
   document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
   const classicCard = document.querySelector('.char-card[data-model="classic"]');
