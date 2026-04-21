@@ -9,7 +9,7 @@ export default defineConfig({
       input: {
         main: 'vite-index.html',
         admin: 'admin.html',
-        leaderboard: 'leaderboard/index.html'
+        leaderboard: 'leaderboard.html'
       }
     }
   },
@@ -17,7 +17,10 @@ export default defineConfig({
     port: 3000,
     open: '/vite-index.html',
     proxy: {
-      '/api': 'http://localhost:3001'
+      '/api': {
+        target: 'https://diy-air-purifier-leaderboard.essays-loges0y.workers.dev',
+        changeOrigin: true
+      }
     }
   }
 });

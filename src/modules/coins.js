@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { state } from './state.js';
 import { TOTAL_SECRETS } from './constants.js';
+import { reportCoin as _reportCoinToServer } from './leaderboard.js';
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -434,6 +435,8 @@ export function updateCoins(ts, playerPos) {
         } else {
           coinScore++;
           playChime(false);
+          // Report to shared leaderboard API (non-blocking, fire-and-forget)
+          _reportCoinToServer(c.id);
         }
       }
     }

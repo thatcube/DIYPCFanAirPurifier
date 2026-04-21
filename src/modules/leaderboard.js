@@ -1,7 +1,7 @@
 // ─── Run timer + leaderboard ────────────────────────────────────────
-// Speedrun timer, local leaderboard with localStorage persistence,
+// Speedrun timer, shared API leaderboard with local fallback,
 // name dialog, finish dialog, copy-result, per-player cap.
-// Ported from the monolith's inline leaderboard + finish dialog system.
+// API: same-origin /api/* proxied to Cloudflare Worker in production.
 
 import {
   catModelKey, catColorKey, catHairKey,
@@ -18,6 +18,17 @@ const LB_PER_PLAYER = 25;
 const LB_STORE_KEY = 'diy_air_purifier_leaderboard_v1';
 const LB_PLAYER_KEY = 'diy_air_purifier_player_name_v1';
 const LB_PLAYER_ID_KEY = 'diy_air_purifier_player_id_v1';
+const LB_API_BASE = ''; // same-origin — Netlify proxies /api/* to Worker
+const LB_SHARED_ENABLED = true;
+
+// ── Shared API state ────────────────────────────────────────────────
+
+let _sharedOnline = false;
+let _sharedRunId = '';
+let _statusNote = LB_SHARED_ENABLED ? 'Connecting' : '';
+const _claimedCoinIds = new Set();
+const _pendingCoinReports = new Set();
+const _failedCoinIds = new Set();
 
 // ── Timer state ─────────────────────────────────────────────────────
 
@@ -196,9 +207,101 @@ function _saveLeaderboard() {
 
 export function getEntries() { return _leaderboard; }
 
-// ── Record a finished run ───────────────────────────────────────────
+// ── Shared API ──────────────────────────────────────────────────────
 
-export function recordRun(timeMs, coinTotal, secretCoins) {
+async function _lbApiRequest(path, body) {
+  const url = `${LB_API_BASE}/api${path}`;
+  const init = body === undefined
+    ? { method: 'GET', credentials: 'same-origin' }
+    : {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      };
+  const res = await fetch(url, init);
+  let payload = {};
+  try { payload = await res.json(); } catch (e) { /* ignore */ }
+  if (!res.ok || payload.ok === false) {
+    const msg = (payload && payload.message) || `API ${res.status}`;
+    const err = new Error(msg);
+    err.apiCode = payload && payload.code ? String(payload.code) : '';
+    err.httpStatus = res.status;
+    throw err;
+  }
+  return payload;
+}
+
+export async function refreshSharedLeaderboard() {
+  if (!LB_SHARED_ENABLED) return;
+  try {
+    const data = await _lbApiRequest('/leaderboard');
+    _sharedOnline = true;
+    _statusNote = '';
+    _leaderboard = _normalizeLeaderboard(Array.isArray(data.leaderboard) ? data.leaderboard : []);
+  } catch (e) {
+    _sharedOnline = false;
+    _statusNote = 'Local fallback';
+    _loadLeaderboard();
+  }
+  renderLeaderboardPanel();
+}
+
+export async function startSharedRun() {
+  _sharedRunId = '';
+  _claimedCoinIds.clear();
+  _failedCoinIds.clear();
+  _pendingCoinReports.clear();
+  if (!LB_SHARED_ENABLED) return;
+  try {
+    const data = await _lbApiRequest('/run/start', {});
+    _sharedRunId = String(data.runId || '');
+    _sharedOnline = !!_sharedRunId;
+    if (_sharedOnline) _statusNote = '';
+  } catch (e) {
+    _sharedOnline = false;
+    _statusNote = 'Local fallback';
+  }
+  renderLeaderboardPanel();
+}
+
+function _trackCoinReport(promise) {
+  _pendingCoinReports.add(promise);
+  promise.finally(() => _pendingCoinReports.delete(promise));
+}
+
+async function _flushCoinReports() {
+  if (!_pendingCoinReports.size) return;
+  await Promise.allSettled([..._pendingCoinReports]);
+}
+
+async function _reconcileCoinClaims(runId) {
+  if (!runId || !_claimedCoinIds.size) return;
+  const jobs = [];
+  for (const coinId of _claimedCoinIds) {
+    jobs.push(
+      _lbApiRequest('/run/coin', { runId, coinId })
+        .then(() => { _failedCoinIds.delete(coinId); })
+        .catch(() => { _failedCoinIds.add(coinId); })
+    );
+  }
+  await Promise.allSettled(jobs);
+}
+
+export function reportCoin(coinId) {
+  if (!_sharedRunId || !_sharedOnline || !coinId) return;
+  if (_claimedCoinIds.has(coinId)) return;
+  const runId = _sharedRunId;
+  _claimedCoinIds.add(coinId);
+  const job = _lbApiRequest('/run/coin', { runId, coinId })
+    .then(() => { _failedCoinIds.delete(coinId); })
+    .catch(() => { _failedCoinIds.add(coinId); });
+  _trackCoinReport(job);
+}
+
+// ── Record a finished run (shared API with local fallback) ──────────
+
+function _recordRunLocal(timeMs, coinTotal, secretCoins) {
   const name = _playerName || 'Player';
   const now = Date.now();
   const entry = {
@@ -223,6 +326,101 @@ export function recordRun(timeMs, coinTotal, secretCoins) {
     secretCoins: secretCoins || 0,
     catColor: entry.catColor, catHair: entry.catHair, catModel: entry.catModel
   };
+}
+
+async function _recordRunShared(timeMs, coinTotal, secretCoins) {
+  if (!_sharedRunId || !_sharedOnline) {
+    return _recordRunLocal(timeMs, coinTotal, secretCoins);
+  }
+  const runId = _sharedRunId;
+  await _flushCoinReports();
+  if (_failedCoinIds.size) await _reconcileCoinClaims(runId);
+  try {
+    const data = await _lbApiRequest('/run/finish', {
+      runId,
+      name: _playerName || 'Player',
+      playerId: _playerId,
+      catColor: sanitizeColorKey(catColorKey),
+      catHair: sanitizeHairKey(catHairKey),
+      catModel: sanitizeModelKey(catModelKey)
+    });
+    _sharedRunId = '';
+    _claimedCoinIds.clear();
+    _failedCoinIds.clear();
+    _pendingCoinReports.clear();
+    _sharedOnline = true;
+    _statusNote = '';
+    _leaderboard = _normalizeLeaderboard(Array.isArray(data.leaderboard) ? data.leaderboard : []);
+    const serverEntry = (data && data.entry) ? data.entry : {};
+    return {
+      entryId: String(serverEntry.id || ''),
+      rank: Math.floor(Number(data && data.rank) || 0),
+      name: _sanitizePlayerName(serverEntry.name || _playerName || 'Player'),
+      timeMs: Math.floor(Number(serverEntry.timeMs) || Math.floor(timeMs)),
+      coins: coinTotal, coinTotal,
+      secretCoins: secretCoins || 0,
+      catColor: sanitizeColorKey(serverEntry.catColor || catColorKey),
+      catHair: sanitizeHairKey(serverEntry.catHair || catHairKey),
+      catModel: sanitizeModelKey(serverEntry.catModel || catModelKey)
+    };
+  } catch (e) {
+    // Retry if incomplete_run (coin claims may have been lost)
+    if (e && e.apiCode === 'incomplete_run') {
+      try {
+        await _reconcileCoinClaims(runId);
+        const retryData = await _lbApiRequest('/run/finish', {
+          runId,
+          name: _playerName || 'Player',
+          playerId: _playerId,
+          catColor: sanitizeColorKey(catColorKey),
+          catHair: sanitizeHairKey(catHairKey),
+          catModel: sanitizeModelKey(catModelKey)
+        });
+        _sharedRunId = '';
+        _claimedCoinIds.clear();
+        _failedCoinIds.clear();
+        _pendingCoinReports.clear();
+        _sharedOnline = true;
+        _statusNote = '';
+        _leaderboard = _normalizeLeaderboard(Array.isArray(retryData.leaderboard) ? retryData.leaderboard : []);
+        const retryEntry = (retryData && retryData.entry) ? retryData.entry : {};
+        return {
+          entryId: String(retryEntry.id || ''),
+          rank: Math.floor(Number(retryData && retryData.rank) || 0),
+          name: _sanitizePlayerName(retryEntry.name || _playerName || 'Player'),
+          timeMs: Math.floor(Number(retryEntry.timeMs) || Math.floor(timeMs)),
+          coins: coinTotal, coinTotal,
+          secretCoins: secretCoins || 0,
+          catColor: sanitizeColorKey(retryEntry.catColor || catColorKey),
+          catHair: sanitizeHairKey(retryEntry.catHair || catHairKey),
+          catModel: sanitizeModelKey(retryEntry.catModel || catModelKey)
+        };
+      } catch (_retryErr) {
+        // Fall through to local fallback
+      }
+    }
+    // API rejected or offline — fall back to local
+    _sharedRunId = '';
+    _claimedCoinIds.clear();
+    _failedCoinIds.clear();
+    _pendingCoinReports.clear();
+    if (e && e.apiCode) {
+      _sharedOnline = true;
+      _statusNote = `Rejected (${e.apiCode})`;
+      void refreshSharedLeaderboard();
+      return { entryId: '', rank: 0, name: _playerName || 'Player', timeMs: Math.floor(timeMs), coins: coinTotal, coinTotal, secretCoins: secretCoins || 0, catColor: sanitizeColorKey(catColorKey), catHair: sanitizeHairKey(catHairKey), catModel: sanitizeModelKey(catModelKey) };
+    }
+    _sharedOnline = false;
+    _statusNote = 'Local fallback';
+    return _recordRunLocal(timeMs, coinTotal, secretCoins);
+  }
+}
+
+export async function recordRun(timeMs, coinTotal, secretCoins) {
+  if (LB_SHARED_ENABLED) {
+    return _recordRunShared(timeMs, coinTotal, secretCoins);
+  }
+  return _recordRunLocal(timeMs, coinTotal, secretCoins);
 }
 
 // ── Render leaderboard panel (in-game, shown on pause) ──────────────
@@ -512,6 +710,8 @@ export function init() {
   _createNameDialogDOM();
   _createFinishDialogDOM();
   renderLeaderboardPanel();
+  // Fetch shared leaderboard from API (non-blocking)
+  void refreshSharedLeaderboard();
 }
 
 // ── Name Dialog DOM ─────────────────────────────────────────────────
