@@ -1459,9 +1459,6 @@ export function createPurifier(scene) {
     exploded=false;
     explodeLerping=true;
     { const el=_el('togExplode'); if(el) el.classList.remove('on'); }
-    // Only auto-disable isolate if explode was the one that turned it on
-    if(isolateMode && _isolateAutoExplode){ toggleIsolate(); }
-    _isolateAutoExplode=false;
     for(const k in explodeV){
       if(!parts[k]) continue;
       targets[k]=origins[k].clone();
@@ -1471,15 +1468,7 @@ export function createPurifier(scene) {
     exploded=!exploded;
     { const el=_el('togExplode'); if(el) el.classList.toggle('on',exploded); }
     if(exploded){
-      // Exploding turns off dimensions
       if(dimVisible) toggleDimensions();
-      // Auto-enable isolate mode (track that explode did it)
-      if(!isolateMode){ _isolateAutoExplode=true; toggleIsolate(); }
-      else { _isolateAutoExplode=false; }
-    } else {
-      // Only auto-disable isolate if explode was the one that turned it on
-      if(isolateMode && _isolateAutoExplode){ toggleIsolate(); }
-      _isolateAutoExplode=false;
     }
     for(const k in explodeV){
       if(!parts[k]) continue;
