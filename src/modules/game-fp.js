@@ -221,18 +221,22 @@ function _buildStaticBoxes() {
     yTop: tvCenterY + tvH / 2 + bezel, yBottom: tvCenterY - tvH / 2 - bezel, room: true
   });
 
-  // Headboard
-  const hbW = BED_W + 2, hbThick = 1.5, hbH = 20;
+  // Headboard — full height from bed clearance to top of headboard
+  // Monolith: hbW=bedW, hbThick=3, hbH=bedH-bedClearance=35.5
+  const hbW = BED_W, hbThick = 3, hbH = BED_H - BED_CLEARANCE;
   _staticBoxes.push({
     xMin: -(BED_X + hbW / 2), xMax: -(BED_X - hbW / 2),
     zMin: BED_Z + BED_L / 2 - hbThick, zMax: BED_Z + BED_L / 2,
     yTop: fy + BED_CLEARANCE + hbH, room: true
   });
 
-  // Pillows
-  const pillowW = 18, pillowD = 12, pillowH = 4;
+  // Pillows — monolith: pillowW=22, pillowD=14, pillowH=4
+  const pillowW = 22, pillowD = 14, pillowH = 4;
+  const slatY = fy + BED_SLATS_FROM_FLOOR; // = fy + 10
+  const mattH = 10;
+  const mattY = slatY + 1 + mattH / 2; // = fy + 16
+  const pillowY = mattY + mattH / 2 - 0.8; // = fy + 20.2
   const pillowBaseZ = BED_Z + BED_L / 2 - hbThick - pillowD / 2 - 2;
-  const pillowY = bedTop - 1.5 + 0.8; // approximate
   _staticBoxes.push({
     xMin: -(BED_X - 13 + pillowW / 2), xMax: -(BED_X - 13 - pillowW / 2),
     zMin: pillowBaseZ - pillowD / 2, zMax: pillowBaseZ + pillowD / 2,
@@ -242,6 +246,14 @@ function _buildStaticBoxes() {
     xMin: -(BED_X + 13 + pillowW / 2), xMax: -(BED_X + 13 - pillowW / 2),
     zMin: pillowBaseZ - pillowD / 2, zMax: pillowBaseZ + pillowD / 2,
     yTop: pillowY + pillowH + 1.5, yBottom: fy + BED_CLEARANCE, room: true
+  });
+
+  // Door extrusion — solid wall block behind the door recess
+  // extRight=51, extLeft=11, recessZ=19
+  _staticBoxes.push({
+    xMin: -51, xMax: -11,
+    zMin: 18.75, zMax: 49,
+    yTop: fy + WALL_HEIGHT, room: true
   });
 }
 
