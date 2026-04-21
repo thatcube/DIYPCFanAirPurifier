@@ -17,24 +17,26 @@
   /* Text shadow for legibility on glass */
   --text-shadow: 0 1px 3px rgba(0,0,0,0.5);
 
-  /* Liquid Glass specular — MS logo quadrant tints over white highlight */
+  /* Liquid Glass specular — prismatic light refraction highlights */
   --glass-specular:
-    radial-gradient(ellipse at 25% 25%, rgba(242, 80, 34, 0.07) 0%, transparent 50%),
-    radial-gradient(ellipse at 75% 25%, rgba(127, 186, 0, 0.06) 0%, transparent 50%),
-    radial-gradient(ellipse at 25% 75%, rgba(0, 164, 239, 0.07) 0%, transparent 50%),
-    radial-gradient(ellipse at 75% 75%, rgba(255, 185, 0, 0.06) 0%, transparent 50%),
-    linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.03) 40%, transparent 60%);
+    radial-gradient(ellipse at 20% 20%, rgba(180, 220, 255, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 15%, rgba(200, 180, 255, 0.08) 0%, transparent 45%),
+    radial-gradient(ellipse at 30% 80%, rgba(160, 240, 255, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 75%, rgba(220, 200, 255, 0.05) 0%, transparent 45%),
+    linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.04) 35%, transparent 55%);
 
-  /* Accent — MS 4-quadrant colors */
-  --accent: #00a4ef;
-  --accent-glow: rgba(0, 164, 239, 0.35);
-  --accent-dim: rgba(0, 164, 239, 0.12);
-  /* Inside fill: smooth 4-color diagonal */
+  /* Accent — cool blue-white glass tint */
+  --accent: rgba(160, 210, 255, 0.9);
+  --accent-glow: rgba(160, 210, 255, 0.25);
+  --accent-dim: rgba(160, 210, 255, 0.1);
+  /* Inside fill: subtle prismatic wash */
   --accent-gradient: linear-gradient(135deg,
-    rgba(242,80,34,0.35) 0%, rgba(127,186,0,0.3) 33%,
-    rgba(0,164,239,0.3) 66%, rgba(255,185,0,0.35) 100%);
-  /* Border: same colors, full brightness */
-  --accent-border: linear-gradient(135deg, #f25022 0%, #7fba00 33%, #00a4ef 66%, #ffb900 100%);
+    rgba(180,220,255,0.12) 0%, rgba(200,180,255,0.1) 40%,
+    rgba(160,240,255,0.1) 70%, rgba(220,200,255,0.12) 100%);
+  /* Border: iridescent shimmer — soft pastels, not brand colors */
+  --accent-border: linear-gradient(135deg,
+    rgba(180,220,255,0.7) 0%, rgba(200,180,255,0.5) 30%,
+    rgba(160,240,255,0.5) 60%, rgba(220,200,255,0.6) 100%);
 
   /* Text — vibrant on glass */
   --text: #e8f4ff;
@@ -947,9 +949,7 @@ body.play-mode #fpCrosshair { display: block; }
 .char-select-inner h2 {
   color: #fff; font-size: 28px; font-weight: 900;
   letter-spacing: -0.5px;
-  background: var(--accent-gradient);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text;
+  text-shadow: var(--text-shadow);
   margin: 0;
 }
 .char-back {
