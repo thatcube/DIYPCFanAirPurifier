@@ -404,7 +404,7 @@ export function toggleFirstPerson() {
     _respawn();
 
     // Reset coins + timer
-    coins.resetScores();
+    coins.fullReset();
     coins.setCoinsVisible(true);
     leaderboard.startTimer();
 
@@ -759,7 +759,7 @@ function _bindInputs() {
         break;
       case 'KeyR':
         _respawn();
-        coins.resetScores();
+        coins.fullReset();
         if (_showToast) _showToast('Reset!');
         break;
       case 'KeyG':

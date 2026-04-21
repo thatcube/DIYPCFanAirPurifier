@@ -205,43 +205,139 @@ export function setCoinsVisible(vis) {
   }
 }
 
-// ── Spawn coins in room ─────────────────────────────────────────────
+// ── Spawn coins in room (exact monolith placements) ─────────────────
+
+// Import spatial constants for coin placement
+import {
+  BED_X, BED_Z, BED_W, BED_L, BED_CLEARANCE, BED_SLATS_FROM_FLOOR,
+  TBL_X, TBL_Z, TBL_W, TBL_D, TBL_H,
+  SIDE_WALL_X, LEFT_WALL_X, OPP_WALL_Z, CLOSET_DEPTH, CLOSET_INTERIOR_W, CLOSET_Z,
+  getFloorY, getWinCenterY, WIN_W, WIN_H, WIN_CENTER_Z
+} from './spatial.js';
 
 export function spawnRoomCoins(roomRefs) {
   if (!_coinGroup) return;
-  const fy = roomRefs.floorY;
+  const fy = getFloorY();
+  const bedClearance = BED_CLEARANCE;
+  const slatY = fy + BED_SLATS_FROM_FLOOR;
+  const mattH = 10, mattY = slatY + 1 + mattH / 2;
+  const duvetH = 1.5;
+  const hbThick = 3, hbH = 42 - bedClearance; // bedH - bedClearance
+  const mattCenterZ = BED_Z - 2;
+  // TV vars
+  const tvCenterX = BED_X, tvCenterY = fy + 48;
+  const tvW = 56.7, tvH = 31.9, tvD = 1.0, bezel = 0.3;
+  const tvZ = OPP_WALL_Z + 0.5 + tvD / 2 + 0.1;
+  // Mini split vars
+  const msX = BED_X + BED_W / 2 + 12, msY = fy + 65, msH = 8, msD = 8, msZ = OPP_WALL_Z + 1;
+  // Closet shelf vars
+  const shelfCx = SIDE_WALL_X + CLOSET_DEPTH - 0.5 - 0.1 - 7;
+  const secZ = CLOSET_Z - (CLOSET_INTERIOR_W - 1) / 2 + (CLOSET_INTERIOR_W - 1) * 0.125;
 
-  // Floor coins around the room
-  const positions = [
-    // Under the bed (center)
-    new THREE.Vector3(-(roomRefs.bedX || 0), fy + 3, roomRefs.bedZ || 0),
-    // Near nightstand
-    new THREE.Vector3(-(roomRefs.tblX || 0) - 8, fy + 3, (roomRefs.tblZ || 0)),
-    // On nightstand top
-    new THREE.Vector3(-(roomRefs.tblX || 0), fy + (roomRefs.tblH || 28) + 2, (roomRefs.tblZ || 0) - 6),
-    // Near window wall
-    new THREE.Vector3(70, fy + 3, 0),
-    // Back corner near door
-    new THREE.Vector3(-20, fy + 3, 40),
-    // Opposite corner
-    new THREE.Vector3(30, fy + 3, -60),
-    // On the bed
-    new THREE.Vector3(-(roomRefs.bedX || 0), fy + (roomRefs.bedH || 25) + 5, (roomRefs.bedZ || 0) - 10),
-    // Center of room
-    new THREE.Vector3(10, fy + 3, -10),
-    // Near TV wall
-    new THREE.Vector3(-(roomRefs.bedX || 0) + 20, fy + 3, -70),
-    // Near closet
-    new THREE.Vector3(-45, fy + 3, 5),
-    // High up — on mini split area
-    new THREE.Vector3(-(roomRefs.bedX || 0) - 10, fy + 55, -72),
-    // Near purifier
-    new THREE.Vector3(0, fy + 3, 20),
-  ];
+  // 1. Under the bed
+  addCoin(_coinGroup, new THREE.Vector3(-BED_X, fy + bedClearance - 1.8, BED_Z + 4), {});
+  // 2. Above nightstand (jump to grab)
+  addCoin(_coinGroup, new THREE.Vector3(-TBL_X, fy + TBL_H + 5, TBL_Z), {});
+  // 3. Middle of room
+  addCoin(_coinGroup, new THREE.Vector3(0, fy + 5, 10), {});
+  // 4. Near TV wall
+  addCoin(_coinGroup, new THREE.Vector3(25, fy + 6, -40), {});
+  // 5. High near mini split (jump!)
+  addCoin(_coinGroup, new THREE.Vector3(-20, fy + 28, -60), {});
+  // 6. On top of bed
+  addCoin(_coinGroup, new THREE.Vector3(-BED_X, mattY + mattH / 2 + duvetH + 3, mattCenterZ), {});
+  // 7. On top of headboard
+  addCoin(_coinGroup, new THREE.Vector3(-BED_X, fy + bedClearance + hbH + 2.5, BED_Z + BED_L / 2 - hbThick / 2), {});
+  // 8. Near closet
+  addCoin(_coinGroup, new THREE.Vector3(35, fy + 3, 20), {});
+  // 9. On closet shelf
+  addCoin(_coinGroup, new THREE.Vector3(-(shelfCx), fy + 80 - 24 + 0.4 + 2.5, secZ), {});
+  // 10. On top of mini split
+  addCoin(_coinGroup, new THREE.Vector3(-msX, msY + msH / 2 + 2.2, msZ - msD / 2 + 1.5), {});
+  // 11. On top of TV
+  addCoin(_coinGroup, new THREE.Vector3(-tvCenterX, tvCenterY + tvH / 2 + bezel + 2.2, tvZ - tvD / 2 + 1.2), {});
+  // 12. Closet corner (floor)
+  addCoin(_coinGroup, new THREE.Vector3(-(SIDE_WALL_X + 2.0), fy + 2.5, CLOSET_Z + CLOSET_INTERIOR_W / 2 - 1.2), {});
+  // 13. On top of lamp shade
+  addCoin(_coinGroup, new THREE.Vector3(-(TBL_X + TBL_W / 2 - 6), fy + TBL_H + 28.5, TBL_Z + TBL_D / 2 - 6), {});
+  // 14. Inside the purifier
+  addCoin(_coinGroup, new THREE.Vector3(0, fy + 3, -68), { insidePurifier: true });
+}
 
-  for (const pos of positions) {
-    addCoin(_coinGroup, pos, {});
+// ── Secret coin system ──────────────────────────────────────────────
+
+const _secretTriggered = {};
+
+function _spawnSecretIfUntriggered(id, parent, pos, opts) {
+  if (_secretTriggered[id]) return;
+  _secretTriggered[id] = true;
+  addCoin(parent, pos, { ...opts, secret: true, isDynamic: true, id: 'secret_' + id });
+  _showToast('Secret coin!');
+}
+
+export function spawnSecretFanCoin() {
+  const fy = getFloorY();
+  _spawnSecretIfUntriggered('xbox', _coinGroup, new THREE.Vector3(45, fy + 15, -68), {});
+}
+
+export function spawnSecretLampCoin() {
+  const fy = getFloorY();
+  _spawnSecretIfUntriggered('lamp', _coinGroup,
+    new THREE.Vector3(-(TBL_X + TBL_W / 2 - 6), fy + TBL_H + 22.4, TBL_Z + TBL_D / 2 - 6), {});
+}
+
+export function spawnSecretCeilingLightCoins() {
+  const fy = getFloorY();
+  const pbX = -(SIDE_WALL_X + 2.5);
+  const pbZBase = CLOSET_Z - CLOSET_INTERIOR_W / 2 + 4;
+  const pbStep = 3.2;
+  if (_secretTriggered['powerbi']) return;
+  _secretTriggered['powerbi'] = true;
+  addCoin(_coinGroup, new THREE.Vector3(pbX, fy + 6, pbZBase), { secret: true, isDynamic: true, id: 'secret_pb1' });
+  addCoin(_coinGroup, new THREE.Vector3(pbX, fy + 14, pbZBase + pbStep), { secret: true, isDynamic: true, id: 'secret_pb2' });
+  addCoin(_coinGroup, new THREE.Vector3(pbX, fy + 22, pbZBase + pbStep * 2), { secret: true, isDynamic: true, id: 'secret_pb3' });
+  _showToast('Secret coins!');
+}
+
+export function spawnSecretWindowCoin() {
+  const fy = getFloorY();
+  _spawnSecretIfUntriggered('window', _coinGroup,
+    new THREE.Vector3(-LEFT_WALL_X - 2, getWinCenterY() - WIN_H / 2 + 3, WIN_CENTER_Z), {});
+}
+
+export function spawnSecretDrawerCoin() {
+  const fy = getFloorY();
+  _spawnSecretIfUntriggered('drawer', _coinGroup,
+    new THREE.Vector3(-BED_X, fy + BED_CLEARANCE - 1.8, BED_Z + BED_L / 2 - 8), {});
+}
+
+// ── Full reset for new run ──────────────────────────────────────────
+
+export function fullReset() {
+  coinScore = 0;
+  coinSecretScore = 0;
+
+  // Remove dynamic (secret) coins
+  for (let i = coins.length - 1; i >= 0; i--) {
+    const c = coins[i];
+    if (c.isDynamic) {
+      if (c.mesh && c.mesh.parent) c.mesh.parent.remove(c.mesh);
+      coins.splice(i, 1);
+    }
   }
+
+  // Clear secret triggers so they can re-spawn
+  for (const k of Object.keys(_secretTriggered)) delete _secretTriggered[k];
+
+  // Un-collect all remaining coins
+  for (const c of coins) {
+    c.collected = false;
+    c.mesh.visible = true;
+    c.mesh.position.copy(c.basePos);
+  }
+
+  // Recalculate coinTotal (secrets were removed)
+  coinTotal = coins.filter(c => !c.secret).length;
 }
 
 // ── Per-frame update ────────────────────────────────────────────────
