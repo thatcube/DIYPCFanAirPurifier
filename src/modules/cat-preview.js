@@ -28,9 +28,9 @@ function _applyLoopPause(action, ts, pauseSeconds) {
 }
 
 const MODEL_MAP = {
-  classic:   { src: 'assets/cat.glb' },
-  toon:      { src: 'assets/tooncat.glb' },
-  bababooey: { src: 'assets/bababooey_cat.glb' },
+  classic:   { src: 'assets/cat.glb',           extraScale: 1, yOffset: 0 },
+  toon:      { src: 'assets/tooncat.glb',       extraScale: 1.25, yOffset: -0.4 },
+  bababooey: { src: 'assets/bababooey_cat.glb', extraScale: 1, yOffset: 0 },
 };
 
 /**
@@ -90,15 +90,15 @@ function _processLoadedModel(preview, entry, gltf, preset) {
   const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
   const h = Math.max(size.y, 0.001);
-  const s = TARGET_H / h;
+  const s = TARGET_H / h * (preview.cfg.extraScale || 1);
   model.scale.setScalar(s);
 
-  // Re-center: XZ centered, feet on ground (y=0)
+  // Re-center: XZ centered, feet on ground (y=0) + per-model Y offset
   box.setFromObject(model);
   const center = box.getCenter(new THREE.Vector3());
   model.position.x -= center.x;
   model.position.z -= center.z;
-  model.position.y -= box.min.y;
+  model.position.y -= box.min.y + (preview.cfg.yOffset || 0);
 
   // Material cleanup
   model.traverse(child => {
