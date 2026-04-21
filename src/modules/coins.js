@@ -274,8 +274,8 @@ export function spawnRoomCoins(roomRefs) {
     // After X-mirror, drawer group.position.x is pre-mirror, so coin world X = -drw.pos.x
     // Coin is in _coinGroup (world space), so we compute the world position
     const coinInDrawer = makeCoin();
-    // Drawer center in world space (post-mirror)
-    const dwx = -drw.position.x;
+    // Drawer center in world space (already mirrored since drawer is _isRoom)
+    const dwx = drw.position.x;
     const dwy = drw.position.y;
     const dwz = drw.position.z + (drw._drawerTrayD || 10) / 2 + 0.4; // center of tray
     coinInDrawer.position.set(dwx, dwy, dwz);
