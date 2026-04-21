@@ -404,8 +404,11 @@ function _getBoxes() {
   // When filters are removed (toggled off) or slid out, skip their side walls
   const filtersOn = _purifierRefs && _purifierRefs.isFilterOn ? _purifierRefs.isFilterOn() : true;
   const filtersSlid = _purifierRefs && _purifierRefs.areFiltersSlid ? _purifierRefs.areFiltersSlid() : { left: false, right: false };
-  const leftOpen = !filtersOn || filtersSlid.left;
-  const rightOpen = !filtersOn || filtersSlid.right;
+  // Filter sides: filterL is at local -X, filterR is at local +X
+  // But the purifier's filter naming is from the viewer's perspective, which
+  // is opposite to the local X axis. Swap so collision matches visuals.
+  const leftOpen = !filtersOn || filtersSlid.right;
+  const rightOpen = !filtersOn || filtersSlid.left;
   const localBoxes = [
     // Top panel — standable
     { lxMin: -hwOuter, lxMax: hwOuter, lzMin: -hdOuter, lzMax: hdOuter, yTop: yTopPanel, yBottom: yTopPanel - ply },
