@@ -2006,6 +2006,7 @@ export function createPurifier(scene) {
     _mouse.y=-((clientY-rect.top)/rect.height)*2+1;
     _raycaster.setFromCamera(_mouse,camera);
     const hits=_raycaster.intersectObjects(scene.children,true);
+    console.log('[purifier] handleClick, hits:', hits.length, hits.slice(0,3).map(h => h.object.constructor.name + (h.object._isLamp ? ' LAMP' : '') + (h.object._isCeilLight ? ' CEIL' : '') + (h.object._isWindow ? ' WIN' : '')));
     // Find the first interactive hit (skip objects inside invisible parent groups)
     let obj=null;
     for(const h of hits){
