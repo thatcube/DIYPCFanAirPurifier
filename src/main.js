@@ -25,6 +25,7 @@ import * as wallFade from './modules/wall-fade.js';
 import { createRoom } from './modules/room.js';
 import { createPurifier } from './modules/purifier.js';
 import { initInteractions, coinBump } from './modules/ui-interactions.js';
+import { initGlassShine } from './modules/glass-shine.js';
 import { initPreviews, recolorClassicPreview } from './modules/cat-preview.js';
 import { initToggleSwitches, initSegButtons, initDecorativeIcons, initClickableDivs, trapFocus, saveFocus } from './modules/a11y.js';
 import {
@@ -716,6 +717,9 @@ animate(performance.now());
 
 // Init UI micro-interactions (bouncy buttons, press effects)
 initInteractions();
+
+// Glass shine: cursor-tracking highlight + click ripple on glass buttons
+initGlassShine();
 
 // Accessibility: toggle-switch keyboard support + seg-button aria-pressed
 initToggleSwitches();
