@@ -133,8 +133,7 @@ canvas#c { display: block; width: 100%; height: 100%; }
 }
 .panel-header h3 {
   font-size: 14px; font-weight: 800; letter-spacing: 0.3px;
-  background: linear-gradient(90deg, #f25022, #ffb900, #7fba00, #00a4ef); -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent; background-clip: text;
+  color: #fff;
 }
 .panel-close {
   width: 30px; height: 30px; border-radius: var(--r-sm); border: none;
@@ -309,7 +308,8 @@ input[type=range]::-moz-range-thumb {
 #playDockBtn {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
   z-index: 200;
-  background: var(--accent-border);
+  background: var(--accent-gradient);
+  backdrop-filter: blur(8px);
   color: #fff; border: none; border-radius: var(--r-md);
   padding: 14px 32px; font-family: inherit; font-size: 15px;
   font-weight: 800; cursor: pointer; letter-spacing: 0.4px;
@@ -317,6 +317,17 @@ input[type=range]::-moz-range-thumb {
   box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.2);
   transition: all var(--dur-med) var(--spring);
   animation: playBtnPulse 3s ease-in-out infinite;
+  position: relative; overflow: hidden;
+}
+#playDockBtn::before {
+  content: ''; position: absolute; inset: 0;
+  border: 3px solid transparent; border-radius: inherit;
+  background: var(--accent-border) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
 }
 @keyframes playBtnPulse {
   0%, 100% { box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.2); }
