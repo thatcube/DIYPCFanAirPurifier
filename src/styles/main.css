@@ -15,7 +15,7 @@
   --glass-stroke-soft: rgba(255, 255, 255, 0.08);
 
   /* Text shadow for legibility on glass */
-  --text-shadow: 0 1px 4px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,0.5);
+  --text-shadow: 0 1px 3px rgba(0,0,0,0.5);
 
   /* Liquid Glass specular — MS logo quadrant tints over white highlight */
   --glass-specular:
