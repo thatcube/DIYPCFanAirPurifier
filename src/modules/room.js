@@ -1462,7 +1462,7 @@ export function createRoom(scene) {
       // Place on duvet (post-mirror coords)
       const rawX = bedX - mattW / 2 + 12;
       root.position.set(-rawX, bedTopY - localBB.min.y, bedZ + 6);
-      root.rotation.y = Math.PI;
+      root.rotation.y = Math.PI + 15 * Math.PI / 180; // rotated ~15° for natural look
       root._isRoom = true;
       root.traverse(o => {
         if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o._isMacbook = true; }
