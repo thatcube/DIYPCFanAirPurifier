@@ -799,7 +799,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       if (h.distance > 220) break;
       let p = h.object;
       while (p) {
-        if (p._isLamp || p._isCeilLight || p._isFan || p._isFilterL || p._isFilterR || p._isDrawer || p._isBifoldLeaf || p._isWindow) { aimingAt = true; break; }
+        if (p._isLamp || p._isCeilLight || p._isFan || p._isFilterL || p._isFilterR || p._isDrawer || p._isBifoldLeaf || p._isWindow || p._isMacbook) { aimingAt = true; break; }
         p = p.parent;
       }
       if (aimingAt) break;
