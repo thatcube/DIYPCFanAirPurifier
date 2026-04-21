@@ -729,8 +729,8 @@ function _createNameDialogDOM() {
         </div>
         <div id="nameDialogHint" class="name-dialog-hint"></div>
         <div class="name-dialog-actions">
-          <button type="button" class="finishDlgBtn secondary" id="nameDialogCancel">Cancel</button>
-          <button type="submit" class="finishDlgBtn primary">Save</button>
+          <button type="button" class="finishDlgBtn glass-btn glass-btn--secondary" id="nameDialogCancel">Cancel</button>
+          <button type="submit" class="finishDlgBtn glass-btn glass-btn--primary">Save</button>
         </div>
       </form>
     </div>
@@ -798,9 +798,9 @@ function _createFinishDialogDOM() {
         <ol id="finishDialogList"></ol>
       </div>
       <div class="finishDialogActions">
-        <button type="button" class="finishDlgBtn danger" id="finishDialogExit"><i class="ph ph-sign-out"></i> Exit</button>
-        <button type="button" class="finishDlgBtn secondary" id="finishDialogAgain"><i class="ph-fill ph-play"></i> Play Again</button>
-        <button type="button" class="finishDlgBtn primary" id="finishDialogCopy"><i class="ph ph-copy"></i> Copy result</button>
+        <button type="button" class="finishDlgBtn glass-btn glass-btn--danger" id="finishDialogExit"><i class="ph ph-sign-out"></i> Exit</button>
+        <button type="button" class="finishDlgBtn glass-btn glass-btn--secondary" id="finishDialogAgain"><i class="ph-fill ph-play"></i> Play Again</button>
+        <button type="button" class="finishDlgBtn glass-btn glass-btn--primary" id="finishDialogCopy"><i class="ph ph-copy"></i> Copy result</button>
       </div>
     </div>
   `;

@@ -3,7 +3,7 @@
 //  and cursor-following glow for glass buttons.
 // ═══════════════════════════════════════════════════════════════════
 
-const SELECTOR = '#playDockBtn, .char-start, .pause-btn, .finishDlgBtn, .pause-pill';
+const SELECTOR = '.glass-btn, .pause-pill';
 
 // ── Shine + Glow (mouse-tracking highlight) ─────────────────────────
 
