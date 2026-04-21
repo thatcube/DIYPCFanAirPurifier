@@ -333,7 +333,8 @@ window._resumeFP = () => gameFp.setPaused(false);
 window._resetFP = () => {
   leaderboard.closeFinishDialog();
   leaderboard.hideShareButton();
-  gameFp.setPaused(false);
+  gameFp.releasePauseFocusTrap();
+  gameFp.clearPauseState();
   leaderboard.resetTimer();
   coins.fullReset();
   void leaderboard.startSharedRun();
@@ -348,7 +349,10 @@ window._exitFP = () => {
   if (pause) pause.style.display = 'none';
   // Release pointer lock
   if (document.pointerLockElement) document.exitPointerLock();
-  gameFp.setPaused(false);
+  // Release focus trap from pause overlay
+  gameFp.releasePauseFocusTrap();
+  // Clear pause without triggering re-lock (setPaused(false) would re-lock pointer)
+  gameFp.clearPauseState();
   if (gameFp.fpMode) gameFp.toggleFirstPerson();
 };
 window._toggleMuteSfx = (checked) => {
@@ -363,7 +367,8 @@ window._switchCamFP = () => gameFp.setCamMode();
 window._playAgain = () => {
   leaderboard.closeFinishDialog();
   leaderboard.hideShareButton();
-  gameFp.setPaused(false);
+  gameFp.releasePauseFocusTrap();
+  gameFp.clearPauseState();
   gameFp.toggleFirstPerson();
   setTimeout(() => window._openCharSelect(), 100);
 };
