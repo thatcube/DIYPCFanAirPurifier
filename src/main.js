@@ -228,9 +228,9 @@ window._selectCat = (model, el) => {
   _selectedModel = model;
   document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
   if (el) el.classList.add('selected');
-  // Show/hide color dots (only for colorable models)
+  // Show/hide color dots (only for colorable models) — use visibility to preserve layout
   const colorSection = document.getElementById('classicColors');
-  if (colorSection) colorSection.style.display = model === 'classic' ? 'flex' : 'none';
+  if (colorSection) colorSection.style.visibility = model === 'classic' ? 'visible' : 'hidden';
 };
 
 window._selectColor = (color, el) => {
