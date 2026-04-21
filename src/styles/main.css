@@ -294,7 +294,7 @@ input[type=range]::-moz-range-thumb {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
   z-index: 200;
   background: var(--accent-gradient);
-  color: #0a0e14; border: none; border-radius: var(--r-pill);
+  color: #0a0e14; border: none; border-radius: var(--r-md);
   padding: 14px 32px; font-family: inherit; font-size: 15px;
   font-weight: 800; cursor: pointer; letter-spacing: 0.4px;
   box-shadow: 0 8px 32px rgba(145,222,255,0.3), 0 2px 8px rgba(0,0,0,0.2);
@@ -366,13 +366,13 @@ input[type=range]::-moz-range-thumb {
   display: none; position: fixed; bottom: 16px; left: 50%;
   transform: translateX(-50%);
   width: 140px; height: 8px;
-  background: rgba(255,255,255,0.06); border-radius: var(--r-pill);
+  background: rgba(255,255,255,0.06); border-radius: var(--r-sm);
   overflow: hidden; border: 1px solid rgba(255,255,255,0.06);
 }
 #fpChargeFill {
   width: 0%; height: 100%;
   background: var(--accent-gradient);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-sm);
   transition: width 0.06s linear;
   box-shadow: 0 0 12px rgba(145,222,255,0.4);
 }
@@ -484,7 +484,7 @@ input[type=range]::-moz-range-thumb {
 .pause-actions { display: flex; gap: 8px; justify-content: center; margin-bottom: 14px; }
 .pause-pill {
   background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
-  border-radius: var(--r-pill); padding: 7px 16px; font-size: 11px; font-weight: 600;
+  border-radius: var(--r-sm); padding: 7px 16px; font-size: 11px; font-weight: 600;
   color: var(--text-dim); cursor: pointer; font-family: inherit;
   transition: all var(--dur-med) var(--spring);
 }
@@ -674,7 +674,7 @@ body.play-mode #fpCrosshair { display: block; }
 }
 .char-start {
   background: var(--accent-gradient);
-  color: #0a0e14; border: none; border-radius: var(--r-pill);
+  color: #0a0e14; border: none; border-radius: var(--r-md);
   padding: 16px 48px; font-size: 16px; font-weight: 900;
   cursor: pointer; letter-spacing: 1px; font-family: inherit;
   box-shadow: 0 8px 32px rgba(145,222,255,0.35);
