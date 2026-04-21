@@ -697,7 +697,7 @@ export function createRoom(scene) {
   // The walk-in interior still uses the full room wallHeight for its ceiling,
   // so _closetInteriorH is kept separate.
   const _closetW=48, _closetH=66, _closetInteriorH=wallHeight, _closetDepth=36, _closetInteriorW=78;
-  const _closetZ=oppWallZ+_closetW/2+4;
+  const _closetZ=oppWallZ+_closetW/2+8; // = -46 (5.5" trim-to-TV-wall gap)
   const rightWall=(()=>{
     // Build the wall as an extruded rectangle with a rectangular hole at the
     // closet opening. Shape lives in Y-Z (the wall's face plane); extrudes along
@@ -884,10 +884,15 @@ export function createRoom(scene) {
     const closetSideP=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, interiorH, 0.5), insideMat);
     closetSideP.position.set(innerCx, floorY+interiorH/2, closetZ+interiorW/2);
     closetSideP.receiveShadow=true; closetSideP._isRoom=true; addRoom(closetSideP);
-    // -Z side wall
-    const closetSideN=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, interiorH, 0.5), insideMat);
-    closetSideN.position.set(innerCx, floorY+interiorH/2, closetZ-interiorW/2);
-    closetSideN.receiveShadow=true; closetSideN._isRoom=true; addRoom(closetSideN);
+    // -Z side: the TV/mini-split wall (oppWallZ) extends into the closet depth
+    // to act as the closet's -Z boundary. This eliminates the gap that caused
+    // light bleed. The wall extends from sideWallX into the full closet depth.
+    const oppWallExt=new THREE.Mesh(
+      new THREE.BoxGeometry(closetDepth+1, interiorH, 0.5),
+      new THREE.MeshStandardMaterial({color:0xd0ccc6, roughness:0.7, metalness:0.05})
+    );
+    oppWallExt.position.set(sideWallX+closetDepth/2, floorY+interiorH/2, oppWallZ);
+    oppWallExt.receiveShadow=true; oppWallExt._isRoom=true; addRoom(oppWallExt);
     // Ceiling
     const closetCeil=new THREE.Mesh(new THREE.BoxGeometry(innerDepth, 0.5, interiorW), insideMat);
     closetCeil.position.set(innerCx, floorY+interiorH, closetZ);
