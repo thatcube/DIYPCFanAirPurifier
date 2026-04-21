@@ -472,17 +472,28 @@ function animate(ts) {
 
   // Cat animation mixer + walk/idle blend
   if (catAnimation.catMixer) {
-    catAnimation.catMixer.update(dtSec);
+    const preset = catAppearance.getSelectedModelPreset();
+    const catAnimSpeed = Math.max(0.12, Number(preset.animSpeed) || 1);
+    catAnimation.catMixer.update(dtSec * catAnimSpeed);
     // Blend walk/idle based on movement speed in game mode
     if (gameFp.fpMode && catAnimation.catWalkAction && catAnimation.catIdleAction) {
       const vel = Math.hypot(gameFp.fpPos.x - (_lastCatX || gameFp.fpPos.x), gameFp.fpPos.z - (_lastCatZ || gameFp.fpPos.z));
       const moveBlend = Math.min(1, vel * 8);
-      catAnimation.catWalkAction.weight += (moveBlend - catAnimation.catWalkAction.weight) * Math.min(1, dtSec * 8);
-      catAnimation.catIdleAction.weight += ((1 - moveBlend) - catAnimation.catIdleAction.weight) * Math.min(1, dtSec * 8);
-      // Speed up walk animation only when sprinting
+      const sprintMult = Math.max(1, Number(preset.sprintAnimMult) || 1);
       const isSprinting = gameFp.fpKeys.shift && vel > 0.01;
-      const animSpeed = isSprinting ? 1.0 + Math.min(vel * 30, 1.8) : 1.0;
-      catAnimation.catWalkAction.timeScale += (animSpeed - catAnimation.catWalkAction.timeScale) * Math.min(1, dtSec * 6);
+
+      if (catAppearance.catModelKey === 'bababooey') {
+        // Bababooey: single bouncy clip — slow idle, ramped for run
+        const idleTs = 0.18;
+        const runTs = (0.85 + vel * 40) * (isSprinting ? sprintMult : 1);
+        catAnimation.catWalkAction.timeScale = idleTs + (runTs - idleTs) * moveBlend;
+      } else {
+        // Normal walk/idle blending
+        catAnimation.catWalkAction.weight += (moveBlend - catAnimation.catWalkAction.weight) * Math.min(1, dtSec * 8);
+        catAnimation.catIdleAction.weight += ((1 - moveBlend) - catAnimation.catIdleAction.weight) * Math.min(1, dtSec * 8);
+        const animSpeed = isSprinting ? 1.0 + Math.min(vel * 30, 1.8) * sprintMult : 1.0;
+        catAnimation.catWalkAction.timeScale += (animSpeed - catAnimation.catWalkAction.timeScale) * Math.min(1, dtSec * 6);
+      }
       _lastCatX = gameFp.fpPos.x;
       _lastCatZ = gameFp.fpPos.z;
     }
