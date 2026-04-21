@@ -26,24 +26,20 @@
   --accent: #00a4ef;
   --accent-glow: rgba(0, 164, 239, 0.35);
   --accent-dim: rgba(0, 164, 239, 0.12);
-  /* Inside fill: 4 quadrants, subtle, blended at edges */
-  --accent-gradient: conic-gradient(
-    from 135deg at 50% 50%,
-    rgba(242,80,34,0.22) 0deg, rgba(242,80,34,0.22) 70deg,
-    rgba(127,186,0,0.20) 90deg, rgba(127,186,0,0.20) 160deg,
-    rgba(255,185,0,0.20) 180deg, rgba(255,185,0,0.20) 250deg,
-    rgba(0,164,239,0.22) 270deg, rgba(0,164,239,0.22) 340deg,
-    rgba(242,80,34,0.22) 360deg
-  );
-  /* Border: same quadrants but full brightness */
-  --accent-border: conic-gradient(
-    from 135deg at 50% 50%,
-    #f25022 0deg, #f25022 70deg,
-    #7fba00 90deg, #7fba00 160deg,
-    #ffb900 180deg, #ffb900 250deg,
-    #00a4ef 270deg, #00a4ef 340deg,
-    #f25022 360deg
-  );
+  /* Inside fill: 4 corner radials, subtle, blending where they meet */
+  --accent-gradient:
+    radial-gradient(ellipse at 0% 0%, rgba(242,80,34,0.35) 0%, transparent 70%),
+    radial-gradient(ellipse at 100% 0%, rgba(127,186,0,0.32) 0%, transparent 70%),
+    radial-gradient(ellipse at 0% 100%, rgba(0,164,239,0.35) 0%, transparent 70%),
+    radial-gradient(ellipse at 100% 100%, rgba(255,185,0,0.32) 0%, transparent 70%),
+    rgba(255,255,255,0.06);
+  /* Border: same layout but full brightness */
+  --accent-border:
+    radial-gradient(ellipse at 0% 0%, #f25022 0%, transparent 70%),
+    radial-gradient(ellipse at 100% 0%, #7fba00 0%, transparent 70%),
+    radial-gradient(ellipse at 0% 100%, #00a4ef 0%, transparent 70%),
+    radial-gradient(ellipse at 100% 100%, #ffb900 0%, transparent 70%),
+    rgba(120,120,120,0.5);
 
   /* Text — vibrant on glass */
   --text: #e8f4ff;
