@@ -696,7 +696,7 @@ export function createRoom(scene) {
   // _closetH is the door *opening* height (and matches the bifold door height).
   // The walk-in interior still uses the full room wallHeight for its ceiling,
   // so _closetInteriorH is kept separate.
-  const _closetW=48, _closetH=66, _closetInteriorH=wallHeight, _closetDepth=36, _closetInteriorW=78;
+  const _closetW=48, _closetH=66, _closetInteriorH=wallHeight, _closetDepth=36, _closetInteriorW=64;
   const _closetZ=oppWallZ+_closetW/2+8; // = -46 (5.5" trim-to-TV-wall gap)
   const rightWall=(()=>{
     // Build the wall as an extruded rectangle with a rectangular hole at the

@@ -76,7 +76,7 @@ export const CEIL_LIGHT_Z = -15;
 export const CLOSET_W = 48;
 export const CLOSET_H = 66;
 export const CLOSET_DEPTH = 36;
-export const CLOSET_INTERIOR_W = 78;
+export const CLOSET_INTERIOR_W = 64;
 export const CLOSET_Z = OPP_WALL_Z + CLOSET_W / 2 + 8; // = -46 (5.5" gap between trim and TV wall)
 
 // ── Placement offsets ───────────────────────────────────────────────
