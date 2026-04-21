@@ -700,6 +700,26 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     }
   }
 
+  // ── Crosshair interaction indicator ───────────────────────────────
+  // Highlight crosshair when aiming at something clickable
+  const crosshair = document.getElementById('fpCrosshair');
+  if (crosshair && ts % 3 < 1) { // throttle to ~20hz
+    _ray.setFromCamera(_rayCenter, _camera);
+    const chHits = _ray.intersectObjects(_scene.children, true);
+    let aimingAt = false;
+    for (const h of chHits) {
+      if (h.distance > 60) break;
+      let p = h.object;
+      while (p) {
+        if (p._isLamp || p._isCeilLight || p._isFan || p._isFilterL || p._isFilterR || p._isDrawer || p._isBifoldLeaf || p._isWindow) { aimingAt = true; break; }
+        p = p.parent;
+      }
+      if (aimingAt) break;
+    }
+    crosshair.style.background = aimingAt ? '#91deff' : 'rgba(255,255,255,0.8)';
+    crosshair.style.transform = aimingAt ? 'translate(-50%,-50%) scale(1.5)' : 'translate(-50%,-50%) scale(1)';
+  }
+
   // ── Coin counter HUD ──────────────────────────────────────────────
   const coinCountEl = document.getElementById('coinCount');
   if (coinCountEl) coinCountEl.textContent = coins.coinScore + '/' + coins.coinTotal;
