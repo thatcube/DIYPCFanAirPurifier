@@ -1049,12 +1049,6 @@ input[type=range]::-moz-range-thumb {
 #finishDialogHeader {
   padding: 16px 20px 14px; border-bottom: 1px solid rgba(255,255,255,0.06);
 }
-#finishDialogSaveHint {
-  margin-top: 8px;
-  min-height: 16px;
-  font-size: 11px;
-  color: rgba(220, 238, 255, 0.62);
-}
 #finishDialogSummaryGrid {
   margin-top: 2px;
   display: grid;
@@ -1173,6 +1167,17 @@ input[type=range]::-moz-range-thumb {
   overflow: visible;
   white-space: normal;
 }
+.finishDialogRowNameWrap {
+  display: grid;
+  row-gap: 4px;
+  min-width: 0;
+}
+.finishDialogRowNameLabel {
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: rgba(197,225,245,0.78);
+  text-transform: uppercase;
+}
 #finishDialogList li .tm { font-variant-numeric: tabular-nums; font-weight: 700; color: #9fe3ff; }
 #finishDialogList li.own .tm { color: var(--gold); }
 #finishDialogList li.pending {
@@ -1196,6 +1201,14 @@ input[type=range]::-moz-range-thumb {
 }
 .finishDialogRowNameInput:disabled {
   opacity: 0.72;
+}
+.finishDialogRowSaveHint {
+  min-height: 12px;
+  font-size: 11px;
+  color: rgba(220,238,255,0.72);
+}
+.finishDialogRowSaveHint.is-error {
+  color: #ffc4c4;
 }
 .finishDialogActions {
   display: flex; justify-content: flex-end; gap: 8px;
