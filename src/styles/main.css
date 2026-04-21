@@ -272,6 +272,21 @@ input[type=range]::-moz-range-thumb {
   cursor: pointer;
 }
 
+/* ─── Part tooltip ───────────────────────────────────────────────── */
+.part-tooltip {
+  position: fixed; z-index: 500; pointer-events: none;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  border-radius: var(--r-sm); padding: 8px 12px;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  opacity: 0; transition: opacity 0.2s var(--ease-out-expo);
+  font-size: 11px; color: var(--text);
+}
+.part-tooltip.visible { opacity: 1; }
+.tip-name { font-weight: 700; font-size: 12px; margin-bottom: 2px; }
+.tip-dims { color: var(--text-dim); font-size: 10px; }
+
 /* ═══════════════════════════════════════════════════════════════════
    PLAY MODE BUTTON — hero CTA, gradient, large
    ═══════════════════════════════════════════════════════════════════ */
