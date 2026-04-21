@@ -5,6 +5,7 @@
 // Migrated from the monolith index.html (lines 6115-7260).
 
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { stdMat } from './materials.js';
 import {
   LEFT_WALL_X, SIDE_WALL_X, OPP_WALL_Z, BACK_WALL_Z,
@@ -1427,6 +1428,36 @@ export function createRoom(scene) {
   });
 
   // Return refs for other modules
+  // ── MacBook on the bed ───────────────────────────────────────────
+  // Load assets/macbook.glb, place on the duvet, tag as _isMacbook
+  {
+    const mbLoader = new GLTFLoader();
+    const slatY = floorY + bedSlatsFromFloor;
+    const mattH = 10, mattY2 = slatY + 1 + mattH / 2;
+    const duvetH = 1.5;
+    const bedTopY = mattY2 + mattH / 2 + duvetH;
+    const mattW = 58;
+    mbLoader.load('assets/macbook.glb', (gltf) => {
+      const root = gltf.scene;
+      // Scale to ~14" wide
+      const bb = new THREE.Box3().setFromObject(root);
+      const sz = bb.getSize(new THREE.Vector3());
+      const longest = Math.max(sz.x, sz.z);
+      if (longest > 0) root.scale.setScalar(14 / longest);
+      root.updateMatrixWorld(true);
+      const localBB = new THREE.Box3().setFromObject(root);
+      // Place on duvet (post-mirror coords)
+      const rawX = bedX - mattW / 2 + 12;
+      root.position.set(-rawX, bedTopY - localBB.min.y, bedZ + 6);
+      root.rotation.y = Math.PI;
+      root._isRoom = true;
+      root.traverse(o => {
+        if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o._isMacbook = true; }
+      });
+      scene.add(root);
+    });
+  }
+
   return {
     floorY, floorMat, floor, ceiling,
     wallMeshL: typeof wallMeshL !== 'undefined' ? wallMeshL : null,
