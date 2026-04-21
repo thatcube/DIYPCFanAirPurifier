@@ -1980,7 +1980,9 @@ export function createPurifier(scene) {
     // Clicked a drawer → toggle slide (ignore if already animating) + spawn
     // secret deep-under-bed coin on the first drawer interaction.
     if(obj._isDrawer){
-      const grp=drawers[obj._drawerIdx];
+      // Walk up to find the drawer Group (the one with _drawerSlideMax)
+      let grp = obj;
+      while(grp && !(grp.isGroup && grp._drawerSlideMax !== undefined)) grp = grp.parent;
       if(!grp) return;
       if(_drawerLerps.some(dl=>dl.obj===grp)) return;
       grp._drawerOpen=!grp._drawerOpen;
