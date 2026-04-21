@@ -2349,8 +2349,14 @@ export function createPurifier(scene) {
     currentFootDiameter=d;
     bunGeo=makeBunGeo(d/2, currentBunH);
     if(feetStyle==='bun'){
+      // Adjust inset so larger feet don't poke outside panel edges
+      const r = d / 2;
+      const ins = Math.max(bunInset, r + 0.1);
       for(const leg of allLegMeshes){
         leg.geometry=bunGeo;
+        const sx=Math.sign(leg.position.x), sz=Math.sign(leg.position.z);
+        leg.position.x=sx*(panelW/2-ins);
+        leg.position.z=sz*(D/2+ply-ins);
         leg.matrixAutoUpdate=true;
         leg.updateMatrixWorld(true);
         leg.matrixAutoUpdate=false;
@@ -2361,20 +2367,24 @@ export function createPurifier(scene) {
     const oldH=currentFeetH;
     currentBunH=h;
     FEET_H.bun=h;
+    // Update global state so floorY / collision tracks the change
+    state.bunFootH = h;
     if(feetStyle==='bun'){
       const newH=h;
-      const delta=newH-oldH;
       currentFeetH=newH;
-      bunGeo=makeBunGeo(currentFootDiameter/2, h);
-      const newLegY=-(H/2+ply+h/2);
-      for(const leg of allLegMeshes){
-        leg.geometry=bunGeo;
-        leg.position.y=newLegY;
-        leg.matrixAutoUpdate=true;
-        leg.updateMatrixWorld(true);
-        leg.matrixAutoUpdate=false;
+      // Hide legs if height is effectively zero
+      legGroup.visible = h > 0.05;
+      if(h > 0.05){
+        bunGeo=makeBunGeo(currentFootDiameter/2, h);
+        const newLegY=-(H/2+ply+h/2);
+        for(const leg of allLegMeshes){
+          leg.geometry=bunGeo;
+          leg.position.y=newLegY;
+          leg.matrixAutoUpdate=true;
+          leg.updateMatrixWorld(true);
+          leg.matrixAutoUpdate=false;
+        }
       }
-      if(Math.abs(delta)>0.001) applyRoomDelta({x:0,y:delta,z:0});
     }
     updateTvGameStackPlacement();
   }
@@ -2471,9 +2481,8 @@ export function createPurifier(scene) {
   let placementOffset={x:0,y:0,z:0};
   let roomOffset={x:0,y:0,z:0};
   function applyRoomDelta(delta){
-    // In the modular build, the room stays at origin and only the purifier
-    // group moves. Room delta is handled by main.js placement logic.
-    // No-op here to prevent crashes from monolith references.
+    // No-op — room geometry stays fixed. Foot height changes are handled
+    // by updating state.bunFootH which adjusts getFloorY() for collision.
   }
   function nudgePlacement(dx,dy,dz){
     const step=2; // 2 inches per press
