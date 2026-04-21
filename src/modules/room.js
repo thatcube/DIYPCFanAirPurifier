@@ -1396,46 +1396,53 @@ export function createRoom(scene) {
     bpBody.castShadow = true; bpBody.receiveShadow = true; bpBody._isRoom = true;
     addRoom(bpBody);
 
-    // Shoulder straps — arched loops on top of the bag (backpack is face-down)
-    const strapMat = new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.88 });
+    // Shoulder straps — two wide flat bands on top of the bag
+    const strapMat = new THREE.MeshStandardMaterial({ color: 0x222228, roughness: 0.92 });
     const bagTop = bpY + bpThick / 2;
     for (const sz of [-1, 1]) {
-      // Build a curved strap using CatmullRomCurve3
-      const pts = [];
-      const strapZ = bpZ + sz * 3.5;
-      // Strap runs along the length of the bag, arching up in the middle
-      for (let t = 0; t <= 1; t += 0.1) {
-        const lx = bpX + (t - 0.5) * (bpL - 4); // along bag length
-        const ly = bagTop + Math.sin(t * Math.PI) * 1.8; // arch up
-        const lz = strapZ;
-        pts.push(new THREE.Vector3(lx, ly, lz));
-      }
-      const curve = new THREE.CatmullRomCurve3(pts);
-      const tubeGeo = new THREE.TubeGeometry(curve, 12, 0.4, 6, false);
-      const strap = new THREE.Mesh(tubeGeo, strapMat);
+      // Each strap: a wide flat box sitting on top, running most of the bag length
+      const strapW = 2.2, strapThick = 0.4, strapL = bpL - 3;
+      const strap = new THREE.Mesh(
+        new THREE.BoxGeometry(strapL, strapThick, strapW),
+        strapMat
+      );
+      strap.position.set(bpX, bagTop + strapThick / 2 + 0.05, bpZ + sz * 3.2);
       strap.rotation.y = bpAngle;
       strap.castShadow = true; strap.receiveShadow = true; strap._isRoom = true;
       addRoom(strap);
+      // Padding bump at shoulder area (thicker in the middle)
+      const pad = new THREE.Mesh(
+        new THREE.BoxGeometry(strapL * 0.5, 0.5, strapW + 0.6),
+        strapMat
+      );
+      pad.position.set(bpX, bagTop + strapThick + 0.3, bpZ + sz * 3.2);
+      pad.rotation.y = bpAngle;
+      pad.castShadow = true; pad.receiveShadow = true; pad._isRoom = true;
+      addRoom(pad);
     }
 
-    // Handle/grab loop at the top end
-    {
-      const handlePts = [];
-      const hx = bpX + bpL / 2 - 1;
-      for (let t = 0; t <= 1; t += 0.1) {
-        handlePts.push(new THREE.Vector3(
-          hx + Math.sin(t * Math.PI) * 1.5,
-          bagTop + Math.sin(t * Math.PI) * 2.5,
-          bpZ
-        ));
-      }
-      const handleCurve = new THREE.CatmullRomCurve3(handlePts);
-      const handleGeo = new THREE.TubeGeometry(handleCurve, 8, 0.3, 5, false);
-      const handle = new THREE.Mesh(handleGeo, strapMat);
-      handle.rotation.y = bpAngle;
-      handle.castShadow = true; handle.receiveShadow = true; handle._isRoom = true;
-      addRoom(handle);
-    }
+    // Grab handle — small loop at top end
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0x333338, roughness: 0.85 });
+    const handleLoop = new THREE.Mesh(
+      new THREE.TorusGeometry(1.2, 0.3, 6, 12, Math.PI),
+      handleMat
+    );
+    handleLoop.position.set(bpX + bpL / 2 - 0.5, bagTop + 0.5, bpZ);
+    handleLoop.rotation.y = bpAngle;
+    handleLoop.rotation.z = Math.PI / 2; // arch upward
+    handleLoop.castShadow = true; handleLoop.receiveShadow = true; handleLoop._isRoom = true;
+    addRoom(handleLoop);
+
+    // Front pocket — slightly raised section on top face
+    const pocketMat = new THREE.MeshStandardMaterial({ color: 0x2e2e34, roughness: 0.9 });
+    const pocket = new THREE.Mesh(
+      new THREE.BoxGeometry(bpL * 0.55, 0.5, bpW * 0.75),
+      pocketMat
+    );
+    pocket.position.set(bpX - 2, bagTop + 0.3, bpZ);
+    pocket.rotation.y = bpAngle;
+    pocket.castShadow = true; pocket.receiveShadow = true; pocket._isRoom = true;
+    addRoom(pocket);
 
     // Logos — render SVGs to canvas since Three.js r128 can't load SVGs as textures
     function loadSvgToCanvas(url, size, callback) {
