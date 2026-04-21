@@ -191,6 +191,8 @@ export function createPurifier(scene) {
   
     const tex=new THREE.CanvasTexture(cvs);
     tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
+    tex.rotation = Math.PI / 2; // rotate 90° so grain runs vertically
+    tex.center.set(0.5, 0.5);
     return tex;
   }
   const birchTexPool=[];
@@ -2310,6 +2312,8 @@ export function createPurifier(scene) {
 
     const tex = new THREE.CanvasTexture(cvs);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.rotation = Math.PI / 2;
+    tex.center.set(0.5, 0.5);
     return tex;
   }
   // Pre-generate ash textures (birch already done above)

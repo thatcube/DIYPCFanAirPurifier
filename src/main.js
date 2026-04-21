@@ -446,10 +446,6 @@ window._toggleDims = () => purifierRefs.toggleDimensions();
 
 window._setStain = (mode) => {
   purifierRefs.setStain(mode);
-  document.querySelectorAll('#btnStainRaw,#btnStainOil,#btnStainWalnut').forEach(b => b.classList.remove('on'));
-  const id = mode === 'raw' ? 'btnStainRaw' : mode === 'oil' ? 'btnStainOil' : 'btnStainWalnut';
-  const btn = document.getElementById(id);
-  if (btn) btn.classList.add('on');
 };
 
 window._setLayout = (mode) => {
