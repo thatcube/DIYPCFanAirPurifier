@@ -6,13 +6,16 @@
 /* ─── Design Tokens ──────────────────────────────────────────────── */
 :root {
   /* Liquid Glass surfaces */
-  --glass: rgba(8, 12, 18, 0.72);
-  --glass-light: rgba(8, 12, 18, 0.6);
+  --glass: rgba(8, 12, 18, 0.55);
+  --glass-light: rgba(8, 12, 18, 0.42);
   --glass-border: rgba(255, 255, 255, 0.15);
   --glass-border-strong: rgba(255, 255, 255, 0.3);
   --glass-blur: blur(40px) saturate(1.8) brightness(1.05);
   --glass-soft: rgba(255, 255, 255, 0.04);
   --glass-stroke-soft: rgba(255, 255, 255, 0.08);
+
+  /* Text shadow for legibility on glass */
+  --text-shadow: 0 1px 4px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,0.5);
 
   /* Liquid Glass specular — MS logo quadrant tints over white highlight */
   --glass-specular:
