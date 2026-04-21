@@ -26,14 +26,16 @@
   --accent: #00a4ef;
   --accent-glow: rgba(0, 164, 239, 0.35);
   --accent-dim: rgba(0, 164, 239, 0.12);
-  /* Inside fill: 4 quadrant blocks with soft blended edges */
+  /* Inside fill: 4 quadrants blending smoothly in all directions */
   --accent-gradient:
-    linear-gradient(to right, rgba(242,80,34,0.4) 0%, rgba(242,80,34,0.3) 40%, rgba(127,186,0,0.3) 60%, rgba(127,186,0,0.4) 100%) top / 100% 50% no-repeat,
-    linear-gradient(to right, rgba(0,164,239,0.4) 0%, rgba(0,164,239,0.3) 40%, rgba(255,185,0,0.3) 60%, rgba(255,185,0,0.4) 100%) bottom / 100% 50% no-repeat;
-  /* Border: same layout, full brightness */
+    linear-gradient(to right, rgba(242,80,34,0.35) 0%, rgba(242,80,34,0.2) 35%, rgba(127,186,0,0.2) 65%, rgba(127,186,0,0.35) 100%) top / 100% 45% no-repeat,
+    linear-gradient(to right, rgba(0,164,239,0.35) 0%, rgba(0,164,239,0.2) 35%, rgba(255,185,0,0.2) 65%, rgba(255,185,0,0.35) 100%) bottom / 100% 45% no-repeat,
+    linear-gradient(to bottom, rgba(180,100,30,0.15), rgba(40,140,180,0.15));
+  /* Border: same layout, full brightness, with vertical blend */
   --accent-border:
-    linear-gradient(to right, #f25022 0%, #f25022 40%, #7fba00 60%, #7fba00 100%) top / 100% 50% no-repeat,
-    linear-gradient(to right, #00a4ef 0%, #00a4ef 40%, #ffb900 60%, #ffb900 100%) bottom / 100% 50% no-repeat;
+    linear-gradient(to right, #f25022 0%, #f25022 35%, #7fba00 65%, #7fba00 100%) top / 100% 45% no-repeat,
+    linear-gradient(to right, #00a4ef 0%, #00a4ef 35%, #ffb900 65%, #ffb900 100%) bottom / 100% 45% no-repeat,
+    linear-gradient(to bottom, #c06020 0%, #c06020 45%, #2090a0 55%, #2090a0 100%);
 
   /* Text — vibrant on glass */
   --text: #e8f4ff;
