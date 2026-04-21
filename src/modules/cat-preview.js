@@ -29,7 +29,7 @@ function _applyLoopPause(action, ts, pauseSeconds) {
 
 const MODEL_MAP = {
   classic:   { src: 'assets/cat.glb',           extraScale: 1, yOffset: 0 },
-  toon:      { src: 'assets/tooncat.glb',       extraScale: 1.25, yOffset: 0.4 },
+  toon:      { src: 'assets/tooncat.glb',       extraScale: 1.25, yOffset: 1.0 },
   bababooey: { src: 'assets/bababooey_cat.glb', extraScale: 1, yOffset: 0 },
 };
 
