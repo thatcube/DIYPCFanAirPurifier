@@ -13,6 +13,7 @@ let _target = new THREE.Vector3(); // orbit target (updated each frame)
 // Reusable vectors
 const _camDir = new THREE.Vector3();
 const _objDir = new THREE.Vector3();
+const _worldPos = new THREE.Vector3();
 
 // ── Init: collect all room meshes ───────────────────────────────────
 
@@ -39,10 +40,14 @@ export function init(scene, roomRefs) {
       obj.material.depthWrite = true;
     }
 
-    // Tag by position for directional fading
-    const z = obj.position.z, x = obj.position.x, y = obj.position.y;
+    // Tag by world position for directional fading
+    obj.getWorldPosition(_worldPos);
+    const z = _worldPos.z, x = _worldPos.x, y = _worldPos.y;
     if (obj === roomRefs.floor || obj._isFloor) { obj._fadeTag = 'floor'; }
     else if (obj === roomRefs.ceiling) { obj._fadeTag = 'ceiling'; }
+    // Bifold door children are nested — always tag as interior so they
+    // fade via the ray-projection path (their world X is near the closet wall).
+    else if (obj._isBifoldLeaf) { obj._fadeTag = 'interior'; }
     else if (z > 47 && Math.abs(x) < 60) { obj._fadeTag = 'back'; }
     else if (z < -76 && Math.abs(x) < 60) { obj._fadeTag = 'front'; }
     else if (x < -49) { obj._fadeTag = 'right'; }
@@ -120,10 +125,11 @@ export function update(camera, orbitTarget) {
     }
 
     // Interior objects: fade if they're between camera and target
-    // Project object position onto camera→target ray
-    const ox = m.position.x - cx;
-    const oy = m.position.y - cy;
-    const oz = m.position.z - cz;
+    // Use world position for nested objects (e.g. bifold door children)
+    m.getWorldPosition(_worldPos);
+    const ox = _worldPos.x - cx;
+    const oy = _worldPos.y - cy;
+    const oz = _worldPos.z - cz;
     // Dot product = how far along the ray this object is
     const dot = ox * _camDir.x + oy * _camDir.y + oz * _camDir.z;
     // Cross-distance = how far from the ray axis
