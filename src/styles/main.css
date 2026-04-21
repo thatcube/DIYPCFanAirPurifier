@@ -22,16 +22,22 @@
     radial-gradient(ellipse at 75% 75%, rgba(255, 185, 0, 0.06) 0%, transparent 50%),
     linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.03) 40%, transparent 60%);
 
-  /* Accent — MS logo quadrant blocks */
+  /* Accent — MS colors blurred and blended */
   --accent: #00a4ef;
   --accent-glow: rgba(0, 164, 239, 0.35);
   --accent-dim: rgba(0, 164, 239, 0.12);
   --accent-gradient:
-    linear-gradient(to right, rgba(242,80,34,0.85) 50%, rgba(127,186,0,0.85) 50%) top / 100% 50% no-repeat,
-    linear-gradient(to right, rgba(0,164,239,0.85) 50%, rgba(255,185,0,0.85) 50%) bottom / 100% 50% no-repeat;
+    radial-gradient(circle at 25% 30%, rgba(242,80,34,0.45) 0%, transparent 55%),
+    radial-gradient(circle at 75% 30%, rgba(127,186,0,0.4) 0%, transparent 55%),
+    radial-gradient(circle at 25% 70%, rgba(0,164,239,0.45) 0%, transparent 55%),
+    radial-gradient(circle at 75% 70%, rgba(255,185,0,0.4) 0%, transparent 55%),
+    linear-gradient(180deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
   --accent-gradient-warm:
-    linear-gradient(to right, rgba(242,80,34,0.9) 50%, rgba(127,186,0,0.9) 50%) top / 100% 50% no-repeat,
-    linear-gradient(to right, rgba(0,164,239,0.9) 50%, rgba(255,185,0,0.9) 50%) bottom / 100% 50% no-repeat;
+    radial-gradient(circle at 25% 30%, rgba(242,80,34,0.5) 0%, transparent 50%),
+    radial-gradient(circle at 75% 30%, rgba(127,186,0,0.45) 0%, transparent 50%),
+    radial-gradient(circle at 25% 70%, rgba(0,164,239,0.5) 0%, transparent 50%),
+    radial-gradient(circle at 75% 70%, rgba(255,185,0,0.45) 0%, transparent 50%),
+    linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.03));
 
   /* Text — vibrant on glass */
   --text: #e8f4ff;
