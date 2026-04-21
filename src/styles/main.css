@@ -22,12 +22,16 @@
     radial-gradient(ellipse at 75% 75%, rgba(255, 185, 0, 0.06) 0%, transparent 50%),
     linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.03) 40%, transparent 60%);
 
-  /* Accent — richer multi-stop gradient */
-  --accent: #91deff;
-  --accent-glow: rgba(145, 222, 255, 0.35);
-  --accent-dim: rgba(145, 222, 255, 0.12);
-  --accent-gradient: linear-gradient(135deg, #00a4ef 0%, #91deff 30%, #a78bfa 60%, #ffb900 100%);
-  --accent-gradient-warm: linear-gradient(135deg, #f25022 0%, #ffb900 50%, #7fba00 100%);
+  /* Accent — MS logo quadrant blocks */
+  --accent: #00a4ef;
+  --accent-glow: rgba(0, 164, 239, 0.35);
+  --accent-dim: rgba(0, 164, 239, 0.12);
+  --accent-gradient:
+    linear-gradient(to right, rgba(242,80,34,0.85) 50%, rgba(127,186,0,0.85) 50%) top / 100% 50% no-repeat,
+    linear-gradient(to right, rgba(0,164,239,0.85) 50%, rgba(255,185,0,0.85) 50%) bottom / 100% 50% no-repeat;
+  --accent-gradient-warm:
+    linear-gradient(to right, rgba(242,80,34,0.9) 50%, rgba(127,186,0,0.9) 50%) top / 100% 50% no-repeat,
+    linear-gradient(to right, rgba(0,164,239,0.9) 50%, rgba(255,185,0,0.9) 50%) bottom / 100% 50% no-repeat;
 
   /* Text — vibrant on glass */
   --text: #e8f4ff;
@@ -129,7 +133,7 @@ canvas#c { display: block; width: 100%; height: 100%; }
 }
 .panel-header h3 {
   font-size: 14px; font-weight: 800; letter-spacing: 0.3px;
-  background: var(--accent-gradient); -webkit-background-clip: text;
+  background: linear-gradient(90deg, #f25022, #ffb900, #7fba00, #00a4ef); -webkit-background-clip: text;
   -webkit-text-fill-color: transparent; background-clip: text;
 }
 .panel-close {
@@ -554,15 +558,8 @@ input[type=range]::-moz-range-thumb {
 .pause-btn:hover { transform: scale(1.03) translateY(-1px); }
 .pause-btn:active { transform: scale(0.96); }
 .pause-btn.primary {
-  background:
-    linear-gradient(135deg, rgba(242,80,34,0.85) 0%, rgba(242,80,34,0.85) 24%, transparent 25%) top left,
-    linear-gradient(135deg, transparent 74%, rgba(127,186,0,0.85) 75%) top right,
-    linear-gradient(135deg, rgba(0,164,239,0.85) 0%, rgba(0,164,239,0.85) 24%, transparent 25%) bottom left,
-    linear-gradient(135deg, transparent 74%, rgba(255,185,0,0.85) 75%) bottom right,
-    rgba(255,255,255,0.15);
-  background-size: 50% 50%;
-  background-repeat: no-repeat;
-  color: #fff; border: none; text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  background: var(--accent-gradient); color: #fff; border: none;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
   box-shadow: 0 4px 16px rgba(0,0,0,0.2);
 }
 .pause-btn.danger {
@@ -796,13 +793,8 @@ input[type=range]::-moz-range-thumb {
 .finishDlgBtn.secondary { background: rgba(255,255,255,0.1); color: #e0e8f4; }
 .finishDlgBtn.secondary:hover { background: rgba(255,255,255,0.14); }
 .finishDlgBtn.primary {
-  background:
-    linear-gradient(to right, rgba(242,80,34,0.8) 0%, rgba(242,80,34,0.8) 100%) top left / 50% 50% no-repeat,
-    linear-gradient(to right, rgba(127,186,0,0.8) 0%, rgba(127,186,0,0.8) 100%) top right / 50% 50% no-repeat,
-    linear-gradient(to right, rgba(0,164,239,0.8) 0%, rgba(0,164,239,0.8) 100%) bottom left / 50% 50% no-repeat,
-    linear-gradient(to right, rgba(255,185,0,0.8) 0%, rgba(255,185,0,0.8) 100%) bottom right / 50% 50% no-repeat;
-  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.25);
-  border-radius: 10px; overflow: hidden;
+  background: var(--accent-gradient); color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.25);
 }
 .finishDlgBtn.primary:hover { filter: brightness(1.05); }
 .finishDlgBtn.danger {
