@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DIY PC Fan Air Purifier</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
 </head>
 <body>
   <div id="loading">Loading...</div>
@@ -12,11 +14,11 @@
   <div id="fps"></div>
 
   <!-- Control Panel -->
-  <button class="panel-fab" id="panelFab" onclick="document.getElementById('panelL').style.display='flex';this.style.display='none'">☰</button>
+  <button class="panel-fab" id="panelFab" onclick="document.getElementById('panelL').style.display='flex';this.style.display='none'"><i class="ph ph-sliders-horizontal"></i></button>
   <div class="panel panel-l" id="panelL">
     <div class="panel-header">
       <h3>Control Center</h3>
-      <button class="panel-close" onclick="this.closest('.panel').style.display='none';document.getElementById('panelFab').style.display='flex'">✕</button>
+      <button class="panel-close" onclick="this.closest('.panel').style.display='none';document.getElementById('panelFab').style.display='flex'"><i class="ph ph-x"></i></button>
     </div>
     <div class="panel-scroll">
 
@@ -149,7 +151,7 @@
   </div>
 
   <!-- Game mode -->
-  <button id="playDockBtn" onclick="window._openCharSelect&&window._openCharSelect()">▶ Play Mode <kbd class="key-hint">G</kbd></button>
+  <button id="playDockBtn" onclick="window._openCharSelect&&window._openCharSelect()"><i class="ph-fill ph-play"></i> Play Mode <kbd class="key-hint">G</kbd></button>
 
   <!-- Character Select (Smash Bros style) -->
   <div id="charSelect">
@@ -183,7 +185,7 @@
 
   <!-- FP HUD -->
   <div id="fpHud">
-    <div id="coinHud">🪙 <span id="coinCount">0/0</span></div>
+    <div id="coinHud"><i class="ph-fill ph-coins" style="color:#ffd700"></i> <span id="coinCount">0/0</span></div>
     <div id="runTimerHud"><span id="runTimerText">0:00.0</span> <span id="runTimerState"></span></div>
   </div>
   <div id="fpCrosshair"></div>
@@ -205,22 +207,22 @@
       <h2>Paused</h2>
       <p class="pause-sub">Timer keeps running...</p>
       <div class="pause-grid">
-        <button class="pause-btn primary" onclick="window._resumeFP&&window._resumeFP()">▶ Resume</button>
-        <button class="pause-btn danger" onclick="window._exitFP&&window._exitFP()">✕ Exit</button>
+        <button class="pause-btn primary" onclick="window._resumeFP&&window._resumeFP()"><i class="ph-fill ph-play"></i> Resume</button>
+        <button class="pause-btn danger" onclick="window._exitFP&&window._exitFP()"><i class="ph ph-sign-out"></i> Exit</button>
       </div>
       <div class="pause-toggles">
         <div class="pause-toggle-row">
-          <span>🔊 SFX</span>
+          <span><i class="ph-fill ph-speaker-high"></i> SFX</span>
           <div class="toggle-sw" id="fpPauseMuteSfx" onclick="this.classList.toggle('on');window._toggleMuteSfx&&window._toggleMuteSfx(this.classList.contains('on'))"></div>
         </div>
         <div class="pause-toggle-row">
-          <span>🎵 Music</span>
+          <span><i class="ph-fill ph-music-notes"></i> Music</span>
           <div class="toggle-sw" id="fpPauseMuteMusic" onclick="this.classList.toggle('on');window._toggleMuteMusic&&window._toggleMuteMusic(this.classList.contains('on'))"></div>
         </div>
       </div>
       <div class="pause-actions">
-        <button class="pause-pill" onclick="window._resetFP&&window._resetFP()">⟳ Reset Run</button>
-        <button class="pause-pill" onclick="window._switchCamFP&&window._switchCamFP()">📷 Switch Camera</button>
+        <button class="pause-pill" onclick="window._resetFP&&window._resetFP()"><i class="ph ph-arrow-counter-clockwise"></i> Reset Run</button>
+        <button class="pause-pill" onclick="window._switchCamFP&&window._switchCamFP()"><i class="ph ph-camera-rotate"></i> Switch Camera</button>
       </div>
       <div class="pause-controls">
         <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
@@ -240,7 +242,7 @@
       <div class="finish-time" id="finishTime">0:00.0</div>
       <div class="finish-coins" id="finishCoins">14/14 coins</div>
       <div class="finish-actions">
-        <button class="pause-btn primary" onclick="window._playAgain&&window._playAgain()">▶ Play Again</button>
+        <button class="pause-btn primary" onclick="window._playAgain&&window._playAgain()"><i class="ph-fill ph-play"></i> Play Again</button>
         <button class="pause-btn danger" onclick="window._exitFP&&window._exitFP()">Exit</button>
       </div>
     </div>
@@ -252,8 +254,8 @@
       <div id="mobileJoyKnob"></div>
     </div>
   </div>
-  <button id="mobileJumpBtn" ontouchstart="window._mobileJump&&window._mobileJump(true)" ontouchend="window._mobileJump&&window._mobileJump(false)">⬆</button>
-  <button id="mobileExitBtn" onclick="window._exitFP&&window._exitFP()">✕</button>
+  <button id="mobileJumpBtn" ontouchstart="window._mobileJump&&window._mobileJump(true)" ontouchend="window._mobileJump&&window._mobileJump(false)"><i class="ph-fill ph-arrow-fat-up"></i></button>
+  <button id="mobileExitBtn" onclick="window._exitFP&&window._exitFP()"><i class="ph ph-x"></i></button>
 
   <script type="module" src="/src/main.js"></script>
 </body>
