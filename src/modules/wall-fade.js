@@ -21,7 +21,7 @@ export function init(scene, roomRefs) {
   _fadingMeshes.length = 0;
 
   scene.traverse(obj => {
-    if (!obj._isRoom || !obj.isMesh || !obj.material) return;
+    if (!(obj._isRoom || obj._isBifoldLeaf) || !obj.isMesh || !obj.material) return;
     // Skip console props — Xbox, Switch, game stack should never fade
     if (obj._isConsoleProp || obj._noFade) {
       obj.material.transparent = false;
@@ -145,7 +145,10 @@ export function update(camera, orbitTarget) {
 
     if (inFront && nearRay) {
       // Fade more aggressively the closer to the ray axis
-      const t = Math.max(0.03, crossDist / 25);
+      // Bifold doors have stacked layers (panel + raised detail) — use lower
+      // min opacity so combined multi-layer alpha matches single-layer walls.
+      const minAlpha = m._isBifoldLeaf ? 0.015 : 0.03;
+      const t = Math.max(minAlpha, crossDist / 25);
       _setFadeOpacity(m, t);
     } else {
       _setFadeOpacity(m, 1);
