@@ -2453,24 +2453,9 @@ export function createPurifier(scene) {
   let placementOffset={x:0,y:0,z:0};
   let roomOffset={x:0,y:0,z:0};
   function applyRoomDelta(delta){
-    roomOffset.x+=delta.x;
-    roomOffset.y+=delta.y;
-    roomOffset.z+=delta.z;
-    scene.traverse(function(o){
-      if(o._isRoom){
-        o.position.x-=delta.x;
-        o.position.y-=delta.y;
-        o.position.z-=delta.z;
-        if(o._isDrawer && Number.isFinite(o._drawerBaseZ)) o._drawerBaseZ-=delta.z;
-        o.matrixAutoUpdate=true;
-        o.updateMatrixWorld(true);
-        o.matrixAutoUpdate=false;
-      }
-    });
-    const todEl=_el('todSlider');
-    if(todEl) applyTimeOfDay(parseInt(todEl.value,10));
-    updatePowerCordGeometry();
-    _prevCx=0; _prevCz=0;
+    // In the modular build, the room stays at origin and only the purifier
+    // group moves. Room delta is handled by main.js placement logic.
+    // No-op here to prevent crashes from monolith references.
   }
   function nudgePlacement(dx,dy,dz){
     const step=2; // 2 inches per press
