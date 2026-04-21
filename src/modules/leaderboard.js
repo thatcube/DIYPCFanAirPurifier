@@ -286,17 +286,29 @@ async function _flushCoinReports() {
   await Promise.allSettled([..._pendingCoinReports]);
 }
 
+function _wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function _reconcileCoinClaims(runId) {
   if (!runId || !_claimedCoinIds.size) return;
-  const jobs = [];
-  for (const coinId of _claimedCoinIds) {
-    jobs.push(
-      _lbApiRequest('/run/coin', { runId, coinId })
-        .then(() => { _failedCoinIds.delete(coinId); })
-        .catch(() => { _failedCoinIds.add(coinId); })
-    );
+  // Server coin claims are rate-limited per run. Reconcile sequentially with
+  // short spacing so quick multi-pickups don't leave the run incomplete.
+  const pending = new Set(_claimedCoinIds);
+  const maxPasses = 3;
+  for (let pass = 0; pass < maxPasses && pending.size > 0; pass++) {
+    for (const coinId of [...pending]) {
+      try {
+        await _lbApiRequest('/run/coin', { runId, coinId });
+        _failedCoinIds.delete(coinId);
+        pending.delete(coinId);
+      } catch (e) {
+        _failedCoinIds.add(coinId);
+      }
+      // Keep attempts above server MIN_COIN_INTERVAL_MS (120ms by default).
+      if (pending.size > 0) await _wait(140);
+    }
   }
-  await Promise.allSettled(jobs);
 }
 
 export function reportCoin(coinId) {
