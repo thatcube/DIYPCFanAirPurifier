@@ -1371,17 +1371,17 @@ export function createRoom(scene) {
       surfBox.rotation.y = 0.15;
       surfBox.castShadow = true; surfBox.receiveShadow = true; surfBox._isRoom = true;
       addRoom(surfBox);
-      // Microsoft logo on top
+      // Microsoft logo on top (async — added after mirror pass, so use post-mirror coords)
       loadSvgTex('img/Microsoft_logo.svg', 256, (tex) => {
         const logo = new THREE.Mesh(
           new THREE.PlaneGeometry(6, 3),
           new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.3 })
         );
         logo.rotation.x = -Math.PI / 2;
-        logo.position.set(itemX, underBedY + boxH + 0.12, itemZ);
-        logo.rotation.z = 0.15;
+        logo.position.set(-itemX, underBedY + boxH + 0.12, itemZ);
+        logo.rotation.z = -0.15;
         logo._isRoom = true;
-        addRoom(logo);
+        scene.add(logo);
       });
     }
 
@@ -1396,17 +1396,17 @@ export function createRoom(scene) {
       notebook.rotation.z = 0.08; // slight tilt
       notebook.castShadow = true; notebook.receiveShadow = true; notebook._isRoom = true;
       addRoom(notebook);
-      // Power BI logo on top
+      // Power BI logo on top (async — post-mirror coords)
       loadSvgTex('img/Power_BI_Logo.svg', 256, (tex) => {
         const logo = new THREE.Mesh(
           new THREE.PlaneGeometry(4, 4),
           new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.5 })
         );
         logo.rotation.x = -Math.PI / 2;
-        logo.position.set(itemX + 8, underBedY + nbH + 0.12, itemZ - 1);
-        logo.rotation.z = -0.3;
+        logo.position.set(-(itemX + 8), underBedY + nbH + 0.12, itemZ - 1);
+        logo.rotation.z = 0.3;
         logo._isRoom = true;
-        addRoom(logo);
+        scene.add(logo);
       });
       // Spine detail (darker edge)
       const spine = new THREE.Mesh(
