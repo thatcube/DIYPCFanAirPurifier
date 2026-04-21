@@ -655,6 +655,7 @@ export function toggleFirstPerson() {
     coins.fullReset();
     coins.setCoinsVisible(true);
     leaderboard.startTimer();
+    void leaderboard.startSharedRun();
 
     // Show cat in third-person
     if (_catGroup) {

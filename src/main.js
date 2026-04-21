@@ -333,8 +333,9 @@ window._resetFP = () => {
   leaderboard.closeFinishDialog();
   leaderboard.hideShareButton();
   gameFp.setPaused(false);
-  gameFp.resetTimer();
+  leaderboard.resetTimer();
   coins.fullReset();
+  void leaderboard.startSharedRun();
   gameFp.toggleFirstPerson();
   setTimeout(() => window._openCharSelect(), 100);
 };
@@ -618,8 +619,8 @@ function animate(ts) {
       const pauseOv = document.getElementById('fpPauseOverlay');
       if (pauseOv) pauseOv.style.display = 'none';
       // Name dialog → record run → open finish dialog
-      leaderboard.openNameDialog(false, () => {
-        const runData = leaderboard.recordRun(finalTime, coins.coinTotal, coins.coinSecretScore);
+      leaderboard.openNameDialog(false, async () => {
+        const runData = await leaderboard.recordRun(finalTime, coins.coinTotal, coins.coinSecretScore);
         leaderboard.renderLeaderboardPanel();
         leaderboard.showShareButton(runData);
         leaderboard.openFinishDialog(runData);

@@ -1,4 +1,5 @@
 secrets.yaml
 node_modules/
 data/
+dist/
 .wrangler/
