@@ -305,7 +305,7 @@ window._exitFP = () => {
   if (pause) pause.style.display = 'none';
   // Release pointer lock
   if (document.pointerLockElement) document.exitPointerLock();
-  gameFp.fpPaused = false;
+  gameFp.setPaused(false);
   if (gameFp.fpMode) gameFp.toggleFirstPerson();
 };
 window._toggleMuteSfx = (checked) => {
