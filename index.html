@@ -1540,7 +1540,7 @@ function _initCatPreview(){
   if(!canvasEl) return;
   _catPreviewRenderer=new THREE.WebGLRenderer({canvas:canvasEl, antialias:true, alpha:false, powerPreference:'high-performance'});
   _catPreviewRenderer.setPixelRatio(Math.min(window.devicePixelRatio,1.4));
-  _catPreviewRenderer.outputEncoding=THREE.sRGBEncoding;
+  _catPreviewRenderer.outputColorSpace=THREE.SRGBColorSpace;
   _catPreviewRenderer.toneMapping=THREE.ACESFilmicToneMapping;
   _catPreviewRenderer.toneMappingExposure=1.15;
 
@@ -2266,7 +2266,7 @@ function _loadGameplayCatFromSelection(){
         o.castShadow=true;
         o.receiveShadow=true;
         // Ensure materials render correctly under tone mapping.
-        if(o.material && o.material.map){ o.material.map.encoding=THREE.sRGBEncoding; }
+        if(o.material && o.material.map){ o.material.map.colorSpace=THREE.SRGBColorSpace; }
         // Make the cat look less glossy and more fur-like.
         const mats=Array.isArray(o.material)?o.material:[o.material];
         for(const m of mats){
@@ -7492,7 +7492,6 @@ let _macbookCoinSpawned=false;
 // which is fine for a tiny laptop screen.
 const _macbookLogoTex=new THREE.TextureLoader().load('assets/scummit-logo.webp', t=>{
   try{ t.colorSpace=THREE.SRGBColorSpace||t.colorSpace; }catch(e){}
-  try{ t.encoding=THREE.sRGBEncoding; }catch(e){}
   t.anisotropy=Math.min(4, renderer.capabilities.getMaxAnisotropy());
   t.needsUpdate=true;
 });

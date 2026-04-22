@@ -650,7 +650,7 @@ export function createRoom(scene) {
   new THREE.TextureLoader().load(
     'img/pokopia.jpg',
     (tex)=>{
-      tex.encoding = THREE.sRGBEncoding;
+      tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy=Math.min(8, (state.renderer ? state.renderer.capabilities.getMaxAnisotropy() : 4));
       screen.material.map=tex;
       screen.material.emissiveMap=tex;
