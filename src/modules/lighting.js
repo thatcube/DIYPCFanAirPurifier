@@ -206,6 +206,7 @@ export function createMoonGlow(leftWallX, winCenterY, winCenterZ) {
  *     mirroredWindowX, winCenterY, winCenterZ, winW,
  *     winTop, winBottom, winFront, winBack,
  *     wallMeshes, baseMeshes, floorMat,
+ *     moonGlow,
  *     _markShadowsDirty }
  */
 export function applyTimeOfDay(minuteOfDay, refs) {
@@ -225,7 +226,8 @@ export function applyTimeOfDay(minuteOfDay, refs) {
   renderer.setClearColor(clearCol.clone(), 1);
   scene.fog.color.copy(clearCol);
   scene.fog.density = mix(0.003, 0.0015, sun);
-  renderer.toneMappingExposure = mix(1.02, 1.34, sun);
+  // Lift baseline exposure so indoor surfaces read better without flattening contrast.
+  renderer.toneMappingExposure = mix(1.12, 1.48, sun);
 
   // Key / window sun
   const keyColor = warm > 0.1
@@ -234,9 +236,9 @@ export function applyTimeOfDay(minuteOfDay, refs) {
   key.color.copy(keyColor);
   windowSun.color.copy(keyColor);
   const baseKeyIntensity = mix(0.14, 0.95, sun) + warm * 0.1;
-  key.intensity = beam > 0 ? Math.max(0.18, baseKeyIntensity * 0.5) * beam : 0;
+  key.intensity = beam > 0 ? Math.max(0.22, baseKeyIntensity * 0.62) * beam : 0;
   windowSun.visible = beam > 0;
-  windowSun.intensity = beam > 0 ? Math.max(0.15, baseKeyIntensity * 0.5) * beam : 0;
+  windowSun.intensity = beam > 0 ? Math.max(0.18, baseKeyIntensity * 0.58) * beam : 0;
 
   // Window sun sweep positions
   const beamSrcY = Math.max(refs.winBottom + 4, Math.min(refs.winTop - 4, mix(refs.winTop + 11, refs.winTop + 1, dayTravel)));
@@ -255,7 +257,7 @@ export function applyTimeOfDay(minuteOfDay, refs) {
   key.shadow.camera.updateProjectionMatrix();
 
   // Hemisphere
-  hemiLight.intensity = mix(0.16, 0.32, sun) + (refs.ceilLightOn ? mix(0.12, 0.04, sun) : 0);
+  hemiLight.intensity = mix(0.22, 0.40, sun) + (refs.ceilLightOn ? mix(0.16, 0.06, sun) : 0);
   {
     const sky = lerpHex(0x334466, 0x8899bb, sun);
     if (refs.ceilLightOn) {
@@ -267,9 +269,9 @@ export function applyTimeOfDay(minuteOfDay, refs) {
   hemiLight.groundColor.copy(lerpHex(0x221100, 0xffeedd, sun));
 
   // Ceiling lights
-  if (ceilSpot) ceilSpot.intensity = refs.ceilLightOn ? mix(1.1, 0.4, sun) : 0;
-  if (refs.domeMat) refs.domeMat.emissiveIntensity = refs.ceilLightOn ? mix(0.9, 0.45, sun) : 0;
-  if (ceilGlow) ceilGlow.intensity = refs.ceilLightOn ? mix(0.35, 0.14, sun) : 0;
+  if (ceilSpot) ceilSpot.intensity = refs.ceilLightOn ? mix(1.35, 0.58, sun) : 0;
+  if (refs.domeMat) refs.domeMat.emissiveIntensity = refs.ceilLightOn ? mix(1.05, 0.62, sun) : 0;
+  if (ceilGlow) ceilGlow.intensity = refs.ceilLightOn ? mix(0.48, 0.22, sun) : 0;
 
   // Outdoor backdrop
   if (refs.outdoor) {
@@ -277,7 +279,8 @@ export function applyTimeOfDay(minuteOfDay, refs) {
   }
 
   // Moonlight
-  if (moonGlow) moonGlow.intensity = mix(0.5, 0, sun);
+  const moonLight = refs.moonGlow || moonGlow;
+  if (moonLight) moonLight.intensity = mix(0.66, 0, sun);
 
   // Room surfaces
   if (refs.wallMeshes) {

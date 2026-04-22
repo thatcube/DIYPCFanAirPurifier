@@ -1746,6 +1746,7 @@ export function createRoom(scene) {
     lampShade: typeof lampShade !== 'undefined' ? lampShade : null,
     ceilSpot: typeof ceilSpot !== 'undefined' ? ceilSpot : null,
     ceilGlow: typeof ceilGlow !== 'undefined' ? ceilGlow : null,
+    moonGlow: typeof moonGlow !== 'undefined' ? moonGlow : null,
     leftWallX,
     toggleCornerDoor,
     getCornerDoorPanelMesh: () => doorPanel,

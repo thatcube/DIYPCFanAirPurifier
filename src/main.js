@@ -155,6 +155,7 @@ const todRefs = {
   wallMeshes: roomRefs.wallMeshes,
   baseMeshes: roomRefs.baseMeshes,
   floorMat: roomRefs.floorMat,
+  moonGlow: roomRefs.moonGlow,
   _markShadowsDirty: markShadowsDirty
 };
 
