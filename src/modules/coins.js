@@ -110,7 +110,8 @@ export function addCoin(parent, localPos, opts) {
     inDrawer: !!(opts && opts.inDrawer),
     consoleProp: !!(opts && opts.consoleProp),
     secret,
-    isDynamic: !!(opts && opts.isDynamic)
+    isDynamic: !!(opts && opts.isDynamic),
+    highJump: !!(opts && opts.highJump)
   });
   if (!secret) coinTotal++;
 }
@@ -238,8 +239,57 @@ import {
   BED_X, BED_Z, BED_W, BED_L, BED_CLEARANCE, BED_SLATS_FROM_FLOOR,
   TBL_X, TBL_Z, TBL_W, TBL_D, TBL_H,
   SIDE_WALL_X, LEFT_WALL_X, OPP_WALL_Z, BACK_WALL_Z, CLOSET_DEPTH, CLOSET_INTERIOR_W, CLOSET_Z,
-  getFloorY, getWinCenterY, WIN_W, WIN_H, WIN_CENTER_Z
+  CEIL_LIGHT_X, CEIL_LIGHT_Z, getFloorY, getCeilingY, getWinCenterY, WIN_W, WIN_H, WIN_CENTER_Z
 } from './spatial.js';
+
+function _randomRange(min, max) {
+  return min + (Math.random() * (max - min));
+}
+
+function _sampleHighJumpCoinPositions() {
+  const ceilingY = getCeilingY();
+  const points = [];
+  const minX = -44;
+  const maxX = 74;
+  const minZ = -70;
+  const maxZ = 43;
+  const minSeparation = 16;
+
+  for (let tries = 0; tries < 120 && points.length < 3; tries++) {
+    const x = CEIL_LIGHT_X + _randomRange(-34, 34);
+    const z = CEIL_LIGHT_Z + _randomRange(-28, 28);
+    const y = ceilingY - _randomRange(8, 16);
+    if (x < minX || x > maxX || z < minZ || z > maxZ) continue;
+
+    let clear = true;
+    for (const p of points) {
+      if (Math.hypot(p.x - x, p.z - z) < minSeparation) {
+        clear = false;
+        break;
+      }
+    }
+    if (!clear) continue;
+    points.push(new THREE.Vector3(x, y, z));
+  }
+
+  while (points.length < 3) {
+    const i = points.length;
+    points.push(new THREE.Vector3(CEIL_LIGHT_X + (i - 1) * 14, ceilingY - 12, CEIL_LIGHT_Z + (i - 1) * 8));
+  }
+  return points;
+}
+
+function _reshuffleHighJumpCoins() {
+  const highCoins = coins.filter(c => !c.secret && c.highJump);
+  if (!highCoins.length) return;
+  const points = _sampleHighJumpCoinPositions();
+  for (let i = 0; i < highCoins.length; i++) {
+    const c = highCoins[i];
+    const p = points[Math.min(i, points.length - 1)];
+    c.basePos.copy(p);
+    c.mesh.position.copy(p);
+  }
+}
 
 export function spawnRoomCoins(roomRefs) {
   if (!_coinGroup) return;
@@ -259,9 +309,7 @@ export function spawnRoomCoins(roomRefs) {
   const msX_r = SIDE_WALL_X - 18 - msW_r / 2; // 17 pre-mirror → world -17
   const msY_r = fy + 80 - 12 - msH_r / 2;     // = fy + 62.5
   const msZ_r = OPP_WALL_Z + 0.5 + msD_r / 2; // = -73.5
-  // Closet shelf vars
-  const shelfCx = SIDE_WALL_X + CLOSET_DEPTH - 0.5 - 0.1 - 7;
-  const secZ = CLOSET_Z - (CLOSET_INTERIOR_W - 1) / 2 + (CLOSET_INTERIOR_W - 1) * 0.125;
+  const highJumpCoins = _sampleHighJumpCoinPositions();
 
   // 1. Under the bed
   addCoin(_coinGroup, new THREE.Vector3(-BED_X, fy + bedClearance - 1.8, BED_Z + 4), {});
@@ -277,16 +325,16 @@ export function spawnRoomCoins(roomRefs) {
   addCoin(_coinGroup, new THREE.Vector3(-BED_X, mattY + mattH / 2 + duvetH + 3, mattCenterZ), {});
   // 7. On top of headboard
   addCoin(_coinGroup, new THREE.Vector3(-BED_X, fy + bedClearance + hbH + 2.5, BED_Z + BED_L / 2 - hbThick / 2), {});
-  // 8. Near closet
-  addCoin(_coinGroup, new THREE.Vector3(35, fy + 3, 20), {});
-  // 9. On closet shelf
-  addCoin(_coinGroup, new THREE.Vector3(-(shelfCx), fy + 80 - 24 + 0.4 + 2.5, secZ), {});
+  // 8. High jump coin (random near ceiling light)
+  addCoin(_coinGroup, highJumpCoins[0].clone(), { highJump: true });
+  // 9. High jump coin (random near ceiling light)
+  addCoin(_coinGroup, highJumpCoins[1].clone(), { highJump: true });
   // 10. On top of mini split
   addCoin(_coinGroup, new THREE.Vector3(-msX_r, msY_r + msH_r / 2 + 2.2, msZ_r), {});
   // 11. On top of TV
   addCoin(_coinGroup, new THREE.Vector3(-tvCenterX, tvCenterY + tvH / 2 + bezel + 2.2, tvZ - tvD / 2 + 1.2), {});
-  // 12. Closet corner (floor)
-  addCoin(_coinGroup, new THREE.Vector3(-(SIDE_WALL_X + 2.0), fy + 2.5, CLOSET_Z + CLOSET_INTERIOR_W / 2 - 1.2), {});
+  // 12. High jump coin (random near ceiling light)
+  addCoin(_coinGroup, highJumpCoins[2].clone(), { highJump: true });
   // 13. On top of lamp shade
   addCoin(_coinGroup, new THREE.Vector3(-(TBL_X + TBL_W / 2 - 6), fy + TBL_H + 28.5, TBL_Z + TBL_D / 2 - 6), {});
   // 14. Inside the purifier (purifier group is at x=45, z=-68)
@@ -413,6 +461,9 @@ export function fullReset() {
 
   // Clear secret triggers so they can re-spawn
   for (const k of Object.keys(_secretTriggered)) delete _secretTriggered[k];
+
+  // Re-roll high jump coins each run so they stay varied.
+  _reshuffleHighJumpCoins();
 
   // Un-collect all remaining coins
   for (const c of coins) {
