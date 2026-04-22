@@ -565,9 +565,12 @@ export function renderLeaderboardPanel() {
   if (emptyEl) emptyEl.style.display = 'none';
   // Show top 5 in the pause card
   const top = _leaderboard.slice(0, 5);
+  const latestEntryId = String(((_lastRunData && _lastRunData.entryId) || (_finishDialogData && _finishDialogData.entryId) || '')).trim();
   list.innerHTML = top.map((r, i) => {
-    const own = r.playerId ? (r.playerId === _playerId) : (r.name === _playerName);
-    return `<li class="${own ? 'own' : ''}">
+    const isHistory = r.playerId ? (r.playerId === _playerId) : (r.name === _playerName);
+    const isCurrent = !!latestEntryId && String(r.id || '') === latestEntryId;
+    const rowClass = `${isHistory ? 'own-history ' : ''}${isCurrent ? 'own-current' : ''}`.trim();
+    return `<li class="${rowClass}">
       <span class="rk">#${i + 1}</span>
       <span class="nm">${_escapeHtml(r.name)}</span>
       ${_catBadgeHtml(r)}
@@ -1226,9 +1229,11 @@ function _renderFinishDialog() {
     if (_leaderboard.length) {
       for (let i = 0; i < _leaderboard.length; i++) {
         const r = _leaderboard[i];
-        const own = (ownId && r.id === ownId) || (!ownId && r.playerId === _playerId);
+        const isHistory = !!r.playerId && r.playerId === _playerId;
+        const isCurrent = !!ownId && r.id === ownId;
+        const rowClass = `${isHistory ? 'own-history ' : ''}${isCurrent ? 'own-current' : ''}`.trim();
         const editable = !pending && !!editableEntryId && r.id === editableEntryId;
-        rows.push(`<li class="${own ? 'own' : ''}" data-entry-id="${_escapeHtml(r.id)}">
+        rows.push(`<li class="${rowClass}" data-entry-id="${_escapeHtml(r.id)}">
           <span class="rk">#${i + 1}</span>
           <span class="nm ${editable ? 'nm-edit' : ''}">${editable
             ? `<input type="text" class="finishDialogRowNameInput" maxlength="24" value="${_escapeHtml(r.name)}" autocomplete="off" spellcheck="false" />`
@@ -1267,7 +1272,7 @@ function _renderFinishDialog() {
     }
 
     setTimeout(() => {
-      const ownLi = list.querySelector('li.own');
+      const ownLi = list.querySelector('li.own-current') || list.querySelector('li.own-history');
       if (ownLi) ownLi.scrollIntoView({ block: 'center' });
     }, 0);
   }
