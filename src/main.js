@@ -189,6 +189,7 @@ purifierRefs.setRoomRefs({
   domeMat: roomRefs.domeMat,
   ceilGlow: roomRefs.ceilGlow,
   outdoor: roomRefs.outdoor,
+  markShadowsDirty,
   applyTimeOfDay: (minutes) => {
     lighting.applyTimeOfDay(minutes, todRefs);
     const todLabel = document.getElementById('todLabel');
@@ -831,7 +832,8 @@ function animate(ts) {
   }
 
   // Shadow throttle — update on dirty flag OR periodically
-  if (_shadowDirtyOneShot || (ts - _lastShadowUpdateTs) >= SHADOW_UPDATE_INTERVAL_MS) {
+  const shadowIntervalMs = gameFp.fpMode ? Math.max(SHADOW_UPDATE_INTERVAL_MS, 1000 / 8) : SHADOW_UPDATE_INTERVAL_MS;
+  if (_shadowDirtyOneShot || (ts - _lastShadowUpdateTs) >= shadowIntervalMs) {
     renderer.shadowMap.needsUpdate = true;
     _shadowDirtyOneShot = false;
     _lastShadowUpdateTs = ts;

@@ -27,7 +27,7 @@ export function createPurifier(scene) {
   // Safe DOM helper — returns a no-op proxy if element doesn't exist
   const _nullEl = { classList: { add(){}, remove(){}, toggle(){} }, style: {}, querySelector(){ return _nullEl; }, querySelectorAll(){ return []; }, get value(){ return ''; }, set value(v){}, get textContent(){ return ''; }, set textContent(v){} };
   const _el = (id) => document.getElementById(id) || _nullEl;
-  const _markShadowsDirty = () => {}; // no-op — shadows managed by main.js
+  let _markShadowsDirty = () => {};
   const { H, W, D, ply, ft, bunFootH, bunFootR, panelW } = state;
   const _boardThickness = ply === 0.75 ? '34' : 'half';
 
@@ -986,10 +986,10 @@ export function createPurifier(scene) {
       for(const blade of blades){
         if(fansRGB){
           blade.color.setHex(BLADE_FROSTED.color);
-          blade.transparent=true;
-          blade.opacity=BLADE_FROSTED.opacity;
+          blade.transparent=false;
+          blade.opacity=1;
           blade.shininess=BLADE_FROSTED.shininess;
-          blade.depthWrite=false;
+          blade.depthWrite=true;
         } else {
           blade.color.setHex(c.blade);
         }
@@ -1572,6 +1572,7 @@ export function createPurifier(scene) {
   let _hoverInteractive=false;
   const _isMobile = state.isMobile;
   const _raycaster=new THREE.Raycaster();
+  _raycaster.far=220;
   const _mouse=new THREE.Vector2();
   
   canvas.addEventListener('mousedown',e=>{
@@ -1742,6 +1743,7 @@ export function createPurifier(scene) {
   }
   
   canvas.addEventListener('mousemove',e=>{
+    if(_fpMode) return;
     if(_pendingFilterDrag && _dragFilter && Math.abs(e.clientX-_clickStartX)>15){
       drag=false;
       _pendingFilterDrag=false;
@@ -1961,9 +1963,10 @@ export function createPurifier(scene) {
     if(obj._isLamp){
       if(!_roomLampLight) return;
       _roomLampOn=!_roomLampOn;
-      _roomLampLight.intensity=_roomLampOn?1.2:0;
-      if(_roomLampShade) _roomLampShade.material.emissiveIntensity=_roomLampOn?0.4:0;
-      if(_roomLampBulb) _roomLampBulb.material.emissiveIntensity=_roomLampOn?1.2:0;
+      _roomLampLight.intensity=_roomLampOn?3.4:0;
+      if(_roomLampShade) _roomLampShade.material.emissiveIntensity=_roomLampOn?0.75:0;
+      if(_roomLampBulb) _roomLampBulb.material.emissiveIntensity=_roomLampOn?1.9:0;
+      _markShadowsDirty();
       if(_fpMode) spawnSecretLampCoin();
       return;
     }
@@ -1971,9 +1974,22 @@ export function createPurifier(scene) {
     if(obj._isCeilLight){
       if(!_roomCeilSpot) return;
       _roomCeilLightOn=!_roomCeilLightOn;
-      _roomCeilSpot.intensity=_roomCeilLightOn?0.95:0;
-      if(_roomDomeMat) _roomDomeMat.emissiveIntensity=_roomCeilLightOn?0.8:0;
-      if(_roomCeilGlow) _roomCeilGlow.intensity=_roomCeilLightOn?0.3:0;
+      if(_roomCeilLightOn){
+        const todSlider=_el('todSlider');
+        const minutes=parseInt(todSlider?.value || '870', 10);
+        if(_applyTimeOfDay){
+          _applyTimeOfDay(minutes);
+        } else {
+          _roomCeilSpot.intensity=1.4;
+          if(_roomDomeMat) _roomDomeMat.emissiveIntensity=0.9;
+          if(_roomCeilGlow) _roomCeilGlow.intensity=0.4;
+        }
+      } else {
+        _roomCeilSpot.intensity=0;
+        if(_roomDomeMat) _roomDomeMat.emissiveIntensity=0;
+        if(_roomCeilGlow) _roomCeilGlow.intensity=0;
+      }
+      _markShadowsDirty();
       if(_fpMode) spawnSecretCeilingLightCoins();
       return;
     }
@@ -3280,6 +3296,7 @@ export function createPurifier(scene) {
     const globalTarget = spinning ? SPIN_MAX * (fanSpeedPct / 100) : 0;
     const aFan = 1 - Math.exp(-1.83 * dtSec);
     for (const rotor of allRotors) {
+      if (!isAncestorVisible(rotor)) continue;
       const target = rotor.userData.spinning ? globalTarget : 0;
       rotor.userData.spinSpeed += (target - rotor.userData.spinSpeed) * aFan;
       const spd = rotor.userData.spinSpeed;
@@ -3302,16 +3319,19 @@ export function createPurifier(scene) {
       _rgbTime += dtSec;
       const breathe = Math.sin(_rgbTime * 1.2) * 0.5 + 0.5;
       const hueBase = _rgbTime * 0.06 + breathe * 0.1;
-      let fanIdx = 0;
-      for (const blades of allBladeMatsPerFan) {
-        const fanHueOffset = fanIdx * 0.12;
+      let visibleFanIdx = 0;
+      for (let i = 0; i < allBladeMatsPerFan.length; i++) {
+        const rotor = allRotors[i];
+        if (rotor && !isAncestorVisible(rotor)) continue;
+        const blades = allBladeMatsPerFan[i];
+        const fanHueOffset = visibleFanIdx * 0.12;
         for (let j = 0; j < blades.length; j++) {
           const bladeHue = (hueBase + fanHueOffset + j * 0.08) % 1;
           _rgbColor.setHSL(bladeHue, 0.9, 0.55);
           blades[j].emissive.copy(_rgbColor);
           blades[j].emissiveIntensity = 0.6 + breathe * 0.3;
         }
-        fanIdx++;
+        visibleFanIdx++;
       }
     }
 
@@ -3434,6 +3454,7 @@ export function createPurifier(scene) {
     if (refs.outdoorDayTex) _roomOutdoorDayTex = refs.outdoorDayTex;
     if (refs.outdoorNightTex) _roomOutdoorNightTex = refs.outdoorNightTex;
     if (refs.applyTimeOfDay) _applyTimeOfDay = refs.applyTimeOfDay;
+    if (refs.markShadowsDirty) _markShadowsDirty = refs.markShadowsDirty;
     if (refs.toggleMacbook) _toggleMacbook = refs.toggleMacbook;
     if (refs.toggleCornerDoor) _toggleCornerDoor = refs.toggleCornerDoor;
   }

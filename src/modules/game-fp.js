@@ -18,6 +18,7 @@ import { getBounds, acquireBox, resetBoxPool, easeAlpha, BODY_R, EYE_H, HEAD_EXT
 import * as coins from './coins.js';
 import * as leaderboard from './leaderboard.js';
 import { trapFocus, saveFocus } from './a11y.js';
+import { RAYCAST_INTERVAL_MS } from './constants.js';
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -102,6 +103,8 @@ let _wasBonking = false;
 let _wasGroundedLast = true;
 let _wasAimingAtInteractable = false;
 let _lastAimToneTs = 0;
+let _lastCrosshairRaycastTs = 0;
+let _crosshairAimingAtInteractable = false;
 let _lastFootstepTs = 0;
 let _wasFootstepMoving = false;
 let _lastUiInteractTs = 0;
@@ -117,6 +120,7 @@ const _right = new THREE.Vector3();
 const _viewDir = new THREE.Vector3();
 const _lookTarget = new THREE.Vector3();
 const _ray = new THREE.Raycaster();
+_ray.far = 220;
 const _rayCenter = new THREE.Vector2(0, 0);
 let _pointerLockRetryTimer = null;
 
@@ -1436,26 +1440,34 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   // ── Crosshair interaction indicator ───────────────────────────────
   // Highlight crosshair when aiming at something clickable
   const crosshair = document.getElementById('fpCrosshair');
-  if (crosshair && ts % 3 < 1) { // throttle to ~20hz
-    _ray.setFromCamera(_rayCenter, _camera);
-    const chHits = _ray.intersectObjects(_scene.children, true);
-    let aimingAt = false;
-    for (const h of chHits) {
-      if (h.distance > 220) break;
-      let p = h.object;
-      while (p) {
-        if (p._isLamp || p._isCeilLight || p._isFan || p._isFilterL || p._isFilterR || p._isDrawer || p._isBifoldLeaf || p._isCornerDoorHandle || p._isWindow || p._isMacbook) { aimingAt = true; break; }
-        p = p.parent;
+  if (crosshair) {
+    if (ts - _lastCrosshairRaycastTs >= RAYCAST_INTERVAL_MS) {
+      _lastCrosshairRaycastTs = ts;
+      _ray.setFromCamera(_rayCenter, _camera);
+      const chHits = _ray.intersectObjects(_scene.children, true);
+      let aimingAt = false;
+      for (const h of chHits) {
+        if (h.distance > 220) break;
+        let p = h.object;
+        while (p) {
+          if (p._isLamp || p._isCeilLight || p._isFan || p._isFilterL || p._isFilterR || p._isDrawer || p._isBifoldLeaf || p._isCornerDoorHandle || p._isWindow || p._isMacbook) { aimingAt = true; break; }
+          p = p.parent;
+        }
+        if (aimingAt) break;
       }
-      if (aimingAt) break;
+      if (aimingAt && !_wasAimingAtInteractable && ts - _lastAimToneTs > 220) {
+        _playAimCue();
+        _lastAimToneTs = ts;
+      }
+      _wasAimingAtInteractable = aimingAt;
+      _crosshairAimingAtInteractable = aimingAt;
+      window._fpLookTarget = aimingAt;
     }
-    if (aimingAt && !_wasAimingAtInteractable && ts - _lastAimToneTs > 220) {
-      _playAimCue();
-      _lastAimToneTs = ts;
-    }
-    _wasAimingAtInteractable = aimingAt;
-    crosshair.style.background = aimingAt ? '#91deff' : 'rgba(255,255,255,0.8)';
-    crosshair.style.transform = aimingAt ? 'translate(-50%,-50%) scale(1.5)' : 'translate(-50%,-50%) scale(1)';
+
+    const desiredBg = _crosshairAimingAtInteractable ? '#91deff' : 'rgba(255,255,255,0.8)';
+    const desiredTransform = _crosshairAimingAtInteractable ? 'translate(-50%,-50%) scale(1.5)' : 'translate(-50%,-50%) scale(1)';
+    if (crosshair.style.background !== desiredBg) crosshair.style.background = desiredBg;
+    if (crosshair.style.transform !== desiredTransform) crosshair.style.transform = desiredTransform;
   }
 
   // ── Coin counter HUD ──────────────────────────────────────────────

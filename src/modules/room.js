@@ -429,7 +429,7 @@ export function createRoom(scene) {
     const shadeMat=new THREE.MeshStandardMaterial({
       color:0xd8d0c0, roughness:0.9, metalness:0, side:THREE.DoubleSide,
       transparent:true, opacity:0.85,
-      emissive:0xffeedd, emissiveIntensity:0.4
+      emissive:0xffeedd, emissiveIntensity:0.75
     });
     lampShade=new THREE.Mesh(new THREE.CylinderGeometry(shadeR1, shadeR2, shadeH, 24, 1, true), shadeMat);
     lampShade.position.set(lampX, lampBaseY+0.8+stemH+shadeH/2-1, lampZ);
@@ -440,12 +440,12 @@ export function createRoom(scene) {
     topCap.position.set(lampX, lampBaseY+0.8+stemH+shadeH-1, lampZ);
     topCap._isRoom=true; topCap._isLamp=true; addRoom(topCap);
     // Warm glow light — strong enough to visibly illuminate surroundings
-    lampLight=new THREE.PointLight(0xffddaa, 1.2, 80);
+    lampLight=new THREE.PointLight(0xffddaa, 3.4, 110);
     lampLight.position.set(lampX, lampBaseY+0.8+stemH+shadeH/2-1, lampZ);
     lampLight.castShadow=false;
     lampLight._isRoom=true; addRoom(lampLight);
     // Bulb visible inside shade
-    const bulbMat=new THREE.MeshStandardMaterial({color:0xffffcc,emissive:0xffeedd,emissiveIntensity:1.2,roughness:0.3});
+    const bulbMat=new THREE.MeshStandardMaterial({color:0xffffcc,emissive:0xffeedd,emissiveIntensity:1.9,roughness:0.3});
     lampBulb=new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), bulbMat);
     lampBulb.position.set(lampX, lampBaseY+0.8+stemH+1, lampZ);
     lampBulb._isRoom=true; lampBulb._isLamp=true; addRoom(lampBulb);

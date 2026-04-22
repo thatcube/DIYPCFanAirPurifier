@@ -12,14 +12,14 @@ export const PARTICLE_TIER_COUNTS = [350, 280, 200, 140];
 export const QUALITY_DPR_TIERS_MOBILE  = [0.72, 0.64, 0.56, 0.50];
 export const QUALITY_DPR_TIERS_DESKTOP = [0.85, 0.74, 0.64, 0.55];
 
-// Shadow throttle in play mode (~45 Hz)
-export const SHADOW_UPDATE_INTERVAL_MS = 1000 / 45;
+// Shadow throttle in play mode (~12 Hz)
+export const SHADOW_UPDATE_INTERVAL_MS = 1000 / 12;
 
 // Idle frame rate (non-game mode, no interaction)
 export const IDLE_FRAME_MS = 1000 / 18;
 
-// Raycast throttle in play mode
-export const RAYCAST_INTERVAL_MS = 32;
+// Raycast throttle in play mode (~14 Hz)
+export const RAYCAST_INTERVAL_MS = 72;
 
 // RGB LED base distance
 export const RGB_BASE_DIST = 45;
