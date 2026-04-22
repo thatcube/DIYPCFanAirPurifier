@@ -40,6 +40,7 @@ export function createRenderer(canvas) {
   const dpr = Math.min(window.devicePixelRatio, dprTiers[state.qualityTier] || dprTiers[0]);
   renderer.setPixelRatio(dpr);
   renderer.setClearColor(0xd4dce8, 1);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.VSMShadowMap;
   renderer.shadowMap.autoUpdate = false;
