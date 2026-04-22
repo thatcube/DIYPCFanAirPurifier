@@ -860,7 +860,7 @@ function _ensureFinishPreviewRenderer() {
   _finishPreviewCanvas = canvas;
   _finishPreviewRenderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power' });
   _finishPreviewRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  _finishPreviewRenderer.outputEncoding = THREE.sRGBEncoding;
+  _finishPreviewRenderer.outputColorSpace = THREE.SRGBColorSpace;
   _finishPreviewRenderer.toneMapping = THREE.ACESFilmicToneMapping;
   _finishPreviewRenderer.toneMappingExposure = 1.2;
 
