@@ -1610,6 +1610,7 @@ export function createRoom(scene) {
 
   // Load screen texture
   const _macbookLogoTex = new THREE.TextureLoader().load('assets/scummit-logo.webp');
+  try { _macbookLogoTex.colorSpace = THREE.SRGBColorSpace; } catch (e) { /* ignore */ }
 
   {
     const mbLoader = new GLTFLoader();
