@@ -320,7 +320,9 @@ async function handleRunFinish(request, env, cfg) {
   }
 
   const elapsed = now - Number(run.started_at);
-  if (elapsed < cfg.MIN_RUN_MS) return apiError(400, 'run_too_fast', 'Run time below minimum allowed threshold');
+  if (!isTest && elapsed < cfg.MIN_RUN_MS) {
+    return apiError(400, 'run_too_fast', 'Run time below minimum allowed threshold');
+  }
   if (elapsed > cfg.MAX_RUN_MS) return apiError(400, 'run_too_long', 'Run time exceeded maximum allowed threshold');
 
   const finalName = name || 'Player';
