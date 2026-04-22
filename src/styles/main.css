@@ -950,13 +950,20 @@ input[type=range]::-moz-range-thumb {
   font-size: 10px; font-variant-numeric: tabular-nums;
   color: var(--text);
 }
-#fpLeaderboardList li.own {
-  background: rgba(255,216,115,0.14); border-color: rgba(255,216,115,0.3);
+#fpLeaderboardList li.own-history {
+  background: rgba(255,216,115,0.07);
+  border-color: rgba(255,216,115,0.2);
+}
+#fpLeaderboardList li.own-current {
+  background: rgba(255,216,115,0.16);
+  border-color: rgba(255,216,115,0.42);
+  box-shadow: 0 0 0 1px rgba(255,216,115,0.14);
 }
 #fpLeaderboardList li .rk { opacity: 0.66; }
 #fpLeaderboardList li .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #fpLeaderboardList li .tm { font-weight: 700; color: #9fe3ff; }
-#fpLeaderboardList li.own .tm { color: var(--gold); }
+#fpLeaderboardList li.own-history .tm { color: #d9ebff; }
+#fpLeaderboardList li.own-current .tm { color: var(--gold); }
 .catBadge {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 9.5px; font-weight: var(--weight-semibold); letter-spacing: 0.02em;
@@ -1162,10 +1169,14 @@ input[type=range]::-moz-range-thumb {
   background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
   font-size: 13px;
 }
-#finishDialogList li.own {
+#finishDialogList li.own-history {
+  background: rgba(255,216,115,0.07);
+  border-color: rgba(255,216,115,0.22);
+}
+#finishDialogList li.own-current {
   background: rgba(255,216,115,0.16);
-  border-color: rgba(255,216,115,0.45);
-  box-shadow: 0 0 0 1px rgba(255,216,115,0.14);
+  border-color: rgba(255,216,115,0.46);
+  box-shadow: 0 0 0 1px rgba(255,216,115,0.15), inset 3px 0 0 rgba(255,226,140,0.65);
 }
 #finishDialogList li .rk { opacity: 0.66; font-variant-numeric: tabular-nums; }
 #finishDialogList li .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1174,7 +1185,8 @@ input[type=range]::-moz-range-thumb {
   white-space: normal;
 }
 #finishDialogList li .tm { font-variant-numeric: tabular-nums; font-weight: 700; color: #9fe3ff; }
-#finishDialogList li.own .tm { color: var(--gold); }
+#finishDialogList li.own-history .tm { color: #d9ebff; }
+#finishDialogList li.own-current .tm { color: var(--gold); }
 #finishDialogList li.pending {
   border-style: dashed;
 }
