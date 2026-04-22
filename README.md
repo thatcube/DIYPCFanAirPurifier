@@ -10,15 +10,26 @@ Interactive 3D model of a DIY air purifier built from:
 
 This is a box-style air purifier designed around two rows of four Arctic P12 Pro fans pushing air through MERV 13 filtration. The 3D model lets you toggle between layout variants (front+back or front+top fan placement), switch wood stain options, and inspect the build from any angle.
 
-## Run Locally (Shared Leaderboard Enabled)
+## Run Locally (Match Live Frontend)
 
-The leaderboard now has a shared backend API. Run the app through the Node server:
+The production site is the Vite app (`vite-index.html` -> `src/main.js`). For parity with live:
 
 1. `npm install`
 2. `npm run dev`
-3. Open `http://localhost:8787`
+3. Open `http://localhost:3000/vite-index.html`
 
-Opening `index.html` directly still renders the scene, but leaderboard sharing requires the API server.
+For production-like local validation:
+
+1. `npm run vite:build`
+2. `npm run vite:preview`
+
+If you need the legacy local API server (`server.js`) for direct API testing, run:
+
+- `npm run dev:api` (serves API on `http://localhost:8787`)
+
+Important:
+
+- `index.html` is the legacy monolith path (Three r128 CDN) and does not match live behavior.
 
 ## Deploy Free (Recommended): Cloudflare Worker + D1 + Netlify
 
