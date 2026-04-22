@@ -30,7 +30,8 @@ import { initGlassShine } from './modules/glass-shine.js';
 import { initPreviews, recolorClassicPreview } from './modules/cat-preview.js';
 import { initToggleSwitches, initSegButtons, initDecorativeIcons, initClickableDivs, trapFocus, saveFocus } from './modules/a11y.js';
 import {
-  SHADOW_UPDATE_INTERVAL_MS, IDLE_FRAME_MS
+  SHADOW_UPDATE_INTERVAL_MS, IDLE_FRAME_MS,
+  QUALITY_DPR_TIERS_MOBILE, QUALITY_DPR_TIERS_DESKTOP
 } from './modules/constants.js';
 
 // ── Utilities (must be defined before wiring) ───────────────────────
@@ -85,6 +86,44 @@ const { scene, camera } = createScene();
 const canvas = document.getElementById('c');
 if (!canvas) throw new Error('Canvas element #c not found');
 const renderer = createRenderer(canvas);
+
+const _fpPerfState = {
+  applied: false,
+  prePixelRatio: renderer.getPixelRatio(),
+  preShadowEnabled: renderer.shadowMap.enabled,
+  preKeyCastShadow: false
+};
+
+function _getQualityDprCap() {
+  const tiers = state.isMobile ? QUALITY_DPR_TIERS_MOBILE : QUALITY_DPR_TIERS_DESKTOP;
+  return tiers[state.qualityTier] || tiers[0] || 1;
+}
+
+function _applyFpPerformanceProfile(fpActive) {
+  if (fpActive === _fpPerfState.applied) return;
+  _fpPerfState.applied = fpActive;
+
+  if (fpActive) {
+    _fpPerfState.prePixelRatio = renderer.getPixelRatio();
+    _fpPerfState.preShadowEnabled = renderer.shadowMap.enabled;
+    _fpPerfState.preKeyCastShadow = !!lighting.key?.castShadow;
+
+    // Aggressive play-mode profile for very high FPS targets.
+    const fpDprCap = state.isMobile ? 0.42 : 0.5;
+    renderer.setPixelRatio(Math.min(_fpPerfState.prePixelRatio, fpDprCap));
+    renderer.shadowMap.enabled = false;
+    if (lighting.key) lighting.key.castShadow = false;
+    _shadowDirtyOneShot = false;
+    onResize();
+    return;
+  }
+
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, _getQualityDprCap()));
+  renderer.shadowMap.enabled = _fpPerfState.preShadowEnabled;
+  if (lighting.key) lighting.key.castShadow = _fpPerfState.preKeyCastShadow;
+  markShadowsDirty();
+  onResize();
+}
 
 // OrbitControls
 const controls = new OrbitControls(camera, canvas);
@@ -655,6 +694,8 @@ let _lastCatX = null, _lastCatZ = null;
 function animate(ts) {
   requestAnimationFrame(animate);
 
+  _applyFpPerformanceProfile(gameFp.fpMode);
+
   // Frame timing
   const rawDt = ts - (_lastFrameTs || ts);
   _lastFrameTs = ts;
@@ -833,7 +874,7 @@ function animate(ts) {
 
   // Shadow throttle — update on dirty flag OR periodically
   const shadowIntervalMs = gameFp.fpMode ? Math.max(SHADOW_UPDATE_INTERVAL_MS, 1000 / 8) : SHADOW_UPDATE_INTERVAL_MS;
-  if (_shadowDirtyOneShot || (ts - _lastShadowUpdateTs) >= shadowIntervalMs) {
+  if (renderer.shadowMap.enabled && (_shadowDirtyOneShot || (ts - _lastShadowUpdateTs) >= shadowIntervalMs)) {
     renderer.shadowMap.needsUpdate = true;
     _shadowDirtyOneShot = false;
     _lastShadowUpdateTs = ts;

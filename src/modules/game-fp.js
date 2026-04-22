@@ -638,16 +638,8 @@ function _buildStaticBoxes() {
 
 function _getBoxes() {
   resetBoxPool();
-  const result = [];
-
-  // Room collision boxes (static, no offset needed)
-  for (const box of _staticBoxes) {
-    const b = acquireBox();
-    b.xMin = box.xMin; b.xMax = box.xMax;
-    b.zMin = box.zMin; b.zMax = box.zMax;
-    b.yTop = box.yTop; b.yBottom = box.yBottom;
-    result.push(b);
-  }
+  // Reuse static room collision boxes directly; only dynamic boxes below need rebuilding.
+  const result = _staticBoxes.slice();
 
   // ── Purifier collision (dynamic — follows placementOffset + rotation) ──
   const px = _placementOffset ? _placementOffset.x : 0;

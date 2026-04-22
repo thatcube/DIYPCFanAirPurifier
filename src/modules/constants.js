@@ -18,8 +18,8 @@ export const SHADOW_UPDATE_INTERVAL_MS = 1000 / 12;
 // Idle frame rate (non-game mode, no interaction)
 export const IDLE_FRAME_MS = 1000 / 18;
 
-// Raycast throttle in play mode (~14 Hz)
-export const RAYCAST_INTERVAL_MS = 72;
+// Raycast throttle in play mode (~10 Hz)
+export const RAYCAST_INTERVAL_MS = 96;
 
 // RGB LED base distance
 export const RGB_BASE_DIST = 45;
