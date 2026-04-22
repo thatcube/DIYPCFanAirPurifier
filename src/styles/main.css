@@ -130,9 +130,23 @@ h1, h2, h3, h4 {
 
 /* ─── FPS counter ────────────────────────────────────────────────── */
 #fps {
-  position: fixed; bottom: 8px; right: 8px;
-  font-size: 11px; font-family: var(--font-mono);
-  color: rgba(0,0,0,0.35); pointer-events: none; z-index: 100;
+  position: fixed;
+  bottom: 8px;
+  right: 8px;
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: rgba(226, 243, 255, 0.9);
+  background: rgba(8, 20, 35, 0.6);
+  border: 1px solid rgba(170, 220, 255, 0.2);
+  border-radius: 8px;
+  padding: 4px 7px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  z-index: 307;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -538,7 +552,7 @@ input[type=range]::-moz-range-thumb {
 /* Share button in HUD */
 #fpShareRow {
   position: fixed;
-  top: 94px;
+  top: 124px;
   right: 16px;
   margin: 0;
   z-index: 306;
@@ -1279,6 +1293,11 @@ body.play-mode .part-tooltip { display: none !important; }
 
 body.play-mode #fpHud { display: block; }
 body.play-mode #fpCrosshair { display: block; }
+body.play-mode #fps {
+  top: 96px;
+  right: 16px;
+  bottom: auto;
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    CHARACTER SELECT — Smash Bros-style grid
@@ -1428,7 +1447,8 @@ body.play-mode #runTimerHud { display: block; }
   body.play-mode #fpQuickControls { display: none !important; }
   body.play-mode #runTimerHud { top: 12px; right: 12px; min-width: 220px; padding: 9px 12px 10px; }
   body.play-mode #runTimerText { font-size: 28px; }
-  body.play-mode #fpShareRow { top: 86px; right: 12px; }
+  body.play-mode #fps { top: 86px; right: 12px; font-size: 10px; padding: 3px 6px; }
+  body.play-mode #fpShareRow { top: 110px; right: 12px; }
   body.play-mode #fpChargeBar { width: min(94vw, 360px); bottom: 10px; padding: 9px 10px 8px; }
   body.play-mode #fpChargeHint { display: none; }
 }
