@@ -35,9 +35,23 @@ const SFX_MUTE_KEY = 'diy_air_purifier_muted_v1';
 let _sfxMuted = false;
 try { _sfxMuted = localStorage.getItem(SFX_MUTE_KEY) === '1'; } catch (e) {}
 
+const QUICK_COIN_MODE_KEY = 'diy_air_purifier_quick_coin_mode';
+let _quickCoinMode = false;
+try { _quickCoinMode = localStorage.getItem(QUICK_COIN_MODE_KEY) === '1'; } catch (e) {}
+
 export function setSfxMuted(muted) {
   _sfxMuted = !!muted;
   try { localStorage.setItem(SFX_MUTE_KEY, _sfxMuted ? '1' : '0'); } catch (e) {}
+}
+
+export function isQuickCoinMode() {
+  return !!_quickCoinMode;
+}
+
+export function setQuickCoinMode(enabled) {
+  _quickCoinMode = !!enabled;
+  try { localStorage.setItem(QUICK_COIN_MODE_KEY, _quickCoinMode ? '1' : '0'); } catch (e) {}
+  _applyQuickCoinMode();
 }
 
 // ── Coin factory ────────────────────────────────────────────────────
@@ -311,6 +325,8 @@ export function spawnRoomCoins(roomRefs) {
     coins.push(drawerCoinEntry);
     coinTotal++;
   }
+
+  _applyQuickCoinMode();
 }
 
 // ── Secret coin system ──────────────────────────────────────────────
@@ -407,6 +423,7 @@ export function fullReset() {
 
   // Recalculate coinTotal (secrets were removed)
   coinTotal = coins.filter(c => !c.secret).length;
+  _applyQuickCoinMode();
 }
 
 // ── Per-frame update ────────────────────────────────────────────────
@@ -454,4 +471,39 @@ export function updateCoins(ts, playerPos) {
       }
     }
   }
+}
+
+function _applyQuickCoinMode() {
+  const regularCoins = coins.filter(c => !c.secret);
+  if (!regularCoins.length) {
+    coinTotal = 0;
+    return;
+  }
+
+  if (!_quickCoinMode) {
+    coinTotal = regularCoins.length;
+    for (const c of regularCoins) {
+      c.collected = false;
+      c.mesh.visible = !!(_coinGroup && _coinGroup.visible);
+      c.mesh.position.copy(c.basePos);
+    }
+    return;
+  }
+
+  const keep = regularCoins.find(c => c.id === 'coin_3')
+    || regularCoins.find(c => !c.inDrawer && !c.insidePurifier)
+    || regularCoins[0];
+
+  for (const c of regularCoins) {
+    if (c === keep) {
+      c.collected = false;
+      c.mesh.visible = !!(_coinGroup && _coinGroup.visible);
+      c.mesh.position.copy(c.basePos);
+    } else {
+      c.collected = true;
+      c.mesh.visible = false;
+    }
+  }
+
+  coinTotal = 1;
 }

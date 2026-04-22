@@ -207,6 +207,16 @@ coins.setToastFn(showToast);
 const coinGroup = coins.createCoinGroup(scene);
 coins.spawnRoomCoins(roomRefs);
 
+function _syncQuickCoinToggleState() {
+  const tog = document.getElementById('togQuickCoin');
+  if (!tog) return;
+  const isOn = coins.isQuickCoinMode();
+  tog.classList.toggle('on', isOn);
+  tog.setAttribute('aria-checked', isOn ? 'true' : 'false');
+}
+
+_syncQuickCoinToggleState();
+
 // ── Cat ─────────────────────────────────────────────────────────────
 
 scene.add(catAnimation.catGroup);
@@ -487,6 +497,26 @@ window._toggleFps = () => {
   const tog = document.getElementById('togFps');
   if (fpsEl) fpsEl.style.display = fpsEl.style.display === 'none' ? '' : 'none';
   if (tog) tog.classList.toggle('on');
+};
+
+window._toggleQuickCoin = () => {
+  const next = !coins.isQuickCoinMode();
+  coins.setQuickCoinMode(next);
+  coins.fullReset();
+
+  leaderboard.closeFinishDialog();
+  leaderboard.hideShareButton();
+  if (gameFp.fpMode) leaderboard.startTimer();
+  else leaderboard.resetTimer();
+  void leaderboard.startSharedRun();
+
+  const coinHudCount = document.getElementById('coinCount');
+  if (coinHudCount) coinHudCount.textContent = `${coins.coinScore}/${coins.coinTotal}`;
+  const secretHudCount = document.getElementById('secretCoinCount');
+  if (secretHudCount) secretHudCount.textContent = String(coins.coinSecretScore || 0);
+
+  _syncQuickCoinToggleState();
+  showToast(next ? 'Quick coin mode on' : 'Quick coin mode off');
 };
 
 // Mobile jump
@@ -848,6 +878,7 @@ initToggleSwitches();
 initSegButtons();
 initDecorativeIcons();
 initClickableDivs();
+_syncQuickCoinToggleState();
 
 // Wire share button click
 const _shareBtn = document.getElementById('fpShareBtn');

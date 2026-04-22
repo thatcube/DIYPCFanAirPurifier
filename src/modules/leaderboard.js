@@ -20,8 +20,13 @@ const LB_PER_PLAYER = 25;
 const LB_STORE_KEY = 'diy_air_purifier_leaderboard_v1';
 const LB_PLAYER_KEY = 'diy_air_purifier_player_name_v1';
 const LB_PLAYER_ID_KEY = 'diy_air_purifier_player_id_v1';
+const QUICK_COIN_MODE_KEY = 'diy_air_purifier_quick_coin_mode';
 const LB_API_BASE = ''; // same-origin — Netlify proxies /api/* to Worker
 const LB_SHARED_ENABLED = true;
+
+function _isQuickCoinMode() {
+  try { return localStorage.getItem(QUICK_COIN_MODE_KEY) === '1'; } catch (e) { return false; }
+}
 
 // ── Shared API state ────────────────────────────────────────────────
 
@@ -367,7 +372,8 @@ async function _recordRunShared(timeMs, coinTotal, secretCoins) {
       playerId: _playerId,
       catColor: sanitizeColorKey(catColorKey),
       catHair: sanitizeHairKey(catHairKey),
-      catModel: sanitizeModelKey(catModelKey)
+      catModel: sanitizeModelKey(catModelKey),
+      isTest: _isQuickCoinMode()
     });
     _sharedRunId = '';
     _claimedCoinIds.clear();
@@ -399,7 +405,8 @@ async function _recordRunShared(timeMs, coinTotal, secretCoins) {
           playerId: _playerId,
           catColor: sanitizeColorKey(catColorKey),
           catHair: sanitizeHairKey(catHairKey),
-          catModel: sanitizeModelKey(catModelKey)
+          catModel: sanitizeModelKey(catModelKey),
+          isTest: _isQuickCoinMode()
         });
         _sharedRunId = '';
         _claimedCoinIds.clear();
