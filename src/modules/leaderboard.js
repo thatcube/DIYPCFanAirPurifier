@@ -867,6 +867,53 @@ function _tintFinishPreviewModel(model, modelKey, colorKey) {
   });
 }
 
+function _stripFinishPreviewBackdrop(model) {
+  if (!model) return;
+  const nameHint = /(graph|chart|grid|axis|axes|backdrop|background|board|screen|panel|plane|pplane|lambert1)/i;
+  const toRemove = [];
+
+  model.traverse(child => {
+    if (!child.isMesh) return;
+    const name = (child.name || '').toLowerCase();
+    const matName = (child.material && child.material.name || '').toLowerCase();
+    if (nameHint.test(name) || nameHint.test(matName)) {
+      toRemove.push(child);
+    }
+  });
+
+  // Fallback: remove the largest planar mesh if no name match.
+  if (toRemove.length === 0) {
+    let biggest = null;
+    let biggestArea = 0;
+    model.traverse(child => {
+      if (!child.isMesh || !child.geometry) return;
+      child.geometry.computeBoundingBox();
+      const bb = child.geometry.boundingBox;
+      const sx = bb.max.x - bb.min.x;
+      const sy = bb.max.y - bb.min.y;
+      const sz = bb.max.z - bb.min.z;
+      const dims = [sx, sy, sz].sort((a, b) => b - a);
+      if (dims[2] < dims[0] * 0.1) {
+        const area = dims[0] * dims[1];
+        if (area > biggestArea) {
+          biggestArea = area;
+          biggest = child;
+        }
+      }
+    });
+    if (biggest) toRemove.push(biggest);
+  }
+
+  for (const mesh of toRemove) {
+    if (mesh.parent) mesh.parent.remove(mesh);
+    if (mesh.geometry) mesh.geometry.dispose();
+    if (mesh.material) {
+      if (Array.isArray(mesh.material)) mesh.material.forEach(m => m.dispose());
+      else mesh.material.dispose();
+    }
+  }
+}
+
 function _placeFinishPreviewModel(model, modelKey) {
   const targetHeight = 3;
   const box = new THREE.Box3().setFromObject(model);
@@ -917,6 +964,7 @@ function _setFinishPreviewModel(modelKey, colorKey, hairKey) {
     _finishPreviewLoader.load(sources[idx], (gltf) => {
       if (token !== _finishPreviewLoadToken) return;
       const model = gltf.scene;
+      if (safeModel === 'bababooey') _stripFinishPreviewBackdrop(model);
       _placeFinishPreviewModel(model, safeModel);
       _tintFinishPreviewModel(model, safeModel, safeColor);
       _finishPreviewScene.add(model);
