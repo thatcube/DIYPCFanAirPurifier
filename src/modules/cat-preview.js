@@ -5,7 +5,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { CAT_MODEL_PRESETS } from './constants.js';
-import { stripBababooeyBackdrop } from './cat-model-utils.js';
 
 const previews = []; // { renderer, scene, camera, model, mixer, animSpeed }
 let _animId = null;
@@ -38,11 +37,57 @@ const MODEL_MAP = {
   bababooey: { src: 'assets/bababooey_cat.glb', extraScale: 1, yOffset: -0.35 },
 };
 
+/**
+ * Remove the bababooey cat's backdrop/graph mesh.
+ * Matches by name regex or falls back to the largest planar mesh.
+ */
+function _stripBababooeyBackdrop(model) {
+  if (!model) return;
+  const nameHint = /(graph|chart|grid|axis|axes|backdrop|background|board|screen|panel|plane|pplane|lambert1)/i;
+  const toRemove = [];
+
+  model.traverse(child => {
+    if (!child.isMesh) return;
+    const name = (child.name || '').toLowerCase();
+    const matName = (child.material && child.material.name || '').toLowerCase();
+    if (nameHint.test(name) || nameHint.test(matName)) {
+      toRemove.push(child);
+    }
+  });
+
+  // Fallback: remove the largest planar mesh if no name match
+  if (toRemove.length === 0) {
+    let biggest = null, biggestArea = 0;
+    model.traverse(child => {
+      if (!child.isMesh || !child.geometry) return;
+      child.geometry.computeBoundingBox();
+      const bb = child.geometry.boundingBox;
+      const sx = bb.max.x - bb.min.x, sy = bb.max.y - bb.min.y, sz = bb.max.z - bb.min.z;
+      const dims = [sx, sy, sz].sort((a, b) => b - a);
+      // Planar = thinnest dimension < 10% of largest
+      if (dims[2] < dims[0] * 0.1) {
+        const area = dims[0] * dims[1];
+        if (area > biggestArea) { biggestArea = area; biggest = child; }
+      }
+    });
+    if (biggest) toRemove.push(biggest);
+  }
+
+  for (const mesh of toRemove) {
+    if (mesh.parent) mesh.parent.remove(mesh);
+    if (mesh.geometry) mesh.geometry.dispose();
+    if (mesh.material) {
+      if (Array.isArray(mesh.material)) mesh.material.forEach(m => m.dispose());
+      else mesh.material.dispose();
+    }
+  }
+}
+
 function _processLoadedModel(preview, entry, gltf, preset) {
   const model = gltf.scene;
 
   // Strip bababooey backdrop
-  if (entry.key === 'bababooey') stripBababooeyBackdrop(model, entry.key);
+  if (entry.key === 'bababooey') _stripBababooeyBackdrop(model);
 
   // Scale to consistent HEIGHT (3 units) so all cats are the same size
   const TARGET_H = 3;

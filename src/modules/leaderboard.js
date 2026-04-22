@@ -12,7 +12,6 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { trapFocus, saveFocus } from './a11y.js';
 import { CAT_COLOR_PRESETS, CAT_MODEL_PRESETS } from './constants.js';
-import { stripBababooeyBackdrop } from './cat-model-utils.js';
 
 // ── Config ──────────────────────────────────────────────────────────
 
@@ -918,7 +917,6 @@ function _setFinishPreviewModel(modelKey, colorKey, hairKey) {
     _finishPreviewLoader.load(sources[idx], (gltf) => {
       if (token !== _finishPreviewLoadToken) return;
       const model = gltf.scene;
-      if (safeModel === 'bababooey') stripBababooeyBackdrop(model, safeModel);
       _placeFinishPreviewModel(model, safeModel);
       _tintFinishPreviewModel(model, safeModel, safeColor);
       _finishPreviewScene.add(model);
