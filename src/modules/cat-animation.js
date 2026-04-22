@@ -260,8 +260,11 @@ function _pinToGround(model, baseLPos, offsetOverride) {
   const parent = model.parent;
   parent.updateMatrixWorld(true);
   groundTmpParentPos.setFromMatrixPosition(parent.matrixWorld);
+  // The room floor is below world 0 in this scene, so pinning against 0
+  // incorrectly lifts toon on floor/space placements.
+  const floorY = -(state.H / 2 + state.ply + state.bunFootH);
   const worldY = groundTmpParentPos.y + baseLPos.y;
-  if (worldY < 0) model.position.y = baseLPos.y - worldY + off;
+  if (worldY < floorY) model.position.y = baseLPos.y + (floorY - worldY) + off;
   else model.position.y = baseLPos.y + off;
 }
 
