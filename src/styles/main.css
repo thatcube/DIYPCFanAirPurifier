@@ -1052,7 +1052,7 @@ input[type=range]::-moz-range-thumb {
 #finishDialogSummaryGrid {
   margin-top: 2px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 .finishDialogSummaryItem {
@@ -1086,10 +1086,10 @@ input[type=range]::-moz-range-thumb {
   text-shadow: 0 1px 12px rgba(159,227,255,0.16);
 }
 .finishDialogSummaryItemTime {
-  grid-column: span 1;
+  grid-column: span 2;
 }
 .finishDialogSummaryItemCat {
-  grid-column: 1 / -1;
+  grid-column: span 2;
 }
 #finishDialogCatPreview {
   display: block;
@@ -1120,6 +1120,15 @@ input[type=range]::-moz-range-thumb {
 }
 #finishDialogSummarySecret {
   color: #b8ecff;
+}
+@media (max-width: 760px) {
+  #finishDialogSummaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .finishDialogSummaryItemTime,
+  .finishDialogSummaryItemCat {
+    grid-column: span 2;
+  }
 }
 @media (max-width: 560px) {
   #finishDialogSummaryGrid {
