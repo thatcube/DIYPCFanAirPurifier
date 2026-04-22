@@ -135,7 +135,7 @@ export function loadGameplayCat(refs = {}) {
     catModel.traverse(o => {
       if (o.isMesh) {
         o.castShadow = true; o.receiveShadow = true;
-        if (o.material && o.material.map) o.material.map.colorSpace = THREE.SRGBColorSpace;
+        if (o.material && o.material.map) o.material.map.encoding = THREE.sRGBEncoding;
         const mats = Array.isArray(o.material) ? o.material : [o.material];
         for (const m of mats) {
           if (!m) continue;
