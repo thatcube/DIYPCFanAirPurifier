@@ -742,6 +742,13 @@ export function createRoom(scene) {
   const doorLeft=doorCenterX-doorW/2;
   const doorRight=doorCenterX+doorW/2;
 
+  // Back-wall opening is the full hallway width so you don't see a thin
+  // sliver of back wall through the recess side gaps (which used to read
+  // like an extra door frame behind the real one).
+  const backOpenW=extrusionW;
+  const backOpenLeft=extCenterX-backOpenW/2;
+  const backOpenRight=extCenterX+backOpenW/2;
+
   // Back wall — full width with a doorway hole so the door opens into the
   // hallway beyond. Built as an ExtrudeGeometry (shape in X-Y plane, extruded
   // along +Z) mirroring the closet-wall-with-hole approach.
@@ -763,8 +770,8 @@ export function createRoom(scene) {
     shape.lineTo(xMin,yMax);
     shape.lineTo(xMin,yMin);
     const hole=new THREE.Path();
-    // Doorway hole — post-mirror X = -doorRight..-doorLeft (= -47..-15).
-    const hxMin=-doorRight, hxMax=-doorLeft;
+    // Hallway-width hole in the back wall, post-mirror X.
+    const hxMin=-backOpenRight, hxMax=-backOpenLeft;
     hole.moveTo(hxMin,yMin);
     hole.lineTo(hxMax,yMin);
     hole.lineTo(hxMax,doorH);
@@ -940,10 +947,10 @@ export function createRoom(scene) {
     // Helper: HSL-ish wood tone. Returns an #rrggbb string.
     const woodTone = (l, warm) => {
       // l: 0..1 lightness bias, warm: -1..1 red/yellow shift
-      const base = 70 + l * 80;                 // 70..150
-      const r = Math.max(0, Math.min(255, base + 35 + warm * 25));
-      const g = Math.max(0, Math.min(255, base * 0.72 + warm * 10));
-      const b = Math.max(0, Math.min(255, base * 0.42 - warm * 8));
+      const base = 108 + l * 70;                // 108..178 (lighter oak)
+      const r = Math.max(0, Math.min(255, base + 35 + warm * 22));
+      const g = Math.max(0, Math.min(255, base * 0.78 + warm * 10));
+      const b = Math.max(0, Math.min(255, base * 0.5 - warm * 8));
       return `rgb(${r|0},${g|0},${b|0})`;
     };
 
@@ -967,14 +974,15 @@ export function createRoom(scene) {
         const y0 = joints[j];
         const y1 = joints[j + 1];
         const plankH = y1 - y0;
-        // Per-plank base hue + lightness variation.
-        const lBias = 0.35 + Math.random() * 0.55;
-        const warm = (Math.random() - 0.5) * 1.6;
+        // Per-plank base hue + lightness variation — keep the range tight
+        // so adjacent planks don't read as wildly different shades.
+        const lBias = 0.55 + Math.random() * 0.25;
+        const warm = (Math.random() - 0.5) * 1.2;
         // Gentle along-plank gradient so each board has its own tonal arc.
         const grad = ctx.createLinearGradient(0, y0, 0, y1);
-        grad.addColorStop(0,   woodTone(lBias + (Math.random()-0.5)*0.1, warm));
-        grad.addColorStop(0.5, woodTone(lBias + (Math.random()-0.5)*0.15, warm + (Math.random()-0.5)*0.4));
-        grad.addColorStop(1,   woodTone(lBias + (Math.random()-0.5)*0.1, warm));
+        grad.addColorStop(0,   woodTone(lBias + (Math.random()-0.5)*0.06, warm));
+        grad.addColorStop(0.5, woodTone(lBias + (Math.random()-0.5)*0.09, warm + (Math.random()-0.5)*0.3));
+        grad.addColorStop(1,   woodTone(lBias + (Math.random()-0.5)*0.06, warm));
         ctx.fillStyle = grad;
         // Leave ~1px gap on all sides for seams/joints.
         ctx.fillRect(px0 + 0.8, y0 + 0.8, plankPxW - 1.6, plankH - 1.6);
@@ -1170,7 +1178,11 @@ export function createRoom(scene) {
       tagAll(frame, { _isRoom:true, _isHallway:true });
       addRoom(frame);
 
-      // Knob on the hallway face, offset from the strike edge.
+      // Knob on the hallway face, offset from the strike edge. Rotation
+      // aligns the knob's local +Z (its protrusion direction) with the
+      // hallway side of the door — for side=-1 the hallway is toward +X so
+      // rotation.y=+π/2 (which maps +Z → +X); for side=+1 the hallway is
+      // toward -X so rotation.y=-π/2.
       const knobZOffset = _hallDoorW/2 - 4;
       const knob = buildDoorKnob();
       knob.position.set(
@@ -1178,7 +1190,7 @@ export function createRoom(scene) {
         panelY - _hallDoorH/2 + 36,
         panelZ + knobZOffset
       );
-      knob.rotation.y = side < 0 ? -Math.PI/2 : Math.PI/2;
+      knob.rotation.y = side < 0 ? Math.PI/2 : -Math.PI/2;
       tagAll(knob, { _isRoom:true, _isHallway:true });
       addRoom(knob);
     }
