@@ -829,21 +829,95 @@ export function createRoom(scene) {
   const _hallDoorH = 80;
   const _hallBbColor = 0xc0bbb4;
 
-  // Floor extension — main floor plane is 200×200 centered at origin, so it
-  // already reaches Z=+100. Extend from Z=100 to Z=_hallZEnd at the hallway's
-  // X range using the same floor material so carpet tiling is continuous.
+  // Hardwood plank floor — 6" wide planks running along the hallway length
+  // (+Z). Covers the full hallway footprint and starts right at the doorway
+  // (Z=49) so the threshold transition is clean. Sits 0.05" above the main
+  // carpet floor (which extends to Z=+100) to hide the carpet that would
+  // otherwise show through the first ~51" of the hallway.
   {
-    const extZMin = 100, extZMax = _hallZEnd;
-    const extD = extZMax - extZMin;
-    const floorExtGeo = new THREE.PlaneGeometry(_hallWidth, extD);
-    const floorExt = new THREE.Mesh(floorExtGeo, floorMat);
-    floorExt.rotation.x = -Math.PI/2;
-    floorExt.position.set(_hallCenterX, floorY, (extZMin+extZMax)/2);
-    floorExt.receiveShadow = true;
-    floorExt._isRoom = true;
-    floorExt._isFloor = true;
-    floorExt._isHallway = true;
-    addRoom(floorExt);
+    const HW_RES_W = 256;  // across the plank (short axis)
+    const HW_RES_H = 1024; // along the plank (long axis)
+    const cvs = document.createElement('canvas');
+    cvs.width = HW_RES_W; cvs.height = HW_RES_H;
+    const ctx = cvs.getContext('2d');
+    // Base wood tone
+    ctx.fillStyle = '#8b5a2b';
+    ctx.fillRect(0, 0, HW_RES_W, HW_RES_H);
+    // Subtle grain streaks along the plank
+    for (let i = 0; i < 600; i++) {
+      const x = Math.random() * HW_RES_W;
+      const y = Math.random() * HW_RES_H;
+      const len = 40 + Math.random() * 200;
+      const shade = 60 + Math.random() * 50;
+      ctx.strokeStyle = `rgba(${shade},${shade*0.65|0},${shade*0.35|0},${0.25+Math.random()*0.35})`;
+      ctx.lineWidth = 0.5 + Math.random() * 1.2;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (Math.random()-0.5)*4, y + len); ctx.stroke();
+    }
+    // Occasional knots
+    for (let i = 0; i < 14; i++) {
+      const x = Math.random() * HW_RES_W;
+      const y = Math.random() * HW_RES_H;
+      const r = 3 + Math.random() * 6;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, 'rgba(50,25,10,0.8)');
+      g.addColorStop(1, 'rgba(80,45,20,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
+    }
+    // Plank seams — dark lines every 1/4 of the canvas (=> 4 planks across)
+    ctx.fillStyle = 'rgba(20,10,0,0.9)';
+    for (let k = 1; k < 4; k++) {
+      const sx = (HW_RES_W / 4) * k;
+      ctx.fillRect(sx - 0.6, 0, 1.2, HW_RES_H);
+    }
+    // Staggered butt joints (across the plank length) — one per plank at a
+    // random Y so adjacent planks don't line up.
+    for (let k = 0; k < 4; k++) {
+      const xStart = (HW_RES_W / 4) * k;
+      const xEnd = (HW_RES_W / 4) * (k + 1);
+      const yJoint = HW_RES_H * (0.25 + Math.random() * 0.5);
+      ctx.fillRect(xStart, yJoint - 0.6, xEnd - xStart, 1.2);
+    }
+    const hwTex = new THREE.CanvasTexture(cvs);
+    hwTex.wrapS = hwTex.wrapT = THREE.RepeatWrapping;
+    // Hallway is 40" wide along X and 240" long along Z. Planks run along Z
+    // so their long axis maps to world Z. Plane is rotated -π/2 around X, so
+    // after rotation the plane's local +X maps to world +X and local +Y maps
+    // to world -Z. Texture U axis = canvas X (HW_RES_W short axis) = across
+    // planks, V axis = canvas Y = along planks.
+    // Width across: 40" / (4 planks × 6" wide) = 40/24 = 1.667 repeats in U.
+    hwTex.repeat.set(40 / (4 * 6), 240 / 60); // 60" plank length per V repeat
+    const hwMat = new THREE.MeshStandardMaterial({map: hwTex, roughness: 0.55, metalness: 0.05});
+    const hwW = 40, hwL = 240;
+    const hwCx = 31; // extCenterX (pre-mirror X)
+    const hwCz = 49 + hwL/2;
+    const hwGeo = new THREE.PlaneGeometry(hwW, hwL);
+    const hw = new THREE.Mesh(hwGeo, hwMat);
+    hw.rotation.x = -Math.PI/2;
+    hw.position.set(hwCx, floorY + 0.05, hwCz);
+    hw.receiveShadow = true;
+    hw._isRoom = true;
+    hw._isFloor = true;
+    hw._isHallway = true;
+    addRoom(hw);
+  }
+
+  // Wood threshold / saddle at the doorway — a warm stained strip at the
+  // transition from carpet (bedroom) to hardwood (hallway). Sits in the
+  // doorway opening (X = doorLeft..doorRight pre-mirror) and fits the full
+  // depth of the doorway jamb so you can see it from both sides.
+  {
+    const thrMat = new THREE.MeshStandardMaterial({
+      color: 0x6b4226, roughness: 0.5, metalness: 0.05,
+    });
+    const thrW = doorW - 0.5;  // slightly narrower than the opening
+    const thrD = 4;            // 4" deep saddle
+    const thrH = 0.4;          // sits proud of the carpet
+    const thrZ = 49 + 0.5;      // just inside the hallway past the wall
+    const thr = roomBox(thrW, thrH, thrD, 0x6b4226,
+      doorCenterX, floorY + thrH/2, thrZ, 0, 0, 0);
+    thr._isHallway = true;
+    void thrMat; // material created inline via roomBox; keep linter quiet
   }
 
   // Ceiling for the hallway — flat panel at the same height as the room ceiling
@@ -1203,15 +1277,102 @@ export function createRoom(scene) {
     const topOfBox = floorY + boxH;
     const feederX = boxCenterX + 6; // shifted toward closet side
 
-    // Main body — white rounded cylinder
-    const bodyR = 4.2, bodyH = 8;
+    // Main body — white rounded cylinder with an actual cutout for the
+    // food chute. Built as three stacked pieces so the middle section can
+    // have an arc-gap (thetaLength < 2π) carved out of it:
+    //
+    //   top ring   — full 360°, above the chute
+    //   mid ring   — 360° minus chuteArc, centered on the front (+Z)
+    //   bottom ring — full 360°, below the chute
+    //
+    // The gap geometry is wrapped by a dark interior so you see *into*
+    // the opening rather than at the transparent back of the cylinder.
+    const bodyR = 4.2;       // top radius
+    const bodyBotR = bodyR + 0.3; // bottom radius (taper)
+    const bodyH = 8;
     const bodyY = topOfBox + bodyH / 2;
     const bodyMat = new THREE.MeshStandardMaterial({color:0xf0f0f0, roughness:0.35, metalness:0.05});
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(bodyR, bodyR+0.3, bodyH, 32), bodyMat);
-    body.position.set(feederX, bodyY, feederZ);
-    body.castShadow = true; body.receiveShadow = true;
-    body._isFoodBowl = true;
-    addRoom(body);
+
+    // Chute geometry — defined here because the body sections depend on it
+    const chuteW = 3.2;
+    const chuteH = 1.8;
+    const midR = (bodyR + bodyBotR) / 2;
+    const chuteArc = chuteW / midR; // radians
+    const trayTopY = topOfBox + 1.6;
+    const chuteY = trayTopY + 0.15 + chuteH / 2;
+    const chuteBotY = chuteY - chuteH / 2;
+    const chuteTopY = chuteY + chuteH / 2;
+    const bodyRAt = y => {
+      const t = (y - topOfBox) / bodyH; // 0=bottom, 1=top
+      return bodyBotR + (bodyR - bodyBotR) * t;
+    };
+    const rAtChuteTop = bodyRAt(chuteTopY);
+    const rAtChuteBot = bodyRAt(chuteBotY);
+
+    // ── Body piece 1: below the chute (full 360°) ──
+    const lowerH = chuteBotY - topOfBox;
+    const lowerGeo = new THREE.CylinderGeometry(rAtChuteBot, bodyBotR, lowerH, 32);
+    const lowerBody = new THREE.Mesh(lowerGeo, bodyMat);
+    lowerBody.position.set(feederX, topOfBox + lowerH / 2, feederZ);
+    lowerBody.castShadow = true; lowerBody.receiveShadow = true;
+    lowerBody._isFoodBowl = true;
+    addRoom(lowerBody);
+
+    // ── Body piece 2: the chute ring (arc with gap at +Z front) ──
+    // Three.js CylinderGeometry: thetaStart=0 points at +X; the +Z front
+    // is at theta=+π/2. We want a gap centered at +π/2 spanning chuteArc.
+    // So the remaining arc starts at π/2 + chuteArc/2 and spans 2π - chuteArc.
+    const midH = chuteTopY - chuteBotY; // = chuteH
+    const midGeo = new THREE.CylinderGeometry(
+      rAtChuteTop, rAtChuteBot, midH, 32, 1, false,
+      Math.PI / 2 + chuteArc / 2, 2 * Math.PI - chuteArc
+    );
+    const midBody = new THREE.Mesh(midGeo, bodyMat);
+    midBody.position.set(feederX, chuteBotY + midH / 2, feederZ);
+    midBody.castShadow = true; midBody.receiveShadow = true;
+    midBody._isFoodBowl = true;
+    addRoom(midBody);
+
+    // ── Body piece 3: above the chute (full 360°) ──
+    const upperH = (topOfBox + bodyH) - chuteTopY;
+    const upperGeo = new THREE.CylinderGeometry(bodyR, rAtChuteTop, upperH, 32);
+    const upperBody = new THREE.Mesh(upperGeo, bodyMat);
+    upperBody.position.set(feederX, chuteTopY + upperH / 2, feederZ);
+    upperBody.castShadow = true; upperBody.receiveShadow = true;
+    upperBody._isFoodBowl = true;
+    addRoom(upperBody);
+
+    // ── Chute interior — a dark curved backing wall *inside* the gap so
+    // looking at the opening you see recessed darkness, not empty space. ──
+    const chuteDarkMat = new THREE.MeshStandardMaterial({
+      color:0x080808, roughness:0.95, metalness:0.0, side: THREE.DoubleSide
+    });
+    // Smaller-radius arc that mirrors the gap, sitting behind the opening
+    const interiorR = rAtChuteBot - 0.6;
+    const interiorGeo = new THREE.CylinderGeometry(
+      interiorR, interiorR, chuteH + 0.1, 24, 1, true,
+      Math.PI / 2 - chuteArc / 2, chuteArc
+    );
+    const chuteInterior = new THREE.Mesh(interiorGeo, chuteDarkMat);
+    chuteInterior.position.set(feederX, chuteY, feederZ);
+    chuteInterior._isFoodBowl = true;
+    addRoom(chuteInterior);
+    // Dark top cap of the opening — the overhang the food drops from
+    const overhangGeo = new THREE.RingGeometry(interiorR - 0.05, rAtChuteTop, 24, 1,
+      Math.PI / 2 - chuteArc / 2, chuteArc);
+    const chuteOverhang = new THREE.Mesh(overhangGeo, chuteDarkMat);
+    chuteOverhang.rotation.x = Math.PI / 2;
+    chuteOverhang.position.set(feederX, chuteTopY - 0.01, feederZ);
+    chuteOverhang._isFoodBowl = true;
+    addRoom(chuteOverhang);
+    // Dark bottom cap of the opening
+    const floorGeo = new THREE.RingGeometry(interiorR - 0.05, rAtChuteBot, 24, 1,
+      Math.PI / 2 - chuteArc / 2, chuteArc);
+    const chuteFloor = new THREE.Mesh(floorGeo, chuteDarkMat);
+    chuteFloor.rotation.x = -Math.PI / 2;
+    chuteFloor.position.set(feederX, chuteBotY + 0.01, feederZ);
+    chuteFloor._isFoodBowl = true;
+    addRoom(chuteFloor);
 
     // Hopper — smoked translucent cylinder. Color is dark gray (not brown);
     // the kibble inside tints the overall look warm.
@@ -1348,63 +1509,9 @@ export function createRoom(scene) {
     brandArea._isFoodBowl = true;
     addRoom(brandArea);
 
-    // Food chute — dark cutout on the front of the feeder body just above
-    // the tray. Built as a curved arc sitting slightly proud of the body
-    // (with matching taper) so it reads as a recessed dispensing slot
-    // rather than a decal. Rounded corners via a tall+short pair.
-    //
-    // No bezel/frame — the flat dark arc against the white body is the
-    // contrast that sells the "cutout" read. A taller bezel was previously
-    // showing as "two white dots" above/below the slot.
-    const chuteW = 3.2;     // arc width along cylinder
-    const chuteH = 1.8;     // vertical height
-    const midR = (bodyR + (bodyR + 0.3)) / 2;
-    const chuteArc = chuteW / midR;
-    const trayTopY = topOfBox + 1.6;
-    const chuteY = trayTopY + 0.15 + chuteH / 2;
-    // Deep black with a hint of emissive so even in shadow the cutout
-    // reads darker than any lit surface behind it.
-    const chuteMat = new THREE.MeshStandardMaterial({
-      color:0x050505, roughness:0.95, metalness:0.0,
-      emissive:0x000000
-    });
-
-    // Body radius at chute's top and bottom Y (linear taper on body)
-    const bodyBotR = bodyR + 0.3;
-    const chuteBotY = chuteY - chuteH / 2;
-    const chuteTopY = chuteY + chuteH / 2;
-    const bodyRAt = y => {
-      const t = (y - topOfBox) / bodyH; // 0 at bottom, 1 at top of body
-      return bodyBotR + (bodyR - bodyBotR) * t;
-    };
-    const bodyRChuteTop = bodyRAt(chuteTopY);
-    const bodyRChuteBot = bodyRAt(chuteBotY);
-
-    // Dark chute arc — sits 0.06 proud of the body surface, matching taper
-    const chuteGeo = new THREE.CylinderGeometry(
-      bodyRChuteTop + 0.06, bodyRChuteBot + 0.06, chuteH, 32, 1, true,
-      -chuteArc / 2, chuteArc
-    );
-    const chute = new THREE.Mesh(chuteGeo, chuteMat);
-    chute.position.set(feederX, chuteY, feederZ);
-    chute._isFoodBowl = true;
-    addRoom(chute);
-
-    // Shadow lip above the chute — thin dark strip suggesting the
-    // overhang where food dispenses, reinforcing the "cutout" read.
-    const lipH = 0.12;
-    const lipY = chuteTopY - lipH / 2 + 0.02;
-    const bodyRLipTop = bodyRAt(lipY + lipH / 2);
-    const bodyRLipBot = bodyRAt(lipY - lipH / 2);
-    const lipGeo = new THREE.CylinderGeometry(
-      bodyRLipTop + 0.08, bodyRLipBot + 0.08, lipH, 32, 1, true,
-      -chuteArc / 2, chuteArc
-    );
-    const chuteLip = new THREE.Mesh(lipGeo,
-      new THREE.MeshStandardMaterial({color:0x000000, roughness:1.0, metalness:0.0}));
-    chuteLip.position.set(feederX, lipY, feederZ);
-    chuteLip._isFoodBowl = true;
-    addRoom(chuteLip);
+    // (Chute cutout is built up-front with the body — the body is three
+    // stacked pieces with an arc-gap in the middle section, backed by a
+    // dark interior. No separate overlay needed here.)
 
     // Food tray — rounded rectangle with very rounded edges, bowl in the middle,
     // embedded into the feeder body (~2.5" overlap)
@@ -1888,9 +1995,10 @@ export function createRoom(scene) {
   // Top
   const wft=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT, winW+frameT*2), frameMat);
   wft.position.set(trimX, winTop+frameT/2, winCenterZ); wft._isRoom=true; wft._isWindow=true; addRoom(wft);
-  // Bottom
+  // Bottom (apron) — sits BELOW the sill so it doesn't z-fight with it.
+  // Sill spans Y=[winBottom-0.5, winBottom]; place apron top flush with sill bottom.
   const wfb=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT, winW+frameT*2), frameMat);
-  wfb.position.set(trimX, winBottom-frameT/2, winCenterZ); wfb._isRoom=true; wfb._isWindow=true; addRoom(wfb);
+  wfb.position.set(trimX, winBottom-0.5-frameT/2, winCenterZ); wfb._isRoom=true; wfb._isWindow=true; addRoom(wfb);
   // Left (toward outside)
   const wfl=new THREE.Mesh(new THREE.BoxGeometry(frameD, winH, frameT), frameMat);
   wfl.position.set(trimX, winCenterY, winFront-frameT/2); wfl._isRoom=true; wfl._isWindow=true; addRoom(wfl);
