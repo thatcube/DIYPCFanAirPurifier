@@ -736,8 +736,10 @@ export function createRoom(scene) {
   const extCenterX=extLeft+extrusionW/2; // 31
   const recessZ=49-recessDepth; // front face of extrusion at Z=19
 
-  // Front face of extrusion — has the door opening
-  const doorW=32, doorH=80;
+  // Front face of extrusion — has the door opening. doorH=68 leaves a ~12"
+  // header between the top of the door and the 80" ceiling (real standard
+  // doors are 80" tall under a 96"+ ceiling; scaled to fit this 80" room).
+  const doorW=32, doorH=68;
   const doorCenterX=extCenterX;
   const doorLeft=doorCenterX-doorW/2;
   const doorRight=doorCenterX+doorW/2;
@@ -915,7 +917,7 @@ export function createRoom(scene) {
   const _hallCeilColor = 0xe0ddd6;
   const _hallDoorCenterZ = _hallZStart + 72; // 6 ft into the hallway
   const _hallDoorW = 32;
-  const _hallDoorH = 80;
+  const _hallDoorH = 68;
   const _hallBbColor = 0xc0bbb4;
 
   // Hardwood plank floor — 6" wide planks running along the hallway length
