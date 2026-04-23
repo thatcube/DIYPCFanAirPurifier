@@ -811,17 +811,23 @@ export function createRoom(scene) {
 
   // Door panel — hinged so it can swing open from the handle click. Uses the
   // shared `buildDoorLeaf` asset so every door in the scene matches.
+  // Hinge is on the pre-mirror +X edge of the doorway (post-mirror: the
+  // closet-side edge, i.e. the side FURTHER from the nightstand). Panel
+  // extends from the pivot in pre-mirror -X so after the _isRoom X-mirror
+  // pass it extends in +X from the pivot toward the nightstand. With that
+  // geometry, a positive rotation.y swings the free edge toward -Z → the
+  // door opens INTO the room.
   const doorPanelZ=recessZ-doorThick/2;
   const doorPanelW=doorW-1;
   const doorPanelH=doorH-0.5;
   const cornerDoorPivot=new THREE.Group();
-  cornerDoorPivot.position.set(doorCenterX-doorPanelW/2, floorY+doorH/2, doorPanelZ);
+  cornerDoorPivot.position.set(doorCenterX+doorPanelW/2, floorY+doorH/2, doorPanelZ);
   cornerDoorPivot._isRoom=true;
   addRoom(cornerDoorPivot);
 
   const doorPanel=buildDoorLeaf({ width:doorPanelW, height:doorPanelH, thickness:doorThick,
                                   color:doorColor });
-  doorPanel.position.set(doorPanelW/2, 0, 0);
+  doorPanel.position.set(-doorPanelW/2, 0, 0);
   tagAll(doorPanel, { _isRoom:true, _isCornerDoor:true });
   // Slab is the canonical center mesh used by game-fp.js for OBB collision.
   doorPanel.userData.doorLeaf.slab.castShadow = true;
@@ -830,7 +836,9 @@ export function createRoom(scene) {
 
   // Knobs on both faces (front = into room at -Z, back = into hallway at +Z).
   const knobY = 36 - doorH/2; // door-local Y of the knob
-  const knobX = doorPanelW/2 + doorW*0.35;
+  // Knob sits near the free edge. Pre-mirror X is negative so the mirror
+  // pass flips it to match the panel's post-mirror +X extension.
+  const knobX = -(doorPanelW/2 + doorW*0.35);
   const knobFront = buildDoorKnob();
   knobFront.position.set(knobX, knobY, -doorThick/2);
   tagAll(knobFront, { _isRoom:true, _isCornerDoorHandle:true });
