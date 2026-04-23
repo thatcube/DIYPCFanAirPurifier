@@ -949,17 +949,45 @@ export function createRoom(scene) {
     innerBowl._isFoodBowl = true;
     addRoom(innerBowl);
 
-    // Invisible hitbox covering the entire feeder assembly — guarantees
-    // consistent hover pointer and click detection from every angle.
-    const hitboxW = boxW, hitboxD = boxD + trayD;
-    const hitboxH = bodyH + hopperH + 2; // body + hopper + lid
-    const hitboxY = topOfBox + hitboxH / 2;
-    const hitboxZ = feederZ + (trayD - embedDepth) / 2;
-    const hitboxMat = new THREE.MeshBasicMaterial({visible: false});
-    const hitbox = new THREE.Mesh(new THREE.BoxGeometry(hitboxW, hitboxH, hitboxD), hitboxMat);
-    hitbox.position.set(feederX, hitboxY, hitboxZ);
-    hitbox._isFoodBowl = true;
-    addRoom(hitbox);
+    // Invisible hitboxes — tight-fitting to the feeder silhouette so the
+    // hover pointer matches the visible shape (not a giant invisible cube).
+    // Uses transparent opacity:0 instead of material.visible=false — this is
+    // the canonical Three.js pattern for raycast-only meshes. (`visible:false`
+    // on the material can cause some pipelines to skip the mesh entirely; an
+    // opacity-0 mesh always raycasts while rendering nothing.)
+    const hbMat = new THREE.MeshBasicMaterial({
+      transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide
+    });
+
+    // 1) Shoe box base (slight padding for forgiving hover at edges)
+    const hbBase = new THREE.Mesh(
+      new THREE.BoxGeometry(boxW + 1, boxH + 0.4, boxD + 1),
+      hbMat
+    );
+    hbBase.position.set(boxCenterX, boxY, feederZ);
+    hbBase._isFoodBowl = true;
+    addRoom(hbBase);
+
+    // 2) Feeder tower — cylinder covering body + hopper + lid + knob
+    const towerH = bodyH + hopperH + 1.6; // body + hopper + lid+knob headroom
+    const towerR = Math.max(bodyR, hopperR) + 0.3;
+    const hbTower = new THREE.Mesh(
+      new THREE.CylinderGeometry(towerR, towerR + 0.2, towerH, 16),
+      hbMat
+    );
+    hbTower.position.set(feederX, topOfBox + towerH / 2, feederZ);
+    hbTower._isFoodBowl = true;
+    addRoom(hbTower);
+
+    // 3) Front tray + bowl area (tight box covering the dish)
+    const hbTrayH = trayH + ibDepth + 0.4; // tray + bowl rim height
+    const hbTray = new THREE.Mesh(
+      new THREE.BoxGeometry(trayW + 0.5, hbTrayH, trayD + 0.5),
+      hbMat
+    );
+    hbTray.position.set(feederX, topOfBox + hbTrayH / 2, trayZ);
+    hbTray._isFoodBowl = true;
+    addRoom(hbTray);
 
     // Food kibble — hidden by default, toggled on click.
     // Each kibble is a regular _isRoom mesh so it goes through the mirror pass
