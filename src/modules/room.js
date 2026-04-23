@@ -1289,39 +1289,42 @@ export function createRoom(scene) {
 
     // Food chute — dark dispensing slot on the front of the feeder body,
     // sitting just above the food tray's top surface. Built as a curved
-    // cylindrical arc so it hugs the body (a flat box would Z-fight with
-    // the curved surface and create the "blocked" look).
-    //
-    // NOTE: tray top is at topOfBox + trayH; chute must sit above that so
-    // it's actually visible (previously half the chute was buried inside
-    // the tray).
-    const chuteW = 3.0;     // arc width along cylinder
+    // cylindrical arc matching the body's taper so it hugs the surface
+    // cleanly (the body tapers from R=4.2 top to R=4.5 bottom, so a
+    // fixed-radius arc would be buried inside the body near the bottom).
+    const chuteW = 3.0;     // arc width along cylinder (roughly, at mid-R)
     const chuteH = 1.6;     // vertical height
-    const chuteArc = chuteW / bodyR; // radians of arc this width covers
-    // Chute bottom just above the tray's top surface (trayH ~1.6 above box)
-    // — tray top ≈ topOfBox + 1.6, leave a 0.2 gap
+    const midR = (bodyR + (bodyR + 0.3)) / 2; // ≈4.35 for arc-width calc
+    const chuteArc = chuteW / midR;
     const trayTopY = topOfBox + 1.6;
     const chuteY = trayTopY + 0.2 + chuteH / 2;
     const chuteMat = new THREE.MeshStandardMaterial({color:0x1a1a1a, roughness:0.9, metalness:0.0});
 
-    // Bezel (white arc panel sitting on the body surface, slightly larger)
-    const frameArc = chuteArc + 0.1;
-    const frameH = chuteH + 0.3;
-    const frameR = bodyR + 0.04;
+    // Body radius at chute's top and bottom Y (linear taper on body)
+    const bodyBotR = bodyR + 0.3;
+    const chuteBotY = chuteY - chuteH / 2;
+    const chuteTopY = chuteY + chuteH / 2;
+    const bodyRAt = y => {
+      const t = (y - topOfBox) / bodyH; // 0 at bottom, 1 at top of body
+      return bodyBotR + (bodyR - bodyBotR) * t;
+    };
+    const bodyRChuteTop = bodyRAt(chuteTopY);
+    const bodyRChuteBot = bodyRAt(chuteBotY);
+
+    // Bezel: sits 0.04 proud of the body surface, matching its taper
     const frameGeo = new THREE.CylinderGeometry(
-      frameR, frameR, frameH, 24, 1, true,
-      -frameArc / 2, frameArc
+      bodyRChuteTop + 0.04, bodyRChuteBot + 0.04, chuteH, 24, 1, true,
+      -(chuteArc + 0.1) / 2, chuteArc + 0.1
     );
     const frame = new THREE.Mesh(frameGeo, bodyMat);
     frame.position.set(feederX, chuteY, feederZ);
     frame._isFoodBowl = true;
     addRoom(frame);
 
-    // Dark chute panel (slightly in front of the bezel so bezel shows as
-    // a thin border around the dark dispensing slot)
-    const chuteR = bodyR + 0.08;
+    // Dark chute panel: 0.05 further out than the bezel so the bezel
+    // reads as a thin light border around the dark slot
     const chuteGeo = new THREE.CylinderGeometry(
-      chuteR, chuteR, chuteH, 24, 1, true,
+      bodyRChuteTop + 0.09, bodyRChuteBot + 0.09, chuteH, 24, 1, true,
       -chuteArc / 2, chuteArc
     );
     const chute = new THREE.Mesh(chuteGeo, chuteMat);
