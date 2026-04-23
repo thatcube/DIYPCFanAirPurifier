@@ -59,12 +59,15 @@ function buildDoorLeaf({ width, height, thickness,
   ];
 
   // Uniform border around every raised panel: `border` wide on all four
-  // sides between the panel and the surrounding rail/stile/mullion.
+  // sides between the panel and the surrounding rail/stile/mullion. The
+  // center mullion is its own strip with `border` of slab visible on each
+  // side (so the inner edge of each panel has the same gap as the outer
+  // edge against the stile).
   const innerW     = width - stileW * 2;
   const border     = Math.max(0.4, Math.min(stileW * 0.35, 1.2));
-  const mullionGap = border * 2; // gap between the two columns
-  const colW       = (innerW - mullionGap - border * 2) / 2;
-  const colCx      = mullionGap / 2 + colW / 2; // center of each panel column
+  const mullionW   = border * 2;
+  const colW       = (innerW - mullionW - border * 4) / 2;
+  const colCx      = mullionW / 2 + border + colW / 2;
   const panelT     = frameD * 0.7; // thinner than frame → sits recessed
 
   // Base slab — darker recess visible around the raised panels.
@@ -82,10 +85,10 @@ function buildDoorLeaf({ width, height, thickness,
       stile.receiveShadow = true;
       group.add(stile);
     }
-    // Central mullion — single vertical piece running the full inner height.
-    // Matching width to the border*2 gap keeps proportions consistent.
+    // Central mullion — thin vertical strip with `border` of slab on each
+    // side so the panels' inner edges have the same gap as their outer.
     const mullion = new THREE.Mesh(
-      new THREE.BoxGeometry(mullionGap, height, frameD), frameMat);
+      new THREE.BoxGeometry(mullionW, height, frameD), frameMat);
     mullion.position.set(0, 0, fz);
     mullion.receiveShadow = true;
     group.add(mullion);
