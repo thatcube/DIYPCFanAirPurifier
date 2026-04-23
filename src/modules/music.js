@@ -12,6 +12,7 @@
 export const PLAYLIST = [
   { kind: 'audio', name: 'Octodad Theme',        src: 'assets/songs/Octodad (Nobody Suspects a Thing).mp3',        volume: 0.28 },
   { kind: 'audio', name: 'Escape from the City', src: 'assets/songs/Escape From The City ... for City Escape.mp3', volume: 0.28 },
+  { kind: 'audio', name: 'Warthog Run',          src: 'assets/songs/H3 Warthog Run OST - Copyright Free.mp3',      volume: 0.28 },
 ];
 
 // ── State ───────────────────────────────────────────────────────────
