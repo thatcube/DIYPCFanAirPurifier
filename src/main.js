@@ -25,7 +25,7 @@ import * as gameFp from './modules/game-fp.js';
 import * as wallFade from './modules/wall-fade.js';
 import { createRoom } from './modules/room.js';
 import { createPurifier } from './modules/purifier.js';
-import { initInteractions, coinBump } from './modules/ui-interactions.js';
+import { initInteractions, coinBump, secretCoinBump } from './modules/ui-interactions.js';
 import { initGlassShine } from './modules/glass-shine.js';
 import { initPreviews, recolorClassicPreview, flushPreviewsOnOpen } from './modules/cat-preview.js';
 import { initToggleSwitches, initSegButtons, initDecorativeIcons, initClickableDivs, trapFocus, saveFocus } from './modules/a11y.js';
@@ -647,13 +647,35 @@ window._setPlacement = (mode) => {
   gameFp.invalidatePurifierCollision();
 };
 
-// FPS toggle
+// FPS toggle — persisted, default off. Keeps Control Center and Pause menu
+// toggles (plus the inline HUD readout) in sync.
+const FPS_VIS_KEY = 'diy_air_purifier_show_fps_v1';
+let _fpsVisible = false;
+try { _fpsVisible = localStorage.getItem(FPS_VIS_KEY) === '1'; } catch (e) {}
+
+function _applyFpsVisibility() {
+  const fpsEl = document.getElementById('fpsInline');
+  const togCc = document.getElementById('togFps');
+  const togPause = document.getElementById('fpPauseShowFps');
+  const stPause = document.getElementById('fpPauseShowFpsState');
+  if (fpsEl) fpsEl.hidden = !_fpsVisible;
+  if (togCc) togCc.classList.toggle('on', _fpsVisible);
+  if (togPause) {
+    togPause.classList.toggle('on', _fpsVisible);
+    togPause.setAttribute('aria-checked', String(_fpsVisible));
+  }
+  if (stPause) {
+    stPause.textContent = _fpsVisible ? 'On' : 'Off';
+    stPause.classList.toggle('off', !_fpsVisible);
+  }
+}
+
 window._toggleFps = () => {
-  const fpsEl = document.getElementById('fps');
-  const tog = document.getElementById('togFps');
-  if (fpsEl) fpsEl.style.display = fpsEl.style.display === 'none' ? '' : 'none';
-  if (tog) tog.classList.toggle('on');
+  _fpsVisible = !_fpsVisible;
+  try { localStorage.setItem(FPS_VIS_KEY, _fpsVisible ? '1' : '0'); } catch (e) {}
+  _applyFpsVisibility();
 };
+_applyFpsVisibility();
 
 window._toggleQuickCoin = () => {
   const next = !coins.isQuickCoinMode();
@@ -813,7 +835,7 @@ let _lastCoinDomUpdate = 0;
 
 // Cached DOM refs for per-frame updates
 const _elRunTimer = document.getElementById('runTimerText');
-const _elFps = document.getElementById('fps');
+const _elFps = document.getElementById('fpsInline');
 const _elPauseOv = document.getElementById('fpPauseOverlay');
 
 function animate(ts) {
@@ -846,8 +868,10 @@ function animate(ts) {
   // Coins (spin/bob/pickup) — only active in game mode
   if (gameFp.fpMode) {
     const prevScore = coins.coinScore;
+    const prevSecret = coins.coinSecretScore;
     coins.updateCoins(ts, gameFp.fpPos);
     if (coins.coinScore > prevScore) coinBump();
+    if (coins.coinSecretScore > prevSecret) secretCoinBump();
     // MacBook music proximity volume (full within ~2 ft, steep falloff beyond)
     if (roomRefs && typeof roomRefs.updateMacbookProximity === 'function') {
       roomRefs.updateMacbookProximity(gameFp.fpPos);
@@ -1038,8 +1062,7 @@ function animate(ts) {
   const fpsNow = performance.now();
   if (fpsNow - _fpsLast >= 1000) {
     const ms = (fpsNow - _fpsLast) / _fpsFrames;
-    const ri = renderer.info.render;
-    if (_elFps) _elFps.textContent = _fpsFrames + 'fps ' + ms.toFixed(1) + 'ms | ' + ri.calls + 'dc ' + ri.triangles + 'tri';
+    if (_elFps) _elFps.textContent = _fpsFrames + ' fps · ' + ms.toFixed(1) + ' ms';
     _fpsFrames = 0;
     _fpsLast = fpsNow;
   }

@@ -91,6 +91,17 @@ export function coinBump() {
 }
 
 /**
+ * Secret coin bump — flashier pulse + cyan glow on the whole coin pill,
+ * and a pop-in animation on the secret chip itself.
+ */
+export function secretCoinBump() {
+  const hud = document.getElementById('coinHud');
+  if (hud) animateClass(hud, 'secret-bump', 700);
+  const chip = document.getElementById('secretCoinHud');
+  if (chip) animateClass(chip, 'pop', 500);
+}
+
+/**
  * Wire all interactive elements with passive bounce effects.
  * Call once after DOM is ready.
  */
