@@ -269,55 +269,6 @@ import {
   CEIL_LIGHT_X, CEIL_LIGHT_Z, getFloorY, getCeilingY, getWinCenterY, WIN_W, WIN_H, WIN_CENTER_Z
 } from './spatial.js';
 
-function _randomRange(min, max) {
-  return min + (Math.random() * (max - min));
-}
-
-function _sampleHighJumpCoinPositions() {
-  const ceilingY = getCeilingY();
-  const points = [];
-  const minX = -44;
-  const maxX = 74;
-  const minZ = -70;
-  const maxZ = 43;
-  const minSeparation = 16;
-
-  for (let tries = 0; tries < 120 && points.length < 3; tries++) {
-    const x = CEIL_LIGHT_X + _randomRange(-34, 34);
-    const z = CEIL_LIGHT_Z + _randomRange(-28, 28);
-    const y = ceilingY - _randomRange(8, 16);
-    if (x < minX || x > maxX || z < minZ || z > maxZ) continue;
-
-    let clear = true;
-    for (const p of points) {
-      if (Math.hypot(p.x - x, p.z - z) < minSeparation) {
-        clear = false;
-        break;
-      }
-    }
-    if (!clear) continue;
-    points.push(new THREE.Vector3(x, y, z));
-  }
-
-  while (points.length < 3) {
-    const i = points.length;
-    points.push(new THREE.Vector3(CEIL_LIGHT_X + (i - 1) * 14, ceilingY - 12, CEIL_LIGHT_Z + (i - 1) * 8));
-  }
-  return points;
-}
-
-function _reshuffleHighJumpCoins() {
-  const highCoins = coins.filter(c => !c.secret && c.highJump);
-  if (!highCoins.length) return;
-  const points = _sampleHighJumpCoinPositions();
-  for (let i = 0; i < highCoins.length; i++) {
-    const c = highCoins[i];
-    const p = points[Math.min(i, points.length - 1)];
-    c.basePos.copy(p);
-    c.mesh.position.copy(p);
-  }
-}
-
 export function spawnRoomCoins(roomRefs) {
   if (!_coinGroup) return;
   const fy = getFloorY();
@@ -336,7 +287,15 @@ export function spawnRoomCoins(roomRefs) {
   const msX_r = SIDE_WALL_X - 18 - msW_r / 2; // 17 pre-mirror → world -17
   const msY_r = fy + 80 - 12 - msH_r / 2;     // = fy + 62.5
   const msZ_r = OPP_WALL_Z + 0.5 + msD_r / 2; // = -73.5
-  const highJumpCoins = _sampleHighJumpCoinPositions();
+  // Console prop world coords (purifier at (45,0,-68) rotated 90° on Y)
+  // Xbox local (0, topY+xbH, 8) → world (45+8, topY+xbH, -68)
+  const purX = 45, purZ = -68;
+  const topY = state.H / 2 + state.ply; // purifier top surface
+  const xbH = 11.85; // Xbox Series X height
+  // Switch game stack: local (0, floorLocal+stackH, -(D/2+ply+gameD/2+8))
+  const floorLocal = -(state.H / 2 + state.ply + state.bunFootH);
+  const gameStackH = 29 * 0.43; // 29 cases × 0.43" each
+  const gameStackZLocal = -(state.D / 2 + state.ply + 4.1 / 2 + 8.0);
 
   // 1. Under the bed
   addCoin(_coinGroup, new THREE.Vector3(-BED_X, fy + bedClearance - 1.8, BED_Z + 4), {});
@@ -352,20 +311,20 @@ export function spawnRoomCoins(roomRefs) {
   addCoin(_coinGroup, new THREE.Vector3(-BED_X, mattY + mattH / 2 + duvetH + 3, mattCenterZ), {});
   // 7. On top of headboard
   addCoin(_coinGroup, new THREE.Vector3(-BED_X, fy + bedClearance + hbH + 2.5, BED_Z + BED_L / 2 - hbThick / 2), {});
-  // 8. High jump coin (random near ceiling light)
-  addCoin(_coinGroup, highJumpCoins[0].clone(), { highJump: true });
-  // 9. High jump coin (random near ceiling light)
-  addCoin(_coinGroup, highJumpCoins[1].clone(), { highJump: true });
+  // 8. On top of switch game stack (world: purX + gameStackZLocal, floorLocal + stackH + 2.5, purZ)
+  addCoin(_coinGroup, new THREE.Vector3(purX + gameStackZLocal, floorLocal + gameStackH + 2.5, purZ), { consoleProp: true });
+  // 9. On top of Xbox Series X (world: purX + 8, topY + xbH + 2.5, purZ)
+  addCoin(_coinGroup, new THREE.Vector3(purX + 8, topY + xbH + 2.5, purZ), { consoleProp: true });
   // 10. On top of mini split
   addCoin(_coinGroup, new THREE.Vector3(-msX_r, msY_r + msH_r / 2 + 2.2, msZ_r), {});
   // 11. On top of TV
   addCoin(_coinGroup, new THREE.Vector3(-tvCenterX, tvCenterY + tvH / 2 + bezel + 2.2, tvZ - tvD / 2 + 1.2), {});
-  // 12. High jump coin (random near ceiling light)
-  addCoin(_coinGroup, highJumpCoins[2].clone(), { highJump: true });
+  // 12. In the corner of the closet (back wall, TV-wall side)
+  addCoin(_coinGroup, new THREE.Vector3(-(SIDE_WALL_X + CLOSET_DEPTH - 3), fy + 3, OPP_WALL_Z + 4), {});
   // 13. On top of lamp shade
   addCoin(_coinGroup, new THREE.Vector3(-(TBL_X + TBL_W / 2 - 6), fy + TBL_H + 28.5, TBL_Z + TBL_D / 2 - 6), {});
-  // 14. Inside the purifier (purifier group is at x=45, z=-68)
-  addCoin(_coinGroup, new THREE.Vector3(45, fy + 8, -68), { insidePurifier: true });
+  // 14. Inside the purifier, floating in the middle (accessible when filter is open)
+  addCoin(_coinGroup, new THREE.Vector3(purX, 0, purZ), { insidePurifier: true });
 
   // 15. Hidden inside a random nightstand drawer (moves with the drawer when opened)
   if (roomRefs && roomRefs.drawers && roomRefs.drawers.length > 0) {
@@ -479,9 +438,11 @@ export function spawnSecretMacbookCoin() {
 
 export function spawnSecretTvCoin() {
   const fy = getFloorY();
-  // Behind the air purifier, near floor level
+  const tvD = 1.0;
+  const tvZ = OPP_WALL_Z + 0.5 + tvD / 2 + 1.1;
+  // Below the TV, centered, floating 6" off the ground
   _spawnSecretIfUntriggered('tv', _coinGroup,
-    new THREE.Vector3(0, fy + 3, 8), {});
+    new THREE.Vector3(-BED_X, fy + 6, tvZ), {});
 }
 
 // ── Full reset for new run ──────────────────────────────────────────
@@ -501,9 +462,6 @@ export function fullReset() {
 
   // Clear secret triggers so they can re-spawn
   for (const k of Object.keys(_secretTriggered)) delete _secretTriggered[k];
-
-  // Re-roll high jump coins each run so they stay varied.
-  _reshuffleHighJumpCoins();
 
   // Un-collect all remaining coins
   for (const c of coins) {

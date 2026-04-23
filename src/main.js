@@ -111,17 +111,10 @@ function _applyFpPerformanceProfile(fpActive) {
     // Aggressive play-mode profile for very high FPS targets.
     const fpDprCap = state.isMobile ? 0.42 : 0.5;
     renderer.setPixelRatio(Math.min(_fpPerfState.prePixelRatio, fpDprCap));
-    // Keep shadows enabled in game mode so the window beam is visible.
-    // Shadow updates are already throttled to 4 Hz in FP mode.
-    // Reduce shadow map resolution in game mode for faster shadow passes.
-    if (lighting.key && lighting.key.shadow) {
-      _fpPerfState.preShadowMapSize = lighting.key.shadow.mapSize.x;
-      lighting.key.shadow.mapSize.set(512, 512);
-      if (lighting.key.shadow.map) {
-        lighting.key.shadow.map.dispose();
-        lighting.key.shadow.map = null;
-      }
-    }
+    // Shadows stay enabled. Shadow throttle is DISABLED in FP mode
+    // (see animate loop) — throttling at 8 Hz while rendering at 200+
+    // FPS causes visible shadow jitter on moving casters. Updating
+    // every frame is the only way to avoid the stepping artifact.
     markShadowsDirty();
     onResize();
     return;
@@ -130,15 +123,6 @@ function _applyFpPerformanceProfile(fpActive) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, _getQualityDprCap()));
   renderer.shadowMap.enabled = _fpPerfState.preShadowEnabled;
   if (lighting.key) lighting.key.castShadow = _fpPerfState.preKeyCastShadow;
-  // Restore shadow map resolution
-  if (lighting.key && lighting.key.shadow && _fpPerfState.preShadowMapSize) {
-    const sz = _fpPerfState.preShadowMapSize;
-    lighting.key.shadow.mapSize.set(sz, sz);
-    if (lighting.key.shadow.map) {
-      lighting.key.shadow.map.dispose();
-      lighting.key.shadow.map = null;
-    }
-  }
   markShadowsDirty();
   onResize();
 }
@@ -322,7 +306,8 @@ purifierRefs.setRoomRefs({
   },
   toggleMacbook: roomRefs.toggleMacbook,
   toggleTV: roomRefs.toggleTV,
-  toggleCornerDoor: roomRefs.toggleCornerDoor
+  toggleCornerDoor: roomRefs.toggleCornerDoor,
+  toggleFoodBowl: roomRefs.toggleFoodBowl
 });
 
 // ── Wire module cross-references ────────────────────────────────────
@@ -784,7 +769,6 @@ document.addEventListener('keyup', e => {
 let _lastFrameTs = 0;
 let _fpsFrames = 0;
 let _fpsLast = performance.now();
-let _lastCatX = null, _lastCatZ = null;
 let _lastCoinDomUpdate = 0;
 
 // Cached DOM refs for per-frame updates
@@ -852,24 +836,22 @@ function animate(ts) {
     const hasWalkClip = !!catAnimation.catWalkAction;
     const hasIdleClip = !!catAnimation.catIdleAction;
 
-    // Keep speed derived from actual travel distance, with blend smoothing and
-    // hysteresis so cat clips don't flicker between idle/walk around thresholds.
-    // IMPORTANT: vel is normalized to per-second (inches/sec) so thresholds are
-    // frame-rate independent. At 60fps vel ≈ 0.30/frame → 18/sec for walk.
-    const prevX = Number.isFinite(_lastCatX) ? _lastCatX : gameFp.fpPos.x;
-    const prevZ = Number.isFinite(_lastCatZ) ? _lastCatZ : gameFp.fpPos.z;
-    const rawDist = gameFp.fpMode
-      ? Math.hypot(gameFp.fpPos.x - prevX, gameFp.fpPos.z - prevZ)
-      : 0;
-    // Convert per-frame distance to per-second speed (frame-rate independent)
-    const vel = dtSec > 0.0001 ? rawDist / dtSec : 0;
+    // Reset catModel to base position BEFORE the mixer runs, so the
+    // mixer's bone world matrix computations see the correct catModel
+    // transform. In Three.js 0.184, mixer.update() reads bone.matrixWorld
+    // which propagates from catModel; resetting AFTER the mixer causes a
+    // one-frame lag between where the bones think they are and where the
+    // mesh actually renders.
+    if (gameFp.fpMode) {
+      catAnimation.resetAndPinGameplayCat();
+    }
+
+    // Use the physics system's velocity directly — it's deterministic and
+    // doesn't depend on frame timing, so it's perfectly stable at any FPS.
+    // gameFp.getHorizSpeed() returns inches/sec from the internal _velX/_velZ.
+    const svel = gameFp.fpMode ? gameFp.getHorizSpeed() : 0;
     const animDt = dtSec * catAnimSpeed;
     const st = catAnimation.catMixer.userData || (catAnimation.catMixer.userData = {});
-    // Smoothed velocity to prevent jitter from frame timing noise
-    if (!Number.isFinite(st._smoothVel)) st._smoothVel = vel;
-    const velSmooth = 1 - Math.exp(-dtSec * 15);
-    st._smoothVel += (vel - st._smoothVel) * velSmooth;
-    const svel = st._smoothVel;
 
     if (!Number.isFinite(st._moveBlend)) st._moveBlend = svel > 2 ? 1 : 0;
     let targetMove = st._moveBlend;
@@ -948,27 +930,19 @@ function animate(ts) {
       if (runBlend > 0.001) catAnimation.applyBababooeyProceduralRun(ts, svel, runBlend);
     }
 
-    // Bababooey idle squish — gentle breathing when standing still
+    // Bababooey idle squish
     if (isBababooey && idleBlend > 0.001) {
       catAnimation.applyBababooeyIdleSquish(ts, idleBlend);
     }
 
-    // Reset position/rotation to base and pin all cats to the ground
-    // each frame (box-based). Must happen AFTER procedural animations
-    // but BEFORE jump deform.
+    // Reset position/rotation to base each frame
     if (gameFp.fpMode) {
-      catAnimation.resetAndPinGameplayCat();
       catAnimation.applyGameplayJumpDeform({
         dtSec,
         vy: gameFp.fpVy,
         holdFrames: gameFp.getJumpHoldFrames(),
         modelKey: catAppearance.catModelKey
       });
-    }
-
-    if (gameFp.fpMode) {
-      _lastCatX = gameFp.fpPos.x;
-      _lastCatZ = gameFp.fpPos.z;
     }
   }
 
@@ -986,14 +960,31 @@ function animate(ts) {
     wallFade.update(camera, controls.target);
   }
 
-  // Shadow throttle — update on dirty flag OR periodically
-  // In game mode: ~4 Hz (250ms) for maximum FPS while keeping window beam visible
-  const shadowIntervalMs = gameFp.fpMode ? 250 : SHADOW_UPDATE_INTERVAL_MS;
-  if (renderer.shadowMap.enabled && (_shadowDirtyOneShot || (ts - _lastShadowUpdateTs) >= shadowIntervalMs)) {
-    renderer.shadowMap.needsUpdate = true;
-    _shadowDirtyOneShot = false;
-    _lastShadowUpdateTs = ts;
+  // Shadow throttle — update on dirty flag OR periodically.
+  // In FP (game) mode: update EVERY frame. Throttling at 8 Hz while
+  // rendering at 200+ FPS creates visible stepping/jitter on any
+  // moving shadow caster (fan blades, window beam vs. static geometry,
+  // etc.) — the shadow map shows a version of the scene up to 125 ms
+  // old, so the shadows on walls/floor appear to snap and trail.
+  if (renderer.shadowMap.enabled) {
+    if (gameFp.fpMode) {
+      renderer.shadowMap.needsUpdate = true;
+      _shadowDirtyOneShot = false;
+      _lastShadowUpdateTs = ts;
+    } else if (_shadowDirtyOneShot || (ts - _lastShadowUpdateTs) >= SHADOW_UPDATE_INTERVAL_MS) {
+      renderer.shadowMap.needsUpdate = true;
+      _shadowDirtyOneShot = false;
+      _lastShadowUpdateTs = ts;
+    }
   }
+
+  // HARD GUARANTEE: cat never casts a shadow. Traverse the subtree
+  // every frame and force castShadow=false on every mesh. This catches
+  // anything that might re-enable it (appearance updates, model swaps,
+  // HMR reloads, GLB loader onLoad races, etc.)
+  catAnimation.catGroup.traverse(o => {
+    if (o.isMesh) o.castShadow = false;
+  });
 
   // Render
   renderer.render(scene, camera);

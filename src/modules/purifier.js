@@ -41,6 +41,7 @@ export function createPurifier(scene) {
   let _toggleMacbook = null;
   let _toggleTV = null;
   let _toggleCornerDoor = null;
+  let _toggleFoodBowl = null;
   let _uiSfxAC = null;
 
   function _ensureUiSfxAC() {
@@ -74,6 +75,49 @@ export function createPurifier(scene) {
     osc.connect(gain).connect(ac.destination);
     osc.start(now);
     osc.stop(now + dur + 0.02);
+  }
+
+  // Kibble-pouring sound — short burst of filtered noise to simulate
+  // dry food hitting a metal/plastic bowl
+  function _playFoodPourSfx() {
+    if (_sfxMuted) return;
+    const ac = _ensureUiSfxAC();
+    if (!ac) return;
+    const now = ac.currentTime;
+    const dur = 0.45;
+    // Create noise buffer
+    const bufLen = Math.ceil(ac.sampleRate * dur);
+    const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1);
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    // Band-pass filter to sound like small hard bits hitting a surface
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(3200, now);
+    bp.frequency.exponentialRampToValueAtTime(1800, now + dur);
+    bp.Q.value = 1.2;
+    // Resonant ping to simulate bowl ring
+    const ping = ac.createOscillator();
+    const pingGain = ac.createGain();
+    ping.type = 'sine';
+    ping.frequency.setValueAtTime(1400, now);
+    ping.frequency.exponentialRampToValueAtTime(800, now + dur * 0.8);
+    pingGain.gain.setValueAtTime(0.008, now);
+    pingGain.gain.exponentialRampToValueAtTime(0.0001, now + dur * 0.7);
+    // Envelope for the noise
+    const gain = ac.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(0.018, now + 0.03);
+    gain.gain.setValueAtTime(0.015, now + 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    src.connect(bp).connect(gain).connect(ac.destination);
+    ping.connect(pingGain).connect(ac.destination);
+    src.start(now);
+    src.stop(now + dur + 0.05);
+    ping.start(now);
+    ping.stop(now + dur + 0.05);
   }
 
   // W, H, D, ply, ft declared in header from state
@@ -1729,7 +1773,7 @@ export function createPurifier(scene) {
   function getInteractiveTarget(obj){
     let p=obj;
     while(p){
-      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isCornerDoorHandle||p._isMacbook||p._isWindow||p._isTV) return p;
+      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isCornerDoorHandle||p._isMacbook||p._isWindow||p._isTV||p._isFoodBowl) return p;
       p=p.parent;
     }
     return null;
@@ -1771,8 +1815,10 @@ export function createPurifier(scene) {
       let hoveredPartId=null;
       for(const h of hits){
         if(!isAncestorVisible(h.object)) continue;
-        const target=getInteractiveTarget(h.object);
-        if(target) _hoverInteractive=true;
+        if(!_hoverInteractive){
+          const target=getInteractiveTarget(h.object);
+          if(target) _hoverInteractive=true;
+        }
         if(!hoveredPartId) hoveredPartId=getPartIdFromAncestors(h.object);
         if(_hoverInteractive || hoveredPartId) break;
       }
@@ -2080,6 +2126,14 @@ export function createPurifier(scene) {
     if(obj._isTV){
       if(_toggleTV) _toggleTV();
       if(_fpMode) spawnSecretTvCoin();
+      return;
+    }
+    // Clicked the food bowl → toggle kibble visibility + play kibble-pouring sound
+    if(obj._isFoodBowl){
+      if(_toggleFoodBowl){
+        const nowVisible = _toggleFoodBowl();
+        if(nowVisible) _playFoodPourSfx();
+      }
       return;
     }
   }
@@ -3112,9 +3166,6 @@ export function createPurifier(scene) {
       const spineMap=makeGameSpineTexture(game.title, game.platform);
       const spineMat=new THREE.MeshStandardMaterial({
         map:spineMap,
-        emissiveMap:spineMap,
-        emissive:0xffffff,
-        emissiveIntensity:0.45,
         roughness:0.7,
         metalness:0.0
       });
@@ -3299,8 +3350,28 @@ export function createPurifier(scene) {
   let _rgbTime = 0;
   const _rgbColor = new THREE.Color();
   let currentRGB = 'rainbow'; // 'rainbow', 'custom', 'off'
+  let _lastRgbUpdateTs = 0;
+  const _RGB_UPDATE_INTERVAL = 1000 / 15; // throttle RGB to ~15 Hz
 
-  function update(dtSec, animFrameScale) {
+  // Pre-cache axis keys for rotors (avoid per-frame string/vector checks)
+  function _cacheRotorAxisKeys() {
+    for (const rotor of allRotors) {
+      if (rotor.userData._axisKeyCached) continue;
+      const av = rotor.userData.axis;
+      let axisKey = 'z';
+      if (av && av.isVector3) {
+        if (Math.abs(av.y) > Math.abs(av.x) && Math.abs(av.y) > Math.abs(av.z)) axisKey = 'y';
+        else if (Math.abs(av.x) > Math.abs(av.z)) axisKey = 'x';
+      } else if (typeof av === 'string') {
+        axisKey = av;
+      }
+      rotor.userData._axisKey = axisKey;
+      rotor.userData._axisKeyCached = true;
+    }
+  }
+  _cacheRotorAxisKeys();
+
+  function update(dtSec, animFrameScale, gameMode) {
     // Fan rotor spinning
     const globalTarget = spinning ? SPIN_MAX * (fanSpeedPct / 100) : 0;
     const aFan = 1 - Math.exp(-1.83 * dtSec);
@@ -3310,37 +3381,32 @@ export function createPurifier(scene) {
       rotor.userData.spinSpeed += (target - rotor.userData.spinSpeed) * aFan;
       const spd = rotor.userData.spinSpeed;
       if (Math.abs(spd) > 0.0001) {
-        // axis is a Vector3 — find the dominant component for rotation
-        const av = rotor.userData.axis;
-        let axisKey = 'z';
-        if (av && av.isVector3) {
-          if (Math.abs(av.y) > Math.abs(av.x) && Math.abs(av.y) > Math.abs(av.z)) axisKey = 'y';
-          else if (Math.abs(av.x) > Math.abs(av.z)) axisKey = 'x';
-        } else if (typeof av === 'string') {
-          axisKey = av;
-        }
-        rotor.rotation[axisKey] += spd * animFrameScale;
+        rotor.rotation[rotor.userData._axisKey || 'z'] += spd * animFrameScale;
       }
     }
 
-    // RGB rainbow cycling — hue rotation across all fan blades
-    if (fansRGB && currentRGB === 'rainbow') {
-      _rgbTime += dtSec;
-      const breathe = Math.sin(_rgbTime * 1.2) * 0.5 + 0.5;
-      const hueBase = _rgbTime * 0.06 + breathe * 0.1;
-      let visibleFanIdx = 0;
-      for (let i = 0; i < allBladeMatsPerFan.length; i++) {
-        const rotor = allRotors[i];
-        if (rotor && !isAncestorVisible(rotor)) continue;
-        const blades = allBladeMatsPerFan[i];
-        const fanHueOffset = visibleFanIdx * 0.12;
-        for (let j = 0; j < blades.length; j++) {
-          const bladeHue = (hueBase + fanHueOffset + j * 0.08) % 1;
-          _rgbColor.setHSL(bladeHue, 0.9, 0.55);
-          blades[j].emissive.copy(_rgbColor);
-          blades[j].emissiveIntensity = 0.6 + breathe * 0.3;
+    // RGB rainbow cycling — throttled and skipped in game mode
+    _rgbTime += dtSec;
+    if (fansRGB && currentRGB === 'rainbow' && !gameMode) {
+      const now = performance.now();
+      if (now - _lastRgbUpdateTs >= _RGB_UPDATE_INTERVAL) {
+        _lastRgbUpdateTs = now;
+        const breathe = Math.sin(_rgbTime * 1.2) * 0.5 + 0.5;
+        const hueBase = _rgbTime * 0.06 + breathe * 0.1;
+        let visibleFanIdx = 0;
+        for (let i = 0; i < allBladeMatsPerFan.length; i++) {
+          const rotor = allRotors[i];
+          if (rotor && !isAncestorVisible(rotor)) continue;
+          const blades = allBladeMatsPerFan[i];
+          const fanHueOffset = visibleFanIdx * 0.12;
+          for (let j = 0; j < blades.length; j++) {
+            const bladeHue = (hueBase + fanHueOffset + j * 0.08) % 1;
+            _rgbColor.setHSL(bladeHue, 0.9, 0.55);
+            blades[j].emissive.copy(_rgbColor);
+            blades[j].emissiveIntensity = 0.6 + breathe * 0.3;
+          }
+          visibleFanIdx++;
         }
-        visibleFanIdx++;
       }
     }
 
@@ -3469,6 +3535,7 @@ export function createPurifier(scene) {
     if (refs.toggleMacbook) _toggleMacbook = refs.toggleMacbook;
     if (refs.toggleTV) _toggleTV = refs.toggleTV;
     if (refs.toggleCornerDoor) _toggleCornerDoor = refs.toggleCornerDoor;
+    if (refs.toggleFoodBowl) _toggleFoodBowl = refs.toggleFoodBowl;
   }
 
   // Apply initial wood species (ash) so panels start with correct texture

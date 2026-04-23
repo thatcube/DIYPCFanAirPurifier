@@ -1664,22 +1664,6 @@
 	"dependencies" : 
 	[
 		{
-			"backtrace" : 39,
-			"id" : "__idf___pio_env::@8ed72ffb2edf9d360e6d"
-		},
-		{
-			"backtrace" : 40,
-			"id" : "__idf_esp_driver_gptimer::@b8628cd9d7b32710339f"
-		},
-		{
-			"backtrace" : 44,
-			"id" : "__idf_app_trace::@dd7eb3aa23293586d3b8"
-		},
-		{
-			"backtrace" : 53,
-			"id" : "__idf_esp_driver_spi::@a108b58494cdd93e678c"
-		},
-		{
 			"backtrace" : 55,
 			"id" : "__idf_console::@4311ed8d271cc0ee1422"
 		},
@@ -1774,6 +1758,22 @@
 		{
 			"backtrace" : 10,
 			"id" : "__idf_riscv::@5eeb1a2ca709d020776e"
+		},
+		{
+			"backtrace" : 39,
+			"id" : "__idf___pio_env::@8ed72ffb2edf9d360e6d"
+		},
+		{
+			"backtrace" : 40,
+			"id" : "__idf_esp_driver_gptimer::@b8628cd9d7b32710339f"
+		},
+		{
+			"backtrace" : 44,
+			"id" : "__idf_app_trace::@dd7eb3aa23293586d3b8"
+		},
+		{
+			"backtrace" : 53,
+			"id" : "__idf_esp_driver_spi::@a108b58494cdd93e678c"
 		}
 	],
 	"id" : "air-purifier.elf::@6890427a1f51a3e7e1df",

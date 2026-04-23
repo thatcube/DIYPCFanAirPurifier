@@ -748,6 +748,7 @@ export function createRoom(scene) {
   }
 
   // ─── Cat food feeder on black shoe box (TV wall / closet corner) ────
+  let _foodGroup = null;
   {
     // Placement: between TV wall and closet opening, ~1.5ft from closet wall.
     // Pre-mirror coords: sideWallX=51, oppWallZ=-78, closet edge at Z=-70.
@@ -761,6 +762,7 @@ export function createRoom(scene) {
     const shoeBox = new THREE.Mesh(new THREE.BoxGeometry(boxW, boxH, boxD), boxMat);
     shoeBox.position.set(boxCenterX, boxY, feederZ);
     shoeBox.castShadow = true; shoeBox.receiveShadow = true;
+    shoeBox._isFoodBowl = true;
     addRoom(shoeBox);
 
     // ── WOpet-style automatic cat feeder (offset toward closet = "left" in world) ──
@@ -774,6 +776,7 @@ export function createRoom(scene) {
     const body = new THREE.Mesh(new THREE.CylinderGeometry(bodyR, bodyR+0.3, bodyH, 32), bodyMat);
     body.position.set(feederX, bodyY, feederZ);
     body.castShadow = true; body.receiveShadow = true;
+    body._isFoodBowl = true;
     addRoom(body);
 
     // Hopper — smoked transparent dome/cylinder on top
@@ -786,16 +789,19 @@ export function createRoom(scene) {
     const hopper = new THREE.Mesh(new THREE.CylinderGeometry(hopperR-0.3, hopperR, hopperH, 32), hopperMat);
     hopper.position.set(feederX, hopperY, feederZ);
     hopper.castShadow = true; hopper.receiveShadow = true;
+    hopper._isFoodBowl = true;
     addRoom(hopper);
 
     // Hopper lid — flat disc on top
     const lidMat = new THREE.MeshStandardMaterial({color:0x4a3828, roughness:0.3, metalness:0.05, transparent:true, opacity:0.6});
     const lid = new THREE.Mesh(new THREE.CylinderGeometry(hopperR-0.2, hopperR-0.3, 0.5, 32), lidMat);
     lid.position.set(feederX, hopperY + hopperH/2 + 0.25, feederZ);
+    lid._isFoodBowl = true;
     addRoom(lid);
     // Lid knob
     const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 0.6, 12), new THREE.MeshStandardMaterial({color:0x666666, roughness:0.4, metalness:0.3}));
     knob.position.set(feederX, hopperY + hopperH/2 + 0.8, feederZ);
+    knob._isFoodBowl = true;
     addRoom(knob);
 
     // Kibble visible inside hopper — cluster of small brown spheres
@@ -809,6 +815,7 @@ export function createRoom(scene) {
       const kSize = 0.2 + Math.random() * 0.15;
       const kibble = new THREE.Mesh(new THREE.SphereGeometry(kSize, 5, 4), kibbleMat);
       kibble.position.set(kx, ky, kz);
+      kibble._isFoodBowl = true;
       addRoom(kibble);
     }
 
@@ -819,12 +826,14 @@ export function createRoom(scene) {
     const panelMat = new THREE.MeshStandardMaterial({color:0x111111, roughness:0.3, metalness:0.1});
     const panel = new THREE.Mesh(new THREE.BoxGeometry(panelW, panelH, panelD), panelMat);
     panel.position.set(feederX, panelY, panelZ);
+    panel._isFoodBowl = true;
     addRoom(panel);
 
     // Blue LED status bar on the panel
     const ledBarMat = new THREE.MeshStandardMaterial({color:0x2288ff, emissive:0x2288ff, emissiveIntensity:0.6, roughness:0.2});
     const ledBar = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.35, 0.05), ledBarMat);
     ledBar.position.set(feederX, panelY + 0.5, panelZ + panelD/2 + 0.03);
+    ledBar._isFoodBowl = true;
     addRoom(ledBar);
 
     // Two round buttons below the panel
@@ -833,6 +842,7 @@ export function createRoom(scene) {
       const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.15, 12), btnMat);
       btn.rotation.x = Math.PI / 2;
       btn.position.set(feederX + bi * 1.0, panelY - panelH/2 - 0.7, panelZ + 0.1);
+      btn._isFoodBowl = true;
       addRoom(btn);
     }
 
@@ -840,48 +850,139 @@ export function createRoom(scene) {
     const brandArea = new THREE.Mesh(new THREE.BoxGeometry(3, 0.8, 0.08),
       new THREE.MeshStandardMaterial({color:0xff6633, emissive:0xff6633, emissiveIntensity:0.15, roughness:0.3}));
     brandArea.position.set(feederX, hopperY - 0.5, feederZ + hopperR + 0.05);
+    brandArea._isFoodBowl = true;
     addRoom(brandArea);
 
-    // Food tray — rounded bowl extending from the front base (lathe profile)
-    const trayR = 3.5, trayH = 1.8, trayWallThick = 0.25;
-    const trayZ = feederZ + bodyR + trayR - 0.5;
+    // Food chute — dark opening at front-bottom of feeder body where food
+    // dispenses into the bowl. Sits at the body's front surface.
+    const chuteW = 3.0, chuteH = 2.0, chuteD = 0.6;
+    const chuteZ = feederZ + bodyR - chuteD / 2 + 0.05;
+    const chuteY = topOfBox + chuteH / 2;
+    const chuteMat = new THREE.MeshStandardMaterial({color:0x1a1a1a, roughness:0.9, metalness:0.0});
+    const chute = new THREE.Mesh(new THREE.BoxGeometry(chuteW, chuteH, chuteD), chuteMat);
+    chute.position.set(feederX, chuteY, chuteZ);
+    chute._isFoodBowl = true;
+    addRoom(chute);
+    // Chute surround — thin white frame around the opening
+    const csThick = 0.2;
+    const csTop = new THREE.Mesh(new THREE.BoxGeometry(chuteW + csThick * 2, csThick, chuteD + 0.1), bodyMat);
+    csTop.position.set(feederX, chuteY + chuteH / 2 + csThick / 2, chuteZ + 0.05);
+    csTop._isFoodBowl = true;
+    addRoom(csTop);
+    const csL = new THREE.Mesh(new THREE.BoxGeometry(csThick, chuteH, chuteD + 0.1), bodyMat);
+    csL.position.set(feederX - chuteW / 2 - csThick / 2, chuteY, chuteZ + 0.05);
+    csL._isFoodBowl = true;
+    addRoom(csL);
+    const csR = new THREE.Mesh(new THREE.BoxGeometry(csThick, chuteH, chuteD + 0.1), bodyMat);
+    csR.position.set(feederX + chuteW / 2 + csThick / 2, chuteY, chuteZ + 0.05);
+    csR._isFoodBowl = true;
+    addRoom(csR);
+
+    // Food tray — rounded rectangle with very rounded edges, bowl in the middle,
+    // embedded into the feeder body (~2.5" overlap)
+    const trayW = 8, trayD = 7, trayH = 1.6, trayCornerR = 2.5;
+    const embedDepth = 2.5; // how far back the tray tucks into the body
+    const trayZ = feederZ + bodyR + trayD / 2 + 0.5 - embedDepth;
     const trayMat = new THREE.MeshStandardMaterial({color:0xe0e0e0, roughness:0.4, metalness:0.05});
-    // Outer bowl shape via LatheGeometry
-    const trayPts = [];
-    for (let i = 0; i <= 12; i++) {
-      const t = i / 12;
-      const r = trayR * Math.sin(t * Math.PI / 2);
-      const y = -trayH * (1 - t);
-      trayPts.push(new THREE.Vector2(r, y));
+
+    // Inner bowl dimensions (used for both the hole and the bowl mesh)
+    const ibR = 2.8, ibDepth = 1.1, ibWall = 0.2;
+    // Bowl center is offset forward from tray center to sit in visible area
+    const bowlOffsetZ = 1.5;
+
+    // Rounded rectangle shape for the base tray — with circular hole for bowl
+    const trayShape = new THREE.Shape();
+    const tw2 = trayW / 2, td2 = trayD / 2, cr = Math.min(trayCornerR, tw2, td2);
+    trayShape.moveTo(-tw2 + cr, -td2);
+    trayShape.lineTo(tw2 - cr, -td2);
+    trayShape.quadraticCurveTo(tw2, -td2, tw2, -td2 + cr);
+    trayShape.lineTo(tw2, td2 - cr);
+    trayShape.quadraticCurveTo(tw2, td2, tw2 - cr, td2);
+    trayShape.lineTo(-tw2 + cr, td2);
+    trayShape.quadraticCurveTo(-tw2, td2, -tw2, td2 - cr);
+    trayShape.lineTo(-tw2, -td2 + cr);
+    trayShape.quadraticCurveTo(-tw2, -td2, -tw2 + cr, -td2);
+
+    // Punch a circular hole where the bowl sits
+    // Shape is in local XY space; after rotateX(-PI/2) X stays X, Y becomes Z
+    const holePath = new THREE.Path();
+    const holeSegs = 32;
+    for (let i = 0; i <= holeSegs; i++) {
+      const a = (i / holeSegs) * Math.PI * 2;
+      const hx = Math.cos(a) * (ibR + 0.05);
+      const hy = bowlOffsetZ + Math.sin(a) * (ibR + 0.05);
+      if (i === 0) holePath.moveTo(hx, hy);
+      else holePath.lineTo(hx, hy);
     }
-    // Lip at the top
-    trayPts.push(new THREE.Vector2(trayR + 0.15, 0));
-    trayPts.push(new THREE.Vector2(trayR + 0.15, 0.2));
-    // Inner wall (goes back down)
-    for (let i = 12; i >= 0; i--) {
-      const t = i / 12;
-      const r = (trayR - trayWallThick) * Math.sin(t * Math.PI / 2);
-      const y = -trayH * (1 - t) + trayWallThick * 0.5;
-      trayPts.push(new THREE.Vector2(Math.max(r, 0.01), y));
-    }
-    const trayGeo = new THREE.LatheGeometry(trayPts, 32);
+    trayShape.holes.push(holePath);
+
+    const trayGeo = new THREE.ExtrudeGeometry(trayShape, {
+      depth: trayH, bevelEnabled: true, bevelThickness: 0.15,
+      bevelSize: 0.15, bevelSegments: 4
+    });
+    trayGeo.rotateX(-Math.PI / 2); // lay flat
     const trayMesh = new THREE.Mesh(trayGeo, trayMat);
-    trayMesh.position.set(feederX, topOfBox + trayH, trayZ);
+    trayMesh.position.set(feederX, topOfBox, trayZ);
     trayMesh.castShadow = true; trayMesh.receiveShadow = true;
+    trayMesh._isFoodBowl = true;
     addRoom(trayMesh);
 
-    // Kibble in the tray
-    for (let i = 0; i < 18; i++) {
+    // Inner bowl (hollow, sits in the hole we punched in the tray)
+    const ibMat = new THREE.MeshStandardMaterial({color:0xd8d8d8, roughness:0.35, metalness:0.08, side: THREE.DoubleSide});
+    const ibPts = [
+      new THREE.Vector2(0.01, -ibDepth),
+      new THREE.Vector2(ibR * 0.3, -ibDepth),
+      new THREE.Vector2(ibR * 0.7, -ibDepth + 0.15),
+      new THREE.Vector2(ibR, 0),
+      new THREE.Vector2(ibR + 0.1, 0.05),
+      new THREE.Vector2(ibR + 0.1, 0.12),
+      new THREE.Vector2(ibR - ibWall, 0.12),
+      new THREE.Vector2(ibR - ibWall, 0),
+      new THREE.Vector2((ibR - ibWall) * 0.7, -ibDepth + ibWall + 0.15),
+      new THREE.Vector2((ibR - ibWall) * 0.3, -(ibDepth - ibWall)),
+      new THREE.Vector2(0.01, -(ibDepth - ibWall)),
+    ];
+    const ibGeo = new THREE.LatheGeometry(ibPts, 32);
+    const innerBowl = new THREE.Mesh(ibGeo, ibMat);
+    innerBowl.position.set(feederX, topOfBox + trayH + 0.01, trayZ + bowlOffsetZ);
+    innerBowl.castShadow = true; innerBowl.receiveShadow = true;
+    innerBowl._isFoodBowl = true;
+    addRoom(innerBowl);
+
+    // Invisible hitbox covering the entire feeder assembly — guarantees
+    // consistent hover pointer and click detection from every angle.
+    const hitboxW = boxW, hitboxD = boxD + trayD;
+    const hitboxH = bodyH + hopperH + 2; // body + hopper + lid
+    const hitboxY = topOfBox + hitboxH / 2;
+    const hitboxZ = feederZ + (trayD - embedDepth) / 2;
+    const hitboxMat = new THREE.MeshBasicMaterial({visible: false});
+    const hitbox = new THREE.Mesh(new THREE.BoxGeometry(hitboxW, hitboxH, hitboxD), hitboxMat);
+    hitbox.position.set(feederX, hitboxY, hitboxZ);
+    hitbox._isFoodBowl = true;
+    addRoom(hitbox);
+
+    // Food kibble — hidden by default, toggled on click.
+    // Each kibble is a regular _isRoom mesh so it goes through the mirror pass
+    // and matrix freeze like everything else. No coordinate juggling needed.
+    // bowlCenterZ shifts kibble to center of the visible bowl
+    const bowlCenterZ = trayZ + bowlOffsetZ;
+    const _foodKibbles = [];
+    for (let i = 0; i < 22; i++) {
       const ang = Math.random() * Math.PI * 2;
-      const rad = Math.random() * (trayR - 1.0);
+      const rad = Math.random() * (ibR - 0.5);
       const kx = feederX + Math.cos(ang) * rad;
-      const kz = trayZ + Math.sin(ang) * rad;
-      const ky = topOfBox + trayWallThick + 0.2 + Math.random() * 0.3;
-      const kSize = 0.18 + Math.random() * 0.12;
+      const kz = bowlCenterZ + Math.sin(ang) * rad;
+      // Place kibble inside the bowl depression
+      const ky = topOfBox + trayH + 0.01 + (-ibDepth + ibWall + 0.2 + Math.random() * 0.6);
+      const kSize = 0.22 + Math.random() * 0.15;
       const k = new THREE.Mesh(new THREE.SphereGeometry(kSize, 5, 4), kibbleMat);
       k.position.set(kx, ky, kz);
+      k.visible = false;
+      k._isFoodBowl = true;
       addRoom(k);
+      _foodKibbles.push(k);
     }
+    _foodGroup = _foodKibbles; // store array reference
 
     // ── Stainless steel water bowl (right / window side of box) ──
     const bowlX = boxCenterX - 6; // toward window ("right" in world)
@@ -1430,20 +1531,38 @@ export function createRoom(scene) {
   roomBox(bedW-2*railThick, 1.0, bedL-hbThick-fbThick, 0x3a3a44,
     bedX, slatY, bedZ+(hbThick-fbThick)/2, 0,0,0);
   
-  // Legs — short cylinders at corners (ground clearance = 6.5")
-  const legBedH=bedClearance, legBedR=1.2;
-  for(const [lx,lz] of [
+  // Legs — cylinders at corners reaching from floor to slat platform
+  const legBedH=bedSlatsFromFloor, legBedR=1.2;
+  const legPositions=[
     [bedX-bedW/2+3, bedZ-bedL/2+3],
     [bedX+bedW/2-3, bedZ-bedL/2+3],
     [bedX-bedW/2+3, bedZ+bedL/2-3],
     [bedX+bedW/2-3, bedZ+bedL/2-3],
-  ]){
+  ];
+  for(const [lx,lz] of legPositions){
     const lg=new THREE.CylinderGeometry(legBedR,legBedR,legBedH,12);
     const lm=new THREE.MeshStandardMaterial({color:0x222222,roughness:0.6});
     const lmesh=new THREE.Mesh(lg,lm);
     lmesh.position.set(lx, floorY+legBedH/2, lz);
     lmesh.castShadow=false; lmesh.receiveShadow=true; lmesh._isRoom=true;
     addRoom(lmesh);
+  }
+
+  // Under-bed frame — center rail + cross supports (visible when cat walks under)
+  const bedFrameY=floorY+bedSlatsFromFloor-0.5; // just below slat platform
+  // Center rail running length of bed
+  const centerRailW=2, centerRailH=1.5;
+  const innerL=bedL-hbThick-fbThick;
+  roomBox(centerRailW, centerRailH, innerL, 0x2a2a2a,
+    bedX, bedFrameY-centerRailH/2, bedZ+(hbThick-fbThick)/2, 0,0,0);
+  // Cross supports (4 evenly spaced)
+  const innerW=bedW-2*railThick-2;
+  const crossH=1.2, crossD=2;
+  for(let i=0;i<4;i++){
+    const t=(i+1)/5;
+    const cz=bedZ-innerL/2+innerL*t+(hbThick-fbThick)/2;
+    roomBox(innerW, crossH, crossD, 0x2a2a2a,
+      bedX, bedFrameY-crossH/2, cz, 0,0,0);
   }
   
   // Mattress (approx 60"×80"×10")
@@ -1939,6 +2058,13 @@ export function createRoom(scene) {
     toggleMacbook,
     setMacbookMuted,
     getMacbookScreenMesh: () => _macbookScreen,
-    drawers
+    drawers,
+    toggleFoodBowl: () => {
+      if (!_foodGroup || !_foodGroup.length) return false;
+      const show = !_foodGroup[0].visible;
+      for (const k of _foodGroup) { k.visible = show; k.matrixAutoUpdate = true; k.updateMatrixWorld(true); k.matrixAutoUpdate = false; }
+      return show;
+    },
+    isFoodVisible: () => _foodGroup && _foodGroup.length ? _foodGroup[0].visible : false
   };
 }

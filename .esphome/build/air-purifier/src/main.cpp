@@ -8,6 +8,7 @@ using std::min;
 using std::max;
 #include <new>
 using namespace light;
+using namespace fan;
 static web_server_base::WebServerBase *web_server_base_webserverbase_id;
 static captive_portal::CaptivePortal *captive_portal_captiveportal_id;
 static wifi::WiFiComponent *wifi_wificomponent_id;
@@ -26,6 +27,10 @@ static esp32_rmt_led_strip::ESP32RMTLEDStripLightOutput *esp32_rmt_led_strip_esp
 static light::AddressableLightState *onboard_led;
 static light::PulseLightEffect *light_pulselighteffect_id;
 static light::RandomLightEffect *light_randomlighteffect_id;
+using namespace output;
+static esp32::ESP32InternalGPIOPin *esp32_esp32internalgpiopin_id_2;
+static ledc::LEDCOutput *fan_pwm_output;
+static speed::SpeedFan *purifier_fan;
 static constexpr size_t ESPHOME_LOOPING_COMPONENT_COUNT = \
   (1 * HasLoopOverride<logger::Logger>::value) + \
   (1 * HasLoopOverride<captive_portal::CaptivePortal>::value) + \
@@ -38,7 +43,9 @@ static constexpr size_t ESPHOME_LOOPING_COMPONENT_COUNT = \
   (1 * HasLoopOverride<api::APIServer>::value) + \
   (1 * HasLoopOverride<web_server::WebServer>::value) + \
   (1 * HasLoopOverride<light::AddressableLightState>::value) + \
-  (1 * HasLoopOverride<esp32_rmt_led_strip::ESP32RMTLEDStripLightOutput>::value);
+  (1 * HasLoopOverride<esp32_rmt_led_strip::ESP32RMTLEDStripLightOutput>::value) + \
+  (1 * HasLoopOverride<ledc::LEDCOutput>::value) + \
+  (1 * HasLoopOverride<speed::SpeedFan>::value);
 // ========== AUTO GENERATED INCLUDE BLOCK END ==========="
 
 void setup() {
@@ -78,6 +85,7 @@ void setup() {
   new (&App) Application();
   App.pre_setup("air-purifier", 12, "Air Purifier", 12);
   // light:
+  // fan:
   logger_logger_id->set_component_source(LOG_STR("logger"));
   App.register_component_(logger_logger_id);
   // web_server_base:
@@ -345,6 +353,49 @@ void setup() {
   esp32_rmt_led_strip_esp32rmtledstriplightoutput_id->set_is_wrgb(false);
   esp32_rmt_led_strip_esp32rmtledstriplightoutput_id->set_use_psram(true);
   esp32_rmt_led_strip_esp32rmtledstriplightoutput_id->set_rmt_symbols(96);
+  // output:
+  // output.ledc:
+  //   platform: ledc
+  //   id: fan_pwm_output
+  //   pin:
+  //     number: 4
+  //     mode:
+  //       output: true
+  //       input: false
+  //       open_drain: false
+  //       pullup: false
+  //       pulldown: false
+  //     id: esp32_esp32internalgpiopin_id_2
+  //     inverted: false
+  //     ignore_pin_validation_error: false
+  //     ignore_strapping_warning: false
+  //     drive_strength: 20.0
+  //   frequency: 25000.0
+  //   zero_means_zero: false
+  esp32_esp32internalgpiopin_id_2 = new esp32::ESP32InternalGPIOPin();
+  esp32_esp32internalgpiopin_id_2->set_pin(::GPIO_NUM_4);
+  esp32_esp32internalgpiopin_id_2->set_drive_strength(::GPIO_DRIVE_CAP_2);
+  esp32_esp32internalgpiopin_id_2->set_flags(gpio::Flags::FLAG_OUTPUT);
+  fan_pwm_output = new ledc::LEDCOutput(esp32_esp32internalgpiopin_id_2);
+  fan_pwm_output->set_component_source(LOG_STR("ledc.output"));
+  App.register_component_(fan_pwm_output);
+  fan_pwm_output->set_zero_means_zero(false);
+  fan_pwm_output->set_frequency(25000.0f);
+  // fan.speed:
+  //   platform: speed
+  //   id: purifier_fan
+  //   name: Purifier Fan
+  //   output: fan_pwm_output
+  //   speed_count: 100
+  //   disabled_by_default: false
+  //   restore_mode: ALWAYS_OFF
+  purifier_fan = new speed::SpeedFan(100);
+  App.register_fan(purifier_fan);
+  purifier_fan->set_restore_mode(fan::FanRestoreMode::ALWAYS_OFF);
+  purifier_fan->configure_entity_("Purifier Fan", 3166296975UL, 0);
+  purifier_fan->set_component_source(LOG_STR("speed.fan"));
+  App.register_component_(purifier_fan);
+  purifier_fan->set_output(fan_pwm_output);
   // md5:
   // sha256:
   //   {}
