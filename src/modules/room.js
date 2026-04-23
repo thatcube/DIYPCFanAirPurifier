@@ -1328,12 +1328,15 @@ export function createRoom(scene) {
     ledBar._isFoodBowl = true;
     addRoom(ledBar);
 
-    // Two round buttons below the panel
+    // Two round buttons — placed ON the display panel (bottom edge), like a
+    // real WOpet feeder. Previously placed below the panel where they
+    // landed directly on top of the food chute and read as "two white
+    // dots on a black rectangle".
     const btnMat = new THREE.MeshStandardMaterial({color:0xe8e8e8, roughness:0.3, metalness:0.05});
     for (let bi = -1; bi <= 1; bi += 2) {
-      const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.15, 12), btnMat);
+      const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.12, 12), btnMat);
       btn.rotation.x = Math.PI / 2;
-      btn.position.set(feederX + bi * 1.0, panelY - panelH/2 - 0.7, panelZ + 0.1);
+      btn.position.set(feederX + bi * 0.7, panelY - panelH/2 + 0.5, panelZ + panelD/2 + 0.04);
       btn._isFoodBowl = true;
       addRoom(btn);
     }
