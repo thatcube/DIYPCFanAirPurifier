@@ -933,6 +933,8 @@ function _getBoxes() {
       _doorEuler.setFromQuaternion(_doorWQ, 'YXZ');
       // Matches room.js dimensions: doorW-1 by doorH-0.5 by doorThick
       const doorAngle = -_doorEuler.y;
+      // Door height (68") — matches room.js bedroom doorH.
+      const doorHeight = 68 - 0.5;
       result.push({
         cx: _doorWP.x,
         cz: _doorWP.z,
@@ -941,8 +943,8 @@ function _getBoxes() {
         angle: doorAngle,
         cosA: Math.cos(-doorAngle), sinA: Math.sin(-doorAngle),
         cosB: Math.cos(doorAngle), sinB: Math.sin(doorAngle),
-        yTop: _doorWP.y + (80 - 0.5) / 2,
-        yBottom: _doorWP.y - (80 - 0.5) / 2,
+        yTop: _doorWP.y + doorHeight / 2,
+        yBottom: _doorWP.y - doorHeight / 2,
         obb: true,
         room: true
       });
@@ -1249,8 +1251,11 @@ window._toggleHelp = _toggleHelp;
 export function setCamMode(mode) {
   fpCamMode = mode || (fpCamMode === 'first' ? 'third' : 'first');
   if (_catGroup) _catGroup.visible = fpMode && fpCamMode === 'third';
+  const text = fpCamMode === 'first' ? 'First person' : 'Third person';
   const label = document.getElementById('fpQuickCamLabel');
-  if (label) label.textContent = fpCamMode === 'first' ? 'First person' : 'Third person';
+  if (label) label.textContent = text;
+  const pauseLabel = document.getElementById('fpPauseCamLabel');
+  if (pauseLabel) pauseLabel.textContent = text;
 }
 
 export function getJumpHoldFrames() {
