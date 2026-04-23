@@ -42,8 +42,8 @@ export let fpCamMode = 'third'; // 'first' or 'third'
 export let sfxMuted = false;
 export let musicMuted = false;
 
-const SFX_MUTE_KEY = 'diy_air_purifier_muted_v1';
-const MUSIC_MUTE_KEY = 'diy_air_purifier_music_muted_v1';
+const SFX_MUTE_KEY = 'diy_air_purifier_muted_v2';
+const MUSIC_MUTE_KEY = 'diy_air_purifier_music_muted_v2';
 
 try { sfxMuted = localStorage.getItem(SFX_MUTE_KEY) === '1'; } catch (e) {}
 try { musicMuted = localStorage.getItem(MUSIC_MUTE_KEY) === '1'; } catch (e) {}
@@ -187,6 +187,7 @@ let _macScreenHW = 0, _macScreenHH = 0;
 // Cached purifier + console collision (rebuilt only on placement/config change)
 let _purifierBoxesCache = null;
 let _purifierBoxesDirtyFlag = true;
+let _purifierFilterSig = -1;
 export function invalidatePurifierCollision() { _purifierBoxesDirtyFlag = true; }
 
 function _isObjectVisibleInWorld(obj) {
@@ -797,7 +798,18 @@ function _getBoxes() {
   resetBoxPool();
   const result = _staticBoxes.slice();
 
-  // Purifier collision (cached — only rebuilt on placement/config change)
+  // Purifier collision (cached — only rebuilt on placement/config change
+  // or when filter on/slide state changes, so removed filters don't leave
+  // invisible walls blocking the player from reaching the coin inside).
+  if (_purifierRefs) {
+    const fOn = _purifierRefs.isFilterOn ? _purifierRefs.isFilterOn() : true;
+    const fSlid = _purifierRefs.areFiltersSlid ? _purifierRefs.areFiltersSlid() : { left: false, right: false };
+    const sig = (fOn ? 1 : 0) | (fSlid.left ? 2 : 0) | (fSlid.right ? 4 : 0);
+    if (sig !== _purifierFilterSig) {
+      _purifierFilterSig = sig;
+      _purifierBoxesDirtyFlag = true;
+    }
+  }
   if (_purifierBoxesDirtyFlag) {
     _purifierBoxesDirtyFlag = false;
     _purifierBoxesCache = _buildPurifierBoxes();
