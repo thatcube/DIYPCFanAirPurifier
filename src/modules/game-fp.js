@@ -363,11 +363,15 @@ export function init(refs) {
   // Build static collision boxes from room refs
   _buildStaticBoxes();
 
-  // Build interactive object list for crosshair raycasting (once)
+  // Build interactive object list for crosshair raycasting (once).
+  // Keep this in sync with getInteractiveTarget() in purifier.js — any flag
+  // that makes a mesh clickable must be listed here or the blue FP-mode
+  // crosshair (aka game-mode cursor) won't grow/turn blue over it.
   _interactiveObjects = [];
   _scene.traverse(obj => {
     if (obj._isLamp || obj._isCeilLight || obj._isFan || obj._isFilterL || obj._isFilterR ||
-        obj._isDrawer || obj._isBifoldLeaf || obj._isCornerDoorHandle || obj._isWindow || obj._isMacbook || obj._isTV) {
+        obj._isDrawer || obj._isBifoldLeaf || obj._isCornerDoorHandle || obj._isWindow ||
+        obj._isMacbook || obj._isTV || obj._isFoodBowl) {
       _interactiveObjects.push(obj);
     }
   });

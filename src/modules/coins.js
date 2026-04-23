@@ -32,7 +32,7 @@ let _bonkBuffer = null;
 let _showToast = () => {};
 export function setToastFn(fn) { _showToast = fn; }
 
-const SFX_MUTE_KEY = 'diy_air_purifier_muted_v1';
+const SFX_MUTE_KEY = 'diy_air_purifier_muted_v2';
 let _sfxMuted = false;
 try { _sfxMuted = localStorage.getItem(SFX_MUTE_KEY) === '1'; } catch (e) {}
 
