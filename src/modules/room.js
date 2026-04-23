@@ -1909,7 +1909,7 @@ export function createRoom(scene) {
   }
 
   return {
-    floorY, floorMat, floor, ceiling,
+    floorY, floorMat, ceilingMat, floor, ceiling,
     wallMeshL: typeof wallMeshL !== 'undefined' ? wallMeshL : null,
     oppWall: typeof oppWall !== 'undefined' ? oppWall : null,
     rightWall: typeof rightWall !== 'undefined' ? rightWall : null,

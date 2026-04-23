@@ -297,6 +297,9 @@ export function applyTimeOfDay(minuteOfDay, refs) {
     const baseCol = lerpHex(NIGHT_BASE, DAY_BASE, sun);
     refs.baseMeshes.forEach(m => m.material.color.copy(baseCol));
   }
+  if (refs.ceilingMat) {
+    refs.ceilingMat.color.copy(lerpHex(NIGHT_WALL, DAY_WALL, sun));
+  }
   if (refs.floorMat) {
     refs.floorMat.color.copy(lerpHex(NIGHT_CARPET, DAY_CARPET, sun));
   }
