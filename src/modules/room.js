@@ -40,23 +40,179 @@ export function createRoom(scene) {
   // Alias scene.add for _isRoom tagging
   function addRoom(mesh) { mesh._isRoom = true; scene.add(mesh); return mesh; }
 
-  // Floor
+  // Floor — fluffy beige carpet (procedural diffuse + normal map, seamlessly tiled)
   const floorGeo = new THREE.PlaneGeometry(200, 200);
-  const carpetCanvas = document.createElement('canvas');
-  carpetCanvas.width = 256; carpetCanvas.height = 256;
-  const cctx = carpetCanvas.getContext('2d');
-  cctx.fillStyle = '#8a8578';
-  cctx.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 12000; i++) {
-    const x = Math.random() * 256, y = Math.random() * 256;
-    const shade = 120 + Math.random() * 40;
-    cctx.fillStyle = `rgb(${shade},${shade-8},${shade-16})`;
-    cctx.fillRect(x, y, 1 + Math.random(), 1 + Math.random() * 2);
+  const CARPET_RES = 1024;
+  const EDGE_PAD = 12; // strokes near edges get wrapped to tile seamlessly
+
+  // Helper: draw a stroke at (x,y) and any wrapped copies needed so the tile
+  // is seamless. Strokes reaching past an edge reappear on the opposite side.
+  const drawWrappedStroke = (ctx, x, y, ang, len) => {
+    const dx = Math.cos(ang) * len;
+    const dy = Math.sin(ang) * len;
+    const offsets = [[0, 0]];
+    if (x < EDGE_PAD) offsets.push([CARPET_RES, 0]);
+    if (x > CARPET_RES - EDGE_PAD) offsets.push([-CARPET_RES, 0]);
+    if (y < EDGE_PAD) offsets.push([0, CARPET_RES]);
+    if (y > CARPET_RES - EDGE_PAD) offsets.push([0, -CARPET_RES]);
+    if (x < EDGE_PAD && y < EDGE_PAD) offsets.push([CARPET_RES, CARPET_RES]);
+    if (x > CARPET_RES - EDGE_PAD && y < EDGE_PAD) offsets.push([-CARPET_RES, CARPET_RES]);
+    if (x < EDGE_PAD && y > CARPET_RES - EDGE_PAD) offsets.push([CARPET_RES, -CARPET_RES]);
+    if (x > CARPET_RES - EDGE_PAD && y > CARPET_RES - EDGE_PAD) offsets.push([-CARPET_RES, -CARPET_RES]);
+    for (const [ox, oy] of offsets) {
+      ctx.beginPath();
+      ctx.moveTo(x + ox, y + oy);
+      ctx.lineTo(x + ox + dx, y + oy + dy);
+      ctx.stroke();
+    }
+  };
+  const drawWrappedBlob = (ctx, x, y, r, fill) => {
+    const offsets = [[0, 0]];
+    if (x < r) offsets.push([CARPET_RES, 0]);
+    if (x > CARPET_RES - r) offsets.push([-CARPET_RES, 0]);
+    if (y < r) offsets.push([0, CARPET_RES]);
+    if (y > CARPET_RES - r) offsets.push([0, -CARPET_RES]);
+    for (const [ox, oy] of offsets) {
+      const g = ctx.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+      g.addColorStop(0, fill[0]);
+      g.addColorStop(1, fill[1]);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x + ox, y + oy, r, 0, Math.PI*2); ctx.fill();
+    }
+  };
+
+  // Height canvas drives the normal map so fiber tips that look bright in the
+  // diffuse also cast shading bumps.
+  const heightCanvas = document.createElement('canvas');
+  heightCanvas.width = heightCanvas.height = CARPET_RES;
+  const hctx = heightCanvas.getContext('2d');
+  hctx.fillStyle = '#4a4a4a';
+  hctx.fillRect(0, 0, CARPET_RES, CARPET_RES);
+  // Low-frequency clumping for soft pile "bunches".
+  for (let i = 0; i < 900; i++) {
+    const x = Math.random() * CARPET_RES, y = Math.random() * CARPET_RES;
+    const r = 24 + Math.random() * 60;
+    const bright = 70 + Math.random() * 35;
+    drawWrappedBlob(hctx, x, y, r,
+      [`rgba(${bright},${bright},${bright},0.55)`, 'rgba(0,0,0,0)']);
   }
+  // Dense short fibers.
+  hctx.lineCap = 'round';
+  for (let i = 0; i < 150000; i++) {
+    const x = Math.random() * CARPET_RES, y = Math.random() * CARPET_RES;
+    const ang = Math.random() * Math.PI * 2;
+    const len = 2 + Math.random() * 4;
+    const tip = 150 + Math.random() * 90;
+    hctx.strokeStyle = `rgb(${tip},${tip},${tip})`;
+    hctx.lineWidth = 0.7 + Math.random() * 0.9;
+    drawWrappedStroke(hctx, x, y, ang, len);
+  }
+
+  // Diffuse: light beige with per-fiber hue variation and large-scale blotches
+  // to break up the tile signature.
+  const carpetCanvas = document.createElement('canvas');
+  carpetCanvas.width = carpetCanvas.height = CARPET_RES;
+  const cctx = carpetCanvas.getContext('2d');
+  cctx.fillStyle = '#cabfa8';
+  cctx.fillRect(0, 0, CARPET_RES, CARPET_RES);
+
+  // Large low-frequency color drift — big soft blobs at the scale of the tile
+  // itself so each tile reads as slightly different when tiled.
+  for (let i = 0; i < 60; i++) {
+    const x = Math.random() * CARPET_RES, y = Math.random() * CARPET_RES;
+    const r = 140 + Math.random() * 220;
+    const warm = Math.random() < 0.5;
+    drawWrappedBlob(cctx, x, y, r, warm
+      ? ['rgba(210,195,160,0.22)', 'rgba(0,0,0,0)']
+      : ['rgba(160,148,125,0.22)', 'rgba(0,0,0,0)']);
+  }
+  // Mid-scale tonal variation.
+  for (let i = 0; i < 1600; i++) {
+    const x = Math.random() * CARPET_RES, y = Math.random() * CARPET_RES;
+    const r = 14 + Math.random() * 46;
+    const dark = Math.random() < 0.45;
+    drawWrappedBlob(cctx, x, y, r, dark
+      ? ['rgba(150,138,115,0.26)', 'rgba(0,0,0,0)']
+      : ['rgba(230,222,200,0.28)', 'rgba(0,0,0,0)']);
+  }
+  // Fiber strokes with per-strand hue variation.
+  cctx.lineCap = 'round';
+  for (let i = 0; i < 170000; i++) {
+    const x = Math.random() * CARPET_RES, y = Math.random() * CARPET_RES;
+    const ang = Math.random() * Math.PI * 2;
+    const len = 2 + Math.random() * 4;
+    const base = 180 + Math.random() * 55;
+    const warm = Math.random() * 16;
+    const r = Math.min(255, base + warm);
+    const gCh = Math.min(255, base + warm * 0.6);
+    const b = Math.max(0, base - 14);
+    cctx.strokeStyle = `rgb(${r|0},${gCh|0},${b|0})`;
+    cctx.lineWidth = 0.7 + Math.random() * 0.9;
+    drawWrappedStroke(cctx, x, y, ang, len);
+  }
+  // Shadow specks.
+  for (let i = 0; i < 18000; i++) {
+    const x = Math.random() * CARPET_RES, y = Math.random() * CARPET_RES;
+    cctx.fillStyle = 'rgba(110,98,78,0.22)';
+    cctx.fillRect(x, y, 1, 1);
+  }
+
+  // Build a normal map from the height canvas (Sobel-ish gradient).
+  const heightImg = hctx.getImageData(0, 0, CARPET_RES, CARPET_RES).data;
+  const normalCanvas = document.createElement('canvas');
+  normalCanvas.width = normalCanvas.height = CARPET_RES;
+  const nctx = normalCanvas.getContext('2d');
+  const normalImg = nctx.createImageData(CARPET_RES, CARPET_RES);
+  const nData = normalImg.data;
+  const sampleH = (x, y) => {
+    const xi = ((x % CARPET_RES) + CARPET_RES) % CARPET_RES;
+    const yi = ((y % CARPET_RES) + CARPET_RES) % CARPET_RES;
+    return heightImg[(yi * CARPET_RES + xi) * 4] / 255;
+  };
+  const strength = 3.0;
+  for (let y = 0; y < CARPET_RES; y++) {
+    for (let x = 0; x < CARPET_RES; x++) {
+      const hL = sampleH(x - 1, y);
+      const hR = sampleH(x + 1, y);
+      const hU = sampleH(x, y - 1);
+      const hD = sampleH(x, y + 1);
+      const dx = (hR - hL) * strength;
+      const dy = (hD - hU) * strength;
+      const nx = -dx, ny = -dy, nz = 1.0;
+      const len = Math.hypot(nx, ny, nz) || 1;
+      const i = (y * CARPET_RES + x) * 4;
+      nData[i]   = ((nx / len) * 0.5 + 0.5) * 255;
+      nData[i+1] = ((ny / len) * 0.5 + 0.5) * 255;
+      nData[i+2] = ((nz / len) * 0.5 + 0.5) * 255;
+      nData[i+3] = 255;
+    }
+  }
+  nctx.putImageData(normalImg, 0, 0);
+
   const carpetTex = new THREE.CanvasTexture(carpetCanvas);
   carpetTex.wrapS = carpetTex.wrapT = THREE.RepeatWrapping;
-  carpetTex.repeat.set(20, 20);
-  const floorMat = new THREE.MeshStandardMaterial({map:carpetTex, roughness:0.95, metalness:0.0, color:0xb0a898});
+  carpetTex.repeat.set(6, 6);
+  carpetTex.anisotropy = 16;
+  // Rotate the UVs slightly so the tile grid doesn't line up with the room walls.
+  carpetTex.center.set(0.5, 0.5);
+  carpetTex.rotation = Math.PI / 7;
+  if ('colorSpace' in carpetTex) carpetTex.colorSpace = THREE.SRGBColorSpace;
+
+  const carpetNormalTex = new THREE.CanvasTexture(normalCanvas);
+  carpetNormalTex.wrapS = carpetNormalTex.wrapT = THREE.RepeatWrapping;
+  carpetNormalTex.repeat.set(6, 6);
+  carpetNormalTex.anisotropy = 16;
+  carpetNormalTex.center.set(0.5, 0.5);
+  carpetNormalTex.rotation = Math.PI / 7;
+
+  const floorMat = new THREE.MeshStandardMaterial({
+    map: carpetTex,
+    normalMap: carpetNormalTex,
+    normalScale: new THREE.Vector2(1.2, 1.2),
+    roughness: 1.0,
+    metalness: 0.0,
+    color: 0xe8dfc8
+  });
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.rotation.x = -Math.PI/2;
   floor.position.y = floorY;
@@ -458,22 +614,55 @@ export function createRoom(scene) {
   const extLeft=extRight-extrusionW; // 11
   const extCenterX=extLeft+extrusionW/2; // 31
   const recessZ=49-recessDepth; // front face of extrusion at Z=19
-  
-  // Back wall — full width behind extrusion
-  const backWallFullW=81+51;
-  const wallMeshL=roomBox(backWallFullW, 80, 0.5, 0xd8d4ce, -15, floorY+40, 49, 0,0,0);
-  
-  // Extrusion side walls (going from back wall into room)
-  const returnWallL=roomBox(0.5, 80, recessDepth, 0xd8d4ce, extLeft, floorY+40, 49-recessDepth/2, 0,0,0);
-  // Right side wall omitted — flush with side wall, would clip
-  // Top of extrusion
-  roomBox(extrusionW, 0.5, recessDepth, 0xd8d4ce, extCenterX, floorY+80, 49-recessDepth/2, 0,0,0);
-  
+
   // Front face of extrusion — has the door opening
   const doorW=32, doorH=80;
   const doorCenterX=extCenterX;
   const doorLeft=doorCenterX-doorW/2;
   const doorRight=doorCenterX+doorW/2;
+
+  // Back wall — full width with a doorway hole so the door opens into the
+  // hallway beyond. Built as an ExtrudeGeometry (shape in X-Y plane, extruded
+  // along +Z) mirroring the closet-wall-with-hole approach.
+  // NOTE: room meshes are X-mirrored via position.x, but ExtrudeGeometry bakes
+  // shape vertices into the geometry — position flipping doesn't flip them.
+  // So we negate every shape X coord up front: the geometry is authored in
+  // *post-mirror* world X, and we set position.x=0 so the mirror pass (which
+  // just flips 0 → 0) leaves it where we want.
+  const backWallFullW=81+51;
+  const wallMeshL=(()=>{
+    const mat=new THREE.MeshStandardMaterial({color:0xd8d4ce,roughness:0.7,metalness:0.05});
+    const shape=new THREE.Shape();
+    // Post-mirror world X range: -51..81 (centered at +15).
+    const xMin=-51, xMax=81;
+    const yMin=0, yMax=80;
+    shape.moveTo(xMin,yMin);
+    shape.lineTo(xMax,yMin);
+    shape.lineTo(xMax,yMax);
+    shape.lineTo(xMin,yMax);
+    shape.lineTo(xMin,yMin);
+    const hole=new THREE.Path();
+    // Doorway hole — post-mirror X = -doorRight..-doorLeft (= -47..-15).
+    const hxMin=-doorRight, hxMax=-doorLeft;
+    hole.moveTo(hxMin,yMin);
+    hole.lineTo(hxMax,yMin);
+    hole.lineTo(hxMax,doorH);
+    hole.lineTo(hxMin,doorH);
+    hole.lineTo(hxMin,yMin);
+    shape.holes.push(hole);
+    const geo=new THREE.ExtrudeGeometry(shape, {depth:0.5, bevelEnabled:false});
+    const mesh=new THREE.Mesh(geo, mat);
+    mesh.position.set(0, floorY, 48.75); // front face at Z=48.75, back at 49.25
+    mesh.castShadow=true; mesh.receiveShadow=true; mesh._isRoom=true;
+    addRoom(mesh);
+    return mesh;
+  })();
+
+  // Extrusion side walls (going from back wall into room)
+  const returnWallL=roomBox(0.5, 80, recessDepth, 0xd8d4ce, extLeft, floorY+40, 49-recessDepth/2, 0,0,0);
+  // Right side wall omitted — flush with side wall, would clip
+  // Top of extrusion
+  roomBox(extrusionW, 0.5, recessDepth, 0xd8d4ce, extCenterX, floorY+80, 49-recessDepth/2, 0,0,0);
   
   // Wall left of door
   const recessWallLeftW=doorLeft-extLeft;
@@ -482,8 +671,13 @@ export function createRoom(scene) {
   const recessWallRightW=extRight-doorRight;
   if(recessWallRightW>0.5) var recessWallR=roomBox(recessWallRightW, 80, 0.5, 0xd8d4ce, doorRight+recessWallRightW/2, floorY+40, recessZ, 0,0,0);
   
-  // Baseboards
-  const baseboardMeshL=roomBox(backWallFullW, 3, 0.6, 0xc0bbb4, -15, floorY+1.5, 48.5, 0,0,0);
+  // Baseboards — split around the doorway so the threshold stays clear.
+  const bbLeftW = (doorLeft) - (-15 - backWallFullW/2);   // -81 → doorLeft
+  const bbRightW = (-15 + backWallFullW/2) - doorRight;    // doorRight → 51
+  const baseboardMeshL = roomBox(bbLeftW, 3, 0.6, 0xc0bbb4,
+    (-15 - backWallFullW/2 + doorLeft)/2, floorY+1.5, 48.5, 0,0,0);
+  const baseboardMeshR = roomBox(bbRightW, 3, 0.6, 0xc0bbb4,
+    (doorRight + (-15 + backWallFullW/2))/2, floorY+1.5, 48.5, 0,0,0);
   const baseboardRetL=roomBox(0.6, 3, recessDepth, 0xc0bbb4, extLeft+0.5, floorY+1.5, 49-recessDepth/2, 0,0,0);
   // Right extrusion baseboard omitted — flush with side wall
   const baseboardRecessL=recessWallLeftW>0.5?roomBox(recessWallLeftW, 3, 0.6, 0xc0bbb4, extLeft+recessWallLeftW/2, floorY+1.5, recessZ+0.5, 0,0,0):null;
@@ -608,12 +802,252 @@ export function createRoom(scene) {
   
   // Collect all back wall + recess meshes for fading
   const backWallParts=[wallMeshL,returnWallL,
-    baseboardMeshL,baseboardRetL];
+    baseboardMeshL,baseboardMeshR,baseboardRetL];
   if(recessWallL) backWallParts.push(recessWallL);
   if(recessWallR) backWallParts.push(recessWallR);
   if(baseboardRecessL) backWallParts.push(baseboardRecessL);
   if(baseboardRecessR) backWallParts.push(baseboardRecessR);
-  
+
+  // ─── Hallway beyond the bedroom door ──────────────────────────────
+  // 20 ft long hallway extruded out through the back wall, aligned to the
+  // same X range as the door extrusion (extLeft..extRight) so the doorway
+  // leads straight into it. Two closed decorative doors sit ~6 ft in on
+  // opposite side walls.
+  const _hallZStart = 49;
+  const _hallLen = 240;                 // 20 ft
+  const _hallZEnd = _hallZStart + _hallLen;  // 289
+  const _hallCenterZ = (_hallZStart + _hallZEnd)/2; // 169
+  const _hallXLeft = extLeft;           // 11 (pre-mirror; -11 world)
+  const _hallXRight = extRight;         // 51 (pre-mirror; -51 world)
+  const _hallCenterX = extCenterX;      // 31
+  const _hallWidth = extrusionW;        // 40
+  const _hallHeight = 80;               // match wallHeight
+  const _hallWallColor = 0xd8d4ce;
+  const _hallCeilColor = 0xe0ddd6;
+  const _hallDoorCenterZ = _hallZStart + 72; // 6 ft into the hallway
+  const _hallDoorW = 32;
+  const _hallDoorH = 80;
+  const _hallBbColor = 0xc0bbb4;
+
+  // Floor extension — main floor plane is 200×200 centered at origin, so it
+  // already reaches Z=+100. Extend from Z=100 to Z=_hallZEnd at the hallway's
+  // X range using the same floor material so carpet tiling is continuous.
+  {
+    const extZMin = 100, extZMax = _hallZEnd;
+    const extD = extZMax - extZMin;
+    const floorExtGeo = new THREE.PlaneGeometry(_hallWidth, extD);
+    const floorExt = new THREE.Mesh(floorExtGeo, floorMat);
+    floorExt.rotation.x = -Math.PI/2;
+    floorExt.position.set(_hallCenterX, floorY, (extZMin+extZMax)/2);
+    floorExt.receiveShadow = true;
+    floorExt._isRoom = true;
+    floorExt._isFloor = true;
+    floorExt._isHallway = true;
+    addRoom(floorExt);
+  }
+
+  // Ceiling for the hallway — flat panel at the same height as the room ceiling
+  {
+    const ceilGeo = new THREE.BoxGeometry(_hallWidth, 0.5, _hallLen);
+    const ceilMat = new THREE.MeshStandardMaterial({color:_hallCeilColor, roughness:0.9, metalness:0.0});
+    const ceil = new THREE.Mesh(ceilGeo, ceilMat);
+    ceil.position.set(_hallCenterX, floorY+_hallHeight+0.25, _hallCenterZ);
+    ceil.receiveShadow = true;
+    ceil._isRoom = true;
+    ceil._isHallway = true;
+    addRoom(ceil);
+  }
+
+  // Hallway side walls — built as continuous boxes. The two hallway doors are
+  // decorative closed panels attached to the interior face of each wall (not
+  // actual openings), so the walls remain solid for collision and framing.
+  const hallWallMat = new THREE.MeshStandardMaterial({color:_hallWallColor, roughness:0.7, metalness:0.05});
+  // -X side wall (pre-mirror X=_hallXLeft=11)
+  const hallWallL = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, _hallHeight, _hallLen),
+    hallWallMat
+  );
+  hallWallL.position.set(_hallXLeft-0.25, floorY+_hallHeight/2, _hallCenterZ);
+  hallWallL.castShadow = true; hallWallL.receiveShadow = true;
+  hallWallL._isRoom = true; hallWallL._isHallway = true;
+  addRoom(hallWallL);
+  // +X side wall (pre-mirror X=_hallXRight=51). This is the continuation of
+  // the main room's right wall so its inside face sits at +_hallXRight.
+  const hallWallR = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, _hallHeight, _hallLen),
+    hallWallMat
+  );
+  hallWallR.position.set(_hallXRight+0.25, floorY+_hallHeight/2, _hallCenterZ);
+  hallWallR.castShadow = true; hallWallR.receiveShadow = true;
+  hallWallR._isRoom = true; hallWallR._isHallway = true;
+  addRoom(hallWallR);
+  // End wall (Z=_hallZEnd)
+  const hallWallEnd = new THREE.Mesh(
+    new THREE.BoxGeometry(_hallWidth+1, _hallHeight, 0.5),
+    hallWallMat
+  );
+  hallWallEnd.position.set(_hallCenterX, floorY+_hallHeight/2, _hallZEnd+0.25);
+  hallWallEnd.castShadow = true; hallWallEnd.receiveShadow = true;
+  hallWallEnd._isRoom = true; hallWallEnd._isHallway = true;
+  addRoom(hallWallEnd);
+
+  // Hallway baseboards — split around each decorative door so they don't
+  // cross the door trim. Ends run from the bedroom-doorway jamb (Z=49) out
+  // to the end wall (Z=_hallZEnd).
+  {
+    const bbColor = _hallBbColor;
+    const doorZmin = _hallDoorCenterZ - _hallDoorW/2 - 2.5;
+    const doorZmax = _hallDoorCenterZ + _hallDoorW/2 + 2.5;
+    const segs = [
+      { zMin: _hallZStart, zMax: doorZmin },
+      { zMin: doorZmax,    zMax: _hallZEnd  },
+    ];
+    for (const s of segs){
+      const w = s.zMax - s.zMin; if (w < 0.5) continue;
+      const zc = (s.zMin+s.zMax)/2;
+      // -X wall (box sits just inside the wall face)
+      roomBox(0.6, 3, w, bbColor, _hallXLeft+0.5, floorY+1.5, zc, 0,0,0);
+      // +X wall
+      roomBox(0.6, 3, w, bbColor, _hallXRight-0.5, floorY+1.5, zc, 0,0,0);
+    }
+    // Baseboard along the end wall
+    roomBox(_hallWidth, 3, 0.6, bbColor, _hallCenterX, floorY+1.5, _hallZEnd-0.5, 0,0,0);
+  }
+
+  // Two decorative doors, one on each side wall, ~6 ft in from the room.
+  // Simple raised-panel style matching the bedroom door palette; no hinge
+  // animation — they read as "other rooms" off the hallway.
+  {
+    const doorMat = new THREE.MeshStandardMaterial({color:0xf0ebe4, roughness:0.5, metalness:0.05});
+    const trimMat = new THREE.MeshStandardMaterial({color:0xf5f5f0, roughness:0.35, metalness:0.05});
+    const knobMat = new THREE.MeshStandardMaterial({color:0xaaaaaa, roughness:0.25, metalness:0.8});
+    const dpAccentMat = new THREE.MeshStandardMaterial({color:0xe8e3dc, roughness:0.45, metalness:0.02});
+    const panelThick = 1.2;
+    const trimW = 2.5, trimD = 1;
+    const headerH = 4;
+    // sides: -1 → -X wall (door faces +X, into hallway), +1 → +X wall.
+    const _hallwayDoorSides = [-1, +1];
+    for (const side of _hallwayDoorSides){
+      const wallX = side < 0 ? _hallXLeft : _hallXRight;
+      // Door panel inset ~0.3" in front of the wall face so the painted face
+      // reads inside the hallway and the trim brackets it.
+      const innerFaceX = wallX + side*0.25; // inside surface of the wall
+      const panelX = innerFaceX - side*(panelThick/2);
+      const panelY = floorY + _hallDoorH/2;
+      const panelZ = _hallDoorCenterZ;
+      const panel = new THREE.Mesh(
+        new THREE.BoxGeometry(panelThick, _hallDoorH-1, _hallDoorW-1),
+        doorMat
+      );
+      panel.position.set(panelX, panelY, panelZ);
+      panel.castShadow = true; panel.receiveShadow = true;
+      panel._isRoom = true; panel._isHallway = true;
+      addRoom(panel);
+      // Raised panel accents — three rows, two columns, on the hallway face.
+      const faceX = panelX - side*(panelThick/2 + 0.15);
+      const dpW = (_hallDoorW-1)*0.35;
+      const dpH1 = _hallDoorH*0.22, dpH2 = _hallDoorH*0.30;
+      const dpY = [
+        panelY - _hallDoorH/2 + _hallDoorH*0.14,
+        panelY - _hallDoorH/2 + _hallDoorH*0.42,
+        panelY - _hallDoorH/2 + _hallDoorH*0.74,
+      ];
+      const dpHArr = [dpH1, dpH2, dpH1];
+      for (const col of [-1, +1]){
+        dpHArr.forEach((ph, ri) => {
+          const dp = new THREE.Mesh(
+            new THREE.BoxGeometry(0.3, ph, dpW),
+            dpAccentMat
+          );
+          dp.position.set(faceX, dpY[ri], panelZ + col*(_hallDoorW*0.2));
+          dp.castShadow = false; dp.receiveShadow = true;
+          dp._isRoom = true; dp._isHallway = true;
+          addRoom(dp);
+        });
+      }
+      // Door frame trim around the opening (on the hallway-facing side).
+      // Header
+      const trimX = innerFaceX - side*(trimD/2 + 0.04);
+      const trH = new THREE.Mesh(
+        new THREE.BoxGeometry(trimD, headerH, _hallDoorW+trimW*2),
+        trimMat
+      );
+      trH.position.set(trimX, floorY+_hallDoorH+headerH/2, panelZ);
+      trH.castShadow = false; trH.receiveShadow = true;
+      trH._isRoom = true; trH._isHallway = true;
+      addRoom(trH);
+      // Left/right jambs (along Z)
+      for (const jz of [-1, +1]){
+        const tr = new THREE.Mesh(
+          new THREE.BoxGeometry(trimD, _hallDoorH, trimW),
+          trimMat
+        );
+        tr.position.set(trimX, floorY+_hallDoorH/2, panelZ + jz*(_hallDoorW/2+trimW/2));
+        tr.castShadow = false; tr.receiveShadow = true;
+        tr._isRoom = true; tr._isHallway = true;
+        addRoom(tr);
+      }
+      // Doorknob on the hallway face
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 12), knobMat);
+      knob.position.set(faceX - side*0.2, panelY - _hallDoorH/2 + 36, panelZ + (_hallDoorW/2 - 4));
+      knob.castShadow = false;
+      knob._isRoom = true; knob._isHallway = true;
+      addRoom(knob);
+      const plateGeo = new THREE.CylinderGeometry(1.8, 1.8, 0.3, 16);
+      plateGeo.rotateZ(Math.PI/2);
+      const plate = new THREE.Mesh(plateGeo, knobMat);
+      plate.position.set(faceX + side*0.05, panelY - _hallDoorH/2 + 36, panelZ + (_hallDoorW/2 - 4));
+      plate.castShadow = false;
+      plate._isRoom = true; plate._isHallway = true;
+      addRoom(plate);
+    }
+  }
+
+  // Trim around the bedroom-side of the back-wall doorway (hallway-facing)
+  // so the hole has a clean jamb when viewed from the hallway.
+  {
+    const trimMat = new THREE.MeshStandardMaterial({color:0xf5f5f0, roughness:0.35, metalness:0.05});
+    const trimW = 2.5, trimD = 1;
+    const headerH = 4;
+    const trimZ = 49 + 0.5 + trimD/2 + 0.04;
+    // Header
+    const trH = new THREE.Mesh(
+      new THREE.BoxGeometry(doorW+trimW*2, headerH, trimD),
+      trimMat
+    );
+    trH.position.set(doorCenterX, floorY+doorH+headerH/2, trimZ);
+    trH.castShadow = false; trH.receiveShadow = true;
+    trH._isRoom = true; trH._isHallway = true;
+    addRoom(trH);
+    for (const jx of [-1, +1]){
+      const tr = new THREE.Mesh(
+        new THREE.BoxGeometry(trimW, doorH, trimD),
+        trimMat
+      );
+      tr.position.set(doorCenterX + jx*(doorW/2+trimW/2), floorY+doorH/2, trimZ);
+      tr.castShadow = false; tr.receiveShadow = true;
+      tr._isRoom = true; tr._isHallway = true;
+      addRoom(tr);
+    }
+  }
+
+  // Simple ceiling fixture + point light at the hallway midpoint so it's not
+  // pitch black. Warm tone similar to the main room's ceiling light.
+  {
+    const fixMat = new THREE.MeshStandardMaterial({color:0xf4ead5, emissive:0xf4ead5, emissiveIntensity:0.45, roughness:0.5});
+    const fixGeo = new THREE.CylinderGeometry(4, 4, 1.2, 24);
+    const fix = new THREE.Mesh(fixGeo, fixMat);
+    fix.position.set(_hallCenterX, floorY+_hallHeight-0.7, _hallCenterZ);
+    fix.castShadow = false; fix.receiveShadow = false;
+    fix._isRoom = true; fix._isHallway = true;
+    addRoom(fix);
+    const hallLight = new THREE.PointLight(0xffe6bb, 260, 220);
+    hallLight.position.set(_hallCenterX, floorY+_hallHeight-6, _hallCenterZ);
+    hallLight.castShadow = false;
+    hallLight._isRoom = true; hallLight._isHallway = true;
+    addRoom(hallLight);
+  }
+
   // Book stack — between mug and lamp
   roomBox(5, 1.2, 7, 0x8b4513, tblX-1, floorY+tblH+0.6, tblZ+2, 0, 0.1, 0);
   roomBox(4.5, 0.8, 6.5, 0x2d5a27, tblX-1, floorY+tblH+1.6, tblZ+2, 0, -0.05, 0);
@@ -885,10 +1319,13 @@ export function createRoom(scene) {
     const trayZ = feederZ + bodyR + trayD / 2 + 0.5 - embedDepth;
     const trayMat = new THREE.MeshStandardMaterial({color:0xe0e0e0, roughness:0.4, metalness:0.05});
 
-    // Inner bowl dimensions (used for both the hole and the bowl mesh)
-    const ibR = 2.8, ibDepth = 1.1, ibWall = 0.2;
-    // Bowl center is offset forward from tray center to sit in visible area
-    const bowlOffsetZ = 1.5;
+    // Inner bowl dimensions (used for both the hole and the bowl mesh).
+    // Bowl is sized to nearly fill the tray (trayD=7 → radius 3.1 leaves
+    // ~0.4 of tray lip front/back) and centered on the tray rather than
+    // pushed forward, so it visually fits the cutout instead of hanging
+    // off the front edge.
+    const ibR = 3.1, ibDepth = 1.1, ibWall = 0.2;
+    const bowlOffsetZ = 0;
 
     // Rounded rectangle shape for the base tray — with circular hole for bowl
     const trayShape = new THREE.Shape();
