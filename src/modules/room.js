@@ -1213,41 +1213,71 @@ export function createRoom(scene) {
     body._isFoodBowl = true;
     addRoom(body);
 
-    // Hopper — smoked transparent dome/cylinder on top
-    const hopperR = 4.0, hopperH = 6;
-    const hopperY = topOfBox + bodyH + hopperH / 2;
+    // Hopper — smoked translucent cylinder. Color is dark gray (not brown);
+    // the kibble inside tints the overall look warm.
+    // Bottom radius matches body top radius (bodyR) so the joint is flush
+    // with no white body-cap poking through the translucent wall. Overlaps
+    // the body by a small amount to hide any seam at the meeting line.
+    const hopperR = bodyR;           // 4.2, matches body top
+    const hopperTopR = bodyR - 0.25; // tapers slightly inward
+    const hopperH = 6;
+    const hopperOverlap = 0.2;
+    const hopperY = topOfBox + bodyH + hopperH / 2 - hopperOverlap;
     const hopperMat = new THREE.MeshStandardMaterial({
-      color:0x3d2b1a, roughness:0.15, metalness:0.02,
-      transparent:true, opacity:0.55, side:THREE.DoubleSide
+      color:0x222222, roughness:0.1, metalness:0.0,
+      transparent:true, opacity:0.5, side:THREE.DoubleSide,
+      depthWrite: false
     });
-    const hopper = new THREE.Mesh(new THREE.CylinderGeometry(hopperR-0.3, hopperR, hopperH, 32), hopperMat);
+    const hopper = new THREE.Mesh(
+      new THREE.CylinderGeometry(hopperTopR, hopperR, hopperH, 32, 1, true),
+      hopperMat
+    );
     hopper.position.set(feederX, hopperY, feederZ);
-    hopper.castShadow = true; hopper.receiveShadow = true;
+    hopper.renderOrder = 1; // draw after opaque body/kibble
     hopper._isFoodBowl = true;
     addRoom(hopper);
 
-    // Hopper lid — flat disc on top
-    const lidMat = new THREE.MeshStandardMaterial({color:0x4a3828, roughness:0.3, metalness:0.05, transparent:true, opacity:0.6});
-    const lid = new THREE.Mesh(new THREE.CylinderGeometry(hopperR-0.2, hopperR-0.3, 0.5, 32), lidMat);
-    lid.position.set(feederX, hopperY + hopperH/2 + 0.25, feederZ);
+    // Hopper lid — dark gray, matches hopper color, sits flush on top
+    const lidH = 0.6;
+    const lidMat = new THREE.MeshStandardMaterial({
+      color:0x2a2a2a, roughness:0.25, metalness:0.02,
+      transparent:true, opacity:0.75
+    });
+    const lidBotR = hopperTopR;       // flush with hopper top rim
+    const lidTopR = hopperTopR - 0.1;
+    const lid = new THREE.Mesh(
+      new THREE.CylinderGeometry(lidTopR, lidBotR, lidH, 32),
+      lidMat
+    );
+    lid.position.set(feederX, hopperY + hopperH/2 + lidH/2 - 0.05, feederZ);
     lid._isFoodBowl = true;
     addRoom(lid);
     // Lid knob
     const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 0.6, 12), new THREE.MeshStandardMaterial({color:0x666666, roughness:0.4, metalness:0.3}));
-    knob.position.set(feederX, hopperY + hopperH/2 + 0.8, feederZ);
+    knob.position.set(feederX, hopperY + hopperH/2 + lidH + 0.3, feederZ);
     knob._isFoodBowl = true;
     addRoom(knob);
 
-    // Kibble visible inside hopper — cluster of small brown spheres
+    // Kibble pile — fills the bottom ~half of the hopper. Packed densely
+    // in a cone/pile shape (radius shrinks as we go up) so it looks like
+    // actual food settled by gravity, not floating pellets.
     const kibbleMat = new THREE.MeshStandardMaterial({color:0x4a3020, roughness:0.9, metalness:0.0});
-    for (let i = 0; i < 40; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const r = Math.random() * (hopperR - 1.2);
-      const kx = feederX + Math.cos(angle) * r;
-      const kz = feederZ + Math.sin(angle) * r;
-      const ky = hopperY - hopperH/2 + 0.4 + Math.random() * (hopperH * 0.6);
-      const kSize = 0.2 + Math.random() * 0.15;
-      const kibble = new THREE.Mesh(new THREE.SphereGeometry(kSize, 5, 4), kibbleMat);
+    const hopperBottomY = topOfBox + bodyH - hopperOverlap;
+    const pileH = hopperH * 0.5; // fill ~half the hopper
+    const kibbleCount = 220;
+    for (let i = 0; i < kibbleCount; i++) {
+      // Random height, biased toward the bottom (cube-root biases upward
+      // density; use a shallower curve so bottom is denser)
+      const t = Math.pow(Math.random(), 1.6); // 0=bottom, 1=top
+      const ky = hopperBottomY + 0.25 + t * pileH;
+      // Radius shrinks as we go up (slight cone, like a real pile)
+      const maxR = hopperR - 0.6 - t * 0.8;
+      const ang = Math.random() * Math.PI * 2;
+      const rad = Math.sqrt(Math.random()) * maxR;
+      const kx = feederX + Math.cos(ang) * rad;
+      const kz = feederZ + Math.sin(ang) * rad;
+      const kSize = 0.22 + Math.random() * 0.13;
+      const kibble = new THREE.Mesh(new THREE.SphereGeometry(kSize, 6, 4), kibbleMat);
       kibble.position.set(kx, ky, kz);
       kibble._isFoodBowl = true;
       addRoom(kibble);
