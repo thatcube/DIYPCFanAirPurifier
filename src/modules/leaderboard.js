@@ -67,10 +67,16 @@ let _finished = false;
 
 function _setTimerHudState(text, cls) {
   const st = document.getElementById('runTimerState');
-  if (!st) return;
-  st.textContent = text;
-  st.classList.remove('running', 'finished', 'ready');
-  if (cls) st.classList.add(cls);
+  const pill = document.getElementById('runTimerHud');
+  if (st) {
+    st.textContent = text;
+    st.classList.remove('running', 'finished', 'ready');
+    if (cls) st.classList.add(cls);
+  }
+  if (pill) {
+    pill.classList.remove('running', 'finished', 'ready');
+    if (cls) pill.classList.add(cls);
+  }
 }
 
 export function startTimer() {

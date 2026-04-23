@@ -125,26 +125,7 @@ h1, h2, h3, h4 {
 /* Loading overlay styles live inline in vite-index.html so the spinner
    renders instantly on first paint, before this stylesheet arrives. */
 
-/* ─── FPS counter ────────────────────────────────────────────────── */
-#fps {
-  position: fixed;
-  bottom: 8px;
-  right: 8px;
-  font-size: 10.5px;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  line-height: 1.2;
-  letter-spacing: 0.01em;
-  color: rgba(226, 243, 255, 0.9);
-  background: rgba(8, 20, 35, 0.6);
-  border: 1px solid rgba(170, 220, 255, 0.2);
-  border-radius: 8px;
-  padding: 4px 7px;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.45);
-  backdrop-filter: blur(8px);
-  pointer-events: none;
-  z-index: 307;
-}
+/* FPS counter lives inside the run-timer pill (see .run-pill__fps). */
 
 /* ═══════════════════════════════════════════════════════════════════
    GLASS BUTTON SYSTEM — shared base + variant modifiers
@@ -507,18 +488,83 @@ input[type=range]::-moz-range-thumb {
   display: none; position: fixed; top: 0; left: 0; width: 100%;
   z-index: 300; pointer-events: none;
 }
-#coinHud {
-  position: fixed; top: 16px; left: 16px;
+/* Run HUD — two glass pills anchored top-left (timer) and top-right (coins)
+   so the secret-coin chip growing the coins pill never shifts the timer. */
+.run-pill {
+  position: fixed;
+  top: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
   background-color: var(--glass);
   background-image: var(--glass-specular);
-  color: var(--gold);
-  border: 1px solid var(--gold-border); border-radius: var(--r-lg);
-  padding: 10px 16px; font-size: 18px; font-weight: 800;
+  border: 1px solid rgba(170, 220, 255, 0.26);
+  border-radius: 999px;
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.2),
-    inset 0 1px 0 rgba(255,255,255,0.3);
-  transition: transform var(--dur-bounce) var(--spring);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.22);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition: border-radius 0.25s var(--ease-out-expo), padding 0.25s var(--ease-out-expo);
+}
+/* When the timer pill is showing its stacked FPS readout, soften the
+   hard 999px pill so the short label below doesn't look crammed into a
+   stadium shape, and give the stack more breathing room. */
+.run-pill--timer:has(.run-pill__fps:not([hidden])) {
+  border-radius: 20px;
+  padding: 10px 16px;
+}
+.run-pill__icon { font-size: 18px; color: rgba(207, 236, 255, 0.85); }
+.run-pill__icon--gold { color: #ffd700; font-size: 20px; }
+.run-pill__icon--cyan { color: #4ab8ff; }
+
+/* Timer (left) */
+.run-pill--timer {
+  left: 16px;
+  color: #f4fbff;
+}
+.run-pill--timer #runTimerText {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.01em;
+  color: #f4fbff;
+  text-shadow: 0 1px 10px rgba(159,227,255,0.22);
+  transition: color 0.25s ease;
+}
+.run-pill__stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.05;
+  gap: 4px;
+}
+.run-pill__fps {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+  color: rgba(215, 238, 255, 0.82);
+  text-shadow: 0 1px 1px rgba(0,0,0,0.35);
+  white-space: nowrap;
+  text-transform: lowercase;
+}
+.run-pill__fps[hidden] { display: none; }
+#runTimerHud.ready #runTimerText    { color: rgba(232, 244, 255, 0.7); }
+#runTimerHud.running #runTimerText  { color: #f4fbff; }
+#runTimerHud.finished #runTimerText { color: #ffe199; text-shadow: 0 1px 12px rgba(255,215,115,0.35); }
+#runTimerHud.finished .run-pill__icon { color: #ffd873; }
+#runTimerHud.running .run-pill__icon  { color: #9fe3ff; }
+
+/* Coins (right) — anchored right so the secret-coin chip grows leftward */
+.run-pill--coins {
+  right: 16px;
+  color: var(--gold);
+  font-size: 17px;
+  font-weight: 800;
+  transform-origin: 100% 50%;
 }
 #coinHud.bump { animation: coinBump 0.4s var(--spring); }
 @keyframes coinBump {
@@ -526,18 +572,43 @@ input[type=range]::-moz-range-thumb {
   40% { transform: scale(1.15); }
   100% { transform: scale(1); }
 }
-#secretCoinHud {
-  position: fixed; top: 16px; left: 186px;
-  background-color: var(--glass);
-  background-image: var(--glass-specular);
+/* Secret coin pickup — stronger scale + cyan glow ring sweep. */
+#coinHud.secret-bump {
+  animation: secretCoinBump 0.7s var(--spring);
+}
+@keyframes secretCoinBump {
+  0%   { transform: scale(1);    box-shadow: 0 10px 30px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.22), 0 0 0 0 rgba(74,184,255,0); }
+  25%  { transform: scale(1.28); box-shadow: 0 12px 36px rgba(0,0,0,0.3),  inset 0 1px 0 rgba(255,255,255,0.35), 0 0 28px 6px rgba(74,184,255,0.65); }
+  60%  { transform: scale(0.98); box-shadow: 0 10px 30px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.3),  0 0 18px 2px rgba(74,184,255,0.35); }
+  100% { transform: scale(1);    box-shadow: 0 10px 30px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.22), 0 0 0 0 rgba(74,184,255,0); }
+}
+.run-pill__secret {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: #4ab8ff;
-  border: 1px solid rgba(74,184,255,0.3); border-radius: var(--r-lg);
-  padding: 10px 16px; font-size: 18px; font-weight: 800;
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.2),
-    inset 0 1px 0 rgba(255,255,255,0.3);
-  animation: coinBump 0.4s var(--spring);
+}
+/* Secret chip pop-in — appears from the right with a quick scale+fade. */
+.run-pill__secret.pop {
+  animation: secretChipPop 0.5s var(--spring);
+}
+@keyframes secretChipPop {
+  0%   { opacity: 0; transform: translateX(10px) scale(0.6); }
+  55%  { opacity: 1; transform: translateX(0)    scale(1.18); }
+  100% { opacity: 1; transform: translateX(0)    scale(1); }
+}
+.run-pill__secret.pop .run-pill__icon--cyan {
+  animation: secretIconSpin 0.6s var(--spring);
+}
+@keyframes secretIconSpin {
+  0%   { transform: rotate(-180deg) scale(0.6); filter: drop-shadow(0 0 0 rgba(74,184,255,0)); }
+  60%  { transform: rotate(10deg)   scale(1.25); filter: drop-shadow(0 0 10px rgba(74,184,255,0.8)); }
+  100% { transform: rotate(0deg)    scale(1);    filter: drop-shadow(0 0 0 rgba(74,184,255,0)); }
+}
+.run-pill__sep {
+  width: 1px;
+  height: 18px;
+  background: rgba(170, 220, 255, 0.3);
 }
 #fpCrosshair {
   display: none; position: fixed; top: 50%; left: 50%;
@@ -557,7 +628,7 @@ input[type=range]::-moz-range-thumb {
 /* Share button in HUD */
 #fpShareRow {
   position: fixed;
-  top: 124px;
+  top: 64px;
   right: 16px;
   margin: 0;
   z-index: 306;
@@ -778,56 +849,7 @@ input[type=range]::-moz-range-thumb {
   box-shadow: 0 0 16px rgba(255,216,115,0.45);
 }
 
-/* ─── Timer HUD ──────────────────────────────────────────────────── */
-#runTimerHud {
-  display: none;
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  min-width: 264px;
-  background: rgba(8, 20, 35, 0.72);
-  color: var(--accent);
-  border: 1px solid rgba(170, 220, 255, 0.25);
-  border-radius: var(--r-lg);
-  padding: 10px 14px 11px;
-  backdrop-filter: blur(14px);
-  font-variant-numeric: tabular-nums;
-  box-shadow: 0 10px 28px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.1);
-  animation: slideDown 0.4s var(--spring) both;
-}
-.run-timer-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 6px;
-}
-.run-timer-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: rgba(205, 236, 255, 0.8);
-  font-weight: var(--weight-medium);
-}
-.run-timer-label i { color: #9fe3ff; }
-#runTimerText {
-  display: block;
-  color: #f4fbff;
-  font-family: var(--font-mono);
-  font-size: 33px;
-  line-height: 1;
-  letter-spacing: 0.01em;
-  font-weight: var(--weight-bold);
-  text-shadow: 0 1px 12px rgba(159,227,255,0.22);
-}
-#runTimerState,
-.run-timer-state {
-  font-size: 11px;
-  color: rgba(210, 235, 255, 0.78);
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.01em;
-}
+/* ─── Timer HUD (legacy positioning — now lives inside .run-hud) ─── */
 #runTimerState.running { color: #9fe3ff; }
 #runTimerState.finished { color: #ffd873; }
 #runTimerState.ready { color: rgba(210, 235, 255, 0.7); }
@@ -913,14 +935,17 @@ input[type=range]::-moz-range-thumb {
   padding: 12px 20px; font-size: 14px;
 }
 .pause-toggles {
-  display: flex; gap: 16px; justify-content: center; margin-bottom: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
 }
 .pause-toggle-row {
   display: flex; align-items: center; gap: 8px;
   background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-  border-radius: var(--r-sm); padding: 6px 14px 6px 12px;
+  border-radius: var(--r-sm); padding: 6px 12px;
   font-size: 11px; color: var(--text-dim);
-  min-width: 170px;
+  min-width: 0;
 }
 .pause-toggle-label {
   display: inline-flex;
@@ -1440,7 +1465,6 @@ body.play-mode #fpControls { display: block; }
 body.play-mode #fpControlsHint { display: none; }
 body.play-mode #fpQuickControls { display: flex; }
 body.play-mode #fpChargeBar { display: block; }
-body.play-mode #runTimerHud { display: block; }
 
 /* Mobile — show touch controls in play mode */
 @media (pointer: coarse) {
@@ -1450,10 +1474,12 @@ body.play-mode #runTimerHud { display: block; }
   body.play-mode #fpControls { display: none !important; }
   body.play-mode #fpControlsHint { display: none !important; }
   body.play-mode #fpQuickControls { display: none !important; }
-  body.play-mode #runTimerHud { top: 12px; right: 12px; min-width: 220px; padding: 9px 12px 10px; }
-  body.play-mode #runTimerText { font-size: 28px; }
-  body.play-mode #fps { top: 86px; right: 12px; font-size: 10px; padding: 3px 6px; }
-  body.play-mode #fpShareRow { top: 110px; right: 12px; }
+  body.play-mode .run-pill { top: 10px; padding: 6px 10px; }
+  body.play-mode .run-pill--timer { left: 10px; }
+  body.play-mode .run-pill--coins { right: 10px; font-size: 15px; }
+  body.play-mode .run-pill--timer #runTimerText { font-size: 18px; }
+  body.play-mode #fps { top: 56px; right: 12px; font-size: 10px; padding: 3px 6px; }
+  body.play-mode #fpShareRow { top: 56px; left: 12px; right: auto; }
   body.play-mode #fpChargeBar { width: min(94vw, 360px); bottom: 10px; padding: 9px 10px 8px; }
   body.play-mode #fpChargeHint { display: none; }
 }

@@ -106,7 +106,6 @@
   </div>
   <main>
   <canvas id="c"></canvas>
-  <div id="fps"></div>
 
   <!-- Control Panel -->
   <button class="panel-fab" id="panelFab" aria-label="Open control panel" onclick="document.getElementById('panelL').style.display='flex';this.style.display='none'"><i class="ph ph-sliders-horizontal" aria-hidden="true"></i></button>
@@ -238,7 +237,7 @@
           <div class="toggle-sw" id="togXray" onclick="window._toggleXray&&window._toggleXray()"></div>
         </div>
         <div class="ctrl-row"><label><i class="ph ph-chart-bar"></i> Show FPS</label>
-          <div class="toggle-sw on" id="togFps" onclick="window._toggleFps&&window._toggleFps()"></div>
+          <div class="toggle-sw" id="togFps" onclick="window._toggleFps&&window._toggleFps()"></div>
         </div>
         <div class="ctrl-row"><label><i class="ph ph-lightning"></i> Quick coin mode</label>
           <div class="toggle-sw" id="togQuickCoin" onclick="window._toggleQuickCoin&&window._toggleQuickCoin()"></div>
@@ -290,15 +289,23 @@
 
   <!-- FP HUD -->
   <div id="fpHud" role="status" aria-live="polite" aria-atomic="false">
-    <div id="coinHud" aria-label="Coins collected"><i class="ph-fill ph-coins" style="color:#ffd700"></i> <span id="coinCount">0/0</span></div>
-    <div id="secretCoinHud" aria-label="Secret coins" style="display:none"><i class="ph-fill ph-coin" style="color:#4ab8ff"></i> <span id="secretCoinCount">0</span></div>
-    <div id="runTimerHud" aria-label="Run timer">
-      <div class="run-timer-meta">
-        <span class="run-timer-label"><i class="ph ph-stopwatch"></i> Run timer</span>
-        <span id="runTimerState" class="run-timer-state">Ready</span>
+    <div id="runTimerHud" class="run-pill run-pill--timer" aria-label="Run timer">
+      <i class="ph ph-stopwatch run-pill__icon"></i>
+      <div class="run-pill__stack">
+        <span id="runTimerText">00:00.000</span>
+        <span id="fpsInline" class="run-pill__fps" hidden></span>
       </div>
-      <span id="runTimerText">00:00.000</span>
     </div>
+    <div id="coinHud" class="run-pill run-pill--coins" aria-label="Coins collected">
+      <i class="ph-fill ph-coins run-pill__icon run-pill__icon--gold"></i>
+      <span id="coinCount">0/0</span>
+      <span id="secretCoinHud" class="run-pill__secret" aria-label="Secret coins" style="display:none">
+        <span class="run-pill__sep" aria-hidden="true"></span>
+        <i class="ph-fill ph-coin run-pill__icon run-pill__icon--cyan"></i>
+        <span id="secretCoinCount">0</span>
+      </span>
+    </div>
+    <span id="runTimerState" class="run-timer-state" hidden></span>
     <div id="fpShareRow" style="display:none"><button id="fpShareBtn" type="button"><i class="ph ph-copy"></i> Copy result</button></div>
   </div>
   <div id="fpCrosshair"></div>
@@ -309,7 +316,7 @@
       <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
       <div><kbd>Space</kbd> Jump (hold to charge)</div>
       <div><kbd>Shift</kbd> Sprint</div>
-      <div><kbd>V</kbd> Switch camera</div>
+      <div><kbd>V</kbd> Toggle first/third person</div>
       <div><kbd>R</kbd> Reset run</div>
       <div><kbd>H</kbd> Toggle this panel</div>
       <div><kbd>G</kbd> Exit game</div>
@@ -320,7 +327,7 @@
   </div>
   <div id="fpQuickControls" role="group" aria-label="Quick controls">
     <button type="button" class="fpQuickBtn" id="fpQuickHelpBtn" onclick="window._toggleHelp&&window._toggleHelp()"><kbd>H</kbd> Help</button>
-    <button type="button" class="fpQuickBtn" onclick="window._switchCamFP&&window._switchCamFP()"><kbd>V</kbd> Camera</button>
+    <button type="button" class="fpQuickBtn" id="fpQuickCamBtn" onclick="window._switchCamFP&&window._switchCamFP()"><kbd>V</kbd> <span id="fpQuickCamLabel">Third person</span></button>
     <button type="button" class="fpQuickBtn" onclick="window._pauseFP&&window._pauseFP()"><kbd>Esc</kbd> Pause</button>
     <button type="button" class="fpQuickBtn" onclick="window._resetFP&&window._resetFP()"><kbd>R</kbd> Reset</button>
   </div>
@@ -355,6 +362,11 @@
               <span class="pause-toggle-label"><i class="ph-fill ph-music-notes"></i> Music</span>
               <div class="toggle-sw on" id="fpPauseMuteMusic" role="switch" aria-checked="true" onclick="this.classList.toggle('on');window._toggleMuteMusic&&window._toggleMuteMusic(!this.classList.contains('on'))"></div>
               <span class="pause-toggle-state" id="fpPauseMuteMusicState">On</span>
+            </div>
+            <div class="pause-toggle-row">
+              <span class="pause-toggle-label"><i class="ph ph-gauge"></i> FPS</span>
+              <div class="toggle-sw" id="fpPauseShowFps" role="switch" aria-checked="false" onclick="window._toggleFps&&window._toggleFps()"></div>
+              <span class="pause-toggle-state off" id="fpPauseShowFpsState">Off</span>
             </div>
           </div>
           <div class="pause-actions">
