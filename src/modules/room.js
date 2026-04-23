@@ -1287,30 +1287,47 @@ export function createRoom(scene) {
     brandArea._isFoodBowl = true;
     addRoom(brandArea);
 
-    // Food chute — dark opening at front-bottom of feeder body where food
-    // dispenses into the bowl. Sits at the body's front surface.
-    const chuteW = 3.0, chuteH = 2.0, chuteD = 0.6;
-    const chuteZ = feederZ + bodyR - chuteD / 2 + 0.05;
-    const chuteY = topOfBox + chuteH / 2;
+    // Food chute — dark dispensing slot on the front of the feeder body,
+    // sitting just above the food tray's top surface. Built as a curved
+    // cylindrical arc so it hugs the body (a flat box would Z-fight with
+    // the curved surface and create the "blocked" look).
+    //
+    // NOTE: tray top is at topOfBox + trayH; chute must sit above that so
+    // it's actually visible (previously half the chute was buried inside
+    // the tray).
+    const chuteW = 3.0;     // arc width along cylinder
+    const chuteH = 1.6;     // vertical height
+    const chuteArc = chuteW / bodyR; // radians of arc this width covers
+    // Chute bottom just above the tray's top surface (trayH ~1.6 above box)
+    // — tray top ≈ topOfBox + 1.6, leave a 0.2 gap
+    const trayTopY = topOfBox + 1.6;
+    const chuteY = trayTopY + 0.2 + chuteH / 2;
     const chuteMat = new THREE.MeshStandardMaterial({color:0x1a1a1a, roughness:0.9, metalness:0.0});
-    const chute = new THREE.Mesh(new THREE.BoxGeometry(chuteW, chuteH, chuteD), chuteMat);
-    chute.position.set(feederX, chuteY, chuteZ);
+
+    // Bezel (white arc panel sitting on the body surface, slightly larger)
+    const frameArc = chuteArc + 0.1;
+    const frameH = chuteH + 0.3;
+    const frameR = bodyR + 0.04;
+    const frameGeo = new THREE.CylinderGeometry(
+      frameR, frameR, frameH, 24, 1, true,
+      -frameArc / 2, frameArc
+    );
+    const frame = new THREE.Mesh(frameGeo, bodyMat);
+    frame.position.set(feederX, chuteY, feederZ);
+    frame._isFoodBowl = true;
+    addRoom(frame);
+
+    // Dark chute panel (slightly in front of the bezel so bezel shows as
+    // a thin border around the dark dispensing slot)
+    const chuteR = bodyR + 0.08;
+    const chuteGeo = new THREE.CylinderGeometry(
+      chuteR, chuteR, chuteH, 24, 1, true,
+      -chuteArc / 2, chuteArc
+    );
+    const chute = new THREE.Mesh(chuteGeo, chuteMat);
+    chute.position.set(feederX, chuteY, feederZ);
     chute._isFoodBowl = true;
     addRoom(chute);
-    // Chute surround — thin white frame around the opening
-    const csThick = 0.2;
-    const csTop = new THREE.Mesh(new THREE.BoxGeometry(chuteW + csThick * 2, csThick, chuteD + 0.1), bodyMat);
-    csTop.position.set(feederX, chuteY + chuteH / 2 + csThick / 2, chuteZ + 0.05);
-    csTop._isFoodBowl = true;
-    addRoom(csTop);
-    const csL = new THREE.Mesh(new THREE.BoxGeometry(csThick, chuteH, chuteD + 0.1), bodyMat);
-    csL.position.set(feederX - chuteW / 2 - csThick / 2, chuteY, chuteZ + 0.05);
-    csL._isFoodBowl = true;
-    addRoom(csL);
-    const csR = new THREE.Mesh(new THREE.BoxGeometry(csThick, chuteH, chuteD + 0.1), bodyMat);
-    csR.position.set(feederX + chuteW / 2 + csThick / 2, chuteY, chuteZ + 0.05);
-    csR._isFoodBowl = true;
-    addRoom(csR);
 
     // Food tray — rounded rectangle with very rounded edges, bowl in the middle,
     // embedded into the feeder body (~2.5" overlap)
