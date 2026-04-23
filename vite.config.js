@@ -30,7 +30,8 @@ export default defineConfig({
       input: {
         main: 'vite-index.html',
         admin: 'admin.html',
-        leaderboard: 'leaderboard.html'
+        leaderboard: 'leaderboard.html',
+        old: 'index.html'
       }
     }
   },
