@@ -32,7 +32,11 @@ export const boundsBase = {
   xMin: -(SIDE_WALL_X + CLOSET_DEPTH) + 0.25,  // closet back wall
   xMax: -(LEFT_WALL_X) - 0.25,                   // window wall
   zMin: OPP_WALL_Z - CLOSET_INTERIOR_W / 2,
-  zMax: 49 - 0.25                                 // back wall
+  // Back wall is at Z=49. Hallway extension runs Z=49..289. Use the hallway
+  // end as zMax; static collision boxes on the back-wall flanks and hallway
+  // side walls keep the player inside the bedroom X range outside the
+  // doorway opening, and inside the hallway X range past Z=49.
+  zMax: 289 - 0.25
 };
 
 export function getBounds(placementOffset) {
