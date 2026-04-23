@@ -903,14 +903,16 @@ export function createRoom(scene) {
     trayShape.lineTo(-tw2, -td2 + cr);
     trayShape.quadraticCurveTo(-tw2, -td2, -tw2 + cr, -td2);
 
-    // Punch a circular hole where the bowl sits
-    // Shape is in local XY space; after rotateX(-PI/2) X stays X, Y becomes Z
+    // Punch a circular hole where the bowl sits.
+    // Shape is in local XY; the tray is extruded along +Z then rotated
+    // -90° around X, which maps shape-Y → world -Z. So to put the hole at
+    // world (trayZ + bowlOffsetZ) we must use shape-Y = -bowlOffsetZ.
     const holePath = new THREE.Path();
     const holeSegs = 32;
     for (let i = 0; i <= holeSegs; i++) {
       const a = (i / holeSegs) * Math.PI * 2;
       const hx = Math.cos(a) * (ibR + 0.05);
-      const hy = bowlOffsetZ + Math.sin(a) * (ibR + 0.05);
+      const hy = -bowlOffsetZ + Math.sin(a) * (ibR + 0.05);
       if (i === 0) holePath.moveTo(hx, hy);
       else holePath.lineTo(hx, hy);
     }
@@ -1330,10 +1332,15 @@ export function createRoom(scene) {
   // Window sill
   roomBox(0.8, 0.5, winW+2, 0xc8c4be, leftWallX+0.4, winBottom-0.25, winCenterZ, 0,0,0);
   
-  // Window frame (thin white trim) — offset 0.3" in front of wall to avoid z-fighting
+  // Window frame (thin white trim) — sit fully proud of the wall surface.
+  // The wall sections around the opening (above/below/front/back) are 0.5" thick
+  // centered at leftWallX, so their inner face is at leftWallX+0.25. The trim
+  // back face must clear that plane or its edges become coplanar with the wall
+  // (along the winTop/winBottom/winFront/winBack boundaries) and z-fight.
   const frameMat=stdMat({color:0xf5f5f0,shininess:10});
   const frameT=0.8, frameD=0.6;
-  const trimX = leftWallX + frameD / 2 + 0.05; // sit proud of the wall surface
+  const wallInnerX = leftWallX + 0.25;
+  const trimX = wallInnerX + frameD / 2 + 0.04; // back face ~0.04" proud of wall
   // Top
   const wft=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT, winW+frameT*2), frameMat);
   wft.position.set(trimX, winTop+frameT/2, winCenterZ); wft._isRoom=true; wft._isWindow=true; addRoom(wft);
