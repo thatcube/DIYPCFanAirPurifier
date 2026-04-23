@@ -19,9 +19,11 @@ import {
 import { state } from './state.js';
 
 // ─── Shared door asset ──────────────────────────────────────────────
-// Single 4-panel shaker-style leaf used for the bedroom door and the two
-// hallway doors. Origin is at the leaf center (width=X, height=Y, thickness=Z).
-// Callers position/rotate freely and attach children for knobs or pivots.
+// 6-panel colonial-style leaf used for the bedroom door and the two
+// hallway doors. Layout top→bottom: 2 square panels, 2 tall rectangles,
+// lock rail (with doorknob), 2 short-medium rectangles. Origin is at the
+// leaf center (width=X, height=Y, thickness=Z). `userData.doorLeaf.lockRailY`
+// gives callers the door-local Y at which to mount the knob.
 function buildDoorLeaf({ width, height, thickness,
                         color=0xf0ebe4, panelColor=0xe8e3dc,
                         shadowColor=0xb8b0a4 }) {
@@ -30,15 +32,42 @@ function buildDoorLeaf({ width, height, thickness,
   const frameMat = new THREE.MeshStandardMaterial({ color,              roughness: 0.52, metalness: 0.04 });
   const panelMat = new THREE.MeshStandardMaterial({ color: panelColor,  roughness: 0.45, metalness: 0.02 });
 
-  const stileW   = Math.min(3.5, width  * 0.14);
-  const railTopH = Math.min(4.5, height * 0.06);
-  const railMidH = Math.min(5.0, height * 0.065);
-  const railBotH = Math.min(7.0, height * 0.10);
-  const frameD   = Math.max(0.35, thickness * 0.30);
-  const slabT    = Math.max(0.1, thickness - frameD * 2);
-  const midY     = -height * 0.05; // lock rail just below center
+  // Real 80"×32" 6-panel door proportions, scaled to this leaf:
+  //   topRail 5 / topRow 14 / r2Rail 5 / midRow 22 / lockRail 4 / botRow 22 / botRail 8
+  const stileW    = Math.max(2.5, width  * 0.14);
+  const railTopH  = height * (5 / 80);
+  const rowSqH    = height * (14 / 80);
+  const railR2H   = height * (5 / 80);
+  const rowTallH  = height * (22 / 80);
+  const railLockH = height * (4 / 80);
+  const rowShortH = height * (22 / 80);
+  const railBotH  = height * (8 / 80);
+  const frameD    = Math.max(0.35, thickness * 0.30);
+  const slabT     = Math.max(0.1, thickness - frameD * 2);
 
-  // Base slab — acts as the darker recess visible around the raised panels.
+  // Rail center Ys (door-local, origin at leaf center) — top→bottom.
+  const topRailY  =  height/2 - railTopH/2;
+  const r2Y       =  height/2 - railTopH - rowSqH - railR2H/2;
+  const lockRailY =  height/2 - railTopH - rowSqH - railR2H - rowTallH - railLockH/2;
+  const botRailY  = -height/2 + railBotH/2;
+
+  // Row center Ys + panel heights.
+  const rows = [
+    { cy: (topRailY - railTopH/2 + r2Y + railR2H/2) / 2,         ph: rowSqH    },
+    { cy: (r2Y - railR2H/2 + lockRailY + railLockH/2) / 2,        ph: rowTallH  },
+    { cy: (lockRailY - railLockH/2 + botRailY + railBotH/2) / 2,  ph: rowShortH },
+  ];
+
+  // Uniform border around every raised panel: `border` wide on all four
+  // sides between the panel and the surrounding rail/stile/mullion.
+  const innerW     = width - stileW * 2;
+  const border     = Math.max(0.4, Math.min(stileW * 0.35, 1.2));
+  const mullionGap = border * 2; // gap between the two columns
+  const colW       = (innerW - mullionGap - border * 2) / 2;
+  const colCx      = mullionGap / 2 + colW / 2; // center of each panel column
+  const panelT     = frameD * 0.7; // thinner than frame → sits recessed
+
+  // Base slab — darker recess visible around the raised panels.
   const slab = new THREE.Mesh(new THREE.BoxGeometry(width, height, slabT), slabMat);
   slab.castShadow = true; slab.receiveShadow = true;
   group.add(slab);
@@ -46,56 +75,48 @@ function buildDoorLeaf({ width, height, thickness,
   for (const face of [-1, +1]) {
     const fz = face * (slabT / 2 + frameD / 2);
 
-    // Stiles (L/R)
+    // Stiles (L/R full height)
     for (const s of [-1, +1]) {
       const stile = new THREE.Mesh(new THREE.BoxGeometry(stileW, height, frameD), frameMat);
-      stile.position.set(s * (width / 2 - stileW / 2), 0, fz);
+      stile.position.set(s * (width/2 - stileW/2), 0, fz);
       stile.receiveShadow = true;
       group.add(stile);
     }
-    const innerW = width - stileW * 2;
-    // Top / middle (lock) / bottom rails
-    const topRail = new THREE.Mesh(new THREE.BoxGeometry(innerW, railTopH, frameD), frameMat);
-    topRail.position.set(0, height / 2 - railTopH / 2, fz);
-    topRail.receiveShadow = true; group.add(topRail);
-    const midRail = new THREE.Mesh(new THREE.BoxGeometry(innerW, railMidH, frameD), frameMat);
-    midRail.position.set(0, midY, fz);
-    midRail.receiveShadow = true; group.add(midRail);
-    const botRail = new THREE.Mesh(new THREE.BoxGeometry(innerW, railBotH, frameD), frameMat);
-    botRail.position.set(0, -height / 2 + railBotH / 2, fz);
-    botRail.receiveShadow = true; group.add(botRail);
+    // Central mullion — single vertical piece running the full inner height.
+    // Matching width to the border*2 gap keeps proportions consistent.
+    const mullion = new THREE.Mesh(
+      new THREE.BoxGeometry(mullionGap, height, frameD), frameMat);
+    mullion.position.set(0, 0, fz);
+    mullion.receiveShadow = true;
+    group.add(mullion);
 
-    // Raised panels filling the four openings between rails + stiles.
-    const gap = 0.5;
-    const colW = innerW / 2 - gap;
-    const colCx = innerW / 4 + gap / 2;
-    const topOpenY1 = midY + railMidH / 2;
-    const topOpenY2 = height / 2 - railTopH;
-    const botOpenY1 = -height / 2 + railBotH;
-    const botOpenY2 = midY - railMidH / 2;
-    const topPanelH = (topOpenY2 - topOpenY1) - gap * 2;
-    const botPanelH = (botOpenY2 - botOpenY1) - gap * 2;
-    const topPanelY = (topOpenY1 + topOpenY2) / 2;
-    const botPanelY = (botOpenY1 + botOpenY2) / 2;
-    const panelT = frameD * 0.7; // thinner than frame → sits recessed
+    // Four horizontal rails.
+    const addRail = (y, h) => {
+      const r = new THREE.Mesh(new THREE.BoxGeometry(innerW, h, frameD), frameMat);
+      r.position.set(0, y, fz);
+      r.receiveShadow = true;
+      group.add(r);
+    };
+    addRail(topRailY,  railTopH);
+    addRail(r2Y,       railR2H);
+    addRail(lockRailY, railLockH);
+    addRail(botRailY,  railBotH);
+
+    // Raised panels — 3 rows × 2 cols. Each panel is inset by `border` on
+    // all four sides from the surrounding frame members.
     const panelZ = face * (slabT / 2 + panelT / 2);
-    for (const col of [-1, +1]) {
-      const cx = col * colCx;
-      if (topPanelH > 1) {
-        const p = new THREE.Mesh(new THREE.BoxGeometry(colW, topPanelH, panelT), panelMat);
-        p.position.set(cx, topPanelY, panelZ);
-        p.receiveShadow = true;
-        group.add(p);
-      }
-      if (botPanelH > 1) {
-        const p = new THREE.Mesh(new THREE.BoxGeometry(colW, botPanelH, panelT), panelMat);
-        p.position.set(cx, botPanelY, panelZ);
+    for (const row of rows) {
+      const ph = row.ph - border * 2;
+      if (ph < 1 || colW < 1) continue;
+      for (const col of [-1, +1]) {
+        const p = new THREE.Mesh(new THREE.BoxGeometry(colW, ph, panelT), panelMat);
+        p.position.set(col * colCx, row.cy, panelZ);
         p.receiveShadow = true;
         group.add(p);
       }
     }
   }
-  group.userData.doorLeaf = { width, height, thickness, slab };
+  group.userData.doorLeaf = { width, height, thickness, slab, lockRailY };
   return group;
 }
 
@@ -772,12 +793,13 @@ export function createRoom(scene) {
     shape.lineTo(xMin,yMax);
     shape.lineTo(xMin,yMin);
     const hole=new THREE.Path();
-    // Hallway-width hole in the back wall, post-mirror X.
+    // Hallway-width hole in the back wall, post-mirror X. Full-height so the
+    // bedroom flows into the hallway as one continuous space with no header.
     const hxMin=-backOpenRight, hxMax=-backOpenLeft;
     hole.moveTo(hxMin,yMin);
     hole.lineTo(hxMax,yMin);
-    hole.lineTo(hxMax,doorH);
-    hole.lineTo(hxMin,doorH);
+    hole.lineTo(hxMax,yMax);
+    hole.lineTo(hxMin,yMax);
     hole.lineTo(hxMin,yMin);
     shape.holes.push(hole);
     const geo=new THREE.ExtrudeGeometry(shape, {depth:0.5, bevelEnabled:false});
@@ -794,24 +816,26 @@ export function createRoom(scene) {
   // Top of extrusion
   roomBox(extrusionW, 0.5, recessDepth, 0xd8d4ce, extCenterX, floorY+80, 49-recessDepth/2, 0,0,0);
   
-  // Wall left of door
-  const recessWallLeftW=doorLeft-extLeft;
-  if(recessWallLeftW>0.5) var recessWallL=roomBox(recessWallLeftW, 80, 0.5, 0xd8d4ce, extLeft+recessWallLeftW/2, floorY+40, recessZ, 0,0,0);
-  // Wall right of door
-  const recessWallRightW=extRight-doorRight;
-  if(recessWallRightW>0.5) var recessWallR=roomBox(recessWallRightW, 80, 0.5, 0xd8d4ce, doorRight+recessWallRightW/2, floorY+40, recessZ, 0,0,0);
-  
-  // Baseboards — split around the doorway so the threshold stays clear.
-  const bbLeftW = (doorLeft) - (-15 - backWallFullW/2);   // -81 → doorLeft
-  const bbRightW = (-15 + backWallFullW/2) - doorRight;    // doorRight → 51
+  // Recess front face is intentionally left open on both sides of the door —
+  // the door frame sits in the opening by itself, and beyond it you see
+  // straight into the hallway (the recess side walls `returnWallL` + the
+  // hallway walls line up at the same X, so the wall planes are continuous).
+  const recessWallL = null;
+  const recessWallR = null;
+  const baseboardRecessL = null;
+  const baseboardRecessR = null;
+
+  // No header above the doorway — the back-wall hole now runs floor to
+  // ceiling so the opening reads as one continuous space with the hallway.
+
+  // Back-wall baseboards — split around the 40" back opening.
+  const bbLeftW = (backOpenLeft) - (-15 - backWallFullW/2);
+  const bbRightW = (-15 + backWallFullW/2) - backOpenRight;
   const baseboardMeshL = roomBox(bbLeftW, 3, 0.6, 0xc0bbb4,
-    (-15 - backWallFullW/2 + doorLeft)/2, floorY+1.5, 48.5, 0,0,0);
+    (-15 - backWallFullW/2 + backOpenLeft)/2, floorY+1.5, 48.5, 0,0,0);
   const baseboardMeshR = roomBox(bbRightW, 3, 0.6, 0xc0bbb4,
-    (doorRight + (-15 + backWallFullW/2))/2, floorY+1.5, 48.5, 0,0,0);
+    (backOpenRight + (-15 + backWallFullW/2))/2, floorY+1.5, 48.5, 0,0,0);
   const baseboardRetL=roomBox(0.6, 3, recessDepth, 0xc0bbb4, extLeft+0.5, floorY+1.5, 49-recessDepth/2, 0,0,0);
-  // Right extrusion baseboard omitted — flush with side wall
-  const baseboardRecessL=recessWallLeftW>0.5?roomBox(recessWallLeftW, 3, 0.6, 0xc0bbb4, extLeft+recessWallLeftW/2, floorY+1.5, recessZ+0.5, 0,0,0):null;
-  const baseboardRecessR=recessWallRightW>0.5?roomBox(recessWallRightW, 3, 0.6, 0xc0bbb4, doorRight+recessWallRightW/2, floorY+1.5, recessZ+0.5, 0,0,0):null;
   
   // ─── Door ───
   const doorThick=1.5, doorFrameW=2.5, doorFrameD=recessDepth>4?4:recessDepth;
@@ -844,7 +868,9 @@ export function createRoom(scene) {
   cornerDoorPivot.add(doorPanel);
 
   // Knobs on both faces (front = into room at -Z, back = into hallway at +Z).
-  const knobY = 36 - doorH/2; // door-local Y of the knob
+  // Knob Y sits on the door's lock rail (between the tall middle panels and
+  // the short bottom panels).
+  const knobY = doorPanel.userData.doorLeaf.lockRailY;
   // Knob sits near the free edge. Pre-mirror X is negative so the mirror
   // pass flips it to match the panel's post-mirror +X extension.
   const knobX = -(doorPanelW/2 + doorW*0.35);
@@ -920,7 +946,7 @@ export function createRoom(scene) {
   const _hallDoorH = 68;
   const _hallBbColor = 0xc0bbb4;
 
-  // Hardwood plank floor — 6" wide planks running along the hallway length
+  // Hardwood plank floor — 5" wide planks running along the hallway length
   // (+Z). Starts inside the bedroom doorway opening (at the door panel) so
   // the hardwood is visible the instant the door swings open, and continues
   // through the door recess and all the way to the end of the hallway. Sits
@@ -934,25 +960,27 @@ export function createRoom(scene) {
     // "same grain every 5 feet" tiling signature the old 60"-tall tile had.
     const hwW = 40;
     const hwL = 289 - _hwStartZ; // from door panel through end of hallway
-    const PLANK_W_IN = 6;                       // plank width in inches
-    const N_PLANKS = Math.max(1, Math.round(hwW / PLANK_W_IN)); // 7 planks
+    const PLANK_W_IN = 5;                       // plank width in inches
+    const N_PLANKS = Math.max(1, Math.round(hwW / PLANK_W_IN)); // 8 planks
     const PX_PER_IN = 10;                       // canvas resolution
-    const HW_RES_W = N_PLANKS * PLANK_W_IN * PX_PER_IN; // 420
+    const HW_RES_W = N_PLANKS * PLANK_W_IN * PX_PER_IN; // 400
     const HW_RES_H = Math.round(hwL * PX_PER_IN);       // ~2707
     const cvs = document.createElement('canvas');
     cvs.width = HW_RES_W; cvs.height = HW_RES_H;
     const ctx = cvs.getContext('2d');
-    // Dark gap color behind everything — shows at plank seams & butt joints.
-    ctx.fillStyle = '#1a0f06';
+    // Gap color behind everything — shows at plank seams & butt joints.
+    // Medium warm brown so seams read as shadow lines, not black slots.
+    ctx.fillStyle = '#6b4a2a';
     ctx.fillRect(0, 0, HW_RES_W, HW_RES_H);
 
     // Helper: HSL-ish wood tone. Returns an #rrggbb string.
     const woodTone = (l, warm) => {
       // l: 0..1 lightness bias, warm: -1..1 red/yellow shift
-      const base = 108 + l * 70;                // 108..178 (lighter oak)
-      const r = Math.max(0, Math.min(255, base + 35 + warm * 22));
-      const g = Math.max(0, Math.min(255, base * 0.78 + warm * 10));
-      const b = Math.max(0, Math.min(255, base * 0.5 - warm * 8));
+      // Stained golden/honey oak — lighter & warmer than before.
+      const base = 150 + l * 70;                // 150..220 (honey oak)
+      const r = Math.max(0, Math.min(255, base + 28 + warm * 20));
+      const g = Math.max(0, Math.min(255, base * 0.84 + 8 + warm * 10));
+      const b = Math.max(0, Math.min(255, base * 0.58 - 4 - warm * 8));
       return `rgb(${r|0},${g|0},${b|0})`;
     };
 
@@ -961,12 +989,18 @@ export function createRoom(scene) {
       const px0 = p * plankPxW;
       const px1 = (p + 1) * plankPxW;
       // Build this column's stack of butt joints (plank end-to-end cuts).
-      // Real oak flooring uses 24"–72" lengths; randomize per board.
+      // Highly variable lengths: 28"–84" with a bimodal-ish distribution so
+      // short (~30") and long (~65"+) boards both show up prominently rather
+      // than everything clustering around the mean.
       const joints = [0];
-      let y = Math.random() * 36 * PX_PER_IN; // first plank starts partway in
+      let y = Math.random() * 40 * PX_PER_IN; // first plank starts partway in
       while (y < HW_RES_H) {
         joints.push(y);
-        y += (24 + Math.random() * 48) * PX_PER_IN;
+        // Mix: ~35% short boards 28–42", ~65% long boards 48–84".
+        const lenIn = (Math.random() < 0.35)
+          ? (28 + Math.random() * 14)
+          : (48 + Math.random() * 36);
+        y += lenIn * PX_PER_IN;
       }
       joints.push(HW_RES_H);
       // Stagger: ensure adjacent columns don't share joint Y. Easy since each
@@ -995,9 +1029,10 @@ export function createRoom(scene) {
           const sx = px0 + 1 + Math.random() * (plankPxW - 2);
           const sy = y0 + Math.random() * plankH;
           const slen = plankH * (0.15 + Math.random() * 0.7);
-          const shade = 40 + Math.random() * 70;
-          const a = 0.08 + Math.random() * 0.28;
-          ctx.strokeStyle = `rgba(${shade},${(shade*0.62)|0},${(shade*0.32)|0},${a})`;
+          // Lighter mid-brown grain — subtle tonal streaks rather than near-black lines.
+          const shade = 90 + Math.random() * 70;
+          const a = 0.05 + Math.random() * 0.18;
+          ctx.strokeStyle = `rgba(${shade},${(shade*0.7)|0},${(shade*0.45)|0},${a})`;
           ctx.lineWidth = 0.4 + Math.random() * 1.3;
           ctx.beginPath();
           ctx.moveTo(sx, sy);
@@ -1184,12 +1219,13 @@ export function createRoom(scene) {
       // aligns the knob's local +Z (its protrusion direction) with the
       // hallway side of the door — for side=-1 the hallway is toward +X so
       // rotation.y=+π/2 (which maps +Z → +X); for side=+1 the hallway is
-      // toward -X so rotation.y=-π/2.
+      // toward -X so rotation.y=-π/2. Y is the leaf's lock-rail Y so the
+      // knob sits on the horizontal rail between the tall + short panels.
       const knobZOffset = _hallDoorW/2 - 4;
       const knob = buildDoorKnob();
       knob.position.set(
         panelCenterX - side*(panelThick/2),
-        panelY - _hallDoorH/2 + 36,
+        panelY + leaf.userData.doorLeaf.lockRailY,
         panelZ + knobZOffset
       );
       knob.rotation.y = side < 0 ? Math.PI/2 : -Math.PI/2;
@@ -1899,8 +1935,11 @@ export function createRoom(scene) {
     return rightWall;
   })();
 
-  // Corner fill — patch the 0.5" gap between right wall (z=48.5) and back wall (z=49)
-  roomBox(0.5, wallHeight, 0.5, 0xd8d4ce, sideWallX, floorY + wallHeight / 2, 48.75, 0, 0, 0);
+  // Corner fill — patch the 0.5" gap between right wall (z=48.5) and back
+  // wall (z=49). Sits flush with the right-wall interior face at X=sideWallX
+  // (pre-mirror) so the bedroom wall, corner fill, and hallway wall all read
+  // as one continuous plane (no step/break at the junction).
+  roomBox(0.5, wallHeight, 0.5, 0xd8d4ce, sideWallX + 0.25, floorY + wallHeight / 2, 48.75, 0, 0, 0);
 
   // Baseboard — break into two pieces so it doesn't cross the closet opening.
   // Inset by trimW (2.5") to not stick past the door trim.
