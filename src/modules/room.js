@@ -1258,24 +1258,52 @@ export function createRoom(scene) {
     knob._isFoodBowl = true;
     addRoom(knob);
 
-    // Kibble pile — fills the bottom ~half of the hopper. Packed densely
-    // in a cone/pile shape (radius shrinks as we go up) so it looks like
-    // actual food settled by gravity, not floating pellets.
+    // Kibble pile — solid base (filled cone) + surface spheres on top for
+    // texture. The base ensures the food reads as a dense mass, not
+    // floating individual pellets.
     const kibbleMat = new THREE.MeshStandardMaterial({color:0x4a3020, roughness:0.9, metalness:0.0});
     const hopperBottomY = topOfBox + bodyH - hopperOverlap;
-    const pileH = hopperH * 0.5; // fill ~half the hopper
-    const kibbleCount = 220;
-    for (let i = 0; i < kibbleCount; i++) {
-      // Random height, biased toward the bottom (cube-root biases upward
-      // density; use a shallower curve so bottom is denser)
-      const t = Math.pow(Math.random(), 1.6); // 0=bottom, 1=top
-      const ky = hopperBottomY + 0.25 + t * pileH;
-      // Radius shrinks as we go up (slight cone, like a real pile)
-      const maxR = hopperR - 0.6 - t * 0.8;
+    const pileH = hopperH * 0.55; // fill ~55% of the hopper
+    const pileBaseR = hopperR - 0.25; // fills almost to the glass wall
+    const pileTopR = pileBaseR * 0.45; // cone taper at the top
+
+    // Solid pile base — one opaque cone/cylinder of kibble material. This
+    // is what makes the food look like a solid mass instead of floating
+    // spheres with gaps.
+    const pileGeo = new THREE.CylinderGeometry(pileTopR, pileBaseR, pileH, 24);
+    const pileMesh = new THREE.Mesh(pileGeo, kibbleMat);
+    pileMesh.position.set(feederX, hopperBottomY + pileH / 2 + 0.05, feederZ);
+    pileMesh._isFoodBowl = true;
+    addRoom(pileMesh);
+
+    // Surface-layer spheres — only sit on/near the pile's outer surface
+    // to give the illusion of individual kibble shapes without wasting
+    // geometry on hidden interior pellets.
+    const surfaceKibble = 160;
+    for (let i = 0; i < surfaceKibble; i++) {
+      // t biases slightly upward so the top of the pile is well-covered
+      const t = Math.pow(Math.random(), 0.85); // 0=bottom, 1=top
+      const ky = hopperBottomY + 0.08 + t * pileH;
+      // Cone surface radius at this height, plus small jitter outward
+      const surfR = pileBaseR + (pileTopR - pileBaseR) * t;
+      const rad = surfR + (Math.random() * 0.3 - 0.05);
       const ang = Math.random() * Math.PI * 2;
-      const rad = Math.sqrt(Math.random()) * maxR;
       const kx = feederX + Math.cos(ang) * rad;
       const kz = feederZ + Math.sin(ang) * rad;
+      const kSize = 0.22 + Math.random() * 0.13;
+      const kibble = new THREE.Mesh(new THREE.SphereGeometry(kSize, 6, 4), kibbleMat);
+      kibble.position.set(kx, ky, kz);
+      kibble._isFoodBowl = true;
+      addRoom(kibble);
+    }
+    // Extra cluster right at the top of the pile (cone tip) so it looks
+    // like the mound peaks rather than flat-tops abruptly.
+    for (let i = 0; i < 30; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const rad = Math.sqrt(Math.random()) * (pileTopR + 0.1);
+      const kx = feederX + Math.cos(ang) * rad;
+      const kz = feederZ + Math.sin(ang) * rad;
+      const ky = hopperBottomY + pileH + 0.05 + Math.random() * 0.25;
       const kSize = 0.22 + Math.random() * 0.13;
       const kibble = new THREE.Mesh(new THREE.SphereGeometry(kSize, 6, 4), kibbleMat);
       kibble.position.set(kx, ky, kz);
@@ -1317,18 +1345,26 @@ export function createRoom(scene) {
     brandArea._isFoodBowl = true;
     addRoom(brandArea);
 
-    // Food chute — dark dispensing slot on the front of the feeder body,
-    // sitting just above the food tray's top surface. Built as a curved
-    // cylindrical arc matching the body's taper so it hugs the surface
-    // cleanly (the body tapers from R=4.2 top to R=4.5 bottom, so a
-    // fixed-radius arc would be buried inside the body near the bottom).
-    const chuteW = 3.0;     // arc width along cylinder (roughly, at mid-R)
-    const chuteH = 1.6;     // vertical height
-    const midR = (bodyR + (bodyR + 0.3)) / 2; // ≈4.35 for arc-width calc
+    // Food chute — dark cutout on the front of the feeder body just above
+    // the tray. Built as a curved arc sitting slightly proud of the body
+    // (with matching taper) so it reads as a recessed dispensing slot
+    // rather than a decal. Rounded corners via a tall+short pair.
+    //
+    // No bezel/frame — the flat dark arc against the white body is the
+    // contrast that sells the "cutout" read. A taller bezel was previously
+    // showing as "two white dots" above/below the slot.
+    const chuteW = 3.2;     // arc width along cylinder
+    const chuteH = 1.8;     // vertical height
+    const midR = (bodyR + (bodyR + 0.3)) / 2;
     const chuteArc = chuteW / midR;
     const trayTopY = topOfBox + 1.6;
-    const chuteY = trayTopY + 0.2 + chuteH / 2;
-    const chuteMat = new THREE.MeshStandardMaterial({color:0x1a1a1a, roughness:0.9, metalness:0.0});
+    const chuteY = trayTopY + 0.15 + chuteH / 2;
+    // Deep black with a hint of emissive so even in shadow the cutout
+    // reads darker than any lit surface behind it.
+    const chuteMat = new THREE.MeshStandardMaterial({
+      color:0x050505, roughness:0.95, metalness:0.0,
+      emissive:0x000000
+    });
 
     // Body radius at chute's top and bottom Y (linear taper on body)
     const bodyBotR = bodyR + 0.3;
@@ -1341,26 +1377,31 @@ export function createRoom(scene) {
     const bodyRChuteTop = bodyRAt(chuteTopY);
     const bodyRChuteBot = bodyRAt(chuteBotY);
 
-    // Bezel: sits 0.04 proud of the body surface, matching its taper
-    const frameGeo = new THREE.CylinderGeometry(
-      bodyRChuteTop + 0.04, bodyRChuteBot + 0.04, chuteH, 24, 1, true,
-      -(chuteArc + 0.1) / 2, chuteArc + 0.1
-    );
-    const frame = new THREE.Mesh(frameGeo, bodyMat);
-    frame.position.set(feederX, chuteY, feederZ);
-    frame._isFoodBowl = true;
-    addRoom(frame);
-
-    // Dark chute panel: 0.05 further out than the bezel so the bezel
-    // reads as a thin light border around the dark slot
+    // Dark chute arc — sits 0.06 proud of the body surface, matching taper
     const chuteGeo = new THREE.CylinderGeometry(
-      bodyRChuteTop + 0.09, bodyRChuteBot + 0.09, chuteH, 24, 1, true,
+      bodyRChuteTop + 0.06, bodyRChuteBot + 0.06, chuteH, 32, 1, true,
       -chuteArc / 2, chuteArc
     );
     const chute = new THREE.Mesh(chuteGeo, chuteMat);
     chute.position.set(feederX, chuteY, feederZ);
     chute._isFoodBowl = true;
     addRoom(chute);
+
+    // Shadow lip above the chute — thin dark strip suggesting the
+    // overhang where food dispenses, reinforcing the "cutout" read.
+    const lipH = 0.12;
+    const lipY = chuteTopY - lipH / 2 + 0.02;
+    const bodyRLipTop = bodyRAt(lipY + lipH / 2);
+    const bodyRLipBot = bodyRAt(lipY - lipH / 2);
+    const lipGeo = new THREE.CylinderGeometry(
+      bodyRLipTop + 0.08, bodyRLipBot + 0.08, lipH, 32, 1, true,
+      -chuteArc / 2, chuteArc
+    );
+    const chuteLip = new THREE.Mesh(lipGeo,
+      new THREE.MeshStandardMaterial({color:0x000000, roughness:1.0, metalness:0.0}));
+    chuteLip.position.set(feederX, lipY, feederZ);
+    chuteLip._isFoodBowl = true;
+    addRoom(chuteLip);
 
     // Food tray — rounded rectangle with very rounded edges, bowl in the middle,
     // embedded into the feeder body (~2.5" overlap)
@@ -1504,7 +1545,20 @@ export function createRoom(scene) {
     // ── Stainless steel water bowl (right / window side of box) ──
     const bowlX = boxCenterX - 6; // toward window ("right" in world)
     const bowlR = 3.2, bowlH = 1.2, bowlWall = 0.2, bowlLipW = 0.4, bowlLipH = 0.2;
-    const bowlMat = stdMat({color:0xe8e8e8, roughness:0.08, metalness:0.92, envMapIntensity:2.0});
+    // Mirror-polished stainless: max metalness, near-zero roughness, and a
+    // clearcoat layer on top of the env-mapped metal base for that "wet
+    // chrome" sheen. MeshPhysicalMaterial extends MeshStandardMaterial so
+    // envMap/envMapIntensity still apply via the stdMat pipeline.
+    const bowlEnv = state.envMap || window._roomEnvMap;
+    const bowlMat = new THREE.MeshPhysicalMaterial({
+      color: 0xf5f5f5,
+      metalness: 1.0,
+      roughness: 0.02,
+      envMap: bowlEnv || null,
+      envMapIntensity: 3.0,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.02,
+    });
     // Cylindrical bowl with 90° edges — straight walls, flat bottom, lip on top
     const bowlPts = [
       new THREE.Vector2(0.01, -bowlH),              // center bottom (outer)
