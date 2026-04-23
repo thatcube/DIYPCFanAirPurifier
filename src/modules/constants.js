@@ -18,8 +18,8 @@ export const SHADOW_UPDATE_INTERVAL_MS = 1000 / 12;
 // Idle frame rate (non-game mode, no interaction)
 export const IDLE_FRAME_MS = 1000 / 18;
 
-// Raycast throttle in play mode (~10 Hz)
-export const RAYCAST_INTERVAL_MS = 96;
+// Raycast throttle in play mode (~6 Hz)
+export const RAYCAST_INTERVAL_MS = 160;
 
 // RGB LED base distance
 export const RGB_BASE_DIST = 45;
@@ -33,8 +33,7 @@ export const BLADE_FROSTED = { color: 0xffffff, opacity: 0.3, shininess: 5 };
 // Color presets
 export const DAY_CLEAR = 0xd4dce8;
 export const NIGHT_CLEAR = 0x181820;
-export const DAY_WALL = 0xd8d4ce;
-export const NIGHT_WALL = 0x2a2a35;
+
 
 // Cat color presets
 export const CAT_COLOR_PRESETS = {

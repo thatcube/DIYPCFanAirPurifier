@@ -112,7 +112,16 @@ function _applyFpPerformanceProfile(fpActive) {
     const fpDprCap = state.isMobile ? 0.42 : 0.5;
     renderer.setPixelRatio(Math.min(_fpPerfState.prePixelRatio, fpDprCap));
     // Keep shadows enabled in game mode so the window beam is visible.
-    // Shadow updates are already throttled to 8 Hz in FP mode.
+    // Shadow updates are already throttled to 4 Hz in FP mode.
+    // Reduce shadow map resolution in game mode for faster shadow passes.
+    if (lighting.key && lighting.key.shadow) {
+      _fpPerfState.preShadowMapSize = lighting.key.shadow.mapSize.x;
+      lighting.key.shadow.mapSize.set(512, 512);
+      if (lighting.key.shadow.map) {
+        lighting.key.shadow.map.dispose();
+        lighting.key.shadow.map = null;
+      }
+    }
     markShadowsDirty();
     onResize();
     return;
@@ -121,6 +130,15 @@ function _applyFpPerformanceProfile(fpActive) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, _getQualityDprCap()));
   renderer.shadowMap.enabled = _fpPerfState.preShadowEnabled;
   if (lighting.key) lighting.key.castShadow = _fpPerfState.preKeyCastShadow;
+  // Restore shadow map resolution
+  if (lighting.key && lighting.key.shadow && _fpPerfState.preShadowMapSize) {
+    const sz = _fpPerfState.preShadowMapSize;
+    lighting.key.shadow.mapSize.set(sz, sz);
+    if (lighting.key.shadow.map) {
+      lighting.key.shadow.map.dispose();
+      lighting.key.shadow.map = null;
+    }
+  }
   markShadowsDirty();
   onResize();
 }
@@ -191,10 +209,6 @@ const todRefs = {
   winBottom: roomRefs.winBottom,
   winFront: roomRefs.winFront,
   winBack: roomRefs.winBack,
-  wallMeshes: roomRefs.wallMeshes,
-  baseMeshes: roomRefs.baseMeshes,
-  floorMat: roomRefs.floorMat,
-  ceilingMat: roomRefs.ceilingMat,
   moonGlow: roomRefs.moonGlow,
   ceilSpot: roomRefs.ceilSpot,
   ceilGlow: roomRefs.ceilGlow,
@@ -605,6 +619,7 @@ window._setPlacement = (mode) => {
   camera.position.set(placementOffset.x + 25, placementOffset.y + 20, placementOffset.z + 35);
   controls.update();
   markShadowsDirty();
+  gameFp.invalidatePurifierCollision();
 };
 
 // FPS toggle
@@ -643,7 +658,7 @@ window._mobileJump = (down) => {
 // ── Purifier control bridges ────────────────────────────────────────
 
 window._toggleExplode = () => purifierRefs.toggleExplode();
-window._toggleFilter = () => purifierRefs.toggleFilter();
+window._toggleFilter = () => { purifierRefs.toggleFilter(); gameFp.invalidatePurifierCollision(); };
 window._toggleGrills = () => purifierRefs.toggleGrills();
 window._setGrillColor = (c) => purifierRefs.setGrillColor(c);
 window._toggleDims = () => purifierRefs.toggleDimensions();
@@ -680,11 +695,13 @@ window._setFeet = (style) => {
   const btn = document.getElementById(id);
   if (btn) btn.classList.add('on');
   markShadowsDirty();
+  gameFp.invalidatePurifierCollision();
 };
 
 window._setFootDia = (val) => {
   purifierRefs.setFootDiameter(parseFloat(val));
   markShadowsDirty();
+  gameFp.invalidatePurifierCollision();
 };
 
 const _initialBunFootH = state.bunFootH;
@@ -768,6 +785,7 @@ let _lastFrameTs = 0;
 let _fpsFrames = 0;
 let _fpsLast = performance.now();
 let _lastCatX = null, _lastCatZ = null;
+let _lastCoinDomUpdate = 0;
 
 // Cached DOM refs for per-frame updates
 const _elRunTimer = document.getElementById('runTimerText');
@@ -808,7 +826,11 @@ function animate(ts) {
     if (coins.coinScore > prevScore) coinBump();
     // Timer tick
     leaderboard.tickTimer(ts);
-    if (_elRunTimer) _elRunTimer.textContent = leaderboard.formatRunTime(leaderboard.getElapsed());
+    // Throttle DOM updates to ~10 Hz to reduce layout thrashing
+    if (ts - _lastCoinDomUpdate >= 100) {
+      _lastCoinDomUpdate = ts;
+      if (_elRunTimer) _elRunTimer.textContent = leaderboard.formatRunTime(leaderboard.getElapsed());
+    }
     // Check for run completion (all regular coins collected)
     if (coins.coinScore >= coins.coinTotal && coins.coinTotal > 0 && !leaderboard.isFinished()) {
       leaderboard.stopTimer();
@@ -832,17 +854,27 @@ function animate(ts) {
 
     // Keep speed derived from actual travel distance, with blend smoothing and
     // hysteresis so cat clips don't flicker between idle/walk around thresholds.
+    // IMPORTANT: vel is normalized to per-second (inches/sec) so thresholds are
+    // frame-rate independent. At 60fps vel ≈ 0.30/frame → 18/sec for walk.
     const prevX = Number.isFinite(_lastCatX) ? _lastCatX : gameFp.fpPos.x;
     const prevZ = Number.isFinite(_lastCatZ) ? _lastCatZ : gameFp.fpPos.z;
-    const vel = gameFp.fpMode
+    const rawDist = gameFp.fpMode
       ? Math.hypot(gameFp.fpPos.x - prevX, gameFp.fpPos.z - prevZ)
       : 0;
+    // Convert per-frame distance to per-second speed (frame-rate independent)
+    const vel = dtSec > 0.0001 ? rawDist / dtSec : 0;
     const animDt = dtSec * catAnimSpeed;
     const st = catAnimation.catMixer.userData || (catAnimation.catMixer.userData = {});
-    if (!Number.isFinite(st._moveBlend)) st._moveBlend = vel > 0.03 ? 1 : 0;
+    // Smoothed velocity to prevent jitter from frame timing noise
+    if (!Number.isFinite(st._smoothVel)) st._smoothVel = vel;
+    const velSmooth = 1 - Math.exp(-dtSec * 15);
+    st._smoothVel += (vel - st._smoothVel) * velSmooth;
+    const svel = st._smoothVel;
+
+    if (!Number.isFinite(st._moveBlend)) st._moveBlend = svel > 2 ? 1 : 0;
     let targetMove = st._moveBlend;
-    if (vel > 0.04) targetMove = 1;
-    else if (vel < 0.02) targetMove = 0;
+    if (svel > 2.5) targetMove = 1;
+    else if (svel < 1.0) targetMove = 0;
     const moveEase = 1 - Math.exp(-animDt * 9.5);
     st._moveBlend += (targetMove - st._moveBlend) * moveEase;
     const moveBlend = Math.max(0, Math.min(1, st._moveBlend));
@@ -854,7 +886,7 @@ function animate(ts) {
     const idleBlend = Math.max(0, Math.min(1, st._idleProceduralBlend));
 
     const sprintMult = Math.max(1, Number(preset.sprintAnimMult) || 1);
-    const sprinting = gameFp.fpMode && gameFp.fpKeys.shift && vel > 0.1;
+    const sprinting = gameFp.fpMode && gameFp.fpKeys.shift && svel > 6;
     const sprintBoost = sprinting ? sprintMult : 1;
 
     if (hasWalkClip) {
@@ -862,12 +894,12 @@ function animate(ts) {
       if (isBababooey) {
         // Bababooey has a single bouncy clip: run it subtly at idle, then ramp up.
         const idleTs = 0.18;
-        const runTs = (0.85 + vel * 40) * sprintBoost;
+        const runTs = (0.85 + svel * 0.65) * sprintBoost;
         catAnimation.catWalkAction.timeScale = idleTs + (runTs - idleTs) * moveBlend;
       } else {
         const walkBaseTs = catAppearance.catModelKey === 'toon'
-          ? (0.9 + vel * 2.2)
-          : (0.8 + vel * 2.0);
+          ? (0.9 + svel * 0.036)
+          : (0.8 + svel * 0.033);
         const walkTargetTs = walkBaseTs * sprintBoost;
         const walkTs = Number(catAnimation.catWalkAction.timeScale) || walkTargetTs;
         catAnimation.catWalkAction.timeScale += (walkTargetTs - walkTs) * Math.min(1, dtSec * 6);
@@ -875,7 +907,7 @@ function animate(ts) {
     }
 
     if (hasWalkClip && hasIdleClip) {
-      const walkW = Math.min(1, vel / 0.25) * moveBlend;
+      const walkW = Math.min(1, svel / 15) * moveBlend;
       catAnimation.catWalkAction.weight = walkW;
       catAnimation.catIdleAction.weight = (1 - walkW) * moveBlend;
       catAnimation.catIdleAction.paused = false;
@@ -887,7 +919,7 @@ function animate(ts) {
 
     if (isBababooey) {
       if (!Number.isFinite(st._bababooeyRunBlend)) st._bababooeyRunBlend = 0;
-      const runTarget = Math.min(1, vel / 0.25) * moveBlend;
+      const runTarget = Math.min(1, svel / 15) * moveBlend;
       const runEase = 1 - Math.exp(-dtSec * 5.0);
       st._bababooeyRunBlend += (runTarget - st._bababooeyRunBlend) * runEase;
       const runBlend = Math.max(0, Math.min(1, st._bababooeyRunBlend));
@@ -899,7 +931,7 @@ function animate(ts) {
     const loopPause = Math.max(0, Number(preset.idleLoopPause) || 0);
     const loopAction = catAnimation.catIdleAction || catAnimation.catWalkAction;
     if (loopPause > 0 && loopAction) {
-      catAnimation.applyLoopPause(loopAction, ts, loopPause, idleBlend > 0.35 && vel < 0.03);
+      catAnimation.applyLoopPause(loopAction, ts, loopPause, idleBlend > 0.35 && svel < 2);
     }
 
     // Bababooey keeps subtle bounce motion at idle; other cats pause clip
@@ -913,7 +945,7 @@ function animate(ts) {
 
     if (isBababooey && moveBlend > 0.001) {
       const runBlend = Number(st._bababooeyRunBlendSmoothed) || 0;
-      if (runBlend > 0.001) catAnimation.applyBababooeyProceduralRun(ts, vel, runBlend);
+      if (runBlend > 0.001) catAnimation.applyBababooeyProceduralRun(ts, svel, runBlend);
     }
 
     // Bababooey idle squish — gentle breathing when standing still
@@ -941,11 +973,13 @@ function animate(ts) {
   }
 
   // Purifier animations (fan spin, explode lerp, filter/drawer/bifold)
-  purifierRefs.update(dtSec, animFrameScale);
+  purifierRefs.update(dtSec, animFrameScale, gameFp.fpMode);
 
-  // Particles
-  particles.updateSpinSpeed(animFrameScale);
-  particles.update(animFrameScale);
+  // Particles — skip in game mode for better FPS
+  if (!gameFp.fpMode) {
+    particles.updateSpinSpeed(animFrameScale);
+    particles.update(animFrameScale);
+  }
 
   // Wall auto-fade (only in orbit mode — FP resets to opaque)
   if (!gameFp.fpMode) {
@@ -953,7 +987,8 @@ function animate(ts) {
   }
 
   // Shadow throttle — update on dirty flag OR periodically
-  const shadowIntervalMs = gameFp.fpMode ? Math.max(SHADOW_UPDATE_INTERVAL_MS, 1000 / 8) : SHADOW_UPDATE_INTERVAL_MS;
+  // In game mode: ~4 Hz (250ms) for maximum FPS while keeping window beam visible
+  const shadowIntervalMs = gameFp.fpMode ? 250 : SHADOW_UPDATE_INTERVAL_MS;
   if (renderer.shadowMap.enabled && (_shadowDirtyOneShot || (ts - _lastShadowUpdateTs) >= shadowIntervalMs)) {
     renderer.shadowMap.needsUpdate = true;
     _shadowDirtyOneShot = false;
