@@ -1391,23 +1391,53 @@ export function createRoom(scene) {
     const rAtChuteTop = bodyRAt(chuteTopY);
     const rAtChuteBot = bodyRAt(chuteBotY);
 
-    // ── Body piece 1: below the chute (full 360°) ──
-    const lowerH = chuteBotY - topOfBox;
-    const lowerGeo = new THREE.CylinderGeometry(rAtChuteBot, bodyBotR, lowerH, 32);
-    const lowerBody = new THREE.Mesh(lowerGeo, bodyMat);
-    lowerBody.position.set(feederX, topOfBox + lowerH / 2, feederZ);
-    lowerBody.castShadow = true; lowerBody.receiveShadow = true;
-    lowerBody._isFoodBowl = true;
-    addRoom(lowerBody);
+    // ── Bowl cutout geometry — the food bowl (radius ibR ≈ 3.1, centered
+    // ~5.7 in front of feeder center) clips into the front of the lower
+    // body. Carve an arc-gap on the +Z face of the lower body so the bowl
+    // nests into a real recess instead of intersecting solid plastic.
+    //
+    // Match the chute's split pattern: short full-360° sliver below the
+    // bowl, then an arc-gap section from bowl bottom up to chute bottom.
+    const bowlHoleR = 3.15;               // slight margin around bowl rim (ibR=3.1)
+    const bowlBottomLocalY = topOfBox + 0.4; // below bowl's lowest point
+    // Gap arc width — chord of (bowlHoleR) inscribed in the cylinder at
+    // the narrowest (top) point of the gap section.
+    const bowlArc = 2 * Math.asin(Math.min(0.99, bowlHoleR / rAtChuteBot));
+    const rAtBowlBot = bodyRAt(bowlBottomLocalY);
+
+    // ── Body piece 1a: sliver below the bowl (full 360°) ──
+    const lower1H = bowlBottomLocalY - topOfBox;
+    if (lower1H > 0.01) {
+      const l1Geo = new THREE.CylinderGeometry(rAtBowlBot, bodyBotR, lower1H, 32);
+      const l1 = new THREE.Mesh(l1Geo, bodyMat);
+      l1.position.set(feederX, topOfBox + lower1H / 2, feederZ);
+      l1.castShadow = true; l1.receiveShadow = true;
+      l1._isFoodBowl = true;
+      addRoom(l1);
+    }
+
+    // ── Body piece 1b: bowl-cutout ring (arc with gap at +Z front) ──
+    // three.js CylinderGeometry: theta=0 points at +Z (x=r·sinθ, z=r·cosθ).
+    // So the +Z front is at theta=0, and we center the gap there.
+    const lower2H = chuteBotY - bowlBottomLocalY;
+    const lower2Geo = new THREE.CylinderGeometry(
+      rAtChuteBot, rAtBowlBot, lower2H, 32, 1, false,
+      bowlArc / 2, 2 * Math.PI - bowlArc
+    );
+    const lower2Body = new THREE.Mesh(lower2Geo, bodyMat);
+    lower2Body.position.set(feederX, bowlBottomLocalY + lower2H / 2, feederZ);
+    lower2Body.castShadow = true; lower2Body.receiveShadow = true;
+    lower2Body._isFoodBowl = true;
+    addRoom(lower2Body);
 
     // ── Body piece 2: the chute ring (arc with gap at +Z front) ──
-    // Three.js CylinderGeometry: thetaStart=0 points at +X; the +Z front
-    // is at theta=+π/2. We want a gap centered at +π/2 spanning chuteArc.
-    // So the remaining arc starts at π/2 + chuteArc/2 and spans 2π - chuteArc.
+    // three.js CylinderGeometry: theta=0 points at +Z (x=r·sinθ, z=r·cosθ).
+    // We want a gap centered on +Z (theta=0) spanning chuteArc. So the
+    // remaining arc starts at chuteArc/2 and spans 2π - chuteArc.
     const midH = chuteTopY - chuteBotY; // = chuteH
     const midGeo = new THREE.CylinderGeometry(
       rAtChuteTop, rAtChuteBot, midH, 32, 1, false,
-      Math.PI / 2 + chuteArc / 2, 2 * Math.PI - chuteArc
+      chuteArc / 2, 2 * Math.PI - chuteArc
     );
     const midBody = new THREE.Mesh(midGeo, bodyMat);
     midBody.position.set(feederX, chuteBotY + midH / 2, feederZ);
@@ -1433,13 +1463,16 @@ export function createRoom(scene) {
     const interiorR = rAtChuteBot - 0.6;
     const interiorGeo = new THREE.CylinderGeometry(
       interiorR, interiorR, chuteH + 0.1, 24, 1, true,
-      Math.PI / 2 - chuteArc / 2, chuteArc
+      -chuteArc / 2, chuteArc
     );
     const chuteInterior = new THREE.Mesh(interiorGeo, chuteDarkMat);
     chuteInterior.position.set(feederX, chuteY, feederZ);
     chuteInterior._isFoodBowl = true;
     addRoom(chuteInterior);
     // Dark top cap of the opening — the overhang the food drops from
+    // RingGeometry: x=r·cosθ, y=r·sinθ. This mesh is rotated by rotation.x=+π/2
+    // which maps local y → world z, so world +Z corresponds to θ=+π/2. Center
+    // the ring arc at +π/2 to sit over the +Z front gap.
     const overhangGeo = new THREE.RingGeometry(interiorR - 0.05, rAtChuteTop, 24, 1,
       Math.PI / 2 - chuteArc / 2, chuteArc);
     const chuteOverhang = new THREE.Mesh(overhangGeo, chuteDarkMat);
@@ -1448,8 +1481,10 @@ export function createRoom(scene) {
     chuteOverhang._isFoodBowl = true;
     addRoom(chuteOverhang);
     // Dark bottom cap of the opening
+    // This mesh is rotated by rotation.x=-π/2 which maps local y → world -z,
+    // so world +Z corresponds to θ=-π/2. Center the arc at -π/2.
     const floorGeo = new THREE.RingGeometry(interiorR - 0.05, rAtChuteBot, 24, 1,
-      Math.PI / 2 - chuteArc / 2, chuteArc);
+      -Math.PI / 2 - chuteArc / 2, chuteArc);
     const chuteFloor = new THREE.Mesh(floorGeo, chuteDarkMat);
     chuteFloor.rotation.x = -Math.PI / 2;
     chuteFloor.position.set(feederX, chuteBotY + 0.01, feederZ);
