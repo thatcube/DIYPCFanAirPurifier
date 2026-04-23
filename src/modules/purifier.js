@@ -2047,9 +2047,12 @@ export function createPurifier(scene) {
       if(!_roomOutdoorMat || !_applyTimeOfDay) return;
       _windowIsNight=!_windowIsNight;
       if(_roomOutdoorNightTex && _roomOutdoorDayTex) {
+        // Swap the texture map on the existing MeshBasicMaterial. Do NOT
+        // set material.needsUpdate — that forces a shader recompile which
+        // causes a visible stutter on day/night toggle. Swapping .map on
+        // a material that already has a map is a cheap pointer swap.
         _roomOutdoorMat.map=_windowIsNight?_roomOutdoorNightTex:_roomOutdoorDayTex;
         _roomOutdoorMat.color.setHex(_windowIsNight?0x445566:0xfff0d4);
-        _roomOutdoorMat.needsUpdate=true;
       }
       const todSlider=_el('todSlider');
       if(_windowIsNight){

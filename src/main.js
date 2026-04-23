@@ -291,6 +291,14 @@ lighting.applyTimeOfDay(_initMinute, todRefs);
 // Force shadow update after TOD repositions lights
 _shadowDirtyOneShot = true;
 
+// Pre-upload the day/night outdoor textures so the first day↔night toggle
+// doesn't stall rendering while the GPU uploads a 512×512 canvas texture.
+// Without this the first click on the window causes a visible stutter.
+if (renderer.initTexture) {
+  if (roomRefs.outdoorDayTex) renderer.initTexture(roomRefs.outdoorDayTex);
+  if (roomRefs.outdoorNightTex) renderer.initTexture(roomRefs.outdoorNightTex);
+}
+
 // Wire room refs into purifier for click interactions (lamp, ceiling light, window)
 purifierRefs.setRoomRefs({
   lampLight: roomRefs.lampLight,
