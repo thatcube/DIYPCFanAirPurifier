@@ -15,6 +15,7 @@ import {
   spawnSecretWindowCoin,
   spawnSecretDrawerCoin,
   spawnSecretMacbookCoin,
+  spawnSecretTvCoin,
   getAudioCtx as _getAudioCtx,
   setAudioCtx as _setAudioCtx
 } from './coins.js';
@@ -38,6 +39,7 @@ export function createPurifier(scene) {
   let _windowIsNight = false;
   let _applyTimeOfDay = null;
   let _toggleMacbook = null;
+  let _toggleTV = null;
   let _toggleCornerDoor = null;
   let _uiSfxAC = null;
 
@@ -1727,7 +1729,7 @@ export function createPurifier(scene) {
   function getInteractiveTarget(obj){
     let p=obj;
     while(p){
-      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isCornerDoorHandle||p._isMacbook||p._isWindow) return p;
+      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isCornerDoorHandle||p._isMacbook||p._isWindow||p._isTV) return p;
       p=p.parent;
     }
     return null;
@@ -2072,6 +2074,12 @@ export function createPurifier(scene) {
     if(obj._isMacbook){
       if(_toggleMacbook) _toggleMacbook();
       if(_fpMode) spawnSecretMacbookCoin();
+      return;
+    }
+    // Clicked the TV → toggle on/off + spawn secret coin on first click.
+    if(obj._isTV){
+      if(_toggleTV) _toggleTV();
+      if(_fpMode) spawnSecretTvCoin();
       return;
     }
   }
@@ -3455,9 +3463,11 @@ export function createPurifier(scene) {
     if (refs.outdoor && refs.outdoor.material) _roomOutdoorMat = refs.outdoor.material;
     if (refs.outdoorDayTex) _roomOutdoorDayTex = refs.outdoorDayTex;
     if (refs.outdoorNightTex) _roomOutdoorNightTex = refs.outdoorNightTex;
+    if (refs.windowIsNight !== undefined) _windowIsNight = refs.windowIsNight;
     if (refs.applyTimeOfDay) _applyTimeOfDay = refs.applyTimeOfDay;
     if (refs.markShadowsDirty) _markShadowsDirty = refs.markShadowsDirty;
     if (refs.toggleMacbook) _toggleMacbook = refs.toggleMacbook;
+    if (refs.toggleTV) _toggleTV = refs.toggleTV;
     if (refs.toggleCornerDoor) _toggleCornerDoor = refs.toggleCornerDoor;
   }
 

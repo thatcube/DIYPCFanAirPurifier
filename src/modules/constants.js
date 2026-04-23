@@ -58,4 +58,4 @@ export const CAT_MODEL_PRESETS = {
 };
 
 // Secret coin total (for all-found check)
-export const TOTAL_SECRETS = 8;
+export const TOTAL_SECRETS = 9;

@@ -608,6 +608,44 @@ function _buildStaticBoxes() {
     yTop: msY + msH / 2, yBottom: msY - msH / 2, room: true
   });
 
+  // Cat feeder + shoe box + water bowl (TV wall / closet corner)
+  // Pre-mirror: boxCenterX=28, feederZ=-74, boxW=24, boxH=5, boxD=16
+  // Feeder at boxCenterX+6=34, bowl at boxCenterX-6=22
+  {
+    const bCX = 28, fZ = -74;
+    const bxW = 24, bxH = 5, bxD = 16;
+    // Shoe box
+    _staticBoxes.push({
+      xMin: -(bCX + bxW/2), xMax: -(bCX - bxW/2),
+      zMin: fZ - bxD/2, zMax: fZ + bxD/2,
+      yTop: fy + bxH, yBottom: fy, room: true
+    });
+    // Feeder body + hopper (cylinder simplified as AABB)
+    const fX = bCX + 6; // feeder offset toward closet
+    const bodyR = 4.2, bodyH = 8, hopperH = 6;
+    _staticBoxes.push({
+      xMin: -(fX + bodyR), xMax: -(fX - bodyR),
+      zMin: fZ - bodyR, zMax: fZ + bodyR,
+      yTop: fy + bxH + bodyH + hopperH + 1.3, yBottom: fy + bxH, room: true
+    });
+    // Food tray (rounded bowl, AABB approximation)
+    const trayR = 3.5, trayH = 1.8;
+    const trayZ = fZ + bodyR + trayR - 0.5;
+    _staticBoxes.push({
+      xMin: -(fX + trayR), xMax: -(fX - trayR),
+      zMin: trayZ - trayR, zMax: trayZ + trayR,
+      yTop: fy + bxH + trayH, yBottom: fy + bxH, room: true
+    });
+    // Water bowl (right / window side)
+    const bowlX = bCX - 6;
+    const bowlR = 3.6, bowlH = 1.2; // slightly larger AABB for lip
+    _staticBoxes.push({
+      xMin: -(bowlX + bowlR), xMax: -(bowlX - bowlR),
+      zMin: fZ - bowlR, zMax: fZ + bowlR,
+      yTop: fy + bxH + bowlH + 0.2, yBottom: fy + bxH, room: true
+    });
+  }
+
   // Headboard — full height from bed clearance to top of headboard
   // Monolith: hbW=bedW, hbThick=3, hbH=bedH-bedClearance=35.5
   const hbW = BED_W, hbThick = 3, hbH = BED_H - BED_CLEARANCE;

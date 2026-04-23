@@ -98,14 +98,16 @@ export function createLights(isMobile) {
   scene.add(hemiLight);
 
   // Key directional (sun through window)
+  // Shadow radius kept low (3) so the window-wall sections cast a clearly
+  // visible window-shaped shadow on the floor and opposite wall.
   key = new THREE.DirectionalLight(0xffe0a0, 1.4);
   key.position.set(95, 38, 0);
   key.castShadow = true;
   key.shadow.mapSize.set(isMobile ? 1024 : 2048, isMobile ? 1024 : 2048);
   key.shadow.bias = -0.0005;
   key.shadow.normalBias = 0.04;
-  key.shadow.radius = isMobile ? 6 : 12;
-  key.shadow.blurSamples = isMobile ? 8 : 20;
+  key.shadow.radius = isMobile ? 5 : 8;
+  key.shadow.blurSamples = isMobile ? 8 : 16;
   key.shadow.camera.near = 1;
   key.shadow.camera.far = 280;
   key.shadow.camera.left = -120;
@@ -238,7 +240,9 @@ export function applyTimeOfDay(minuteOfDay, refs) {
   const baseKeyIntensity = mix(0.34, 1.85, sun) + warm * 0.18;
   key.intensity = beam > 0 ? Math.max(0.4, baseKeyIntensity * 0.75) * beam : 0;
   windowSun.visible = beam > 0;
-  windowSun.intensity = beam > 0 ? Math.max(0.32, baseKeyIntensity * 0.72) * beam : 0;
+  // SpotLight intensity is in candela (physically correct) — scale up from the
+  // legacy baseKeyIntensity so the beam is actually visible on surfaces.
+  windowSun.intensity = beam > 0 ? Math.max(50, baseKeyIntensity * 140) * beam : 0;
 
   // Window sun sweep positions
   const beamSrcY = Math.max(refs.winBottom + 4, Math.min(refs.winTop - 4, mix(refs.winTop + 11, refs.winTop + 1, dayTravel)));
@@ -275,9 +279,9 @@ export function applyTimeOfDay(minuteOfDay, refs) {
   if (refs.domeMat) refs.domeMat.emissiveIntensity = refs.ceilLightOn ? mix(1.2, 0.65, sun) : 0;
   if (_cg) _cg.intensity = refs.ceilLightOn ? mix(50, 25, sun) : 0;
 
-  // Outdoor backdrop
+  // Outdoor backdrop — dim significantly at night
   if (refs.outdoor) {
-    refs.outdoor.material.color.setScalar(mix(0.35, 1.4, sun) + warm * 0.25);
+    refs.outdoor.material.color.setScalar(mix(0.12, 1.2, sun) + warm * 0.2);
   }
 
   // Moonlight

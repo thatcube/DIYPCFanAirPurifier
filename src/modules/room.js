@@ -634,6 +634,7 @@ export function createRoom(scene) {
     tvCenterX, tvCenterY, tvZ, 0,0,0);
   tvFrame.material.roughness=0.3;
   tvFrame.material.metalness=0.6;
+  tvFrame._isTV=true;
   
   // Screen — dark glossy panel, optionally displays an image (pokopia.jpg if present).
   const screenGeo=new THREE.PlaneGeometry(tvW, tvH);
@@ -645,6 +646,7 @@ export function createRoom(scene) {
   const screen=new THREE.Mesh(screenGeo, screenMat);
   screen.position.set(tvCenterX, tvCenterY, tvZ+tvD/2+0.08);
   screen._isRoom=true;
+  screen._isTV=true;
   addRoom(screen);
   // Load TV screen image — falls back silently to dark glass if file is missing.
   new THREE.TextureLoader().load(
@@ -743,6 +745,165 @@ export function createRoom(scene) {
       new THREE.MeshStandardMaterial({color:0xfafafa,roughness:0.2}));
     logoArea.position.set(msX, msY+msH/2-3, msZ+msD/2+0.06);
     logoArea._isRoom=true; addRoom(logoArea);
+  }
+
+  // ─── Cat food feeder on black shoe box (TV wall / closet corner) ────
+  {
+    // Placement: between TV wall and closet opening, ~1.5ft from closet wall.
+    // Pre-mirror coords: sideWallX=51, oppWallZ=-78, closet edge at Z=-70.
+    const boxCenterX = 28;    // box center
+    const feederZ = -74;      // Z position for everything
+
+    // ── Black shoe box (platform) ──
+    const boxW = 24, boxH = 5, boxD = 16;
+    const boxY = floorY + boxH / 2;
+    const boxMat = new THREE.MeshStandardMaterial({color:0x111111, roughness:0.85, metalness:0.02});
+    const shoeBox = new THREE.Mesh(new THREE.BoxGeometry(boxW, boxH, boxD), boxMat);
+    shoeBox.position.set(boxCenterX, boxY, feederZ);
+    shoeBox.castShadow = true; shoeBox.receiveShadow = true;
+    addRoom(shoeBox);
+
+    // ── WOpet-style automatic cat feeder (offset toward closet = "left" in world) ──
+    const topOfBox = floorY + boxH;
+    const feederX = boxCenterX + 6; // shifted toward closet side
+
+    // Main body — white rounded cylinder
+    const bodyR = 4.2, bodyH = 8;
+    const bodyY = topOfBox + bodyH / 2;
+    const bodyMat = new THREE.MeshStandardMaterial({color:0xf0f0f0, roughness:0.35, metalness:0.05});
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(bodyR, bodyR+0.3, bodyH, 32), bodyMat);
+    body.position.set(feederX, bodyY, feederZ);
+    body.castShadow = true; body.receiveShadow = true;
+    addRoom(body);
+
+    // Hopper — smoked transparent dome/cylinder on top
+    const hopperR = 4.0, hopperH = 6;
+    const hopperY = topOfBox + bodyH + hopperH / 2;
+    const hopperMat = new THREE.MeshStandardMaterial({
+      color:0x3d2b1a, roughness:0.15, metalness:0.02,
+      transparent:true, opacity:0.55, side:THREE.DoubleSide
+    });
+    const hopper = new THREE.Mesh(new THREE.CylinderGeometry(hopperR-0.3, hopperR, hopperH, 32), hopperMat);
+    hopper.position.set(feederX, hopperY, feederZ);
+    hopper.castShadow = true; hopper.receiveShadow = true;
+    addRoom(hopper);
+
+    // Hopper lid — flat disc on top
+    const lidMat = new THREE.MeshStandardMaterial({color:0x4a3828, roughness:0.3, metalness:0.05, transparent:true, opacity:0.6});
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(hopperR-0.2, hopperR-0.3, 0.5, 32), lidMat);
+    lid.position.set(feederX, hopperY + hopperH/2 + 0.25, feederZ);
+    addRoom(lid);
+    // Lid knob
+    const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 0.6, 12), new THREE.MeshStandardMaterial({color:0x666666, roughness:0.4, metalness:0.3}));
+    knob.position.set(feederX, hopperY + hopperH/2 + 0.8, feederZ);
+    addRoom(knob);
+
+    // Kibble visible inside hopper — cluster of small brown spheres
+    const kibbleMat = new THREE.MeshStandardMaterial({color:0x4a3020, roughness:0.9, metalness:0.0});
+    for (let i = 0; i < 40; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.random() * (hopperR - 1.2);
+      const kx = feederX + Math.cos(angle) * r;
+      const kz = feederZ + Math.sin(angle) * r;
+      const ky = hopperY - hopperH/2 + 0.4 + Math.random() * (hopperH * 0.6);
+      const kSize = 0.2 + Math.random() * 0.15;
+      const kibble = new THREE.Mesh(new THREE.SphereGeometry(kSize, 5, 4), kibbleMat);
+      kibble.position.set(kx, ky, kz);
+      addRoom(kibble);
+    }
+
+    // Front panel — black display area (faces +Z in pre-mirror → faces -Z in world)
+    const panelW = 3.5, panelH = 3, panelD = 0.15;
+    const panelY = bodyY + bodyH/2 - panelH/2 - 1.5;
+    const panelZ = feederZ + bodyR + 0.1;
+    const panelMat = new THREE.MeshStandardMaterial({color:0x111111, roughness:0.3, metalness:0.1});
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(panelW, panelH, panelD), panelMat);
+    panel.position.set(feederX, panelY, panelZ);
+    addRoom(panel);
+
+    // Blue LED status bar on the panel
+    const ledBarMat = new THREE.MeshStandardMaterial({color:0x2288ff, emissive:0x2288ff, emissiveIntensity:0.6, roughness:0.2});
+    const ledBar = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.35, 0.05), ledBarMat);
+    ledBar.position.set(feederX, panelY + 0.5, panelZ + panelD/2 + 0.03);
+    addRoom(ledBar);
+
+    // Two round buttons below the panel
+    const btnMat = new THREE.MeshStandardMaterial({color:0xe8e8e8, roughness:0.3, metalness:0.05});
+    for (let bi = -1; bi <= 1; bi += 2) {
+      const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.15, 12), btnMat);
+      btn.rotation.x = Math.PI / 2;
+      btn.position.set(feederX + bi * 1.0, panelY - panelH/2 - 0.7, panelZ + 0.1);
+      addRoom(btn);
+    }
+
+    // "wopet" brand text area — small lighter rectangle on hopper front
+    const brandArea = new THREE.Mesh(new THREE.BoxGeometry(3, 0.8, 0.08),
+      new THREE.MeshStandardMaterial({color:0xff6633, emissive:0xff6633, emissiveIntensity:0.15, roughness:0.3}));
+    brandArea.position.set(feederX, hopperY - 0.5, feederZ + hopperR + 0.05);
+    addRoom(brandArea);
+
+    // Food tray — rounded bowl extending from the front base (lathe profile)
+    const trayR = 3.5, trayH = 1.8, trayWallThick = 0.25;
+    const trayZ = feederZ + bodyR + trayR - 0.5;
+    const trayMat = new THREE.MeshStandardMaterial({color:0xe0e0e0, roughness:0.4, metalness:0.05});
+    // Outer bowl shape via LatheGeometry
+    const trayPts = [];
+    for (let i = 0; i <= 12; i++) {
+      const t = i / 12;
+      const r = trayR * Math.sin(t * Math.PI / 2);
+      const y = -trayH * (1 - t);
+      trayPts.push(new THREE.Vector2(r, y));
+    }
+    // Lip at the top
+    trayPts.push(new THREE.Vector2(trayR + 0.15, 0));
+    trayPts.push(new THREE.Vector2(trayR + 0.15, 0.2));
+    // Inner wall (goes back down)
+    for (let i = 12; i >= 0; i--) {
+      const t = i / 12;
+      const r = (trayR - trayWallThick) * Math.sin(t * Math.PI / 2);
+      const y = -trayH * (1 - t) + trayWallThick * 0.5;
+      trayPts.push(new THREE.Vector2(Math.max(r, 0.01), y));
+    }
+    const trayGeo = new THREE.LatheGeometry(trayPts, 32);
+    const trayMesh = new THREE.Mesh(trayGeo, trayMat);
+    trayMesh.position.set(feederX, topOfBox + trayH, trayZ);
+    trayMesh.castShadow = true; trayMesh.receiveShadow = true;
+    addRoom(trayMesh);
+
+    // Kibble in the tray
+    for (let i = 0; i < 18; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const rad = Math.random() * (trayR - 1.0);
+      const kx = feederX + Math.cos(ang) * rad;
+      const kz = trayZ + Math.sin(ang) * rad;
+      const ky = topOfBox + trayWallThick + 0.2 + Math.random() * 0.3;
+      const kSize = 0.18 + Math.random() * 0.12;
+      const k = new THREE.Mesh(new THREE.SphereGeometry(kSize, 5, 4), kibbleMat);
+      k.position.set(kx, ky, kz);
+      addRoom(k);
+    }
+
+    // ── Stainless steel water bowl (right / window side of box) ──
+    const bowlX = boxCenterX - 6; // toward window ("right" in world)
+    const bowlR = 3.2, bowlH = 1.2, bowlWall = 0.2, bowlLipW = 0.4, bowlLipH = 0.2;
+    const bowlMat = stdMat({color:0xe8e8e8, roughness:0.08, metalness:0.92, envMapIntensity:2.0});
+    // Cylindrical bowl with 90° edges — straight walls, flat bottom, lip on top
+    const bowlPts = [
+      new THREE.Vector2(0.01, -bowlH),              // center bottom (outer)
+      new THREE.Vector2(bowlR, -bowlH),              // bottom outer edge
+      new THREE.Vector2(bowlR, 0),                    // wall top (sharp 90°)
+      new THREE.Vector2(bowlR + bowlLipW, 0),         // lip extends outward
+      new THREE.Vector2(bowlR + bowlLipW, bowlLipH),  // lip top outer
+      new THREE.Vector2(bowlR - bowlWall, bowlLipH),  // lip top inner
+      new THREE.Vector2(bowlR - bowlWall, 0.01),      // inner wall top
+      new THREE.Vector2(bowlR - bowlWall, -(bowlH - bowlWall)), // inner wall bottom
+      new THREE.Vector2(0.01, -(bowlH - bowlWall)),   // inner floor center
+    ];
+    const bowlGeo = new THREE.LatheGeometry(bowlPts, 32);
+    const bowlMesh = new THREE.Mesh(bowlGeo, bowlMat);
+    bowlMesh.position.set(bowlX, topOfBox + bowlH, feederZ);
+    bowlMesh.castShadow = true; bowlMesh.receiveShadow = true;
+    addRoom(bowlMesh);
   }
   
   // ─── Right side wall (with a cut-out for the bifold closet) ───
@@ -1132,12 +1293,14 @@ export function createRoom(scene) {
   nightOutdoorTex.generateMipmaps=false;
   nightOutdoorTex.minFilter=THREE.LinearFilter;
   
-  let _windowIsNight=false;
+  // Auto-detect night based on local clock (before 6 AM or after 8 PM)
+  const _curHour = new Date().getHours();
+  let _windowIsNight = _curHour >= 20 || _curHour < 6;
   const _outdoorDayTex=outdoorTex;
   const _outdoorNightTex=nightOutdoorTex;
   
-  const outdoorMat=new THREE.MeshBasicMaterial({map:outdoorTex, color:0xfff0d4}); // warm sunlight tint
-  outdoorMat.toneMapped=false; // bypass ACES compression — let it be BRIGHT
+  const outdoorMat=new THREE.MeshBasicMaterial({map:_windowIsNight?nightOutdoorTex:outdoorTex, color:_windowIsNight?0x445566:0xfff0d4});
+  outdoorMat.toneMapped=false;
   const outdoorGeo=new THREE.PlaneGeometry(winW*2.5, winH*2);
   const outdoor=new THREE.Mesh(outdoorGeo, outdoorMat);
   outdoor.rotation.y=Math.PI/2;
@@ -1704,6 +1867,24 @@ export function createRoom(scene) {
     });
   }
 
+  // TV toggle function (called from purifier click handler via roomRefs)
+  let _tvOn = true;
+  function toggleTV() {
+    _tvOn = !_tvOn;
+    if (screen) {
+      screen.material.emissiveIntensity = _tvOn ? 0.85 : 0;
+      if (_tvOn) {
+        screen.material.color.setHex(0x000000);
+        screen.material.roughness = 0.4;
+      } else {
+        screen.material.color.setHex(0x050505);
+        screen.material.roughness = 0.05;
+      }
+      screen.material.needsUpdate = true;
+    }
+    if (tvGlow) tvGlow.intensity = _tvOn ? 50 : 0;
+  }
+
   // MacBook toggle function (called from purifier click handler via roomRefs)
   function toggleMacbook() {
     _macbookOn = !_macbookOn;
@@ -1747,10 +1928,14 @@ export function createRoom(scene) {
     ceilSpot: typeof ceilSpot !== 'undefined' ? ceilSpot : null,
     ceilGlow: typeof ceilGlow !== 'undefined' ? ceilGlow : null,
     moonGlow: typeof moonGlow !== 'undefined' ? moonGlow : null,
+    outdoorDayTex: _outdoorDayTex,
+    outdoorNightTex: _outdoorNightTex,
+    windowIsNight: _windowIsNight,
     leftWallX,
     toggleCornerDoor,
     getCornerDoorPanelMesh: () => doorPanel,
     getCornerDoorAngle: () => _cornerDoorAngle,
+    toggleTV,
     toggleMacbook,
     setMacbookMuted,
     getMacbookScreenMesh: () => _macbookScreen,
