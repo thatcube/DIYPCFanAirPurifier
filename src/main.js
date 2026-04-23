@@ -194,6 +194,7 @@ const todRefs = {
   wallMeshes: roomRefs.wallMeshes,
   baseMeshes: roomRefs.baseMeshes,
   floorMat: roomRefs.floorMat,
+  ceilingMat: roomRefs.ceilingMat,
   moonGlow: roomRefs.moonGlow,
   ceilSpot: roomRefs.ceilSpot,
   ceilGlow: roomRefs.ceilGlow,
