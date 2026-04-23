@@ -33,7 +33,7 @@ export function createPurifier(scene) {
 
   // Room refs — set after both room and purifier are built via setRoomRefs()
   let _roomLampOn = true, _roomLampLight = null, _roomLampShade = null, _roomLampBulb = null;
-  let _roomCeilLightOn = true, _roomCeilSpot = null, _roomDomeMat = null, _roomCeilGlow = null;
+  let _roomCeilLightOn = true, _roomCeilSpot = null, _roomDomeMat = null, _roomCeilGlow = null, _todRefs = null;
   let _roomOutdoorMat = null, _roomOutdoorDayTex = null, _roomOutdoorNightTex = null;
   let _windowIsNight = false;
   let _applyTimeOfDay = null;
@@ -1963,7 +1963,7 @@ export function createPurifier(scene) {
     if(obj._isLamp){
       if(!_roomLampLight) return;
       _roomLampOn=!_roomLampOn;
-      _roomLampLight.intensity=_roomLampOn?3.4:0;
+      _roomLampLight.intensity=_roomLampOn?400:0;
       if(_roomLampShade) _roomLampShade.material.emissiveIntensity=_roomLampOn?0.75:0;
       if(_roomLampBulb) _roomLampBulb.material.emissiveIntensity=_roomLampOn?1.9:0;
       _markShadowsDirty();
@@ -1974,15 +1974,16 @@ export function createPurifier(scene) {
     if(obj._isCeilLight){
       if(!_roomCeilSpot) return;
       _roomCeilLightOn=!_roomCeilLightOn;
+      if(_todRefs) _todRefs.ceilLightOn=_roomCeilLightOn;
       if(_roomCeilLightOn){
         const todSlider=_el('todSlider');
         const minutes=parseInt(todSlider?.value || '870', 10);
         if(_applyTimeOfDay){
           _applyTimeOfDay(minutes);
         } else {
-          _roomCeilSpot.intensity=1.4;
-          if(_roomDomeMat) _roomDomeMat.emissiveIntensity=0.9;
-          if(_roomCeilGlow) _roomCeilGlow.intensity=0.4;
+          _roomCeilSpot.intensity=80;
+          if(_roomDomeMat) _roomDomeMat.emissiveIntensity=0.7;
+          if(_roomCeilGlow) _roomCeilGlow.intensity=30;
         }
       } else {
         _roomCeilSpot.intensity=0;
@@ -3450,6 +3451,7 @@ export function createPurifier(scene) {
     if (refs.ceilSpot) _roomCeilSpot = refs.ceilSpot;
     if (refs.domeMat) _roomDomeMat = refs.domeMat;
     if (refs.ceilGlow) _roomCeilGlow = refs.ceilGlow;
+    if (refs.todRefs) _todRefs = refs.todRefs;
     if (refs.outdoor && refs.outdoor.material) _roomOutdoorMat = refs.outdoor.material;
     if (refs.outdoorDayTex) _roomOutdoorDayTex = refs.outdoorDayTex;
     if (refs.outdoorNightTex) _roomOutdoorNightTex = refs.outdoorNightTex;

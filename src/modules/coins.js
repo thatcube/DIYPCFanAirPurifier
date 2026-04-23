@@ -13,6 +13,7 @@ export let coinScore = 0;
 export let coinSecretScore = 0;
 export let coinTotal = 0;
 export const PICK_RADIUS = 4.6;
+const PICK_RADIUS_SQ = PICK_RADIUS * PICK_RADIUS;
 
 // Shared geometry + materials (lazy init)
 let _geo = null;
@@ -405,15 +406,21 @@ export function spawnSecretLampCoin() {
 }
 
 export function spawnSecretCeilingLightCoins() {
-  const fy = getFloorY();
-  const pbX = -(SIDE_WALL_X + 2.5);
-  const pbZBase = CLOSET_Z - CLOSET_INTERIOR_W / 2 + 4;
-  const pbStep = 3.2;
   if (_secretTriggered['powerbi']) return;
   _secretTriggered['powerbi'] = true;
-  addCoin(_coinGroup, new THREE.Vector3(pbX, fy + 6, pbZBase), { secret: true, isDynamic: true, id: 'secret_pb1' });
-  addCoin(_coinGroup, new THREE.Vector3(pbX, fy + 14, pbZBase + pbStep), { secret: true, isDynamic: true, id: 'secret_pb2' });
-  addCoin(_coinGroup, new THREE.Vector3(pbX, fy + 22, pbZBase + pbStep * 2), { secret: true, isDynamic: true, id: 'secret_pb3' });
+  const ceilY = getCeilingY();
+  // 3 secret coins hovering near the ceiling light at random-ish positions.
+  // Use seeded offsets so they're always in the same spot per session but
+  // look naturally scattered. Positions are near CEIL_LIGHT_X/Z, varying
+  // in XZ spread and Y height below the ceiling.
+  const positions = [
+    new THREE.Vector3(CEIL_LIGHT_X - 8,  ceilY - 4,  CEIL_LIGHT_Z + 10),
+    new THREE.Vector3(CEIL_LIGHT_X + 12, ceilY - 16, CEIL_LIGHT_Z - 7),
+    new THREE.Vector3(CEIL_LIGHT_X - 3,  ceilY - 28, CEIL_LIGHT_Z - 14),
+  ];
+  for (let i = 0; i < positions.length; i++) {
+    addCoin(_coinGroup, positions[i], { secret: true, isDynamic: true, id: 'secret_pb' + (i + 1) });
+  }
   // Make all 3 visible immediately
   for (let i = coins.length - 3; i < coins.length; i++) {
     if (coins[i]) coins[i].mesh.visible = true;
@@ -504,9 +511,9 @@ export function updateCoins(ts, playerPos) {
       const dx = c.mesh.position.x - playerPos.x;
       const dy = (c.mesh.position.y) - (playerPos.y - 2); // mid-body
       const dz = c.mesh.position.z - playerPos.z;
-      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      const distSq = dx * dx + dy * dy + dz * dz;
 
-      if (dist < PICK_RADIUS) {
+      if (distSq < PICK_RADIUS_SQ) {
         c.collected = true;
         c.mesh.visible = false;
         if (c.secret) {

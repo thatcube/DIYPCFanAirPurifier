@@ -268,10 +268,12 @@ export function applyTimeOfDay(minuteOfDay, refs) {
   }
   hemiLight.groundColor.copy(lerpHex(0x221100, 0xffeedd, sun));
 
-  // Ceiling lights
-  if (ceilSpot) ceilSpot.intensity = refs.ceilLightOn ? mix(2.6, 1.1, sun) : 0;
-  if (refs.domeMat) refs.domeMat.emissiveIntensity = refs.ceilLightOn ? mix(1.45, 0.85, sun) : 0;
-  if (ceilGlow) ceilGlow.intensity = refs.ceilLightOn ? mix(0.9, 0.35, sun) : 0;
+  // Ceiling lights — use refs (room.js owns these lights, not the module-level vars)
+  const _cs = refs.ceilSpot || ceilSpot;
+  const _cg = refs.ceilGlow || ceilGlow;
+  if (_cs) _cs.intensity = refs.ceilLightOn ? mix(140, 60, sun) : 0;
+  if (refs.domeMat) refs.domeMat.emissiveIntensity = refs.ceilLightOn ? mix(1.2, 0.65, sun) : 0;
+  if (_cg) _cg.intensity = refs.ceilLightOn ? mix(50, 25, sun) : 0;
 
   // Outdoor backdrop
   if (refs.outdoor) {
@@ -280,7 +282,7 @@ export function applyTimeOfDay(minuteOfDay, refs) {
 
   // Moonlight
   const moonLight = refs.moonGlow || moonGlow;
-  if (moonLight) moonLight.intensity = mix(0.9, 0, sun);
+  if (moonLight) moonLight.intensity = mix(60, 0, sun);
 
   // Room surfaces
   if (refs.wallMeshes) {

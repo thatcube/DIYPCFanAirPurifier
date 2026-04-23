@@ -32,9 +32,9 @@ function _applyLoopPause(action, ts, pauseSeconds) {
 }
 
 const MODEL_MAP = {
-  classic:   { src: 'assets/cat.glb',           extraScale: 1, yOffset: 0.35 },
-  toon:      { src: 'assets/tooncat.glb',       extraScale: 1.25, yOffset: 1.6 },
-  bababooey: { src: 'assets/bababooey_cat.glb', extraScale: 1, yOffset: -0.35 },
+  classic:   { src: 'assets/cat.glb' },
+  toon:      { src: 'assets/tooncat.glb' },
+  bababooey: { src: 'assets/bababooey_cat.glb' },
 };
 
 /**
@@ -83,6 +83,81 @@ function _stripBababooeyBackdrop(model) {
   }
 }
 
+// ── Procedural idle for preview (self-contained) ────────────────────
+
+const _pvEuler = new THREE.Euler(0, 0, 0, 'XYZ');
+const _pvQA = new THREE.Quaternion();
+const _pvQB = new THREE.Quaternion();
+
+function _collectPreviewIdleBones(model) {
+  const tailRe = /(^tail$|^tail[._]|_tail|tail_)/i;
+  const headRe = /(^head$|^head[._]|_head|head_|^neck$|^neck[._]|_neck|neck_)/i;
+  const spineRe = /(^spine$|^spine[._]|_spine|spine_|^chest$|^chest[._]|_chest|chest_)/i;
+  const tails = [], heads = [], spines = [];
+  model.traverse(o => {
+    if (!o || !o.isBone) return;
+    const n = String(o.name || '');
+    if (tailRe.test(n)) tails.push(o);
+    if (headRe.test(n)) heads.push(o);
+    if (spineRe.test(n)) spines.push(o);
+  });
+  if (tails.length > 4) tails.length = 4;
+  if (spines.length > 2) spines.length = 2;
+  // Pick best head bone
+  const filteredHeads = [];
+  if (heads.length) {
+    const headBone = heads.find(b => /head/i.test(String(b.name || ''))) || heads[0];
+    filteredHeads.push(headBone);
+    const neckBone = heads.find(b => /neck/i.test(String(b.name || '')) && b !== headBone);
+    if (neckBone) filteredHeads.push(neckBone);
+  }
+  // Store base quaternions
+  const all = [...tails, ...spines, ...filteredHeads];
+  for (const b of all) {
+    if (!b.userData) b.userData = {};
+    b.userData._pvBaseQuat = b.quaternion.clone();
+  }
+  return { tails, heads: filteredHeads, spines };
+}
+
+function _applyPreviewProceduralIdle(bones, ts) {
+  const t = ts * 0.001;
+  for (let i = 0; i < bones.tails.length; i++) {
+    const b = bones.tails[i];
+    const base = b.userData._pvBaseQuat;
+    const wave = 0.75 + (i * 0.18);
+    const yaw = Math.sin((t * 1.7 * wave) + (i * 0.55)) * 0.065;
+    const pitch = Math.sin((t * 1.2 * wave) + (i * 0.4)) * 0.025;
+    const roll = Math.sin((t * 1.05 * wave) + (i * 0.9)) * 0.012;
+    _pvEuler.set(pitch, yaw, roll);
+    _pvQA.setFromEuler(_pvEuler);
+    _pvQB.copy(base).multiply(_pvQA);
+    b.quaternion.slerp(_pvQB, 0.5);
+  }
+  for (let i = 0; i < bones.spines.length; i++) {
+    const b = bones.spines[i];
+    const base = b.userData._pvBaseQuat;
+    const swayScale = 0.65 - (i * 0.12);
+    const yaw = Math.sin((t * 0.82) + (i * 0.45)) * 0.012 * swayScale;
+    const pitch = Math.sin((t * 0.62) + (i * 0.35)) * 0.008 * swayScale;
+    _pvEuler.set(pitch, yaw, 0);
+    _pvQA.setFromEuler(_pvEuler);
+    _pvQB.copy(base).multiply(_pvQA);
+    b.quaternion.slerp(_pvQB, 0.32);
+  }
+  for (let i = 0; i < bones.heads.length; i++) {
+    const b = bones.heads[i];
+    const base = b.userData._pvBaseQuat;
+    const headScale = i === 0 ? 1 : 0.58;
+    const yaw = (Math.sin((t * 0.8) + 0.7) * 0.12 + Math.sin((t * 1.55) + 0.2) * 0.036) * headScale;
+    const pitch = (Math.sin((t * 0.62) + 1.1) * 0.072 + Math.sin((t * 1.35) + 0.9) * 0.021) * headScale;
+    _pvEuler.set(pitch, yaw, 0);
+    _pvQA.setFromEuler(_pvEuler);
+    _pvQB.copy(base).multiply(_pvQA);
+    b.quaternion.slerp(_pvQB, 0.78);
+  }
+}
+
 function _processLoadedModel(preview, entry, gltf, preset) {
   const model = gltf.scene;
 
@@ -94,15 +169,29 @@ function _processLoadedModel(preview, entry, gltf, preset) {
   const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
   const h = Math.max(size.y, 0.001);
-  const s = TARGET_H / h * (preview.cfg.extraScale || 1);
+  const s = TARGET_H / h;
   model.scale.setScalar(s);
 
-  // Re-center: XZ centered, feet on ground (y=0) + per-model Y offset
+  // Re-center: XZ centered, feet on ground (y=0)
   box.setFromObject(model);
   const center = box.getCenter(new THREE.Vector3());
   model.position.x -= center.x;
   model.position.z -= center.z;
-  model.position.y -= box.min.y + (preview.cfg.yOffset || 0);
+  model.position.y -= box.min.y;
+
+  // Second pass — find the lowest foot bone to correct grounding for
+  // skeletal models whose geometry extends below the foot rest position.
+  model.updateMatrixWorld(true);
+  let minFootY = Infinity;
+  const _tmpV = new THREE.Vector3();
+  model.traverse(o => {
+    if (!o || !o.isBone) return;
+    if (!/foot|toe|paw/i.test(String(o.name || ''))) return;
+    o.getWorldPosition(_tmpV);
+    if (_tmpV.y < minFootY) minFootY = _tmpV.y;
+  });
+  if (Number.isFinite(minFootY)) model.position.y -= minFootY;
+
   model.rotation.y = PREVIEW_BASE_YAW;
 
   // Material cleanup
@@ -115,16 +204,49 @@ function _processLoadedModel(preview, entry, gltf, preset) {
 
   preview.scene.add(model);
   preview.model = model;
+  preview.baseScale = model.scale.x; // uniform scale, save for squish
+
+  // Auto-frame camera to fit the model with consistent padding.
+  // Compute the bounding sphere after final positioning, then set
+  // camera distance so the model fills roughly the same fraction of
+  // the viewport regardless of proportions.
+  model.updateMatrixWorld(true);
+  box.setFromObject(model);
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  const fovRad = THREE.MathUtils.degToRad(preview.camera.fov);
+  // Distance so the sphere fits with ~25% padding
+  const fitDist = (sphere.radius * 0.95) / Math.sin(fovRad / 2);
+  // Position camera slightly right and above center, looking at sphere center
+  preview.camera.position.set(
+    sphere.center.x + fitDist * 0.12,
+    sphere.center.y + fitDist * 0.08,
+    sphere.center.z + fitDist
+  );
+  preview.camera.lookAt(sphere.center.x, sphere.center.y * 0.85, sphere.center.z);
+  preview.camera.updateProjectionMatrix();
 
   // Animation mixer
   if (gltf.animations && gltf.animations.length > 0) {
     const mixer = new THREE.AnimationMixer(model);
-    let clip = gltf.animations.find(a => /idle/i.test(a.name)) || gltf.animations[0];
-    const action = mixer.clipAction(clip);
-    action.play();
-    preview.mixer = mixer;
-    preview.idleAction = action;
-    preview.loopPause = Math.max(0, Number(preset.idleLoopPause) || 0);
+    const idleClip = gltf.animations.find(a => /idle|sit|rest/i.test(a.name));
+    if (idleClip) {
+      // Has a dedicated idle clip — play it
+      const action = mixer.clipAction(idleClip);
+      action.play();
+      preview.mixer = mixer;
+      preview.idleAction = action;
+      preview.loopPause = Math.max(0, Number(preset.idleLoopPause) || 0);
+    } else {
+      // No idle clip (e.g. toon cat only has walk) — use procedural idle.
+      // Don't play any baked clip; just collect bones for procedural sway.
+      preview.mixer = mixer;
+      preview.useProceduralIdle = true;
+      preview.idleBones = _collectPreviewIdleBones(model);
+    }
+  } else {
+    // No animations at all — still set up procedural idle
+    preview.useProceduralIdle = true;
+    preview.idleBones = _collectPreviewIdleBones(model);
   }
 }
 
@@ -153,10 +275,10 @@ export function initPreviews() {
     // Scene
     const scene = new THREE.Scene();
 
-    // Camera — same for all models (cats are normalized to 3 units tall, feet at y=0)
+    // Camera — will be auto-framed per model after loading
     const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
-    camera.position.set(1.35, 2.55, 9.6);
-    camera.lookAt(0, 0.95, 0);
+    camera.position.set(0, 1.5, 10); // default, overridden by auto-frame
+    camera.lookAt(0, 1, 0);
 
     // Lights
     scene.add(new THREE.AmbientLight(0xffffff, 0.6));
@@ -168,7 +290,7 @@ export function initPreviews() {
     scene.add(rimLight);
 
     const animSpeed = Math.max(0.12, Number(preset.animSpeed) || 1);
-    const preview = { renderer, scene, camera, model: null, mixer: null, key: entry.key, cfg, animSpeed };
+    const preview = { renderer, scene, camera, model: null, mixer: null, key: entry.key, cfg, animSpeed, src: cfg.src };
     previews.push(preview);
 
     // Load model (with fallback for alt filenames)
@@ -224,12 +346,29 @@ function _animate() {
     }
 
     // Update mixer with model-specific animation speed
-    if (p.mixer) {
+    if (p.mixer && !p.useProceduralIdle) {
       p.mixer.update(dt * p.animSpeed);
       // Apply idle loop pause (bababooey pauses between bounces)
       if (p.idleAction && p.loopPause > 0) {
         _applyLoopPause(p.idleAction, performance.now(), p.loopPause);
       }
+    }
+
+    // Procedural idle for models without a dedicated idle clip
+    if (p.useProceduralIdle && p.idleBones) {
+      _applyPreviewProceduralIdle(p.idleBones, performance.now());
+    }
+
+    // Bababooey idle squish — gentle breathing scale oscillation
+    if (p.key === 'bababooey' && p.model && p.baseScale) {
+      const t = performance.now() * 0.001;
+      const wave = Math.sin(t * 1.6) * 0.7 + Math.sin(t * 2.5) * 0.3;
+      const sq = wave * 0.035;
+      p.model.scale.set(
+        p.baseScale * (1 + sq * 0.6),
+        p.baseScale * (1 - sq),
+        p.baseScale * (1 + sq * 0.6)
+      );
     }
 
     p.renderer.render(p.scene, p.camera);

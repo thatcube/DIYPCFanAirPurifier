@@ -110,9 +110,23 @@ let _wasFootstepMoving = false;
 let _lastUiInteractTs = 0;
 let _quickControlsVisible = false;
 
+// Cached DOM elements (looked up once in init or on first use)
+let _cachedCbBar = null, _cachedCbFill = null, _cachedCbValue = null;
+let _cachedCrosshair = null;
+let _domCached = false;
+
+function _cacheDom() {
+  if (_domCached) return;
+  _domCached = true;
+  _cachedCbBar = document.getElementById('fpChargeBar');
+  _cachedCbFill = document.getElementById('fpChargeFill');
+  _cachedCbValue = document.getElementById('fpChargeValue');
+  _cachedCrosshair = document.getElementById('fpCrosshair');
+}
+
 const HUD_IDLE_CONTROLS_MS = 1400;
 
-const PITCH_MIN = -1.2;
+const PITCH_MIN = -1.45;
 const PITCH_MAX = 1.55;
 
 const _fwd = new THREE.Vector3();
@@ -1199,20 +1213,18 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   }
   if (!fpKeys.space) _spaceHeld = 0;
 
-  // Charge bar UI
+  // Charge bar UI (cached DOM refs)
+  _cacheDom();
   const chargePct = _spaceHeld > 0 ? Math.min(_spaceHeld / 60, 1) : 0;
-  const cbBar = document.getElementById('fpChargeBar');
-  const cbFill = document.getElementById('fpChargeFill');
-  const cbValue = document.getElementById('fpChargeValue');
-  if (cbFill) {
-    cbFill.style.width = `${Math.round(chargePct * 100)}%`;
+  if (_cachedCbFill) {
+    _cachedCbFill.style.width = `${Math.round(chargePct * 100)}%`;
   }
-  if (cbBar) {
-    cbBar.classList.toggle('charging', chargePct > 0);
-    cbBar.classList.toggle('charged', chargePct >= 0.95);
+  if (_cachedCbBar) {
+    _cachedCbBar.classList.toggle('charging', chargePct > 0);
+    _cachedCbBar.classList.toggle('charged', chargePct >= 0.95);
   }
-  if (cbValue) {
-    cbValue.textContent = chargePct > 0 ? `${Math.round(chargePct * 100)}%` : 'Ready';
+  if (_cachedCbValue) {
+    _cachedCbValue.textContent = chargePct > 0 ? `${Math.round(chargePct * 100)}%` : 'Ready';
   }
 
   // ── Gravity ───────────────────────────────────────────────────────
@@ -1264,7 +1276,8 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
           bonkedThisFrame = true;
           bonkIntensity = Math.max(bonkIntensity, fpVy * 1.2);
           newY = box.yBottom - 0.2 - HEAD_EXTRA;
-          if (fpVy > 0) fpVy = 0;
+          fpVy = -0.05;
+          _spaceHeld = 0;
         } else {
           // Push out in local space, then rotate back to world
           const dist = Math.sqrt(distSq) || 0.001;
@@ -1305,7 +1318,8 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
         bonkedThisFrame = true;
         bonkIntensity = Math.max(bonkIntensity, fpVy * 1.2);
         newY = box.yBottom - 0.2 - HEAD_EXTRA;
-        if (fpVy > 0) fpVy = 0;
+        fpVy = -0.05;
+        _spaceHeld = 0;
       } else {
         // XZ push-out
         const pushXL = box.xMax + r - nx;
@@ -1327,10 +1341,19 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   const impactVy = fpVy;
   if (fpPos.y < groundY) { fpPos.y = groundY; fpVy = 0; }
 
-  // Ceiling
+  // Ceiling — push down immediately to avoid oscillation jitter
   const floorY = getFloorY();
   const ceilMax = (floorY + 80) - 0.5;
-  if (fpPos.y > ceilMax) { fpPos.y = ceilMax; fpVy = Math.min(fpVy, 0); }
+  if (fpPos.y > ceilMax) {
+    const hitVy = fpVy;
+    fpPos.y = ceilMax;
+    fpVy = -0.05;
+    _spaceHeld = 0;
+    if (hitVy > 0.05) {
+      bonkedThisFrame = true;
+      bonkIntensity = Math.max(bonkIntensity, hitVy * 1.2);
+    }
+  }
 
   // Bonk SFX
   if (bonkedThisFrame && !_wasBonking) _playBonk(bonkIntensity);
@@ -1379,7 +1402,11 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   } else {
     // Third-person
     const focal = _lookTarget.set(fpPos.x + fwd.x * 0.6, fpPos.y + 0.7, fpPos.z + fwd.z * 0.6);
-    const camDist = 7.3, camLift = 2.2, camShoulder = 0.9;
+    const camShoulder = 0.9;
+    // pitchN: 0 = looking fully down, 1 = looking fully up
+    const pitchN = (fpPitch - PITCH_MIN) / (PITCH_MAX - PITCH_MIN);
+    const camDist = 9.0;
+    const camLift = 2.2;
     let dxC = -lookDir.x * camDist + right.x * camShoulder;
     let dyC = -lookDir.y * camDist + camLift;
     let dzC = -lookDir.z * camDist + right.z * camShoulder;
@@ -1390,7 +1417,10 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     // Z bounds must include closet interior (extends to cZ - cIW/2 = -89)
     const camWallZMin = CLOSET_Z - CLOSET_INTERIOR_W / 2 + 1; // closet -Z side wall
     const camWallZMax = 49 - 1;             // back wall inner face - buffer
-    const cyMin = floorY + 2, cyMax = (floorY + 80) - 2;
+    // Camera Y min tracks the player's current ground, not the room floor,
+    // so on elevated surfaces (bed, nightstand) it doesn't clip below them.
+    const cyMin = Math.max(floorY + 0.5, fpPos.y - EYE_H + 1.5);
+    const cyMax = (floorY + 80) - 2;
     const maxDX = dxC > 0 ? (camWallXMax - focal.x) : (focal.x - camWallXMin);
     const maxDY = dyC > 0 ? (cyMax - focal.y) : (focal.y - cyMin);
     const maxDZ = dzC > 0 ? (camWallZMax - focal.z) : (focal.z - camWallZMin);
@@ -1404,13 +1434,33 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     let cxC = focal.x + dxC * scale;
     let cyC = focal.y + dyC * scale;
     let czC = focal.z + dzC * scale;
-    // Hard clamp — camera must never leave the room
+    // Hard clamp — camera must never leave the room.
+    // Track how much the Y clamp shifts the camera so we can shift
+    // the lookAt target by the same amount, preserving the viewing
+    // angle and preventing the crosshair from jumping at the ceiling.
+    const idealCyC = cyC;
     cxC = Math.max(camWallXMin, Math.min(camWallXMax, cxC));
     cyC = Math.max(cyMin, Math.min(cyMax, cyC));
     czC = Math.max(camWallZMin, Math.min(camWallZMax, czC));
+    const camYShift = cyC - idealCyC;
 
     _camera.position.set(cxC, cyC, czC);
-    _camera.lookAt(cxC + lookDir.x * 10, cyC + lookDir.y * 10, czC + lookDir.z * 10);
+    // Blend lookAt: when looking down (pitchN < 0.5), look at the cat
+    // so you can see its face. When looking up (pitchN > 0.5), look
+    // forward so ceiling/lights are visible and the cat doesn't block.
+    // pitchN=0.45 is the crossover (slightly below center).
+    const lookAtCatBlend = Math.max(0, Math.min(1, (0.55 - pitchN) * 3));
+    const fwdLookX = cxC + lookDir.x * 10;
+    const fwdLookY = cyC + lookDir.y * 10 + camYShift;
+    const fwdLookZ = czC + lookDir.z * 10;
+    const catLookX = focal.x;
+    const catLookY = focal.y + camYShift;
+    const catLookZ = focal.z;
+    _camera.lookAt(
+      fwdLookX + (catLookX - fwdLookX) * lookAtCatBlend,
+      fwdLookY + (catLookY - fwdLookY) * lookAtCatBlend,
+      fwdLookZ + (catLookZ - fwdLookZ) * lookAtCatBlend
+    );
 
     if (_catGroup) {
       if (_catGroup.parent !== _scene) _scene.add(_catGroup);
@@ -1431,8 +1481,8 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
   // ── Crosshair interaction indicator ───────────────────────────────
   // Highlight crosshair when aiming at something clickable
-  const crosshair = document.getElementById('fpCrosshair');
-  if (crosshair) {
+  _cacheDom();
+  if (_cachedCrosshair) {
     if (ts - _lastCrosshairRaycastTs >= RAYCAST_INTERVAL_MS) {
       _lastCrosshairRaycastTs = ts;
       _ray.setFromCamera(_rayCenter, _camera);
@@ -1458,6 +1508,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
     const desiredBg = _crosshairAimingAtInteractable ? '#91deff' : 'rgba(255,255,255,0.8)';
     const desiredTransform = _crosshairAimingAtInteractable ? 'translate(-50%,-50%) scale(1.5)' : 'translate(-50%,-50%) scale(1)';
+    const crosshair = _cachedCrosshair;
     if (crosshair.style.background !== desiredBg) crosshair.style.background = desiredBg;
     if (crosshair.style.transform !== desiredTransform) crosshair.style.transform = desiredTransform;
   }

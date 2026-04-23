@@ -440,7 +440,7 @@ export function createRoom(scene) {
     topCap.position.set(lampX, lampBaseY+0.8+stemH+shadeH-1, lampZ);
     topCap._isRoom=true; topCap._isLamp=true; addRoom(topCap);
     // Warm glow light — strong enough to visibly illuminate surroundings
-    lampLight=new THREE.PointLight(0xffddaa, 3.4, 110);
+    lampLight=new THREE.PointLight(0xffddaa, 400, 110);
     lampLight.position.set(lampX, lampBaseY+0.8+stemH+shadeH/2-1, lampZ);
     lampLight.castShadow=false;
     lampLight._isRoom=true; addRoom(lampLight);
@@ -667,7 +667,7 @@ export function createRoom(scene) {
   // Small bottom-center power nub (trapezoid pod + tiny center button).
   // TV ambient glow — washes the bed and floor in front of the TV.
   // Positioned well in front of the screen so it reaches the bed area.
-  const tvGlow=new THREE.PointLight(0x6688cc,0.6,80,0.9);
+  const tvGlow=new THREE.PointLight(0x6688cc,50,80,0.9);
   tvGlow.position.set(tvCenterX, tvCenterY, tvZ+tvD/2+12);
   tvGlow.castShadow=false;
   tvGlow._isRoom=true;
@@ -1171,7 +1171,7 @@ export function createRoom(scene) {
   // Downward spot lights the floor (main pool). Ceiling + upper walls need
   // their own source since a spot only throws inside its cone, and the room
   // has no global ambient bounce. We split those two jobs on purpose.
-  const ceilSpot=new THREE.SpotLight(0xfff0dd,1.1,0,Math.PI*0.42,0.6,0.9);
+  const ceilSpot=new THREE.SpotLight(0xfff0dd,60,0,Math.PI*0.42,0.6,0.9);
   ceilSpot.position.set(ceilLightX,ceilY-1,ceilLightZ);
   ceilSpot.target.position.set(ceilLightX,floorY,ceilLightZ);
   addRoom(ceilSpot); addRoom(ceilSpot.target);
@@ -1188,7 +1188,7 @@ export function createRoom(scene) {
   // The light SOURCE should be co-located with the fixture mesh and tagged
   // _isRoom so it moves with the room when placement changes. Previously
   // it was at a hardcoded world position that only matched in Under TV mode.
-  ceilGlow=new THREE.PointLight(0xfff3df,0.35,0,0.8);
+  ceilGlow=new THREE.PointLight(0xfff3df,25,0,0.8);
   ceilGlow.position.set(ceilLightX,ceilY-8,ceilLightZ);
   ceilGlow.castShadow=false;
   ceilGlow._isRoom=true;
