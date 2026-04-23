@@ -180,7 +180,7 @@ controls.update();
 // ── Wire time-of-day lighting ───────────────────────────────────────
 
 const todRefs = {
-  ceilLightOn: roomRefs.ceilLightOn,
+  ceilLightOn: roomRefs.ceilLightOn,  // mutable — purifier.js updates via todRefs ref
   domeMat: roomRefs.domeMat,
   outdoor: roomRefs.outdoor,
   mirroredWindowX: roomRefs.mirroredWindowX,
@@ -195,27 +195,74 @@ const todRefs = {
   baseMeshes: roomRefs.baseMeshes,
   floorMat: roomRefs.floorMat,
   moonGlow: roomRefs.moonGlow,
+  ceilSpot: roomRefs.ceilSpot,
+  ceilGlow: roomRefs.ceilGlow,
+  lampLight: roomRefs.lampLight,
   _markShadowsDirty: markShadowsDirty
 };
 
 // Apply initial time-of-day — default to 2:30 PM (matches monolith default)
 lighting.applyTimeOfDay(870, todRefs);
 
-// ── DEBUG: Uncomment to visualize key light position, target, and shadow frustum ──
-// {
-//   const srcOrb = new THREE.Mesh(new THREE.SphereGeometry(4, 16, 12),
-//     new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true, transparent: true, opacity: 0.8 }));
-//   srcOrb.position.copy(lighting.key.position);
-//   scene.add(srcOrb);
-//   const tgtOrb = new THREE.Mesh(new THREE.SphereGeometry(3, 12, 8),
-//     new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, transparent: true, opacity: 0.8 }));
-//   tgtOrb.position.copy(lighting.key.target.position);
-//   scene.add(tgtOrb);
-//   const helper = new THREE.CameraHelper(lighting.key.shadow.camera);
-//   scene.add(helper);
-//   console.log('[DEBUG] Key light at:', lighting.key.position.x.toFixed(1), lighting.key.position.y.toFixed(1), lighting.key.position.z.toFixed(1));
-//   console.log('[DEBUG] Key target at:', lighting.key.target.position.x.toFixed(1), lighting.key.target.position.y.toFixed(1), lighting.key.target.position.z.toFixed(1));
-// }
+// ── DEBUG: Light position helpers ──
+// Visible colored orbs at each light source. Toggle via console:
+//   window._debugLights(true/false)
+{
+  const _debugHelpers = [];
+  function makeHelper(color, radius, lightOrPos, label) {
+    const mat = new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.85, depthTest: false });
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 12, 8), mat);
+    mesh.renderOrder = 9999;
+    mesh.visible = false;
+    scene.add(mesh);
+    _debugHelpers.push({ mesh, lightOrPos, label });
+    return mesh;
+  }
+  // Ceiling spot (yellow)
+  if (roomRefs.ceilSpot) makeHelper(0xffff00, 3, roomRefs.ceilSpot, 'ceilSpot');
+  // Ceiling spot target (dark yellow)
+  if (roomRefs.ceilSpot) makeHelper(0x888800, 2, roomRefs.ceilSpot.target, 'ceilSpot.target');
+  // Ceiling glow (orange)
+  if (roomRefs.ceilGlow) makeHelper(0xff8800, 2.5, roomRefs.ceilGlow, 'ceilGlow');
+  // Lamp light (warm white)
+  if (roomRefs.lampLight) makeHelper(0xffddaa, 2, roomRefs.lampLight, 'lampLight');
+  // Moon glow (blue)
+  if (roomRefs.moonGlow) makeHelper(0x4488ff, 2, roomRefs.moonGlow, 'moonGlow');
+  // Key light (magenta)
+  makeHelper(0xff00ff, 4, lighting.key, 'key (sun)');
+  // Key target (cyan)
+  makeHelper(0x00ffff, 3, lighting.key.target, 'key.target');
+
+  // SpotLightHelper for ceiling
+  let _ceilSpotHelper = null;
+  if (roomRefs.ceilSpot) {
+    _ceilSpotHelper = new THREE.SpotLightHelper(roomRefs.ceilSpot, 0xffff00);
+    _ceilSpotHelper.visible = false;
+    scene.add(_ceilSpotHelper);
+  }
+
+  window._debugLights = function(show) {
+    _debugHelpers.forEach(h => {
+      h.mesh.visible = !!show;
+      if (show) {
+        // Sync position from the light/object
+        const p = h.lightOrPos.position || h.lightOrPos;
+        h.mesh.position.copy(p);
+        console.log(`[DEBUG] ${h.label} at (${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)})`);
+        if (h.lightOrPos.intensity !== undefined) {
+          console.log(`  intensity: ${h.lightOrPos.intensity.toFixed(1)}`);
+        }
+      }
+    });
+    if (_ceilSpotHelper) {
+      _ceilSpotHelper.visible = !!show;
+      if (show) _ceilSpotHelper.update();
+    }
+    if (show) console.log('[DEBUG] Light helpers ON — colored orbs visible at light positions');
+    else console.log('[DEBUG] Light helpers OFF');
+  };
+  console.log('[main] Light debug helpers ready — call _debugLights(true) in console to show');
+}
 
 // Force shadow update after TOD repositions lights
 _shadowDirtyOneShot = true;
@@ -228,6 +275,7 @@ purifierRefs.setRoomRefs({
   domeMat: roomRefs.domeMat,
   ceilGlow: roomRefs.ceilGlow,
   outdoor: roomRefs.outdoor,
+  todRefs,  // so purifier can sync ceilLightOn state
   markShadowsDirty,
   applyTimeOfDay: (minutes) => {
     lighting.applyTimeOfDay(minutes, todRefs);
@@ -336,10 +384,13 @@ window._openCharSelect = () => {
     _previewsInited = true;
     requestAnimationFrame(() => initPreviews());
   }
-  // Pre-select classic
+  // Highlight the previously selected model (or classic on first open)
   document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
-  const classicCard = document.querySelector('.char-card[data-model="classic"]');
-  if (classicCard) classicCard.classList.add('selected');
+  const activeCard = document.querySelector(`.char-card[data-model="${_selectedModel}"]`);
+  if (activeCard) activeCard.classList.add('selected');
+  // Show/hide color dots based on current selection
+  const colorSection = document.getElementById('classicColors');
+  if (colorSection) colorSection.style.visibility = _selectedModel === 'classic' ? 'visible' : 'hidden';
 };
 
 window._closeCharSelect = () => {
@@ -665,12 +716,15 @@ window._toggleIsolate = () => {
   markShadowsDirty();
 };
 
-// ── Orbit mode WASD panning ─────────────────────────────────────────
+// ── Orbit mode keyboard camera ──────────────────────────────────────
+// W/S = tilt up/down, A/D = rotate left/right around the target.
 
 const _camKeys = { w: false, a: false, s: false, d: false };
 document.addEventListener('keydown', e => {
   if (gameFp.fpMode) return;
   if (leaderboard.isNameDialogOpen()) return;
+  const cs = document.getElementById('charSelect');
+  if (cs && cs.classList.contains('open')) return;
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
   const k = e.key.toLowerCase();
@@ -691,6 +745,11 @@ let _fpsFrames = 0;
 let _fpsLast = performance.now();
 let _lastCatX = null, _lastCatZ = null;
 
+// Cached DOM refs for per-frame updates
+const _elRunTimer = document.getElementById('runTimerText');
+const _elFps = document.getElementById('fps');
+const _elPauseOv = document.getElementById('fpPauseOverlay');
+
 function animate(ts) {
   requestAnimationFrame(animate);
 
@@ -705,19 +764,13 @@ function animate(ts) {
   // Controls (only in orbit mode)
   if (!gameFp.fpMode) {
     controls.update();
-    // WASD orbit pan
+    // WASD orbit: A/D rotate around target, W/S tilt up/down
     if (_camKeys.w || _camKeys.a || _camKeys.s || _camKeys.d) {
-      const azimuth = controls.getAzimuthalAngle();
-      const spd = 0.4;
-      const fwdX = -Math.sin(azimuth), fwdZ = -Math.cos(azimuth);
-      const rightX = Math.cos(azimuth), rightZ = -Math.sin(azimuth);
-      let dx = 0, dz = 0;
-      if (_camKeys.w) { dx += fwdX * spd; dz += fwdZ * spd; }
-      if (_camKeys.s) { dx -= fwdX * spd; dz -= fwdZ * spd; }
-      if (_camKeys.a) { dx -= rightX * spd; dz -= rightZ * spd; }
-      if (_camKeys.d) { dx += rightX * spd; dz += rightZ * spd; }
-      controls.target.x += dx;
-      controls.target.z += dz;
+      const rotSpd = 0.025; // radians per frame
+      if (_camKeys.a) controls.rotateLeft(rotSpd);
+      if (_camKeys.d) controls.rotateLeft(-rotSpd);
+      if (_camKeys.w) controls.rotateUp(rotSpd);
+      if (_camKeys.s) controls.rotateUp(-rotSpd);
     }
   }
 
@@ -731,16 +784,14 @@ function animate(ts) {
     if (coins.coinScore > prevScore) coinBump();
     // Timer tick
     leaderboard.tickTimer(ts);
-    const timerEl = document.getElementById('runTimerText');
-    if (timerEl) timerEl.textContent = leaderboard.formatRunTime(leaderboard.getElapsed());
+    if (_elRunTimer) _elRunTimer.textContent = leaderboard.formatRunTime(leaderboard.getElapsed());
     // Check for run completion (all regular coins collected)
     if (coins.coinScore >= coins.coinTotal && coins.coinTotal > 0 && !leaderboard.isFinished()) {
       leaderboard.stopTimer();
       const finalTime = leaderboard.getElapsed();
       gameFp.setPaused(true);
       // Hide the regular pause overlay (finish takes precedence)
-      const pauseOv = document.getElementById('fpPauseOverlay');
-      if (pauseOv) pauseOv.style.display = 'none';
+      if (_elPauseOv) _elPauseOv.style.display = 'none';
       // Open finish screen immediately and let player edit name inline
       // before saving this run.
       leaderboard.openFinishDialogForRun(finalTime, coins.coinTotal, coins.coinSecretScore);
@@ -841,16 +892,21 @@ function animate(ts) {
       if (runBlend > 0.001) catAnimation.applyBababooeyProceduralRun(ts, vel, runBlend);
     }
 
+    // Bababooey idle squish — gentle breathing when standing still
+    if (isBababooey && idleBlend > 0.001) {
+      catAnimation.applyBababooeyIdleSquish(ts, idleBlend);
+    }
+
+    // Reset position/rotation to base and pin all cats to the ground
+    // each frame (box-based). Must happen AFTER procedural animations
+    // but BEFORE jump deform.
     if (gameFp.fpMode) {
-      const gpOff = Number.isFinite(preset.gameGroundPinOffset)
-        ? preset.gameGroundPinOffset
-        : preset.groundPinOffset;
+      catAnimation.resetAndPinGameplayCat();
       catAnimation.applyGameplayJumpDeform({
         dtSec,
         vy: gameFp.fpVy,
         holdFrames: gameFp.getJumpHoldFrames(),
-        modelKey: catAppearance.catModelKey,
-        groundPinOffset: gpOff
+        modelKey: catAppearance.catModelKey
       });
     }
 
@@ -889,8 +945,7 @@ function animate(ts) {
   if (fpsNow - _fpsLast >= 1000) {
     const ms = (fpsNow - _fpsLast) / _fpsFrames;
     const ri = renderer.info.render;
-    const fpsEl = document.getElementById('fps');
-    if (fpsEl) fpsEl.textContent = _fpsFrames + 'fps ' + ms.toFixed(1) + 'ms | ' + ri.calls + 'dc ' + ri.triangles + 'tri';
+    if (_elFps) _elFps.textContent = _fpsFrames + 'fps ' + ms.toFixed(1) + 'ms | ' + ri.calls + 'dc ' + ri.triangles + 'tri';
     _fpsFrames = 0;
     _fpsLast = fpsNow;
   }
@@ -927,5 +982,21 @@ _syncQuickCoinToggleState();
 // Wire share button click
 const _shareBtn = document.getElementById('fpShareBtn');
 if (_shareBtn) _shareBtn.addEventListener('click', () => leaderboard.copyLastResult());
+
+// Scroll fade on panel-scroll — fade bottom edge when more content below
+{
+  const ps = document.querySelector('.panel-scroll');
+  if (ps) {
+    const checkFade = () => {
+      const canScroll = ps.scrollHeight > ps.clientHeight + 1;
+      const atBottom = ps.scrollTop + ps.clientHeight >= ps.scrollHeight - 2;
+      ps.classList.toggle('scroll-fade', canScroll && !atBottom);
+    };
+    ps.addEventListener('scroll', checkFade, { passive: true });
+    window.addEventListener('resize', checkFade);
+    new MutationObserver(checkFade).observe(ps, { childList: true, subtree: true, attributes: true });
+    checkFade();
+  }
+}
 
 console.log('[main] Render loop started');

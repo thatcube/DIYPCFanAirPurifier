@@ -775,11 +775,6 @@ let _onExitGame = null;
 let _finishFocusTrap = null;
 let _finishSavedFocus = null;
 
-const _finishPreviewOffsets = {
-  classic: 0.35,
-  toon: 1.6,
-  bababooey: -0.35,
-};
 const _finishPreviewBaseYaw = THREE.MathUtils.degToRad(35);
 let _finishPreviewRenderer = null;
 let _finishPreviewScene = null;
@@ -862,20 +857,23 @@ function _ensureFinishPreviewRenderer() {
   _finishPreviewRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   _finishPreviewRenderer.outputColorSpace = THREE.SRGBColorSpace;
   _finishPreviewRenderer.toneMapping = THREE.ACESFilmicToneMapping;
-  _finishPreviewRenderer.toneMappingExposure = 1.2;
+  _finishPreviewRenderer.toneMappingExposure = 1.5;
 
   _finishPreviewScene = new THREE.Scene();
   _finishPreviewCamera = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
-  _finishPreviewCamera.position.set(1.35, 2.55, 9.6);
-  _finishPreviewCamera.lookAt(0, 0.95, 0);
+  _finishPreviewCamera.position.set(0, 1.5, 10); // default, overridden by auto-frame
+  _finishPreviewCamera.lookAt(0, 1, 0);
 
-  _finishPreviewScene.add(new THREE.AmbientLight(0xffffff, 0.6));
-  const keyLight = new THREE.DirectionalLight(0xffeedd, 1.2);
+  _finishPreviewScene.add(new THREE.AmbientLight(0xffffff, 0.9));
+  const keyLight = new THREE.DirectionalLight(0xffeedd, 1.6);
   keyLight.position.set(3, 5, 4);
   _finishPreviewScene.add(keyLight);
-  const rimLight = new THREE.DirectionalLight(0x8899bb, 0.4);
+  const rimLight = new THREE.DirectionalLight(0x8899bb, 0.6);
   rimLight.position.set(-3, 2, -4);
   _finishPreviewScene.add(rimLight);
+  const fillLight = new THREE.DirectionalLight(0xddeeff, 0.4);
+  fillLight.position.set(-1, 0, 5);
+  _finishPreviewScene.add(fillLight);
 
   if (!_finishPreviewLoader) _finishPreviewLoader = new GLTFLoader();
   _resizeFinishPreview();
@@ -892,7 +890,8 @@ function _tintFinishPreviewModel(model, modelKey, colorKey) {
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     for (const m of mats) {
       if (!m || !m.color || !(m.isMeshStandardMaterial || m.isMeshPhysicalMaterial)) continue;
-      m.color.lerp(coat, 0.82);
+      // Same approach as character select: set to coat then lighten 30% toward white
+      m.color.copy(coat).lerp(new THREE.Color(0xffffff), 0.3);
       m.needsUpdate = true;
     }
   });
@@ -953,12 +952,40 @@ function _placeFinishPreviewModel(model, modelKey) {
   const scale = targetHeight / h;
   model.scale.setScalar(scale);
 
+  // Two-pass grounding: center XZ, ground on box.min.y, then correct
+  // with foot bone positions for accurate grounding on any model.
   box.setFromObject(model);
   const center = box.getCenter(new THREE.Vector3());
   model.position.x -= center.x;
   model.position.z -= center.z;
-  model.position.y -= box.min.y + (_finishPreviewOffsets[modelKey] || 0);
+  model.position.y -= box.min.y;
+
+  model.updateMatrixWorld(true);
+  let minFootY = Infinity;
+  const _tmpV = new THREE.Vector3();
+  model.traverse(o => {
+    if (!o || !o.isBone) return;
+    if (!/foot|toe|paw/i.test(String(o.name || ''))) return;
+    o.getWorldPosition(_tmpV);
+    if (_tmpV.y < minFootY) minFootY = _tmpV.y;
+  });
+  if (Number.isFinite(minFootY)) model.position.y -= minFootY;
+
   model.rotation.y = _finishPreviewBaseYaw;
+
+  // Auto-frame camera to fit this model
+  model.updateMatrixWorld(true);
+  box.setFromObject(model);
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  const fovRad = THREE.MathUtils.degToRad(_finishPreviewCamera.fov);
+  const fitDist = (sphere.radius * 0.95) / Math.sin(fovRad / 2);
+  _finishPreviewCamera.position.set(
+    sphere.center.x + fitDist * 0.12,
+    sphere.center.y + fitDist * 0.08,
+    sphere.center.z + fitDist
+  );
+  _finishPreviewCamera.lookAt(sphere.center.x, sphere.center.y * 0.85, sphere.center.z);
+  _finishPreviewCamera.updateProjectionMatrix();
 }
 
 function _setFinishPreviewModel(modelKey, colorKey, hairKey) {

@@ -124,12 +124,17 @@ export function loadGameplayCat(refs = {}) {
     catModel.scale.setScalar(s);
     baseScale.copy(catModel.scale);
 
-    const preset = getSelectedModelPreset();
-    _centerAndGround(catModel, preset.gameLift);
-    if (preset.gameModelZ) catModel.position.z += Number(preset.gameModelZ) || 0;
+    _centerAndGround(catModel);
 
     baseLocalPos.copy(catModel.position);
     baseLocalQuat.copy(catModel.quaternion);
+
+    // Log final model metrics for debugging new models
+    {
+      const dbgBox = new THREE.Box3().setFromObject(catModel);
+      const dbgSize = dbgBox.getSize(new THREE.Vector3());
+      console.log(`[cat-anim] model "${catModelKey}" grounded — pos: (${catModel.position.x.toFixed(2)}, ${catModel.position.y.toFixed(2)}, ${catModel.position.z.toFixed(2)}) size: (${dbgSize.x.toFixed(2)}, ${dbgSize.y.toFixed(2)}, ${dbgSize.z.toFixed(2)}) box.min.y: ${dbgBox.min.y.toFixed(3)}`);
+    }
 
     // Shadows + material cleanup
     catModel.traverse(o => {
@@ -243,29 +248,48 @@ function _stripBackdrop(model, src) {
   for (const o of toRemove) { if (o.parent) o.parent.remove(o); }
 }
 
-function _centerAndGround(model, extraDrop = 0) {
+function _centerAndGround(model) {
+  // Two-pass ground: first center XZ and rough-ground on box.min.y,
+  // then find foot bones and correct Y so feet sit exactly at local Y=0.
+  // This makes every model consistent regardless of mesh origin or bone
+  // rest-pose, so no per-model fudge offsets are needed.
   const box = new THREE.Box3().setFromObject(model);
   const center = box.getCenter(new THREE.Vector3());
-  const size = box.getSize(new THREE.Vector3());
   model.position.x -= center.x;
   model.position.z -= center.z;
-  model.position.y -= (box.min.y + (extraDrop || 0));
+  model.position.y -= box.min.y;
+
+  // Second pass — find the lowest foot bone and pin to that instead,
+  // because skeletal models often have geometry that extends below the
+  // foot rest position (e.g. toon cat's big paws).
+  model.updateMatrixWorld(true);
+  let minFootY = Infinity;
+  const _tmpVec = new THREE.Vector3();
+  model.traverse(o => {
+    if (!o || !o.isBone) return;
+    if (!/foot|toe|paw/i.test(String(o.name || ''))) return;
+    o.getWorldPosition(_tmpVec);
+    if (_tmpVec.y < minFootY) minFootY = _tmpVec.y;
+  });
+  if (Number.isFinite(minFootY)) {
+    model.position.y -= minFootY;
+  }
 }
 
-function _pinToGround(model, baseLPos, offsetOverride) {
+function _pinToGround(model, baseLPos) {
   if (!model || !model.parent) return;
-  const preset = getSelectedModelPreset();
-  const off = (offsetOverride !== undefined) ? offsetOverride : (preset.groundPinOffset || 0);
-  model.position.copy(baseLPos);
+
+  // Box-based ground pin: compute the actual mesh bounding box (which
+  // changes with animation), convert to parent-local space, and push
+  // the model up/down so its feet sit at baseLPos.y.
+  boxTmp.setFromObject(model);
+  if (!Number.isFinite(boxTmp.min.y)) return;
   const parent = model.parent;
-  parent.updateMatrixWorld(true);
-  groundTmpParentPos.setFromMatrixPosition(parent.matrixWorld);
-  // The room floor is below world 0 in this scene, so pinning against 0
-  // incorrectly lifts toon on floor/space placements.
-  const floorY = -(state.H / 2 + state.ply + state.bunFootH);
-  const worldY = groundTmpParentPos.y + baseLPos.y;
-  if (worldY < floorY) model.position.y = baseLPos.y + (floorY - worldY) + off;
-  else model.position.y = baseLPos.y + off;
+  parent.getWorldPosition(groundTmpParentPos);
+  const localMinY = boxTmp.min.y - groundTmpParentPos.y;
+  const targetLocalMinY = baseLPos.y + 0.002;
+  const delta = targetLocalMinY - localMinY;
+  model.position.y += delta;
 }
 
 // ── Bone collection ─────────────────────────────────────────────────
@@ -501,7 +525,7 @@ function _applyToonJumpLegs(squash) {
   applyOffset(L.lowerFR, B.lowerFR, +shinBend * 0.6, 0, +ang * 0.4);
 }
 
-export function applyGameplayJumpDeform({ dtSec, vy, holdFrames, modelKey, groundPinOffset }) {
+export function applyGameplayJumpDeform({ dtSec, vy, holdFrames, modelKey }) {
   if (!catModel || !catMixer) return;
   const st = catMixer.userData || (catMixer.userData = {});
   if (!Number.isFinite(st._squashBlend)) st._squashBlend = 0;
@@ -535,6 +559,37 @@ export function applyGameplayJumpDeform({ dtSec, vy, holdFrames, modelKey, groun
 
   if (isToon) {
     _applyToonJumpLegs(s);
-    _pinToGround(catModel, baseLocalPos, groundPinOffset);
+    _pinToGround(catModel, baseLocalPos);
   }
+}
+
+/**
+ * Apply a gentle breathing/squish to bababooey when idle.
+ * Oscillates scale Y down and XZ up slowly for a squishy feel.
+ * @param {number} ts - timestamp in ms
+ * @param {number} intensity - 0..1 blend (use idleBlend)
+ */
+export function applyBababooeyIdleSquish(ts, intensity) {
+  if (!catModel || intensity <= 0.001) return;
+  const t = ts * 0.001;
+  // Slow breathing: ~0.8 Hz with a gentle secondary wobble
+  const wave = Math.sin(t * 1.6) * 0.7 + Math.sin(t * 2.5) * 0.3;
+  const squish = wave * 0.035 * intensity; // max ~3.5% scale change
+  catModel.scale.set(
+    baseScale.x * (1 + squish * 0.6),
+    baseScale.y * (1 - squish),
+    baseScale.z * (1 + squish * 0.6)
+  );
+}
+
+/**
+ * Reset the cat model to its base pose and pin to the ground using the
+ * box-based approach. Called every frame BEFORE applyGameplayJumpDeform
+ * so animations don't drift the cat through the floor.
+ */
+export function resetAndPinGameplayCat() {
+  if (!catModel) return;
+  catModel.position.copy(baseLocalPos);
+  catModel.quaternion.copy(baseLocalQuat);
+  _pinToGround(catModel, baseLocalPos);
 }

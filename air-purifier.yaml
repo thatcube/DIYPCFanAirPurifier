@@ -56,3 +56,46 @@ light:
           name: "Random"
           transition_length: 2s
           update_interval: 3s
+
+  # ARGB chain for the 6 Arctic P12 Pro fans
+  # 8 LEDs per fan × 6 fans = 48 addressable LEDs
+  # Data goes through TXS0108E level shifter (GPIO5 → A0, B0 → fan #1 Data)
+  # 5V piggybacks off the ESP32's 5V pin — capped brightness to stay under ~2A
+  - platform: esp32_rmt_led_strip
+    id: fan_argb
+    name: "Fan ARGB"
+    pin: GPIO5
+    num_leds: 48
+    rgb_order: GRB
+    chipset: WS2812
+    default_transition_length: 0.5s
+    # Cap max brightness to ~80% to keep current draw safe when powered via ESP32 5V pin
+    gamma_correct: 2.8
+    effects:
+      - addressable_rainbow:
+          name: "Rainbow"
+      - addressable_color_wipe:
+          name: "Color Wipe"
+      - addressable_scan:
+          name: "Scan"
+      - addressable_twinkle:
+          name: "Twinkle"
+      - addressable_fireworks:
+          name: "Fireworks"
+      - pulse:
+          name: "Pulse"
+
+# 25 kHz PWM output on GPIO4 for the fan speed signal (PC fans expect ~25 kHz)
+output:
+  - platform: ledc
+    id: fan_pwm_output
+    pin: GPIO4
+    frequency: 25000Hz
+
+# Fan control exposed to Home Assistant / web UI with speed slider
+fan:
+  - platform: speed
+    id: purifier_fan
+    name: "Purifier Fan"
+    output: fan_pwm_output
+    speed_count: 100

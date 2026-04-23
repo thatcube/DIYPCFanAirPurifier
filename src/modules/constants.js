@@ -52,9 +52,9 @@ export const CAT_HAIR_PRESETS = {
 
 // Cat model presets
 export const CAT_MODEL_PRESETS = {
-  classic:   { label: 'Classic Cat',   sources: ['assets/cat.glb'],         colorable: true,  animSpeed: 1.0, idleLoopPause: 0,   groundPinOffset: 0.0,  sprintAnimMult: 1.0 },
-  toon:      { label: 'Toon Cat',      sources: ['assets/tooncat.glb', 'assets/toon-cat.glb'], colorable: false, animSpeed: 1.0, idleLoopPause: 0,   groundPinOffset: -1.25, sprintAnimMult: 2,   gameModelZ: -1.2, gameGroundPinOffset: -2.1 },
-  bababooey: { label: 'Bababooey Cat', sources: ['assets/bababooey_cat.glb'], colorable: false, animSpeed: 0.7, idleLoopPause: 2.2, groundPinOffset: 0.0,  sprintAnimMult: 1.4 }
+  classic:   { label: 'Classic Cat',   sources: ['assets/cat.glb'],         colorable: true,  animSpeed: 0.85, idleLoopPause: 0,   sprintAnimMult: 1.0 },
+  toon:      { label: 'Toon Cat',      sources: ['assets/tooncat.glb', 'assets/toon-cat.glb'], colorable: false, animSpeed: 0.85, idleLoopPause: 0,   sprintAnimMult: 2 },
+  bababooey: { label: 'Bababooey Cat', sources: ['assets/bababooey_cat.glb'], colorable: false, animSpeed: 0.6, idleLoopPause: 2.2, sprintAnimMult: 1.4 }
 };
 
 // Secret coin total (for all-found check)
