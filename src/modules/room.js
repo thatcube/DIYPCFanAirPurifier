@@ -18,6 +18,127 @@ import {
 } from './spatial.js';
 import { state } from './state.js';
 
+// ─── Shared door asset ──────────────────────────────────────────────
+// Single 4-panel shaker-style leaf used for the bedroom door and the two
+// hallway doors. Origin is at the leaf center (width=X, height=Y, thickness=Z).
+// Callers position/rotate freely and attach children for knobs or pivots.
+function buildDoorLeaf({ width, height, thickness,
+                        color=0xf0ebe4, panelColor=0xe8e3dc,
+                        shadowColor=0xb8b0a4 }) {
+  const group = new THREE.Group();
+  const slabMat  = new THREE.MeshStandardMaterial({ color: shadowColor, roughness: 0.75, metalness: 0.02 });
+  const frameMat = new THREE.MeshStandardMaterial({ color,              roughness: 0.52, metalness: 0.04 });
+  const panelMat = new THREE.MeshStandardMaterial({ color: panelColor,  roughness: 0.45, metalness: 0.02 });
+
+  const stileW   = Math.min(3.5, width  * 0.14);
+  const railTopH = Math.min(4.5, height * 0.06);
+  const railMidH = Math.min(5.0, height * 0.065);
+  const railBotH = Math.min(7.0, height * 0.10);
+  const frameD   = Math.max(0.35, thickness * 0.30);
+  const slabT    = Math.max(0.1, thickness - frameD * 2);
+  const midY     = -height * 0.05; // lock rail just below center
+
+  // Base slab — acts as the darker recess visible around the raised panels.
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(width, height, slabT), slabMat);
+  slab.castShadow = true; slab.receiveShadow = true;
+  group.add(slab);
+
+  for (const face of [-1, +1]) {
+    const fz = face * (slabT / 2 + frameD / 2);
+
+    // Stiles (L/R)
+    for (const s of [-1, +1]) {
+      const stile = new THREE.Mesh(new THREE.BoxGeometry(stileW, height, frameD), frameMat);
+      stile.position.set(s * (width / 2 - stileW / 2), 0, fz);
+      stile.receiveShadow = true;
+      group.add(stile);
+    }
+    const innerW = width - stileW * 2;
+    // Top / middle (lock) / bottom rails
+    const topRail = new THREE.Mesh(new THREE.BoxGeometry(innerW, railTopH, frameD), frameMat);
+    topRail.position.set(0, height / 2 - railTopH / 2, fz);
+    topRail.receiveShadow = true; group.add(topRail);
+    const midRail = new THREE.Mesh(new THREE.BoxGeometry(innerW, railMidH, frameD), frameMat);
+    midRail.position.set(0, midY, fz);
+    midRail.receiveShadow = true; group.add(midRail);
+    const botRail = new THREE.Mesh(new THREE.BoxGeometry(innerW, railBotH, frameD), frameMat);
+    botRail.position.set(0, -height / 2 + railBotH / 2, fz);
+    botRail.receiveShadow = true; group.add(botRail);
+
+    // Raised panels filling the four openings between rails + stiles.
+    const gap = 0.5;
+    const colW = innerW / 2 - gap;
+    const colCx = innerW / 4 + gap / 2;
+    const topOpenY1 = midY + railMidH / 2;
+    const topOpenY2 = height / 2 - railTopH;
+    const botOpenY1 = -height / 2 + railBotH;
+    const botOpenY2 = midY - railMidH / 2;
+    const topPanelH = (topOpenY2 - topOpenY1) - gap * 2;
+    const botPanelH = (botOpenY2 - botOpenY1) - gap * 2;
+    const topPanelY = (topOpenY1 + topOpenY2) / 2;
+    const botPanelY = (botOpenY1 + botOpenY2) / 2;
+    const panelT = frameD * 0.7; // thinner than frame → sits recessed
+    const panelZ = face * (slabT / 2 + panelT / 2);
+    for (const col of [-1, +1]) {
+      const cx = col * colCx;
+      if (topPanelH > 1) {
+        const p = new THREE.Mesh(new THREE.BoxGeometry(colW, topPanelH, panelT), panelMat);
+        p.position.set(cx, topPanelY, panelZ);
+        p.receiveShadow = true;
+        group.add(p);
+      }
+      if (botPanelH > 1) {
+        const p = new THREE.Mesh(new THREE.BoxGeometry(colW, botPanelH, panelT), panelMat);
+        p.position.set(cx, botPanelY, panelZ);
+        p.receiveShadow = true;
+        group.add(p);
+      }
+    }
+  }
+  group.userData.doorLeaf = { width, height, thickness, slab };
+  return group;
+}
+
+// Door trim: two jambs + header around an opening of (width × height), with
+// the frame centered at Z=0 and depth extending along Z.
+function buildDoorFrame({ width, height, depth, frameW = 2.5, color = 0xf5f5f0 }) {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.35, metalness: 0.05 });
+  const left = new THREE.Mesh(new THREE.BoxGeometry(frameW, height, depth), mat);
+  left.position.set(-(width / 2 + frameW / 2 - 0.5), 0, 0);
+  left.receiveShadow = true; group.add(left);
+  const right = new THREE.Mesh(new THREE.BoxGeometry(frameW, height, depth), mat);
+  right.position.set(+(width / 2 + frameW / 2 - 0.5), 0, 0);
+  right.receiveShadow = true; group.add(right);
+  const header = new THREE.Mesh(
+    new THREE.BoxGeometry(width + frameW * 2 - 1, frameW, depth), mat);
+  header.position.set(0, height / 2 + frameW / 2 - 0.5, 0);
+  header.receiveShadow = true; group.add(header);
+  return group;
+}
+
+// Nicer doorknob (rose + neck + ball). Points along +Z; mirror with
+// `rotation.y = Math.PI` for the opposite face.
+function buildDoorKnob() {
+  const group = new THREE.Group();
+  const knobMat  = new THREE.MeshStandardMaterial({ color: 0xb0aca4, roughness: 0.22, metalness: 0.88 });
+  const plateMat = new THREE.MeshStandardMaterial({ color: 0xc0bcb4, roughness: 0.28, metalness: 0.78 });
+  const plate = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 0.3, 20), plateMat);
+  plate.rotation.x = Math.PI / 2; plate.position.z = 0.15;
+  group.add(plate);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.5, 0.9, 14), knobMat);
+  neck.rotation.x = Math.PI / 2; neck.position.z = 0.75;
+  group.add(neck);
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(1.2, 20, 14), knobMat);
+  ball.position.z = 1.6;
+  group.add(ball);
+  return group;
+}
+
+function tagAll(obj, flags) {
+  obj.traverse(o => { for (const k in flags) o[k] = flags[k]; });
+}
+
 export function createRoom(scene) {
   const floorY = getFloorY();
   const { H, W, D, ply, ft, bunFootH } = state;
@@ -687,8 +808,9 @@ export function createRoom(scene) {
   const doorThick=1.5, doorFrameW=2.5, doorFrameD=recessDepth>4?4:recessDepth;
   const doorColor=0xf0ebe4; // warm off-white painted door
   const doorFrameColor=0xf5f5f0;
-  
-  // Door panel — hinged so it can swing open from the handle click.
+
+  // Door panel — hinged so it can swing open from the handle click. Uses the
+  // shared `buildDoorLeaf` asset so every door in the scene matches.
   const doorPanelZ=recessZ-doorThick/2;
   const doorPanelW=doorW-1;
   const doorPanelH=doorH-0.5;
@@ -697,85 +819,37 @@ export function createRoom(scene) {
   cornerDoorPivot._isRoom=true;
   addRoom(cornerDoorPivot);
 
-  const doorPanelMat=new THREE.MeshStandardMaterial({color:doorColor, roughness:0.5, metalness:0.05});
-  const doorPanel=new THREE.Mesh(new THREE.BoxGeometry(doorPanelW, doorPanelH, doorThick), doorPanelMat);
+  const doorPanel=buildDoorLeaf({ width:doorPanelW, height:doorPanelH, thickness:doorThick,
+                                  color:doorColor });
   doorPanel.position.set(doorPanelW/2, 0, 0);
-  doorPanel.castShadow=true;
-  doorPanel.receiveShadow=true;
-  doorPanel._isRoom=true;
-  doorPanel._isCornerDoor=true;
+  tagAll(doorPanel, { _isRoom:true, _isCornerDoor:true });
+  // Slab is the canonical center mesh used by game-fp.js for OBB collision.
+  doorPanel.userData.doorLeaf.slab.castShadow = true;
+  doorPanel.userData.doorLeaf.slab.receiveShadow = true;
   cornerDoorPivot.add(doorPanel);
-  
-  // Six-panel door detail — raised panels on both faces.
-  const dpInset=0.3, dpW=doorW*0.35, dpH1=doorH*0.22, dpH2=doorH*0.30;
-  const dpY=[doorH*0.14-doorH/2, doorH*0.42-doorH/2, doorH*0.74-doorH/2]; // centers of 3 rows (door-local)
-  const dpHArr=[dpH1, dpH2, dpH1];
-  const dpMat=new THREE.MeshStandardMaterial({color:0xe8e3dc,roughness:0.45,metalness:0.02});
-  [-1, 1].forEach(faceSign=>{
-    [-1,1].forEach(side=>{
-      dpHArr.forEach((ph,ri)=>{
-        const pg=new THREE.BoxGeometry(dpW, ph, dpInset);
-        const pm=new THREE.Mesh(pg, dpMat);
-        pm.position.set(
-          doorPanelW/2+side*(doorW*0.2),
-          dpY[ri],
-          faceSign*(doorThick/2+dpInset/2+0.01)
-        );
-        pm.castShadow=false;
-        pm._isRoom=true;
-        pm._isCornerDoor=true;
-        cornerDoorPivot.add(pm);
-      });
-    });
-  });
-  
-  // Door frame (trim around opening — spans from recessed wall into room)
-  const dfMat=new THREE.MeshStandardMaterial({color:doorFrameColor,roughness:0.35,metalness:0.05});
-  const frameZ=recessZ-doorFrameD/2;
-  // Left jamb
-  const dfl=new THREE.Mesh(new THREE.BoxGeometry(doorFrameW, doorH, doorFrameD), dfMat);
-  dfl.position.set(doorLeft-doorFrameW/2+0.5, floorY+doorH/2, frameZ);
-  dfl.castShadow=false; dfl._isRoom=true; addRoom(dfl);
-  // Right jamb
-  const dfr=new THREE.Mesh(new THREE.BoxGeometry(doorFrameW, doorH, doorFrameD), dfMat);
-  dfr.position.set(doorRight+doorFrameW/2-0.5, floorY+doorH/2, frameZ);
-  dfr.castShadow=false; dfr._isRoom=true; addRoom(dfr);
-  // Header
-  const dfh=new THREE.Mesh(new THREE.BoxGeometry(doorW+doorFrameW*2-1, doorFrameW, doorFrameD), dfMat);
-  dfh.position.set(doorCenterX, floorY+doorH+doorFrameW/2-0.5, frameZ);
-  dfh.castShadow=false; dfh._isRoom=true; addRoom(dfh);
-  
-  // Door knob + plate (interactive) — front and back so both sides match.
-  const knobMat=new THREE.MeshStandardMaterial({color:0xaaaaaa,roughness:0.25,metalness:0.8});
-  const knobGeo=new THREE.SphereGeometry(1.2, 16, 12);
-  const knob=new THREE.Mesh(knobGeo, knobMat);
-  knob.position.set(doorPanelW/2+doorW*0.35, 36-doorH/2, -doorThick/2-1.2);
-  knob.castShadow=false;
-  knob._isRoom=true;
-  knob._isCornerDoorHandle=true;
-  cornerDoorPivot.add(knob);
-  const knobBack=new THREE.Mesh(knobGeo, knobMat);
-  knobBack.position.set(doorPanelW/2+doorW*0.35, 36-doorH/2, doorThick/2+1.2);
-  knobBack.castShadow=false;
-  knobBack._isRoom=true;
-  knobBack._isCornerDoorHandle=true;
+
+  // Knobs on both faces (front = into room at -Z, back = into hallway at +Z).
+  const knobY = 36 - doorH/2; // door-local Y of the knob
+  const knobX = doorPanelW/2 + doorW*0.35;
+  const knobFront = buildDoorKnob();
+  knobFront.position.set(knobX, knobY, -doorThick/2);
+  tagAll(knobFront, { _isRoom:true, _isCornerDoorHandle:true });
+  knobFront.rotation.y = Math.PI; // point -Z
+  cornerDoorPivot.add(knobFront);
+  const knobBack = buildDoorKnob();
+  knobBack.position.set(knobX, knobY, doorThick/2);
+  tagAll(knobBack, { _isRoom:true, _isCornerDoorHandle:true });
   cornerDoorPivot.add(knobBack);
-  // Knob base plate
-  const plateMat=new THREE.MeshStandardMaterial({color:0xbbbbbb,roughness:0.3,metalness:0.7});
-  const plateGeo=new THREE.CylinderGeometry(1.8, 1.8, 0.3, 16);
-  plateGeo.rotateX(Math.PI/2);
-  const plate=new THREE.Mesh(plateGeo, plateMat);
-  plate.position.set(doorPanelW/2+doorW*0.35, 36-doorH/2, -doorThick/2-0.2);
-  plate.castShadow=false;
-  plate._isRoom=true;
-  plate._isCornerDoorHandle=true;
-  cornerDoorPivot.add(plate);
-  const plateBack=new THREE.Mesh(plateGeo, plateMat);
-  plateBack.position.set(doorPanelW/2+doorW*0.35, 36-doorH/2, doorThick/2+0.2);
-  plateBack.castShadow=false;
-  plateBack._isRoom=true;
-  plateBack._isCornerDoorHandle=true;
-  cornerDoorPivot.add(plateBack);
+
+  // Door frame (trim around opening — spans from recessed wall into room)
+  const frameZ=recessZ-doorFrameD/2;
+  const doorFrame = buildDoorFrame({
+    width: doorW, height: doorH, depth: doorFrameD,
+    frameW: doorFrameW, color: doorFrameColor
+  });
+  doorFrame.position.set(doorCenterX, floorY+doorH/2, frameZ);
+  tagAll(doorFrame, { _isRoom:true });
+  addRoom(doorFrame);
 
   // Simple smooth hinge animation for the corner door.
   let _cornerDoorOpen=false;
@@ -830,67 +904,134 @@ export function createRoom(scene) {
   const _hallBbColor = 0xc0bbb4;
 
   // Hardwood plank floor — 6" wide planks running along the hallway length
-  // (+Z). Covers the full hallway footprint and starts right at the doorway
-  // (Z=49) so the threshold transition is clean. Sits 0.05" above the main
-  // carpet floor (which extends to Z=+100) to hide the carpet that would
-  // otherwise show through the first ~51" of the hallway.
+  // (+Z). Starts inside the bedroom doorway opening (at the door panel) so
+  // the hardwood is visible the instant the door swings open, and continues
+  // through the door recess and all the way to the end of the hallway. Sits
+  // 0.05" above the main carpet floor to hide the carpet underneath.
+  // doorPanelZ = recessZ - doorThick/2 = 19 - 0.75 = 18.25 (pre-mirror Z of
+  // the door panel). Recompute here to keep this block self-contained.
+  const _hwStartZ = recessZ - 1.5/2; // 18.25
   {
-    const HW_RES_W = 256;  // across the plank (short axis)
-    const HW_RES_H = 1024; // along the plank (long axis)
+    // Build a single non-repeating texture that covers the whole hallway
+    // floor (hwW × hwL inches). Using repeat=(1,1) avoids the obvious
+    // "same grain every 5 feet" tiling signature the old 60"-tall tile had.
+    const hwW = 40;
+    const hwL = 289 - _hwStartZ; // from door panel through end of hallway
+    const PLANK_W_IN = 6;                       // plank width in inches
+    const N_PLANKS = Math.max(1, Math.round(hwW / PLANK_W_IN)); // 7 planks
+    const PX_PER_IN = 10;                       // canvas resolution
+    const HW_RES_W = N_PLANKS * PLANK_W_IN * PX_PER_IN; // 420
+    const HW_RES_H = Math.round(hwL * PX_PER_IN);       // ~2707
     const cvs = document.createElement('canvas');
     cvs.width = HW_RES_W; cvs.height = HW_RES_H;
     const ctx = cvs.getContext('2d');
-    // Base wood tone
-    ctx.fillStyle = '#8b5a2b';
+    // Dark gap color behind everything — shows at plank seams & butt joints.
+    ctx.fillStyle = '#1a0f06';
     ctx.fillRect(0, 0, HW_RES_W, HW_RES_H);
-    // Subtle grain streaks along the plank
-    for (let i = 0; i < 600; i++) {
-      const x = Math.random() * HW_RES_W;
-      const y = Math.random() * HW_RES_H;
-      const len = 40 + Math.random() * 200;
-      const shade = 60 + Math.random() * 50;
-      ctx.strokeStyle = `rgba(${shade},${shade*0.65|0},${shade*0.35|0},${0.25+Math.random()*0.35})`;
-      ctx.lineWidth = 0.5 + Math.random() * 1.2;
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (Math.random()-0.5)*4, y + len); ctx.stroke();
+
+    // Helper: HSL-ish wood tone. Returns an #rrggbb string.
+    const woodTone = (l, warm) => {
+      // l: 0..1 lightness bias, warm: -1..1 red/yellow shift
+      const base = 70 + l * 80;                 // 70..150
+      const r = Math.max(0, Math.min(255, base + 35 + warm * 25));
+      const g = Math.max(0, Math.min(255, base * 0.72 + warm * 10));
+      const b = Math.max(0, Math.min(255, base * 0.42 - warm * 8));
+      return `rgb(${r|0},${g|0},${b|0})`;
+    };
+
+    const plankPxW = HW_RES_W / N_PLANKS;
+    for (let p = 0; p < N_PLANKS; p++) {
+      const px0 = p * plankPxW;
+      const px1 = (p + 1) * plankPxW;
+      // Build this column's stack of butt joints (plank end-to-end cuts).
+      // Real oak flooring uses 24"–72" lengths; randomize per board.
+      const joints = [0];
+      let y = Math.random() * 36 * PX_PER_IN; // first plank starts partway in
+      while (y < HW_RES_H) {
+        joints.push(y);
+        y += (24 + Math.random() * 48) * PX_PER_IN;
+      }
+      joints.push(HW_RES_H);
+      // Stagger: ensure adjacent columns don't share joint Y. Easy since each
+      // column's joint stack is independently random.
+
+      for (let j = 0; j < joints.length - 1; j++) {
+        const y0 = joints[j];
+        const y1 = joints[j + 1];
+        const plankH = y1 - y0;
+        // Per-plank base hue + lightness variation.
+        const lBias = 0.35 + Math.random() * 0.55;
+        const warm = (Math.random() - 0.5) * 1.6;
+        // Gentle along-plank gradient so each board has its own tonal arc.
+        const grad = ctx.createLinearGradient(0, y0, 0, y1);
+        grad.addColorStop(0,   woodTone(lBias + (Math.random()-0.5)*0.1, warm));
+        grad.addColorStop(0.5, woodTone(lBias + (Math.random()-0.5)*0.15, warm + (Math.random()-0.5)*0.4));
+        grad.addColorStop(1,   woodTone(lBias + (Math.random()-0.5)*0.1, warm));
+        ctx.fillStyle = grad;
+        // Leave ~1px gap on all sides for seams/joints.
+        ctx.fillRect(px0 + 0.8, y0 + 0.8, plankPxW - 1.6, plankH - 1.6);
+
+        // Long grain streaks (vary per plank).
+        const streakCount = 28 + (plankH * 0.02 | 0);
+        for (let i = 0; i < streakCount; i++) {
+          const sx = px0 + 1 + Math.random() * (plankPxW - 2);
+          const sy = y0 + Math.random() * plankH;
+          const slen = plankH * (0.15 + Math.random() * 0.7);
+          const shade = 40 + Math.random() * 70;
+          const a = 0.08 + Math.random() * 0.28;
+          ctx.strokeStyle = `rgba(${shade},${(shade*0.62)|0},${(shade*0.32)|0},${a})`;
+          ctx.lineWidth = 0.4 + Math.random() * 1.3;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(sx + (Math.random() - 0.5) * 3, Math.min(y1 - 0.5, sy + slen));
+          ctx.stroke();
+        }
+        // Occasional lighter highlight streak.
+        if (Math.random() < 0.55) {
+          const sx = px0 + 2 + Math.random() * (plankPxW - 4);
+          const sy = y0 + Math.random() * plankH * 0.7;
+          ctx.strokeStyle = `rgba(255,230,190,${0.05 + Math.random() * 0.08})`;
+          ctx.lineWidth = 1 + Math.random() * 2;
+          ctx.beginPath(); ctx.moveTo(sx, sy);
+          ctx.lineTo(sx + (Math.random()-0.5)*2, Math.min(y1 - 0.5, sy + plankH * (0.3 + Math.random() * 0.5)));
+          ctx.stroke();
+        }
+        // Knots — rare, weighted by plank size.
+        const knotChance = plankH / (PX_PER_IN * 120);
+        if (Math.random() < knotChance) {
+          const kx = px0 + 3 + Math.random() * (plankPxW - 6);
+          const ky = y0 + 6 + Math.random() * (plankH - 12);
+          const kr = 2.5 + Math.random() * 5;
+          const kg = ctx.createRadialGradient(kx, ky, 0, kx, ky, kr);
+          kg.addColorStop(0,   'rgba(40,20,8,0.85)');
+          kg.addColorStop(0.6, 'rgba(70,40,18,0.55)');
+          kg.addColorStop(1,   'rgba(80,45,20,0)');
+          ctx.fillStyle = kg;
+          ctx.beginPath(); ctx.arc(kx, ky, kr, 0, Math.PI * 2); ctx.fill();
+        }
+      }
     }
-    // Occasional knots
-    for (let i = 0; i < 14; i++) {
-      const x = Math.random() * HW_RES_W;
-      const y = Math.random() * HW_RES_H;
-      const r = 3 + Math.random() * 6;
-      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-      g.addColorStop(0, 'rgba(50,25,10,0.8)');
-      g.addColorStop(1, 'rgba(80,45,20,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
+
+    // Fine noise overlay to kill any residual banding.
+    const noise = ctx.getImageData(0, 0, HW_RES_W, HW_RES_H);
+    const nd = noise.data;
+    for (let i = 0; i < nd.length; i += 4) {
+      const n = (Math.random() - 0.5) * 18;
+      nd[i]   = Math.max(0, Math.min(255, nd[i]   + n));
+      nd[i+1] = Math.max(0, Math.min(255, nd[i+1] + n * 0.7));
+      nd[i+2] = Math.max(0, Math.min(255, nd[i+2] + n * 0.5));
     }
-    // Plank seams — dark lines every 1/4 of the canvas (=> 4 planks across)
-    ctx.fillStyle = 'rgba(20,10,0,0.9)';
-    for (let k = 1; k < 4; k++) {
-      const sx = (HW_RES_W / 4) * k;
-      ctx.fillRect(sx - 0.6, 0, 1.2, HW_RES_H);
-    }
-    // Staggered butt joints (across the plank length) — one per plank at a
-    // random Y so adjacent planks don't line up.
-    for (let k = 0; k < 4; k++) {
-      const xStart = (HW_RES_W / 4) * k;
-      const xEnd = (HW_RES_W / 4) * (k + 1);
-      const yJoint = HW_RES_H * (0.25 + Math.random() * 0.5);
-      ctx.fillRect(xStart, yJoint - 0.6, xEnd - xStart, 1.2);
-    }
+    ctx.putImageData(noise, 0, 0);
+
     const hwTex = new THREE.CanvasTexture(cvs);
-    hwTex.wrapS = hwTex.wrapT = THREE.RepeatWrapping;
-    // Hallway is 40" wide along X and 240" long along Z. Planks run along Z
-    // so their long axis maps to world Z. Plane is rotated -π/2 around X, so
-    // after rotation the plane's local +X maps to world +X and local +Y maps
-    // to world -Z. Texture U axis = canvas X (HW_RES_W short axis) = across
-    // planks, V axis = canvas Y = along planks.
-    // Width across: 40" / (4 planks × 6" wide) = 40/24 = 1.667 repeats in U.
-    hwTex.repeat.set(40 / (4 * 6), 240 / 60); // 60" plank length per V repeat
+    hwTex.wrapS = hwTex.wrapT = THREE.ClampToEdgeWrapping;
+    hwTex.anisotropy = 16;
+    if ('colorSpace' in hwTex) hwTex.colorSpace = THREE.SRGBColorSpace;
+    // One-to-one: canvas covers the whole hallway floor, no tiling.
+    hwTex.repeat.set(1, 1);
     const hwMat = new THREE.MeshStandardMaterial({map: hwTex, roughness: 0.55, metalness: 0.05});
-    const hwW = 40, hwL = 240;
-    const hwCx = 31; // extCenterX (pre-mirror X)
-    const hwCz = 49 + hwL/2;
+    const hwCx = 31; // extCenterX (pre-mirror X) — between the recess walls
+    const hwCz = _hwStartZ + hwL/2;
     const hwGeo = new THREE.PlaneGeometry(hwW, hwL);
     const hw = new THREE.Mesh(hwGeo, hwMat);
     hw.rotation.x = -Math.PI/2;
@@ -902,22 +1043,16 @@ export function createRoom(scene) {
     addRoom(hw);
   }
 
-  // Wood threshold / saddle at the doorway — a warm stained strip at the
-  // transition from carpet (bedroom) to hardwood (hallway). Sits in the
-  // doorway opening (X = doorLeft..doorRight pre-mirror) and fits the full
-  // depth of the doorway jamb so you can see it from both sides.
+  // Wood threshold / saddle at the carpet↔hardwood transition — sits directly
+  // under where the door panel closes so you see a warm stained strip framing
+  // the opening. Width matches the door panel.
   {
-    const thrMat = new THREE.MeshStandardMaterial({
-      color: 0x6b4226, roughness: 0.5, metalness: 0.05,
-    });
-    const thrW = doorW - 0.5;  // slightly narrower than the opening
-    const thrD = 4;            // 4" deep saddle
-    const thrH = 0.4;          // sits proud of the carpet
-    const thrZ = 49 + 0.5;      // just inside the hallway past the wall
+    const thrW = doorW - 0.5;
+    const thrD = 2.5;
+    const thrH = 0.4;
     const thr = roomBox(thrW, thrH, thrD, 0x6b4226,
-      doorCenterX, floorY + thrH/2, thrZ, 0, 0, 0);
+      doorCenterX, floorY + thrH/2, _hwStartZ, 0, 0, 0);
     thr._isHallway = true;
-    void thrMat; // material created inline via roomBox; keep linter quiet
   }
 
   // Ceiling for the hallway — flat panel at the same height as the room ceiling
@@ -989,119 +1124,55 @@ export function createRoom(scene) {
   }
 
   // Two decorative doors, one on each side wall, ~6 ft in from the room.
-  // Simple raised-panel style matching the bedroom door palette; no hinge
+  // Same shared door asset as the bedroom door so they all match; no hinge
   // animation — they read as "other rooms" off the hallway.
   {
-    const doorMat = new THREE.MeshStandardMaterial({color:0xf0ebe4, roughness:0.5, metalness:0.05});
-    const trimMat = new THREE.MeshStandardMaterial({color:0xf5f5f0, roughness:0.35, metalness:0.05});
-    const knobMat = new THREE.MeshStandardMaterial({color:0xaaaaaa, roughness:0.25, metalness:0.8});
-    const dpAccentMat = new THREE.MeshStandardMaterial({color:0xe8e3dc, roughness:0.45, metalness:0.02});
-    const panelThick = 1.2;
-    const trimW = 2.5, trimD = 1;
-    const headerH = 4;
+    const panelThick = 1.4;
     // sides: -1 → -X wall (door faces +X, into hallway), +1 → +X wall.
     const _hallwayDoorSides = [-1, +1];
     for (const side of _hallwayDoorSides){
       const wallX = side < 0 ? _hallXLeft : _hallXRight;
-      // Door panel inset ~0.3" in front of the wall face so the painted face
-      // reads inside the hallway and the trim brackets it.
-      const innerFaceX = wallX + side*0.25; // inside surface of the wall
-      const panelX = innerFaceX - side*(panelThick/2);
+      const innerFaceX = wallX + side*0.25;
+      const panelCenterX = innerFaceX - side*(panelThick/2);
       const panelY = floorY + _hallDoorH/2;
       const panelZ = _hallDoorCenterZ;
-      const panel = new THREE.Mesh(
-        new THREE.BoxGeometry(panelThick, _hallDoorH-1, _hallDoorW-1),
-        doorMat
-      );
-      panel.position.set(panelX, panelY, panelZ);
-      panel.castShadow = true; panel.receiveShadow = true;
-      panel._isRoom = true; panel._isHallway = true;
-      addRoom(panel);
-      // Raised panel accents — three rows, two columns, on the hallway face.
-      const faceX = panelX - side*(panelThick/2 + 0.15);
-      const dpW = (_hallDoorW-1)*0.35;
-      const dpH1 = _hallDoorH*0.22, dpH2 = _hallDoorH*0.30;
-      const dpY = [
-        panelY - _hallDoorH/2 + _hallDoorH*0.14,
-        panelY - _hallDoorH/2 + _hallDoorH*0.42,
-        panelY - _hallDoorH/2 + _hallDoorH*0.74,
-      ];
-      const dpHArr = [dpH1, dpH2, dpH1];
-      for (const col of [-1, +1]){
-        dpHArr.forEach((ph, ri) => {
-          const dp = new THREE.Mesh(
-            new THREE.BoxGeometry(0.3, ph, dpW),
-            dpAccentMat
-          );
-          dp.position.set(faceX, dpY[ri], panelZ + col*(_hallDoorW*0.2));
-          dp.castShadow = false; dp.receiveShadow = true;
-          dp._isRoom = true; dp._isHallway = true;
-          addRoom(dp);
-        });
-      }
-      // Door frame trim around the opening (on the hallway-facing side).
-      // Header
-      const trimX = innerFaceX - side*(trimD/2 + 0.04);
-      const trH = new THREE.Mesh(
-        new THREE.BoxGeometry(trimD, headerH, _hallDoorW+trimW*2),
-        trimMat
-      );
-      trH.position.set(trimX, floorY+_hallDoorH+headerH/2, panelZ);
-      trH.castShadow = false; trH.receiveShadow = true;
-      trH._isRoom = true; trH._isHallway = true;
-      addRoom(trH);
-      // Left/right jambs (along Z)
-      for (const jz of [-1, +1]){
-        const tr = new THREE.Mesh(
-          new THREE.BoxGeometry(trimD, _hallDoorH, trimW),
-          trimMat
-        );
-        tr.position.set(trimX, floorY+_hallDoorH/2, panelZ + jz*(_hallDoorW/2+trimW/2));
-        tr.castShadow = false; tr.receiveShadow = true;
-        tr._isRoom = true; tr._isHallway = true;
-        addRoom(tr);
-      }
-      // Doorknob on the hallway face
-      const knob = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 12), knobMat);
-      knob.position.set(faceX - side*0.2, panelY - _hallDoorH/2 + 36, panelZ + (_hallDoorW/2 - 4));
-      knob.castShadow = false;
-      knob._isRoom = true; knob._isHallway = true;
-      addRoom(knob);
-      const plateGeo = new THREE.CylinderGeometry(1.8, 1.8, 0.3, 16);
-      plateGeo.rotateZ(Math.PI/2);
-      const plate = new THREE.Mesh(plateGeo, knobMat);
-      plate.position.set(faceX + side*0.05, panelY - _hallDoorH/2 + 36, panelZ + (_hallDoorW/2 - 4));
-      plate.castShadow = false;
-      plate._isRoom = true; plate._isHallway = true;
-      addRoom(plate);
-    }
-  }
 
-  // Trim around the bedroom-side of the back-wall doorway (hallway-facing)
-  // so the hole has a clean jamb when viewed from the hallway.
-  {
-    const trimMat = new THREE.MeshStandardMaterial({color:0xf5f5f0, roughness:0.35, metalness:0.05});
-    const trimW = 2.5, trimD = 1;
-    const headerH = 4;
-    const trimZ = 49 + 0.5 + trimD/2 + 0.04;
-    // Header
-    const trH = new THREE.Mesh(
-      new THREE.BoxGeometry(doorW+trimW*2, headerH, trimD),
-      trimMat
-    );
-    trH.position.set(doorCenterX, floorY+doorH+headerH/2, trimZ);
-    trH.castShadow = false; trH.receiveShadow = true;
-    trH._isRoom = true; trH._isHallway = true;
-    addRoom(trH);
-    for (const jx of [-1, +1]){
-      const tr = new THREE.Mesh(
-        new THREE.BoxGeometry(trimW, doorH, trimD),
-        trimMat
+      // Leaf is built canonical (width along X, thickness along Z). Rotating
+      // ±90° around Y swings the width onto the Z axis so it sits flush
+      // inside the hallway wall, thickness becoming the X axis.
+      const leaf = buildDoorLeaf({
+        width: _hallDoorW-1, height: _hallDoorH-1, thickness: panelThick,
+      });
+      leaf.position.set(panelCenterX, panelY, panelZ);
+      leaf.rotation.y = side < 0 ? Math.PI/2 : -Math.PI/2;
+      tagAll(leaf, { _isRoom:true, _isHallway:true });
+      // Need shadows on the slab for a grounded look.
+      leaf.userData.doorLeaf.slab.castShadow = true;
+      addRoom(leaf);
+
+      // Trim frame on the hallway-facing side of the wall. Frame is built in
+      // canonical XY plane; rotate to lie flat against the wall.
+      const trimD = 1;
+      const trimX = innerFaceX - side*(trimD/2 + 0.04);
+      const frame = buildDoorFrame({
+        width: _hallDoorW, height: _hallDoorH, depth: trimD,
+      });
+      frame.position.set(trimX, panelY, panelZ);
+      frame.rotation.y = side < 0 ? Math.PI/2 : -Math.PI/2;
+      tagAll(frame, { _isRoom:true, _isHallway:true });
+      addRoom(frame);
+
+      // Knob on the hallway face, offset from the strike edge.
+      const knobZOffset = _hallDoorW/2 - 4;
+      const knob = buildDoorKnob();
+      knob.position.set(
+        panelCenterX - side*(panelThick/2),
+        panelY - _hallDoorH/2 + 36,
+        panelZ + knobZOffset
       );
-      tr.position.set(doorCenterX + jx*(doorW/2+trimW/2), floorY+doorH/2, trimZ);
-      tr.castShadow = false; tr.receiveShadow = true;
-      tr._isRoom = true; tr._isHallway = true;
-      addRoom(tr);
+      knob.rotation.y = side < 0 ? -Math.PI/2 : Math.PI/2;
+      tagAll(knob, { _isRoom:true, _isHallway:true });
+      addRoom(knob);
     }
   }
 
