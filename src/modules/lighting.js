@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { state } from './state.js';
 import {
-  DAY_CLEAR, NIGHT_CLEAR, DAY_WALL, NIGHT_WALL
+  DAY_CLEAR, NIGHT_CLEAR
 } from './constants.js';
 
 // ── Internal helpers ────────────────────────────────────────────────
@@ -54,10 +54,6 @@ export function windowBeamCurve(minuteOfDay) {
 
 // ── Color constants ─────────────────────────────────────────────────
 
-const DAY_BASE    = 0xc0bbb4;
-const NIGHT_BASE  = 0x1e1e28;
-const DAY_CARPET  = 0xb0a898;
-const NIGHT_CARPET= 0x4a4840;
 const GOLDEN_KEY  = 0xffddaa;
 
 // ── Lights ──────────────────────────────────────────────────────────
@@ -228,8 +224,9 @@ export function applyTimeOfDay(minuteOfDay, refs) {
   renderer.setClearColor(clearCol.clone(), 1);
   scene.fog.color.copy(clearCol);
   scene.fog.density = mix(0.003, 0.0015, sun);
-  // Three r18x lighting reads darker than the old baseline; use a higher indoor exposure curve.
-  renderer.toneMappingExposure = mix(1.36, 1.84, sun);
+  // Exposure curve — lower at night so surfaces darken naturally via lighting
+  // instead of forcing dark material colors.
+  renderer.toneMappingExposure = mix(1.0, 1.84, sun);
 
   // Key / window sun
   const keyColor = warm > 0.1
@@ -260,8 +257,9 @@ export function applyTimeOfDay(minuteOfDay, refs) {
   key.updateMatrixWorld();
   key.shadow.camera.updateProjectionMatrix();
 
-  // Hemisphere
-  hemiLight.intensity = mix(0.36, 0.62, sun) + (refs.ceilLightOn ? mix(0.24, 0.1, sun) : 0);
+  // Hemisphere — at night the base is low so surfaces darken naturally;
+  // ceiling-light-on adds a bigger boost to compensate.
+  hemiLight.intensity = mix(0.12, 0.62, sun) + (refs.ceilLightOn ? mix(0.38, 0.1, sun) : 0);
   {
     const sky = lerpHex(0x334466, 0x8899bb, sun);
     if (refs.ceilLightOn) {
@@ -288,21 +286,9 @@ export function applyTimeOfDay(minuteOfDay, refs) {
   const moonLight = refs.moonGlow || moonGlow;
   if (moonLight) moonLight.intensity = mix(60, 0, sun);
 
-  // Room surfaces
-  if (refs.wallMeshes) {
-    const wallCol = lerpHex(NIGHT_WALL, DAY_WALL, sun);
-    refs.wallMeshes.forEach(m => m.material.color.copy(wallCol));
-  }
-  if (refs.baseMeshes) {
-    const baseCol = lerpHex(NIGHT_BASE, DAY_BASE, sun);
-    refs.baseMeshes.forEach(m => m.material.color.copy(baseCol));
-  }
-  if (refs.ceilingMat) {
-    refs.ceilingMat.color.copy(lerpHex(NIGHT_WALL, DAY_WALL, sun));
-  }
-  if (refs.floorMat) {
-    refs.floorMat.color.copy(lerpHex(NIGHT_CARPET, DAY_CARPET, sun));
-  }
+  // Room surfaces — keep materials at their natural (paint/fabric) color.
+  // The reduced hemisphere + exposure at night darkens everything naturally
+  // via PBR lighting, so we don't override material colors per time-of-day.
 
   // Shadow refresh
   if (refs._markShadowsDirty) refs._markShadowsDirty();
