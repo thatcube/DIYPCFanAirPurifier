@@ -6,11 +6,13 @@
   from = "/"
   to = "/vite-index.html"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/index.html"
   to = "/vite-index.html"
   status = 301
+  force = true
 
 [[redirects]]
   from = "/leaderboard"
@@ -57,3 +59,14 @@
   to = "https://diy-air-purifier-leaderboard.essays-loges0y.workers.dev/api/:splat"
   status = 200
   force = true
+
+# Never cache HTML so redirect/routing changes take effect immediately.
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
