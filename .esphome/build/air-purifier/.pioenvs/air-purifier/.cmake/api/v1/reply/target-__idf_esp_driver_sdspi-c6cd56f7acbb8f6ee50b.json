@@ -477,15 +477,15 @@
 					"path" : "/Users/brandon/.platformio/packages/framework-espidf/components/lwip/port/esp32xx/include/sys"
 				},
 				{
-					"backtrace" : 6,
+					"backtrace" : 5,
 					"path" : "/Users/brandon/.platformio/packages/framework-espidf/components/sdmmc/include"
 				},
 				{
-					"backtrace" : 5,
+					"backtrace" : 6,
 					"path" : "/Users/brandon/.platformio/packages/framework-espidf/components/esp_driver_spi/include"
 				},
 				{
-					"backtrace" : 5,
+					"backtrace" : 6,
 					"path" : "/Users/brandon/.platformio/packages/framework-espidf/components/esp_pm/include"
 				},
 				{
@@ -514,15 +514,15 @@
 	[
 		{
 			"backtrace" : 5,
-			"id" : "__idf_esp_driver_spi::@a108b58494cdd93e678c"
-		},
-		{
-			"backtrace" : 6,
 			"id" : "__idf_sdmmc::@89ed5bca1750ffbc7db6"
 		},
 		{
 			"backtrace" : 2,
 			"id" : "__idf_riscv::@5eeb1a2ca709d020776e"
+		},
+		{
+			"backtrace" : 6,
+			"id" : "__idf_esp_driver_spi::@a108b58494cdd93e678c"
 		}
 	],
 	"id" : "__idf_esp_driver_sdspi::@c293af58c49fe790ac32",

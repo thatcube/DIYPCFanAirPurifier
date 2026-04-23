@@ -30,10 +30,22 @@ import {
 export const catGroup = new THREE.Group();
 catGroup.visible = false;
 
+// Hard-exclude the entire cat subtree from ANY shadow pass. three.js
+// calls onBeforeShadow on each object before rendering it into a shadow
+// map — flipping castShadow off here guarantees the cat never writes to
+// any shadow map, regardless of what other code does to castShadow.
+catGroup.onBeforeShadow = function () {
+  this.traverse(o => { if (o.isMesh) o.castShadow = false; });
+};
+
 export let catModel = null;
 export let catMixer = null;
 export let catWalkAction = null;
 export let catIdleAction = null;
+
+// Kept for API compatibility (no-op shim — blob shadow was removed).
+export const catBlobShadow = null;
+export function updateCatBlobShadow() {}
 
 // ── Constants ───────────────────────────────────────────────────────
 
@@ -129,17 +141,14 @@ export function loadGameplayCat(refs = {}) {
     baseLocalPos.copy(catModel.position);
     baseLocalQuat.copy(catModel.quaternion);
 
-    // Log final model metrics for debugging new models
-    {
-      const dbgBox = new THREE.Box3().setFromObject(catModel);
-      const dbgSize = dbgBox.getSize(new THREE.Vector3());
-      console.log(`[cat-anim] model "${catModelKey}" grounded — pos: (${catModel.position.x.toFixed(2)}, ${catModel.position.y.toFixed(2)}, ${catModel.position.z.toFixed(2)}) size: (${dbgSize.x.toFixed(2)}, ${dbgSize.y.toFixed(2)}, ${dbgSize.z.toFixed(2)}) box.min.y: ${dbgBox.min.y.toFixed(3)}`);
-    }
-
     // Shadows + material cleanup
     catModel.traverse(o => {
       if (o.isMesh) {
-        o.castShadow = true; o.receiveShadow = true;
+        // Cat does NOT cast shadows — at throttled shadow refresh rates
+        // the cat's shadow trails behind during movement, creating a
+        // visible ghost/jitter effect. The cat still receives shadows.
+        o.castShadow = false; o.receiveShadow = true;
+        if (o.isSkinnedMesh) o.frustumCulled = false;
         if (o.material && o.material.map) o.material.map.colorSpace = THREE.SRGBColorSpace;
         const mats = Array.isArray(o.material) ? o.material : [o.material];
         for (const m of mats) {
@@ -161,6 +170,21 @@ export function loadGameplayCat(refs = {}) {
 
     // Animations
     if (gltf.animations && gltf.animations.length) {
+      // Strip position (translation) tracks from all animation clips.
+      // Many GLB cat models bake root motion into bone position tracks
+      // (e.g. the "All" root bone translates forward during walk/run).
+      // In Three.js 0.184+ these bone positions are applied faithfully,
+      // causing the mesh to slide forward then snap back every cycle.
+      // We handle all movement via catGroup.position, so bone position
+      // tracks are unwanted — only rotation/scale tracks are kept.
+      for (const clip of gltf.animations) {
+        clip.tracks = clip.tracks.filter(t => !t.name.endsWith('.position'));
+      }
+      // Reset duration since we removed tracks
+      for (const clip of gltf.animations) {
+        clip.resetDuration();
+      }
+
       catMixer = new THREE.AnimationMixer(catModel);
       const byName = (names) => {
         for (const n of names) {
@@ -184,6 +208,18 @@ export function clearGameplayCat() {
   if (catModel && catModel.parent) catModel.parent.remove(catModel);
   catModel = null;
   _resetIdleBones();
+}
+
+/**
+ * Force-disable shadow casting on the cat model. At throttled shadow
+ * refresh rates (8 Hz in play mode) the cat's cast shadow visibly lags
+ * behind on the floor. We rely on the fake blob shadow (catBlobShadow)
+ * for contact shadowing instead. Kept as a function so it can be
+ * reapplied after model swaps or appearance changes.
+ */
+export function setCatShadows(_enabled) {
+  if (!catModel) return;
+  catModel.traverse(o => { if (o.isMesh) o.castShadow = false; });
 }
 
 /**
@@ -253,6 +289,14 @@ function _centerAndGround(model) {
   // then find foot bones and correct Y so feet sit exactly at local Y=0.
   // This makes every model consistent regardless of mesh origin or bone
   // rest-pose, so no per-model fudge offsets are needed.
+  //
+  // In Three.js 0.184+, SkinnedMesh has boundingBox=null which makes
+  // Box3.setFromObject call computeBoundingBox (bone-aware, expensive,
+  // frame-varying). Force it to undefined so setFromObject uses the
+  // stable geometry-level bounding box instead.
+  model.traverse(o => {
+    if (o.isSkinnedMesh && o.boundingBox === null) o.boundingBox = undefined;
+  });
   const box = new THREE.Box3().setFromObject(model);
   const center = box.getCenter(new THREE.Vector3());
   model.position.x -= center.x;
@@ -279,9 +323,6 @@ function _centerAndGround(model) {
 function _pinToGround(model, baseLPos) {
   if (!model || !model.parent) return;
 
-  // Box-based ground pin: compute the actual mesh bounding box (which
-  // changes with animation), convert to parent-local space, and push
-  // the model up/down so its feet sit at baseLPos.y.
   boxTmp.setFromObject(model);
   if (!Number.isFinite(boxTmp.min.y)) return;
   const parent = model.parent;
@@ -371,12 +412,18 @@ export function applyLoopPause(action, ts, pauseSeconds, allowPause) {
   }
 }
 
+
 export function refreshGameplayIdleBasePose() {
   const all = [...idleTailBones, ...idleSpineBones, ...idleHeadBones];
   for (const b of all) {
     if (!b || !b.isBone) continue;
     if (!b.userData) b.userData = {};
-    b.userData._catIdleBaseQuat = b.quaternion.clone();
+    // Reuse existing Quaternion to avoid GC churn
+    if (b.userData._catIdleBaseQuat) {
+      b.userData._catIdleBaseQuat.copy(b.quaternion);
+    } else {
+      b.userData._catIdleBaseQuat = b.quaternion.clone();
+    }
   }
 }
 
@@ -435,7 +482,8 @@ export function applyBababooeyProceduralRun(ts, moveSpeed, moveBlend) {
   if (!babaBones.left && !babaBones.right && !babaBones.down && !babaBones.up && !babaBones.mid) return;
   const t = ts * 0.001;
   const sp = Math.max(0, moveSpeed);
-  const spN = Math.min(1, sp / 0.45);
+  // moveSpeed is in inches/sec; normalize to 0..1 where ~27 in/s is full sprint
+  const spN = Math.min(1, sp / 27);
   const blend = Math.max(0, Math.min(1, moveBlend)) * spN;
   if (blend <= 0.001) return;
 
@@ -559,7 +607,6 @@ export function applyGameplayJumpDeform({ dtSec, vy, holdFrames, modelKey }) {
 
   if (isToon) {
     _applyToonJumpLegs(s);
-    _pinToGround(catModel, baseLocalPos);
   }
 }
 
@@ -583,13 +630,19 @@ export function applyBababooeyIdleSquish(ts, intensity) {
 }
 
 /**
- * Reset the cat model to its base pose and pin to the ground using the
- * box-based approach. Called every frame BEFORE applyGameplayJumpDeform
- * so animations don't drift the cat through the floor.
+ * Reset the cat model to its base pose and pin to the ground.
+ *
+ * In Three.js 0.184+, catGroup must stay at identity (pos=0, rot=0) because
+ * Skeleton.update() reads bone.matrixWorld which propagates from catGroup.
+ * If catGroup moves, bone matrices include that displacement, but
+ * boneInverses (from bind time at origin) don't — so the shader applies
+ * the displacement twice (once via boneMat, once via modelMatrix).
+ *
+ * Fix: catGroup stays at identity. All gameplay transforms are applied
+ * to catModel directly, combining baseLocalPos with the gameplay offset.
  */
 export function resetAndPinGameplayCat() {
   if (!catModel) return;
   catModel.position.copy(baseLocalPos);
   catModel.quaternion.copy(baseLocalQuat);
-  _pinToGround(catModel, baseLocalPos);
 }

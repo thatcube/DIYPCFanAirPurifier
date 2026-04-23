@@ -14,9 +14,10 @@ import {
   TBL_X, TBL_Z, TBL_W, TBL_D, TBL_H,
   WALL_HEIGHT, PLACEMENT_OFFSETS
 } from './spatial.js';
-import { getBounds, acquireBox, resetBoxPool, easeAlpha, BODY_R, EYE_H, HEAD_EXTRA } from './game-collision.js';
+import { getBounds, boundsBase, acquireBox, resetBoxPool, easeAlpha, BODY_R, EYE_H, HEAD_EXTRA } from './game-collision.js';
 import * as coins from './coins.js';
 import * as leaderboard from './leaderboard.js';
+import * as catAnimation from './cat-animation.js';
 import { trapFocus, saveFocus } from './a11y.js';
 import { RAYCAST_INTERVAL_MS } from './constants.js';
 
@@ -96,6 +97,16 @@ export function setMusicMuted(muted) {
 // ── Internal state ──────────────────────────────────────────────────
 
 let _velX = 0, _velZ = 0;
+
+/**
+ * Return the current horizontal speed in inches/second.
+ * Uses physics velocity directly — no noisy position-delta math.
+ */
+export function getHorizSpeed() {
+  // _velX/_velZ are in units-per-frame-at-60fps; multiply by 60 for per-second
+  return Math.hypot(_velX, _velZ) * 60;
+}
+
 let _bobPhase = 0;
 let _lastPhysicsTs = 0;
 let _spaceHeld = 0;
@@ -135,6 +146,7 @@ const _viewDir = new THREE.Vector3();
 const _lookTarget = new THREE.Vector3();
 const _ray = new THREE.Raycaster();
 _ray.far = 220;
+_ray.firstHitOnly = true;
 const _rayCenter = new THREE.Vector2(0, 0);
 let _pointerLockRetryTimer = null;
 
@@ -161,6 +173,21 @@ let _staticBoxes = [];
 const _dynWorldBox = new THREE.Box3();
 const _dynMin = new THREE.Vector3();
 const _dynMax = new THREE.Vector3();
+
+// Reusable vectors for dynamic collision (avoid per-frame allocations)
+const _doorWP = new THREE.Vector3();
+const _doorWQ = new THREE.Quaternion();
+const _doorEuler = new THREE.Euler();
+const _macWP = new THREE.Vector3();
+const _macBB = new THREE.Box3();
+const _macSz = new THREE.Vector3();
+let _macScreenBBCached = false;
+let _macScreenHW = 0, _macScreenHH = 0;
+
+// Cached purifier + console collision (rebuilt only on placement/config change)
+let _purifierBoxesCache = null;
+let _purifierBoxesDirtyFlag = true;
+export function invalidatePurifierCollision() { _purifierBoxesDirtyFlag = true; }
 
 function _isObjectVisibleInWorld(obj) {
   for (let n = obj; n; n = n.parent) {
@@ -316,6 +343,9 @@ function _playFootstepCue(speedNorm, sprinting) {
 
 // ── Init ────────────────────────────────────────────────────────────
 
+// Cached list of interactive objects for crosshair raycasting
+let _interactiveObjects = [];
+
 export function init(refs) {
   _camera = refs.camera;
   _canvas = refs.canvas;
@@ -331,6 +361,15 @@ export function init(refs) {
 
   // Build static collision boxes from room refs
   _buildStaticBoxes();
+
+  // Build interactive object list for crosshair raycasting (once)
+  _interactiveObjects = [];
+  _scene.traverse(obj => {
+    if (obj._isLamp || obj._isCeilLight || obj._isFan || obj._isFilterL || obj._isFilterR ||
+        obj._isDrawer || obj._isBifoldLeaf || obj._isCornerDoorHandle || obj._isWindow || obj._isMacbook || obj._isTV) {
+      _interactiveObjects.push(obj);
+    }
+  });
 
   // Bind input
   _bindInputs();
@@ -419,9 +458,9 @@ function _buildStaticBoxes() {
     yTop: bedTop, yBottom: fy + BED_CLEARANCE, room: true
   });
 
-  // Bed legs — corner posts from floor up to frame clearance.
+  // Bed legs — corner posts from floor up to slat platform.
   const bedLegR = 1.2;
-  const bedLegH = BED_CLEARANCE;
+  const bedLegH = BED_SLATS_FROM_FLOOR;
   for (const [lx, lz] of [
     [BED_X - BED_W / 2 + 3, BED_Z - BED_L / 2 + 3],
     [BED_X + BED_W / 2 - 3, BED_Z - BED_L / 2 + 3],
@@ -688,58 +727,37 @@ function _buildStaticBoxes() {
 
 // ── Get collision boxes (per-frame) ─────────────────────────────────
 
-function _getBoxes() {
-  resetBoxPool();
-  // Reuse static room collision boxes directly; only dynamic boxes below need rebuilding.
-  const result = _staticBoxes.slice();
-
-  // ── Purifier collision (dynamic — follows placementOffset + rotation) ──
+function _buildPurifierBoxes() {
+  const boxes = [];
   const px = _placementOffset ? _placementOffset.x : 0;
   const py = _placementOffset ? _placementOffset.y : 0;
   const pz = _placementOffset ? _placementOffset.z : 0;
   const { W, H, D, ply, ft, bunFootH } = state;
   const panelW = W + 2 * ft;
-
-  // Cabinet dimensions in local space
-  const hwOuter = panelW / 2;    // half-width (filter side)
-  const hdOuter = D / 2 + ply;   // half-depth (front/back)
+  const hwOuter = panelW / 2;
+  const hdOuter = D / 2 + ply;
   const yTopPanel = py + H / 2 + ply;
   const yBotPanel = py - H / 2 - ply;
-  const yBotFeet = yBotPanel - bunFootH;
-
-  // Detect rotation from the actual purifierGroup rotation
   const rotated = _purifierGroup ? Math.abs(_purifierGroup.rotation.y) > 0.1 : false;
-
-  // When filters are removed (toggled off) or slid out, skip their side walls
   const filtersOn = _purifierRefs && _purifierRefs.isFilterOn ? _purifierRefs.isFilterOn() : true;
   const filtersSlid = _purifierRefs && _purifierRefs.areFiltersSlid ? _purifierRefs.areFiltersSlid() : { left: false, right: false };
-  // Filter sides: filterL is at local -X, filterR is at local +X
-  // But the purifier's filter naming is from the viewer's perspective, which
-  // is opposite to the local X axis. Swap so collision matches visuals.
   const leftOpen = !filtersOn || filtersSlid.right;
   const rightOpen = !filtersOn || filtersSlid.left;
   const localBoxes = [
-    // Top panel — standable
     { lxMin: -hwOuter, lxMax: hwOuter, lzMin: -hdOuter, lzMax: hdOuter, yTop: yTopPanel, yBottom: yTopPanel - ply },
-    // Bottom panel — thin standable surface (player can stand on it inside)
     { lxMin: -hwOuter, lxMax: hwOuter, lzMin: -hdOuter, lzMax: hdOuter, yTop: yBotPanel + ply, yBottom: yBotPanel },
-    // Front wall (-Z face)
     { lxMin: -hwOuter, lxMax: hwOuter, lzMin: -hdOuter, lzMax: -D / 2, yTop: yTopPanel, yBottom: yBotPanel },
-    // Back wall (+Z face)
     { lxMin: -hwOuter, lxMax: hwOuter, lzMin: D / 2, lzMax: hdOuter, yTop: yTopPanel, yBottom: yBotPanel },
   ];
-  // Only add filter side walls if filters are in place (not removed and not slid out)
   if (!leftOpen) {
     localBoxes.push({ lxMin: -hwOuter, lxMax: -hwOuter + ft, lzMin: -D / 2, lzMax: D / 2, yTop: yTopPanel, yBottom: yBotPanel });
   }
   if (!rightOpen) {
     localBoxes.push({ lxMin: hwOuter - ft, lxMax: hwOuter, lzMin: -D / 2, lzMax: D / 2, yTop: yTopPanel, yBottom: yBotPanel });
   }
-
   for (const lb of localBoxes) {
-    const b = acquireBox();
+    const b = {};
     if (rotated) {
-      // 90° rotation: local X → world Z, local Z → world -X
       b.xMin = px - lb.lzMax; b.xMax = px - lb.lzMin;
       b.zMin = pz + lb.lxMin; b.zMax = pz + lb.lxMax;
     } else {
@@ -747,35 +765,45 @@ function _getBoxes() {
       b.zMin = pz + lb.lzMin; b.zMax = pz + lb.lzMax;
     }
     b.yTop = lb.yTop; b.yBottom = lb.yBottom;
-    result.push(b);
+    boxes.push(b);
   }
-
-  // Console props collision — use live mesh bounds so hitboxes always align.
+  // Console props collision
   if (_purifierRefs && _purifierRefs.getConsoleCollisionBoxes) {
     const consoleBoxes = _purifierRefs.getConsoleCollisionBoxes();
     if (Array.isArray(consoleBoxes)) {
       for (const src of consoleBoxes) {
-        if (!src) continue;
-        const b = acquireBox();
-        b.xMin = src.xMin;
-        b.xMax = src.xMax;
-        b.zMin = src.zMin;
-        b.zMax = src.zMax;
-        b.yTop = src.yTop;
-        b.yBottom = src.yBottom;
-        result.push(b);
+        if (src) boxes.push({ xMin: src.xMin, xMax: src.xMax, zMin: src.zMin, zMax: src.zMax, yTop: src.yTop, yBottom: src.yBottom });
       }
     }
   }
-
-  // Purifier feet/legs collision — derived from current leg meshes so
-  // style/diameter/height changes stay in sync with physics.
+  // Purifier feet/legs collision
   const purifierLegGroup = _purifierRefs && _purifierRefs.parts && _purifierRefs.parts.legs;
   if (purifierLegGroup && Array.isArray(purifierLegGroup.children)) {
     for (const legMesh of purifierLegGroup.children) {
       if (!legMesh || !legMesh.isMesh) continue;
-      _pushWorldAabbBox(result, legMesh, 0.04);
+      if (!_isObjectVisibleInWorld(legMesh)) continue;
+      legMesh.updateWorldMatrix(true, true);
+      _dynWorldBox.setFromObject(legMesh);
+      if (_dynWorldBox.isEmpty()) continue;
+      _dynMin.copy(_dynWorldBox.min);
+      _dynMax.copy(_dynWorldBox.max);
+      boxes.push({ xMin: _dynMin.x - 0.04, xMax: _dynMax.x + 0.04, zMin: _dynMin.z - 0.04, zMax: _dynMax.z + 0.04, yTop: _dynMax.y, yBottom: _dynMin.y });
     }
+  }
+  return boxes;
+}
+
+function _getBoxes() {
+  resetBoxPool();
+  const result = _staticBoxes.slice();
+
+  // Purifier collision (cached — only rebuilt on placement/config change)
+  if (_purifierBoxesDirtyFlag) {
+    _purifierBoxesDirtyFlag = false;
+    _purifierBoxesCache = _buildPurifierBoxes();
+  }
+  if (_purifierBoxesCache) {
+    for (let i = 0; i < _purifierBoxesCache.length; i++) result.push(_purifierBoxesCache[i]);
   }
 
   // Closet bifold doors — dynamic collision based on door state
@@ -864,20 +892,21 @@ function _getBoxes() {
     const doorPanel = _roomRefs.getCornerDoorPanelMesh();
     if (doorPanel && doorPanel.parent) {
       doorPanel.updateMatrixWorld(true);
-      const wp = new THREE.Vector3();
-      const wq = new THREE.Quaternion();
-      doorPanel.getWorldPosition(wp);
-      doorPanel.getWorldQuaternion(wq);
-      const rot = new THREE.Euler().setFromQuaternion(wq, 'YXZ');
+      doorPanel.getWorldPosition(_doorWP);
+      doorPanel.getWorldQuaternion(_doorWQ);
+      _doorEuler.setFromQuaternion(_doorWQ, 'YXZ');
       // Matches room.js dimensions: doorW-1 by doorH-0.5 by doorThick
+      const doorAngle = -_doorEuler.y;
       result.push({
-        cx: wp.x,
-        cz: wp.z,
+        cx: _doorWP.x,
+        cz: _doorWP.z,
         hw: (32 - 1) / 2,
         hd: 1.5 / 2 + 0.12,
-        angle: -rot.y,
-        yTop: wp.y + (80 - 0.5) / 2,
-        yBottom: wp.y - (80 - 0.5) / 2,
+        angle: doorAngle,
+        cosA: Math.cos(-doorAngle), sinA: Math.sin(-doorAngle),
+        cosB: Math.cos(doorAngle), sinB: Math.sin(doorAngle),
+        yTop: _doorWP.y + (80 - 0.5) / 2,
+        yBottom: _doorWP.y - (80 - 0.5) / 2,
         obb: true,
         room: true
       });
@@ -889,26 +918,26 @@ function _getBoxes() {
     const scrMesh = _roomRefs.getMacbookScreenMesh();
     if (scrMesh && scrMesh.parent) {
       scrMesh.parent.updateMatrixWorld(true);
-      // Get screen world position and dimensions
-      const wp = new THREE.Vector3();
-      scrMesh.getWorldPosition(wp);
-      // The screen is a ShapeGeometry in local XY plane
-      // Screen has rotation.y = PI, parent has rotation.y = PI + 25°
-      // Combined world Y-rotation = parent.rot + screen.rot
-      const parentRotY = scrMesh.parent.rotation.y; // PI + 25°
-      const screenRotY = scrMesh.rotation.y;         // PI
-      const worldRotY = parentRotY + screenRotY;     // 2*PI + 25° ≡ 25°
-      // Screen dimensions (screen.scale = invScale cancels parent scale)
-      const bb = new THREE.Box3().setFromBufferAttribute(scrMesh.geometry.attributes.position);
-      const sz = bb.getSize(new THREE.Vector3());
-      const hw = sz.x / 2; // half-width (screen X = world horizontal)
-      const hh = sz.y / 2; // half-height (screen Y = world vertical)
-      // Thin wall OBB: the lid plane
+      scrMesh.getWorldPosition(_macWP);
+      const parentRotY = scrMesh.parent.rotation.y;
+      const screenRotY = scrMesh.rotation.y;
+      const worldRotY = parentRotY + screenRotY;
+      // Cache screen bounding box dimensions (geometry never changes)
+      if (!_macScreenBBCached) {
+        _macBB.setFromBufferAttribute(scrMesh.geometry.attributes.position);
+        _macBB.getSize(_macSz);
+        _macScreenHW = _macSz.x / 2;
+        _macScreenHH = _macSz.y / 2;
+        _macScreenBBCached = true;
+      }
+      const macAngle = -worldRotY;
       result.push({
-        cx: wp.x, cz: wp.z,
-        hw: hw, hd: 0.3,           // 0.3" thin wall
-        angle: -worldRotY,
-        yTop: wp.y + hh, yBottom: wp.y - hh,
+        cx: _macWP.x, cz: _macWP.z,
+        hw: _macScreenHW, hd: 0.3,
+        angle: macAngle,
+        cosA: Math.cos(-macAngle), sinA: Math.sin(-macAngle),
+        cosB: Math.cos(macAngle), sinB: Math.sin(macAngle),
+        yTop: _macWP.y + _macScreenHH, yBottom: _macWP.y - _macScreenHH,
         obb: true
       });
     }
@@ -1017,6 +1046,9 @@ export function toggleFirstPerson() {
       _catGroup.visible = fpCamMode === 'third';
       if (_catGroup.parent !== _scene) _scene.add(_catGroup);
     }
+    // Disable cat shadow casting — shadow map refreshes at ~8 Hz so the
+    // cat's shadow visually trails behind during movement at high FPS.
+    catAnimation.setCatShadows(false);
 
     if (_markShadowsDirty) _markShadowsDirty();
     document.body.classList.add('play-mode');
@@ -1064,6 +1096,8 @@ export function toggleFirstPerson() {
     }
 
     if (_markShadowsDirty) _markShadowsDirty();
+    // Restore cat shadow casting for orbit mode
+    catAnimation.setCatShadows(true);
     document.body.classList.remove('play-mode');
     _playModeCue(false);
   }
@@ -1274,8 +1308,8 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   let nz = fpPos.z + moveZ;
   const r = BODY_R;
 
-  // Wall bounds — room stays at origin, no placement offset needed
-  const bounds = getBounds(new THREE.Vector3());
+  // Wall bounds — room stays at origin, use pre-computed base bounds
+  const bounds = boundsBase;
   if (nx < bounds.xMin + r) { nx = bounds.xMin + r; _velX = Math.max(_velX, 0); }
   else if (nx > bounds.xMax - r) { nx = bounds.xMax - r; _velX = Math.min(_velX, 0); }
   if (nz < bounds.zMin + r) { nz = bounds.zMin + r; _velZ = Math.max(_velZ, 0); }
@@ -1290,11 +1324,10 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   for (const box of boxes) {
     // ── OBB (rotated box) collision ───────────────────────────────
     if (box.obb) {
-      // Transform player into OBB local space
+      // Transform player into OBB local space (trig pre-computed on box)
       const dx = nx - box.cx, dz = nz - box.cz;
-      const cosA = Math.cos(-box.angle), sinA = Math.sin(-box.angle);
-      const lx = dx * cosA - dz * sinA; // local X
-      const lz = dx * sinA + dz * cosA; // local Z
+      const lx = dx * box.cosA - dz * box.sinA;
+      const lz = dx * box.sinA + dz * box.cosA;
       // Closest point on local AABB to local player pos
       const clampX = Math.max(-box.hw, Math.min(box.hw, lx));
       const clampZ = Math.max(-box.hd, Math.min(box.hd, lz));
@@ -1306,7 +1339,11 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
         const newFeet = newY - EYE_H;
         const newHeadTop = newY + HEAD_EXTRA;
         const onTopPrev = prevFeet >= box.yTop - 0.25;
-        if (onTopPrev && newFeet >= box.yTop - 0.5) {
+        // Swept-landing: if we started at/above the top and are descending (or
+        // barely moving down), treat this as a landing regardless of how far
+        // we'd overshoot this frame. Otherwise fast falls would punch through.
+        const descendingOntoTop = onTopPrev && (fpVy <= 0 || newFeet <= prevFeet);
+        if (descendingOntoTop || (onTopPrev && newFeet >= box.yTop - 0.5)) {
           groundY = Math.max(groundY, box.yTop + EYE_H);
         } else if (box.yBottom !== undefined && newHeadTop <= box.yBottom - 0.2) {
           // Fully beneath — pass through
@@ -1322,10 +1359,9 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
           const pushDist = r - dist;
           const pushLX = (distX / dist) * pushDist;
           const pushLZ = (distZ / dist) * pushDist;
-          // Rotate push vector back to world space
-          const cosB = Math.cos(box.angle), sinB = Math.sin(box.angle);
-          const pushWX = pushLX * cosB - pushLZ * sinB;
-          const pushWZ = pushLX * sinB + pushLZ * cosB;
+          // Rotate push vector back to world space (trig pre-computed)
+          const pushWX = pushLX * box.cosB - pushLZ * box.sinB;
+          const pushWZ = pushLX * box.sinB + pushLZ * box.cosB;
           nx += pushWX;
           nz += pushWZ;
           // Kill velocity along push direction
@@ -1347,7 +1383,11 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       const newHeadTop = newY + HEAD_EXTRA;
 
       const onTopPrev = prevFeet >= box.yTop - 0.25;
-      if (onTopPrev && newFeet >= box.yTop - 0.5) {
+      // Swept-landing: a fast descent from above can drop feet more than 0.5
+      // below box.yTop in a single frame. Without this, the player skips the
+      // landing branch, gets pushed sideways, and ends up on the floor.
+      const descendingOntoTop = onTopPrev && (fpVy <= 0 || newFeet <= prevFeet);
+      if (descendingOntoTop || (onTopPrev && newFeet >= box.yTop - 0.5)) {
         groundY = Math.max(groundY, box.yTop + EYE_H);
       } else if (box.yBottom !== undefined && newHeadTop <= box.yBottom - 0.2) {
         // Fully beneath — pass through
@@ -1524,16 +1564,16 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     if (ts - _lastCrosshairRaycastTs >= RAYCAST_INTERVAL_MS) {
       _lastCrosshairRaycastTs = ts;
       _ray.setFromCamera(_rayCenter, _camera);
-      const chHits = _ray.intersectObjects(_scene.children, true);
+      // Raycast only against known interactive objects (not entire scene)
       let aimingAt = false;
-      for (const h of chHits) {
-        if (h.distance > 220) break;
-        let p = h.object;
-        while (p) {
-          if (p._isLamp || p._isCeilLight || p._isFan || p._isFilterL || p._isFilterR || p._isDrawer || p._isBifoldLeaf || p._isCornerDoorHandle || p._isWindow || p._isMacbook) { aimingAt = true; break; }
-          p = p.parent;
+      for (let i = 0; i < _interactiveObjects.length; i++) {
+        const obj = _interactiveObjects[i];
+        if (!obj.parent) continue; // removed from scene
+        const hits = _ray.intersectObject(obj, true);
+        if (hits.length > 0 && hits[0].distance <= 220) {
+          aimingAt = true;
+          break;
         }
-        if (aimingAt) break;
       }
       if (aimingAt && !_wasAimingAtInteractable && ts - _lastAimToneTs > 220) {
         _playAimCue();

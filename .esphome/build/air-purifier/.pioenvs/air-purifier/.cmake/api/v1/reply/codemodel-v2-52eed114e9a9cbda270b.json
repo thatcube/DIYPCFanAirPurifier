@@ -1843,7 +1843,7 @@
 				{
 					"directoryIndex" : 48,
 					"id" : "__idf_app_trace::@dd7eb3aa23293586d3b8",
-					"jsonFile" : "target-__idf_app_trace-f95eef5be12cd26805db.json",
+					"jsonFile" : "target-__idf_app_trace-e9e43ea3870bc25c5072.json",
 					"name" : "__idf_app_trace",
 					"projectIndex" : 1
 				},
@@ -1983,7 +1983,7 @@
 				{
 					"directoryIndex" : 81,
 					"id" : "__idf_esp_driver_sdspi::@c293af58c49fe790ac32",
-					"jsonFile" : "target-__idf_esp_driver_sdspi-f212582de8578f338013.json",
+					"jsonFile" : "target-__idf_esp_driver_sdspi-c6cd56f7acbb8f6ee50b.json",
 					"name" : "__idf_esp_driver_sdspi",
 					"projectIndex" : 1
 				},
@@ -2284,7 +2284,7 @@
 				{
 					"directoryIndex" : 97,
 					"id" : "__idf_src::@2478b13de56d3028f688",
-					"jsonFile" : "target-__idf_src-c3e12b032c8ce09c78e6.json",
+					"jsonFile" : "target-__idf_src-82dbd76b0d4bf5167dc7.json",
 					"name" : "__idf_src",
 					"projectIndex" : 1
 				},
@@ -2319,7 +2319,7 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "__ldgen_output_sections.ld::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-__ldgen_output_sections.ld-694a470c31fea31baa95.json",
+					"jsonFile" : "target-__ldgen_output_sections.ld-70eee457f4fea5167747.json",
 					"name" : "__ldgen_output_sections.ld",
 					"projectIndex" : 0
 				},
@@ -2333,7 +2333,7 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "air-purifier.elf::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-air-purifier.elf-c52068cec53eeaff9baa.json",
+					"jsonFile" : "target-air-purifier.elf-798c29f4e4a354613e70.json",
 					"name" : "air-purifier.elf",
 					"projectIndex" : 0
 				},
@@ -2347,7 +2347,7 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "app::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-app-132f792139a0db96850d.json",
+					"jsonFile" : "target-app-2bbf50435ec8b53b2319.json",
 					"name" : "app",
 					"projectIndex" : 0
 				},
@@ -2361,7 +2361,7 @@
 				{
 					"directoryIndex" : 15,
 					"id" : "app_check_size::@bf8f55be585a12323665",
-					"jsonFile" : "target-app_check_size-093d68c8fc51eb21871f.json",
+					"jsonFile" : "target-app_check_size-2f9fcb0c7f6ba4b4f2e0.json",
 					"name" : "app_check_size",
 					"projectIndex" : 1
 				},
@@ -2501,7 +2501,7 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "flash::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-flash-d399b2c742bc751c1e84.json",
+					"jsonFile" : "target-flash-dd18a04b626c40c1f68f.json",
 					"name" : "flash",
 					"projectIndex" : 0
 				},
