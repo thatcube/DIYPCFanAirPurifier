@@ -728,6 +728,26 @@ function _buildStaticBoxes() {
     // Front face right of the doorway opening
     { xMin: -51, xMax: -47, zMin: 18.75, zMax: 19.25, yTop: fy + WALL_HEIGHT, room: true }
   );
+
+  // ── Back wall solid flanks at Z=49 (around the hallway doorway) ──
+  // Pre-mirror the back wall spans X=-81..51 with a doorway hole at X=15..47.
+  // After mirror, the solid flanks sit at world X=-15..81 and -51..-47.
+  _staticBoxes.push(
+    { xMin: -15, xMax: 81, zMin: 48.75, zMax: 49.25, yTop: fy + WALL_HEIGHT, room: true },
+    { xMin: -51, xMax: -47, zMin: 48.75, zMax: 49.25, yTop: fy + WALL_HEIGHT, room: true }
+  );
+
+  // ── Hallway walls (20 ft extension past the bedroom door) ──
+  // Pre-mirror hallway X = 11..51, Z = 49..289. World X = -51..-11.
+  const hzStart = 49, hzEnd = 289;
+  _staticBoxes.push(
+    // -X side wall of hallway (pre-mirror X=10.5..11)
+    { xMin: -11, xMax: -10.5, zMin: hzStart, zMax: hzEnd, yTop: fy + WALL_HEIGHT, room: true },
+    // +X side wall of hallway (pre-mirror X=51..51.5)
+    { xMin: -51.5, xMax: -51, zMin: hzStart, zMax: hzEnd, yTop: fy + WALL_HEIGHT, room: true },
+    // End wall at Z=_hallZEnd
+    { xMin: -51.5, xMax: -10.5, zMin: hzEnd, zMax: hzEnd + 0.5, yTop: fy + WALL_HEIGHT, room: true }
+  );
 }
 
 // ── Get collision boxes (per-frame) ─────────────────────────────────
@@ -1229,6 +1249,8 @@ window._toggleHelp = _toggleHelp;
 export function setCamMode(mode) {
   fpCamMode = mode || (fpCamMode === 'first' ? 'third' : 'first');
   if (_catGroup) _catGroup.visible = fpMode && fpCamMode === 'third';
+  const label = document.getElementById('fpQuickCamLabel');
+  if (label) label.textContent = fpCamMode === 'first' ? 'First person' : 'Third person';
 }
 
 export function getJumpHoldFrames() {
@@ -1506,11 +1528,16 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     let dzC = -lookDir.z * camDist + right.z * camShoulder;
 
     // Camera wall clamp — include closet area so player can walk in
-    const camWallXMin = -(SIDE_WALL_X + CLOSET_DEPTH) + 1; // closet back wall + buffer
-    const camWallXMax = -LEFT_WALL_X - 1;   // window wall inner face - buffer
+    const inHallway = focal.z > 49 - 1;
+    const camWallXMin = inHallway ? (-51 + 1) : (-(SIDE_WALL_X + CLOSET_DEPTH) + 1); // hallway -X wall vs. closet back wall
+    const camWallXMax = inHallway ? (-11 - 1) : (-LEFT_WALL_X - 1);                  // hallway +X wall vs. window wall
     // Z bounds must include closet interior (extends to cZ - cIW/2 = -89)
     const camWallZMin = CLOSET_Z - CLOSET_INTERIOR_W / 2 + 1; // closet -Z side wall
-    const camWallZMax = 49 - 1;             // back wall inner face - buffer
+    // Default Z clamp stops at the back-wall inner face. When the player is in
+    // the hallway extension (focal X inside the hallway opening and past the
+    // back wall), extend Z so the camera can follow.
+    const inHallwayX = (focal.x >= -51 + 1 && focal.x <= -11 - 1);
+    const camWallZMax = (inHallwayX && focal.z > 49 - 6) ? (289 - 1) : (49 - 1);
     // Camera Y min tracks the player's current ground, not the room floor,
     // so on elevated surfaces (bed, nightstand) it doesn't clip below them.
     const cyMin = Math.max(floorY + 0.5, fpPos.y - EYE_H + 1.5);

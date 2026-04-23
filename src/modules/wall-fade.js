@@ -48,6 +48,10 @@ export function init(scene, roomRefs) {
     // Bifold door children are nested — always tag as interior so they
     // fade via the ray-projection path (their world X is near the closet wall).
     else if (obj._isBifoldLeaf) { obj._fadeTag = 'interior'; }
+    // Hallway meshes extend past the back wall (z>49). Treat them as their
+    // own group so they don't fade out whenever the camera is past z=45
+    // (which happens as soon as the player steps into the hallway).
+    else if (obj._isHallway) { obj._fadeTag = 'hallway'; }
     else if (z > 47 && Math.abs(x) < 60) { obj._fadeTag = 'back'; }
     else if (z < -76 && Math.abs(x) < 60) { obj._fadeTag = 'front'; }
     else if (x < -49) { obj._fadeTag = 'right'; }
@@ -121,6 +125,16 @@ export function update(camera, orbitTarget) {
         || (tag === 'right' && outsideRight)
         || (tag === 'left' && outsideLeft);
       _setFadeOpacity(m, outside ? 0.08 : 1);
+      continue;
+    }
+
+    // Hallway: fade the near side wall/ceiling when the camera is inside the
+    // hallway past them so they don't block the view. Kept simple — just hold
+    // everything opaque. The ray-projection path below would work too, but
+    // hallway walls/ceiling are large enough that aggressive fading makes
+    // them blink when walking through.
+    if (tag === 'hallway') {
+      _setFadeOpacity(m, 1);
       continue;
     }
 
