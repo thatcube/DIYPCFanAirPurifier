@@ -142,19 +142,20 @@ function buildDoorFrame({ width, height, depth, frameW = 2.5, color = 0xf5f5f0 }
 }
 
 // Nicer doorknob (rose + neck + ball). Points along +Z; mirror with
-// `rotation.y = Math.PI` for the opposite face.
+// `rotation.y = Math.PI` for the opposite face. Rose plate is sized to fit
+// within a ~3.4" lock rail (keep under ~1.4" radius).
 function buildDoorKnob() {
   const group = new THREE.Group();
   const knobMat  = new THREE.MeshStandardMaterial({ color: 0xb0aca4, roughness: 0.22, metalness: 0.88 });
   const plateMat = new THREE.MeshStandardMaterial({ color: 0xc0bcb4, roughness: 0.28, metalness: 0.78 });
-  const plate = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 0.3, 20), plateMat);
+  const plate = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 0.3, 20), plateMat);
   plate.rotation.x = Math.PI / 2; plate.position.z = 0.15;
   group.add(plate);
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.5, 0.9, 14), knobMat);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 0.9, 14), knobMat);
   neck.rotation.x = Math.PI / 2; neck.position.z = 0.75;
   group.add(neck);
-  const ball = new THREE.Mesh(new THREE.SphereGeometry(1.2, 20, 14), knobMat);
-  ball.position.z = 1.6;
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(1.0, 20, 14), knobMat);
+  ball.position.z = 1.5;
   group.add(ball);
   return group;
 }
@@ -752,32 +753,24 @@ export function createRoom(scene) {
     lampBulb._isRoom=true; lampBulb._isLamp=true; addRoom(lampBulb);
   }
   
-  // Wall section — back wall with door extrusion bumping INTO the room (-Z direction)
-  const recessDepth=30; // 2.5 feet into room
-  const extrusionW=40; // door (32") + 4" each side
-  const extRight=51; // flush with right/side wall
-  const extLeft=extRight-extrusionW; // 11
+  // Back wall — flat wall at Z=49 with a door-sized hole. No recess/extrusion:
+  // the bedroom back wall is a single plane, the door sits in it flush, and
+  // the hallway starts immediately behind it.
+  const extrusionW=40;                // hallway width (still used below for sizing the hallway itself)
+  const extRight=51;
+  const extLeft=extRight-extrusionW;  // 11
   const extCenterX=extLeft+extrusionW/2; // 31
-  const recessZ=49-recessDepth; // front face of extrusion at Z=19
+  const recessZ=49;                   // no recess — back wall IS the "recess" plane
 
-  // Front face of extrusion — has the door opening. doorH=68 leaves a ~12"
-  // header between the top of the door and the 80" ceiling (real standard
-  // doors are 80" tall under a 96"+ ceiling; scaled to fit this 80" room).
+  // Door opening: 32" × 68" centered in the hallway span so the door lines
+  // up with the hallway, with 4" of back wall on either side + 12" header.
   const doorW=32, doorH=68;
   const doorCenterX=extCenterX;
   const doorLeft=doorCenterX-doorW/2;
   const doorRight=doorCenterX+doorW/2;
 
-  // Back-wall opening is the full hallway width so you don't see a thin
-  // sliver of back wall through the recess side gaps (which used to read
-  // like an extra door frame behind the real one).
-  const backOpenW=extrusionW;
-  const backOpenLeft=extCenterX-backOpenW/2;
-  const backOpenRight=extCenterX+backOpenW/2;
-
-  // Back wall — full width with a doorway hole so the door opens into the
-  // hallway beyond. Built as an ExtrudeGeometry (shape in X-Y plane, extruded
-  // along +Z) mirroring the closet-wall-with-hole approach.
+  // Back wall — built as an ExtrudeGeometry (shape in X-Y plane, extruded
+  // along +Z) with a door-sized rectangular hole.
   // NOTE: room meshes are X-mirrored via position.x, but ExtrudeGeometry bakes
   // shape vertices into the geometry — position flipping doesn't flip them.
   // So we negate every shape X coord up front: the geometry is authored in
@@ -796,13 +789,12 @@ export function createRoom(scene) {
     shape.lineTo(xMin,yMax);
     shape.lineTo(xMin,yMin);
     const hole=new THREE.Path();
-    // Hallway-width hole in the back wall, post-mirror X. Full-height so the
-    // bedroom flows into the hallway as one continuous space with no header.
-    const hxMin=-backOpenRight, hxMax=-backOpenLeft;
+    // Door-sized hole in the back wall, post-mirror X.
+    const hxMin=-doorRight, hxMax=-doorLeft;
     hole.moveTo(hxMin,yMin);
     hole.lineTo(hxMax,yMin);
-    hole.lineTo(hxMax,yMax);
-    hole.lineTo(hxMin,yMax);
+    hole.lineTo(hxMax,doorH);
+    hole.lineTo(hxMin,doorH);
     hole.lineTo(hxMin,yMin);
     shape.holes.push(hole);
     const geo=new THREE.ExtrudeGeometry(shape, {depth:0.5, bevelEnabled:false});
@@ -813,35 +805,26 @@ export function createRoom(scene) {
     return mesh;
   })();
 
-  // Extrusion side walls (going from back wall into room)
-  const returnWallL=roomBox(0.5, 80, recessDepth, 0xd8d4ce, extLeft, floorY+40, 49-recessDepth/2, 0,0,0);
-  // Right side wall omitted — flush with side wall, would clip
-  // Top of extrusion
-  roomBox(extrusionW, 0.5, recessDepth, 0xd8d4ce, extCenterX, floorY+80, 49-recessDepth/2, 0,0,0);
-  
-  // Recess front face is intentionally left open on both sides of the door —
-  // the door frame sits in the opening by itself, and beyond it you see
-  // straight into the hallway (the recess side walls `returnWallL` + the
-  // hallway walls line up at the same X, so the wall planes are continuous).
+  // Recess/extrusion pieces intentionally omitted — back wall is a single
+  // flat plane at Z=49. Keep these as null so later references (fading array,
+  // closet geometry, etc.) still resolve to "nothing to fade".
+  const returnWallL = null;
   const recessWallL = null;
   const recessWallR = null;
   const baseboardRecessL = null;
   const baseboardRecessR = null;
 
-  // No header above the doorway — the back-wall hole now runs floor to
-  // ceiling so the opening reads as one continuous space with the hallway.
-
-  // Back-wall baseboards — split around the 40" back opening.
-  const bbLeftW = (backOpenLeft) - (-15 - backWallFullW/2);
-  const bbRightW = (-15 + backWallFullW/2) - backOpenRight;
+  // Back-wall baseboards — split around the 32" door opening.
+  const bbLeftW = (doorLeft) - (-15 - backWallFullW/2);
+  const bbRightW = (-15 + backWallFullW/2) - doorRight;
   const baseboardMeshL = roomBox(bbLeftW, 3, 0.6, 0xc0bbb4,
-    (-15 - backWallFullW/2 + backOpenLeft)/2, floorY+1.5, 48.5, 0,0,0);
+    (-15 - backWallFullW/2 + doorLeft)/2, floorY+1.5, 48.5, 0,0,0);
   const baseboardMeshR = roomBox(bbRightW, 3, 0.6, 0xc0bbb4,
-    (backOpenRight + (-15 + backWallFullW/2))/2, floorY+1.5, 48.5, 0,0,0);
-  const baseboardRetL=roomBox(0.6, 3, recessDepth, 0xc0bbb4, extLeft+0.5, floorY+1.5, 49-recessDepth/2, 0,0,0);
-  
+    (doorRight + (-15 + backWallFullW/2))/2, floorY+1.5, 48.5, 0,0,0);
+  const baseboardRetL = null; // no recess return to trim
+
   // ─── Door ───
-  const doorThick=1.5, doorFrameW=2.5, doorFrameD=recessDepth>4?4:recessDepth;
+  const doorThick=1.5, doorFrameW=2.5, doorFrameD=0.5;
   const doorColor=0xf0ebe4; // warm off-white painted door
   const doorFrameColor=0xf5f5f0;
 
@@ -853,7 +836,7 @@ export function createRoom(scene) {
   // pass it extends in +X from the pivot toward the nightstand. With that
   // geometry, a positive rotation.y swings the free edge toward -Z → the
   // door opens INTO the room.
-  const doorPanelZ=recessZ-doorThick/2;
+  const doorPanelZ=recessZ-doorThick/2-0.25; // 48.5
   const doorPanelW=doorW-1;
   const doorPanelH=doorH-0.5;
   const cornerDoorPivot=new THREE.Group();
@@ -887,8 +870,8 @@ export function createRoom(scene) {
   tagAll(knobBack, { _isRoom:true, _isCornerDoorHandle:true });
   cornerDoorPivot.add(knobBack);
 
-  // Door frame (trim around opening — spans from recessed wall into room)
-  const frameZ=recessZ-doorFrameD/2;
+  // Door frame — thin casing around the opening on the bedroom face only.
+  const frameZ = 49 - 0.25 - doorFrameD/2; // just in front of the back wall
   const doorFrame = buildDoorFrame({
     width: doorW, height: doorH, depth: doorFrameD,
     frameW: doorFrameW, color: doorFrameColor
@@ -920,13 +903,8 @@ export function createRoom(scene) {
     _cornerDoorAnim=requestAnimationFrame(_stepCornerDoor);
   }
   
-  // Collect all back wall + recess meshes for fading
-  const backWallParts=[wallMeshL,returnWallL,
-    baseboardMeshL,baseboardMeshR,baseboardRetL];
-  if(recessWallL) backWallParts.push(recessWallL);
-  if(recessWallR) backWallParts.push(recessWallR);
-  if(baseboardRecessL) backWallParts.push(baseboardRecessL);
-  if(baseboardRecessR) backWallParts.push(baseboardRecessR);
+  // Collect all back wall meshes for fading
+  const backWallParts=[wallMeshL, baseboardMeshL, baseboardMeshR].filter(Boolean);
 
   // ─── Hallway beyond the bedroom door ──────────────────────────────
   // 20 ft long hallway extruded out through the back wall, aligned to the
