@@ -111,9 +111,9 @@ function _applyFpPerformanceProfile(fpActive) {
     // Aggressive play-mode profile for very high FPS targets.
     const fpDprCap = state.isMobile ? 0.42 : 0.5;
     renderer.setPixelRatio(Math.min(_fpPerfState.prePixelRatio, fpDprCap));
-    renderer.shadowMap.enabled = false;
-    if (lighting.key) lighting.key.castShadow = false;
-    _shadowDirtyOneShot = false;
+    // Keep shadows enabled in game mode so the window beam is visible.
+    // Shadow updates are already throttled to 8 Hz in FP mode.
+    markShadowsDirty();
     onResize();
     return;
   }
@@ -201,8 +201,15 @@ const todRefs = {
   _markShadowsDirty: markShadowsDirty
 };
 
-// Apply initial time-of-day — default to 2:30 PM (matches monolith default)
-lighting.applyTimeOfDay(870, todRefs);
+// Apply initial time-of-day — use actual clock if nighttime, else 2:30 PM
+const _initMinute = roomRefs.windowIsNight ? (new Date().getHours() * 60 + new Date().getMinutes()) : 870;
+lighting.applyTimeOfDay(_initMinute, todRefs);
+{
+  const todSlider = document.getElementById('todSlider');
+  if (todSlider) todSlider.value = _initMinute;
+  const todLabel = document.getElementById('todLabel');
+  if (todLabel) todLabel.textContent = lighting.formatTime(_initMinute);
+}
 
 // ── DEBUG: Light position helpers ──
 // Visible colored orbs at each light source. Toggle via console:
@@ -241,6 +248,14 @@ lighting.applyTimeOfDay(870, todRefs);
     scene.add(_ceilSpotHelper);
   }
 
+  // CameraHelper for key light shadow frustum
+  let _keyShadowHelper = null;
+  {
+    _keyShadowHelper = new THREE.CameraHelper(lighting.key.shadow.camera);
+    _keyShadowHelper.visible = false;
+    scene.add(_keyShadowHelper);
+  }
+
   window._debugLights = function(show) {
     _debugHelpers.forEach(h => {
       h.mesh.visible = !!show;
@@ -257,6 +272,10 @@ lighting.applyTimeOfDay(870, todRefs);
     if (_ceilSpotHelper) {
       _ceilSpotHelper.visible = !!show;
       if (show) _ceilSpotHelper.update();
+    }
+    if (_keyShadowHelper) {
+      _keyShadowHelper.visible = !!show;
+      if (show) _keyShadowHelper.update();
     }
     if (show) console.log('[DEBUG] Light helpers ON — colored orbs visible at light positions');
     else console.log('[DEBUG] Light helpers OFF');
@@ -275,6 +294,9 @@ purifierRefs.setRoomRefs({
   domeMat: roomRefs.domeMat,
   ceilGlow: roomRefs.ceilGlow,
   outdoor: roomRefs.outdoor,
+  outdoorDayTex: roomRefs.outdoorDayTex,
+  outdoorNightTex: roomRefs.outdoorNightTex,
+  windowIsNight: roomRefs.windowIsNight,
   todRefs,  // so purifier can sync ceilLightOn state
   markShadowsDirty,
   applyTimeOfDay: (minutes) => {
@@ -284,6 +306,7 @@ purifierRefs.setRoomRefs({
     markShadowsDirty();
   },
   toggleMacbook: roomRefs.toggleMacbook,
+  toggleTV: roomRefs.toggleTV,
   toggleCornerDoor: roomRefs.toggleCornerDoor
 });
 

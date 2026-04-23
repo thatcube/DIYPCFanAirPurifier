@@ -201,6 +201,32 @@ export function playBonk(intensity) {
   } catch (e) { /* ignore */ }
 }
 
+/**
+ * Play a soft, magical sparkle when a secret coin spawns.
+ */
+export function playSecretSpawnSfx() {
+  try {
+    if (_sfxMuted) return;
+    const ac = _ensureAC();
+    if (!ac) return;
+    // Gentle rising sparkle — quiet and mysterious
+    const notes = [523, 659, 784];
+    notes.forEach((freq, idx) => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine'; o.frequency.value = freq;
+      const vol = 0.04 - idx * 0.008;          // each note softer
+      g.gain.value = 0;
+      o.connect(g).connect(ac.destination);
+      const t = ac.currentTime + idx * 0.15;
+      o.start(t);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(vol, t + 0.06);  // soft fade-in
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+      o.stop(t + 0.47);
+    });
+  } catch (e) { /* ignore */ }
+}
+
 // ── Internal ────────────────────────────────────────────────────────
 
 function _ensureAC() {
@@ -389,7 +415,7 @@ function _spawnSecretIfUntriggered(id, parent, pos, opts) {
   // Make the just-spawned coin visible immediately (we're already in game mode)
   const justAdded = coins[coins.length - 1];
   if (justAdded) justAdded.mesh.visible = true;
-  _showToast('🔵 Secret coin!');
+  playSecretSpawnSfx();
 }
 
 export function spawnSecretCornerDoorCoin() {
@@ -425,7 +451,7 @@ export function spawnSecretCeilingLightCoins() {
   for (let i = coins.length - 3; i < coins.length; i++) {
     if (coins[i]) coins[i].mesh.visible = true;
   }
-  _showToast('🔵 Secret coins!');
+  playSecretSpawnSfx();
 }
 
 export function spawnSecretWindowCoin() {
@@ -449,6 +475,13 @@ export function spawnSecretMacbookCoin() {
   const rawX = BED_X - 58 / 2 + 12 + 24;
   _spawnSecretIfUntriggered('macbook', _coinGroup,
     new THREE.Vector3(-rawX, bedTopY + 9, BED_Z + 6), {});
+}
+
+export function spawnSecretTvCoin() {
+  const fy = getFloorY();
+  // Behind the air purifier, near floor level
+  _spawnSecretIfUntriggered('tv', _coinGroup,
+    new THREE.Vector3(0, fy + 3, 8), {});
 }
 
 // ── Full reset for new run ──────────────────────────────────────────
