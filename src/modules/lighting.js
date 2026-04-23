@@ -270,12 +270,12 @@ export function applyTimeOfDay(minuteOfDay, refs) {
   }
   hemiLight.groundColor.copy(lerpHex(0x221100, 0xffeedd, sun));
 
-  // Ceiling lights — use refs (room.js owns these lights, not the module-level vars)
+  // Ceiling lights — dimmer at night (like a real dimmer switch), brighter midday.
   const _cs = refs.ceilSpot || ceilSpot;
   const _cg = refs.ceilGlow || ceilGlow;
-  if (_cs) _cs.intensity = refs.ceilLightOn ? mix(140, 60, sun) : 0;
-  if (refs.domeMat) refs.domeMat.emissiveIntensity = refs.ceilLightOn ? mix(1.2, 0.65, sun) : 0;
-  if (_cg) _cg.intensity = refs.ceilLightOn ? mix(50, 25, sun) : 0;
+  if (_cs) _cs.intensity = refs.ceilLightOn ? mix(80, 60, sun) : 0;
+  if (refs.domeMat) refs.domeMat.emissiveIntensity = refs.ceilLightOn ? mix(0.7, 0.65, sun) : 0;
+  if (_cg) _cg.intensity = refs.ceilLightOn ? mix(28, 25, sun) : 0;
 
   // Outdoor backdrop — dim significantly at night
   if (refs.outdoor) {
