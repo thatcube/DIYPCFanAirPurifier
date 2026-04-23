@@ -1,6 +1,7 @@
 // ─── Renderer setup ─────────────────────────────────────────────────
 
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { state } from './state.js';
 import { QUALITY_DPR_TIERS_MOBILE, QUALITY_DPR_TIERS_DESKTOP } from './constants.js';
 
@@ -65,6 +66,25 @@ export function createScene() {
 
   state.scene = scene;
   state.camera = camera;
+
+  // Build a cheap PMREM environment map so metallic/glossy materials
+  // (stainless water bowl, chrome, glass, etc.) have something real to
+  // reflect. We deliberately do NOT assign scene.environment — that would
+  // make the env act as an ambient IBL light on every PBR material and
+  // brighten the whole room (breaking the night/lights-off look). Instead
+  // we publish the texture on state.envMap; stdMat() opts individual
+  // metallic/glossy materials into reflecting it.
+  if (state.renderer) {
+    try {
+      const pmrem = new THREE.PMREMGenerator(state.renderer);
+      const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      state.envMap = envTex;
+      window._roomEnvMap = envTex;
+      pmrem.dispose();
+    } catch (e) {
+      console.warn('PMREM env map generation failed:', e);
+    }
+  }
 
   return { scene, camera };
 }
