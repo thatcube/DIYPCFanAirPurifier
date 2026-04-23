@@ -1217,11 +1217,17 @@ export function createRoom(scene) {
   
   // Screen — dark glossy panel, optionally displays an image (pokopia.jpg if present).
   const screenGeo=new THREE.PlaneGeometry(tvW, tvH);
-  const screenMat=stdMat({color:0x0a0a0a,roughness:0.05,metalness:0.0,envMapIntensity:1.5});
+  // No envMap reflection on the screen. The PMREM RoomEnvironment has
+  // bright rectangular light-panel planes baked in, and any non-zero
+  // envMapIntensity reflected them onto the screen as a phantom "window"
+  // shape visible even with all scene lights off. Real TV screens are
+  // anti-glare enough that killing IBL reflection entirely is fine here.
+  const screenMat=stdMat({color:0x0a0a0a,roughness:0.5,metalness:0.0,envMapIntensity:0});
   screenMat.polygonOffset=true;
   screenMat.polygonOffsetFactor=-2;
   screenMat.polygonOffsetUnits=-2;
   screenMat.depthWrite=false;
+  state.tvScreenMat=screenMat;
   const screen=new THREE.Mesh(screenGeo, screenMat);
   screen.position.set(tvCenterX, tvCenterY, tvZ+tvD/2+0.08);
   screen._isRoom=true;
@@ -1237,6 +1243,10 @@ export function createRoom(scene) {
       screen.material.emissiveMap=tex;
       screen.material.emissive=new THREE.Color(0xffffff);
       screen.material.emissiveIntensity=0.85;
+      // Remember the "TV on" emissive level so lighting.js can fade the
+      // screen out when the room goes dark (TV screens don't emit light
+      // unless they're actually on).
+      screen.material.userData._tvOnEmissive = 0.85;
       screen.material.color=new THREE.Color(0x000000);
       screen.material.roughness=0.4;
       screen.material.needsUpdate=true;
@@ -1252,6 +1262,7 @@ export function createRoom(scene) {
   tvGlow.position.set(tvCenterX, tvCenterY, tvZ+tvD/2+12);
   tvGlow.castShadow=false;
   tvGlow._isRoom=true;
+  state.tvGlow = tvGlow;
   addRoom(tvGlow);
   {
     const nubGroup=new THREE.Group();
@@ -1732,11 +1743,11 @@ export function createRoom(scene) {
     // envMap/envMapIntensity still apply via the stdMat pipeline.
     const bowlEnv = state.envMap || window._roomEnvMap;
     const bowlMat = new THREE.MeshPhysicalMaterial({
-      color: 0xf5f5f5,
+      color: 0xffffff,
       metalness: 1.0,
-      roughness: 0.02,
+      roughness: 0.05,
       envMap: bowlEnv || null,
-      envMapIntensity: 3.0,
+      envMapIntensity: 1.5,
       clearcoat: 1.0,
       clearcoatRoughness: 0.02,
     });
@@ -1757,6 +1768,10 @@ export function createRoom(scene) {
     bowlMesh.position.set(bowlX, topOfBox + bowlH, feederZ);
     bowlMesh.castShadow = true; bowlMesh.receiveShadow = true;
     addRoom(bowlMesh);
+    // Expose the bowl material so lighting.js can dim its env reflections
+    // at night (otherwise the mirror stays lit up by the PMREM env even
+    // when the room is pitch black).
+    state.bowlMat = bowlMat;
   }
   
   // ─── Right side wall (with a cut-out for the bifold closet) ───

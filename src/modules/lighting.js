@@ -286,6 +286,36 @@ export function applyTimeOfDay(minuteOfDay, refs) {
   const moonLight = refs.moonGlow || moonGlow;
   if (moonLight) moonLight.intensity = mix(60, 0, sun);
 
+  // Mirror-finish bowl: PMREM env reflections are independent of scene
+  // lighting, so at night the stainless bowl stays as bright as at noon.
+  // Scale envMapIntensity with ambient brightness — daylight keeps a crisp
+  // reflection, night with lights off dims it to ~0.1 so it reads as dark
+  // metal instead of a lit-up mirror. Ceiling lights restore some sheen.
+  if (state.bowlMat) {
+    const lit = refs.ceilLightOn ? 1 : 0;
+    const base = mix(0.1, 1.5, sun);      // night-dark → daylight-bright
+    const lampBoost = lit ? mix(0.6, 0.15, sun) : 0;
+    state.bowlMat.envMapIntensity = base + lampBoost;
+  }
+
+  // TV screen: the screen material has envMapIntensity:0 so we don't
+  // modulate reflection here (PMREM RoomEnvironment has bright rectangle
+  // light panels baked in that would otherwise show as phantom glow).
+  // We only dim the emissive image so the TV acts like it's actually off.
+  if (state.tvScreenMat) {
+    const tvOnEmissive = state.tvScreenMat.userData?._tvOnEmissive ?? 0;
+    if (tvOnEmissive > 0) {
+      const tvOn = refs.ceilLightOn ? 1 : Math.max(0, (sun - 0.4) / 0.3);
+      state.tvScreenMat.emissiveIntensity = tvOnEmissive * Math.min(1, tvOn);
+    }
+  }
+
+  // TV ambient glow PointLight — only on when the TV itself is "on".
+  if (state.tvGlow) {
+    const tvOn = refs.ceilLightOn ? 1 : Math.max(0, (sun - 0.4) / 0.3);
+    state.tvGlow.intensity = 50 * Math.min(1, tvOn);
+  }
+
   // Room surfaces — keep materials at their natural (paint/fabric) color.
   // The reduced hemisphere + exposure at night darkens everything naturally
   // via PBR lighting, so we don't override material colors per time-of-day.

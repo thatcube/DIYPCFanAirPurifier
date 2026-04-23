@@ -79,13 +79,13 @@ function markShadowsDirty() {
 
 console.log('[main] DIY Air Purifier — modular build');
 
-// Scene + camera
-const { scene, camera } = createScene();
-
-// Renderer
+// Renderer (must exist before createScene so PMREM env map can be built)
 const canvas = document.getElementById('c');
 if (!canvas) throw new Error('Canvas element #c not found');
 const renderer = createRenderer(canvas);
+
+// Scene + camera
+const { scene, camera } = createScene();
 
 const _fpPerfState = {
   applied: false,
