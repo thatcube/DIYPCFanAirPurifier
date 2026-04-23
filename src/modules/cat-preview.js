@@ -297,6 +297,10 @@ export function initPreviews() {
     const loadModel = (src) => {
       loader.load(src, (gltf) => {
         _processLoadedModel(preview, entry, gltf, preset);
+        // Render one frame immediately so the cat is visible the moment the
+        // user opens the character-select screen (even if the _animate loop
+        // is still early-returning because the modal isn't .open yet).
+        _renderPreviewOnce(preview);
       }, undefined, (err) => {
         const altSources = { 'assets/tooncat.glb': 'assets/toon-cat.glb', 'assets/toon-cat.glb': 'assets/tooncat.glb' };
         const alt = altSources[src];
@@ -308,6 +312,26 @@ export function initPreviews() {
   }
 
   if (!_animId) _animate();
+}
+
+/** Size the canvas and render a single frame, even if the char-select modal
+ *  hasn't been opened yet. Safe to call at any time; no-ops if the canvas
+ *  has no layout yet. */
+function _renderPreviewOnce(p) {
+  if (!p || !p.renderer || !p.model) return;
+  const rect = p.renderer.domElement.getBoundingClientRect();
+  if (rect.width > 0 && rect.height > 0) {
+    p.renderer.setSize(rect.width, rect.height, false);
+    p.camera.aspect = rect.width / rect.height;
+    p.camera.updateProjectionMatrix();
+  }
+  p.renderer.render(p.scene, p.camera);
+}
+
+/** Re-render all loaded previews once. Call when the character-select modal
+ *  is opened so the first frame appears without waiting for rAF. */
+export function flushPreviewsOnOpen() {
+  for (const p of previews) _renderPreviewOnce(p);
 }
 
 function _animate() {

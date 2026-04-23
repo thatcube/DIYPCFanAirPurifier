@@ -1860,34 +1860,76 @@ export function createRoom(scene) {
   // ── MacBook on the bed ───────────────────────────────────────────
   // Load assets/macbook.glb, place on the duvet, tag as _isMacbook
   let _macbookScreen = null;
+  let _macbookRoot = null;
   let _macbookOn = false;
   let _macbookAudio = null;
-  const MUSIC_MUTE_KEY = 'diy_air_purifier_music_muted_v1';
+  let _macbookBaseVol = 0.28;
+  let _macbookProxVol = 1;
+  const MUSIC_MUTE_KEY = 'diy_air_purifier_music_muted_v2';
   let _macbookMuted = false;
   try { _macbookMuted = localStorage.getItem(MUSIC_MUTE_KEY) === '1'; } catch (e) {}
   const _mbPlaylist = [
     { name: 'Octodad Theme', src: 'assets/songs/Octodad (Nobody Suspects a Thing).mp3', volume: 0.28 },
     { name: 'Escape from the City', src: 'assets/songs/Escape From The City ... for City Escape.mp3', volume: 0.28 },
   ];
-  let _mbSongIdx = 0;
+  let _mbLastSongIdx = -1;
+  // Cache one HTMLAudioElement per song so the browser streams it
+  // progressively on first play and replays are instant from memory.
+  const _mbAudioCache = new Map();
+  function _getCachedAudio(song) {
+    let a = _mbAudioCache.get(song.src);
+    if (!a) {
+      a = new Audio();
+      a.preload = 'auto';          // start buffering ASAP
+      a.crossOrigin = 'anonymous';
+      a.src = song.src;
+      try { a.load(); } catch (e) {}
+      _mbAudioCache.set(song.src, a);
+    }
+    return a;
+  }
+  function _prefetchMacbookSongs() {
+    for (const song of _mbPlaylist) _getCachedAudio(song);
+  }
+
+  function _pickMacbookSongIdx() {
+    const n = _mbPlaylist.length;
+    if (n <= 1) return 0;
+    // Avoid repeating the same song twice in a row
+    let idx = Math.floor(Math.random() * n);
+    if (idx === _mbLastSongIdx) idx = (idx + 1) % n;
+    return idx;
+  }
 
   function _playMacbookTrack() {
     if (!_macbookOn) return;
-    const song = _mbPlaylist[_mbSongIdx % _mbPlaylist.length];
-    const audio = new Audio(song.src);
-    audio.volume = song.volume;
+    const idx = _pickMacbookSongIdx();
+    _mbLastSongIdx = idx;
+    const song = _mbPlaylist[idx];
+    const audio = _getCachedAudio(song);
+    // Rewind in case it was played previously
+    try { audio.currentTime = 0; } catch (e) {}
+    _macbookBaseVol = song.volume;
+    audio.volume = _macbookBaseVol * _macbookProxVol;
     audio.muted = _macbookMuted;
     audio.loop = false;
-    audio.addEventListener('ended', () => {
+    // Remove any stale listeners before attaching new ones
+    if (audio._mbEndHandler) audio.removeEventListener('ended', audio._mbEndHandler);
+    const onEnded = () => {
       if (_macbookAudio !== audio) return;
-      _mbSongIdx = (_mbSongIdx + 1) % _mbPlaylist.length;
       _macbookAudio = null;
       if (_macbookOn) _playMacbookTrack();
-    });
+    };
+    audio._mbEndHandler = onEnded;
+    audio.addEventListener('ended', onEnded);
     _macbookAudio = audio;
+    // HTMLAudio streams progressively — .play() starts as soon as enough
+    // data is buffered (typically a few hundred KB), not after full download.
     audio.play().catch(() => {
       if (_macbookAudio === audio) _macbookAudio = null;
     });
+    // Warm up the other song(s) in the background for instant switching.
+    _prefetchMacbookSongs();
   }
 
   // Load screen texture
@@ -1907,7 +1949,10 @@ export function createRoom(scene) {
       if (typeof args[0] === 'string' && args[0].includes('Custom UV set')) return;
       _origWarn.apply(console, args);
     };
-    mbLoader.load('assets/macbook.glb', (gltf) => {
+    // Defer loading the 8.5MB macbook.glb to idle time so it doesn't compete
+    // with the character-select cat GLBs and main scene textures on first
+    // paint. The macbook appears on the bed a moment later, which is fine.
+    const _kickMacbookLoad = () => mbLoader.load('assets/macbook.glb', (gltf) => {
       console.warn = _origWarn; // restore
       const root = gltf.scene;
       // Scale to ~14" wide
@@ -1928,6 +1973,7 @@ export function createRoom(scene) {
       root.traverse(o => {
         if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o._isMacbook = true; }
       });
+      _macbookRoot = root;
 
       // Screen overlay plane — matches monolith's exact positioning knobs
       const screenW = localSize.x * 0.96;
@@ -1984,6 +2030,19 @@ export function createRoom(scene) {
 
       scene.add(root);
     });
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      window.requestIdleCallback(_kickMacbookLoad, { timeout: 2500 });
+    } else {
+      setTimeout(_kickMacbookLoad, 600);
+    }
+    // Begin buffering songs in the background during idle time so the
+    // first click on the macbook starts playback nearly instantly.
+    const _kickSongPrefetch = () => _prefetchMacbookSongs();
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      window.requestIdleCallback(_kickSongPrefetch, { timeout: 8000 });
+    } else {
+      setTimeout(_kickSongPrefetch, 3000);
+    }
   }
 
   // TV toggle function (called from purifier click handler via roomRefs)
@@ -2027,6 +2086,35 @@ export function createRoom(scene) {
     if (_macbookAudio) _macbookAudio.muted = _macbookMuted;
   }
 
+  // Proximity volume: full at ≤24" (~2 ft), steep inverse-square dropoff after that,
+  // but never below a minimum floor so far-away players still hear it faintly.
+  const _mbTmpVec = new THREE.Vector3();
+  function updateMacbookProximity(playerPos) {
+    if (!_macbookAudio || !_macbookRoot || !playerPos) return;
+    _macbookRoot.getWorldPosition(_mbTmpVec);
+    const dx = _mbTmpVec.x - playerPos.x;
+    const dy = _mbTmpVec.y - playerPos.y;
+    const dz = _mbTmpVec.z - playerPos.z;
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const near = 24;      // 2 ft — full volume inside this radius
+    const floorVol = 0.18; // minimum proximity multiplier at extreme distance
+    let prox = 1;
+    if (dist > near) {
+      const k = near / dist; // inverse distance
+      prox = floorVol + (1 - floorVol) * (k * k); // square for steep dropoff
+    }
+    // Smooth toward target to avoid zipper noise
+    _macbookProxVol += (prox - _macbookProxVol) * 0.2;
+    try { _macbookAudio.volume = Math.max(0, Math.min(1, _macbookBaseVol * _macbookProxVol)); } catch (e) {}
+  }
+
+  function resetMacbookProximity() {
+    _macbookProxVol = 1;
+    if (_macbookAudio) {
+      try { _macbookAudio.volume = _macbookBaseVol; } catch (e) {}
+    }
+  }
+
   return {
     floorY, floorMat, ceilingMat, floor, ceiling,
     wallMeshL: typeof wallMeshL !== 'undefined' ? wallMeshL : null,
@@ -2057,6 +2145,8 @@ export function createRoom(scene) {
     toggleTV,
     toggleMacbook,
     setMacbookMuted,
+    updateMacbookProximity,
+    resetMacbookProximity,
     getMacbookScreenMesh: () => _macbookScreen,
     drawers,
     toggleFoodBowl: () => {
