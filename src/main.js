@@ -27,7 +27,7 @@ import { createRoom } from './modules/room.js';
 import { createPurifier } from './modules/purifier.js';
 import { initInteractions, coinBump } from './modules/ui-interactions.js';
 import { initGlassShine } from './modules/glass-shine.js';
-import { initPreviews, recolorClassicPreview } from './modules/cat-preview.js';
+import { initPreviews, recolorClassicPreview, flushPreviewsOnOpen } from './modules/cat-preview.js';
 import { initToggleSwitches, initSegButtons, initDecorativeIcons, initClickableDivs, trapFocus, saveFocus } from './modules/a11y.js';
 import {
   SHADOW_UPDATE_INTERVAL_MS, IDLE_FRAME_MS,
@@ -138,9 +138,15 @@ controls.maxPolarAngle = Math.PI * 0.48;
 // Lights
 lighting.createLights(state.isMobile);
 
-// Hide loading overlay
+// Hide loading overlay — fade out so it doesn't snap away, then remove from
+// layout entirely once the transition finishes.
 const loadingEl = document.getElementById('loading');
-if (loadingEl) loadingEl.style.display = 'none';
+if (loadingEl) {
+  loadingEl.classList.add('is-hiding');
+  const _removeLoading = () => { loadingEl.style.display = 'none'; };
+  loadingEl.addEventListener('transitionend', _removeLoading, { once: true });
+  setTimeout(_removeLoading, 900); // safety net if transitionend doesn't fire
+}
 ensureGlassBlurCompat();
 
 // ── Build scene ─────────────────────────────────────────────────────
@@ -406,6 +412,10 @@ window._openCharSelect = () => {
   if (!_previewsInited) {
     _previewsInited = true;
     requestAnimationFrame(() => initPreviews());
+  } else {
+    // Already loaded — render a frame immediately so the cats appear the
+    // moment the modal opens, without waiting for the next rAF tick.
+    requestAnimationFrame(() => flushPreviewsOnOpen());
   }
   // Highlight the previously selected model (or classic on first open)
   document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
@@ -436,6 +446,24 @@ if (_PLAY_PATH_AUTO_OPEN) {
   setTimeout(() => {
     if (!gameFp.fpMode) window._openCharSelect();
   }, 120);
+}
+
+// Eagerly warm the character-select previews in the background so the 3D cats
+// are already fetched, parsed, and rendered by the time the user opens the
+// select screen. The preview canvases exist in the DOM (the modal is just
+// hidden via CSS), so GLTF loading + scene setup is safe without layout; the
+// first render happens the moment each model finishes loading.
+const _warmPreviews = () => {
+  if (_previewsInited) return;
+  _previewsInited = true;
+  initPreviews();
+};
+if ('requestIdleCallback' in window) {
+  // Wait until the main scene has breathing room, but cap the delay so slow
+  // tabs still get the cats early.
+  window.requestIdleCallback(_warmPreviews, { timeout: 1500 });
+} else {
+  setTimeout(_warmPreviews, 300);
 }
 
 window._selectCat = (model, el) => {
@@ -510,6 +538,10 @@ window._exitFP = () => {
   // Clear pause without triggering re-lock (setPaused(false) would re-lock pointer)
   gameFp.clearPauseState();
   if (gameFp.fpMode) gameFp.toggleFirstPerson();
+  // Reset macbook music to full volume when leaving game mode
+  if (roomRefs && typeof roomRefs.resetMacbookProximity === 'function') {
+    roomRefs.resetMacbookProximity();
+  }
 };
 window._toggleMuteSfx = (checked) => {
   gameFp.setSfxMuted(checked);
@@ -808,6 +840,10 @@ function animate(ts) {
     const prevScore = coins.coinScore;
     coins.updateCoins(ts, gameFp.fpPos);
     if (coins.coinScore > prevScore) coinBump();
+    // MacBook music proximity volume (full within ~2 ft, steep falloff beyond)
+    if (roomRefs && typeof roomRefs.updateMacbookProximity === 'function') {
+      roomRefs.updateMacbookProximity(gameFp.fpPos);
+    }
     // Timer tick
     leaderboard.tickTimer(ts);
     // Throttle DOM updates to ~10 Hz to reduce layout thrashing
