@@ -166,6 +166,9 @@ function tagAll(obj, flags) {
 
 export function createRoom(scene) {
   const floorY = getFloorY();
+  // All standardized door knobs (corner door + hallway doors) — exposed via
+  // roomRefs so game-fp.js can generate small landing pads on top of them.
+  const doorKnobs = [];
   const { H, W, D, ply, ft, bunFootH } = state;
   const panelW = W + 2 * ft;
   const leftWallX = LEFT_WALL_X;
@@ -369,13 +372,22 @@ export function createRoom(scene) {
   
   // updatePowerCordGeometry — handled by purifier module
   
-  // Ceiling — flat plane at top of walls
-  const ceilingGeo = new THREE.PlaneGeometry(200, 200);
+  // Ceiling — one continuous flat plane covering BOTH the bedroom and the
+  // hallway extrusion. Same trick we use for the hardwood floor: a single
+  // mesh with a single material so there's no seam where the two areas
+  // meet. Spans X=-100..100 (bedroom X range, which fully contains the
+  // hallway's -51..-11) and Z=-100..300 (past the far end of the hallway
+  // at Z=289). Walls below terminate at Y=floorY+80; we sit the ceiling
+  // 0.05" above that to avoid coplanar z-fighting with every wall top
+  // (which was reading as a faint overlapping-textures line, most visibly
+  // across the hallway doorway). This is the ceiling equivalent of the
+  // hardwood-above-carpet trick.
   const ceilingMat = new THREE.MeshStandardMaterial({color:0xe0ddd6, roughness:0.9, metalness:0.0, side:THREE.DoubleSide});
+  const ceilingGeo = new THREE.PlaneGeometry(200, 400);
   const ceiling = new THREE.Mesh(ceilingGeo, ceilingMat);
   ceiling.rotation.x = Math.PI/2;
-  ceiling.position.y = floorY+80;
-  ceiling.castShadow = false; // NEVER let the ceiling cast directional-light shadows — it's a 200×200 plane that shadows the upper portions of every wall and itself, making them permanently dark
+  ceiling.position.set(0, floorY+80+0.05, 100); // center Z=100 → spans Z=-100..300
+  ceiling.castShadow = false; // NEVER let the ceiling cast directional-light shadows — it's a large plane that would shadow the upper portions of every wall and itself, making them permanently dark
   ceiling.receiveShadow = true;
   ceiling._isRoom = true;
   addRoom(ceiling);
@@ -753,24 +765,32 @@ export function createRoom(scene) {
     lampBulb._isRoom=true; lampBulb._isLamp=true; addRoom(lampBulb);
   }
   
-  // Back wall — flat wall at Z=49 with a door-sized hole. No recess/extrusion:
-  // the bedroom back wall is a single plane, the door sits in it flush, and
-  // the hallway starts immediately behind it.
-  const extrusionW=40;                // hallway width (still used below for sizing the hallway itself)
-  const extRight=51;
-  const extLeft=extRight-extrusionW;  // 11
+  // Wall section — back wall with door extrusion bumping INTO the room (-Z direction)
+  const recessDepth=20; // ~1.5 feet into room
+  const extrusionW=40; // door (32") + 4" each side
+  const extRight=51; // flush with right/side wall
+  const extLeft=extRight-extrusionW; // 11
   const extCenterX=extLeft+extrusionW/2; // 31
-  const recessZ=49;                   // no recess — back wall IS the "recess" plane
+  const recessZ=49-recessDepth; // front face of extrusion at Z=19
 
-  // Door opening: 32" × 68" centered in the hallway span so the door lines
-  // up with the hallway, with 4" of back wall on either side + 12" header.
+  // Front face of extrusion — has the door opening. doorH=68 leaves a ~12"
+  // header between the top of the door and the 80" ceiling (real standard
+  // doors are 80" tall under a 96"+ ceiling; scaled to fit this 80" room).
   const doorW=32, doorH=68;
   const doorCenterX=extCenterX;
   const doorLeft=doorCenterX-doorW/2;
   const doorRight=doorCenterX+doorW/2;
 
-  // Back wall — built as an ExtrudeGeometry (shape in X-Y plane, extruded
-  // along +Z) with a door-sized rectangular hole.
+  // Back-wall opening is the full hallway width so you don't see a thin
+  // sliver of back wall through the recess side gaps (which used to read
+  // like an extra door frame behind the real one).
+  const backOpenW=extrusionW;
+  const backOpenLeft=extCenterX-backOpenW/2;
+  const backOpenRight=extCenterX+backOpenW/2;
+
+  // Back wall — full width with a doorway hole so the door opens into the
+  // hallway beyond. Built as an ExtrudeGeometry (shape in X-Y plane, extruded
+  // along +Z) mirroring the closet-wall-with-hole approach.
   // NOTE: room meshes are X-mirrored via position.x, but ExtrudeGeometry bakes
   // shape vertices into the geometry — position flipping doesn't flip them.
   // So we negate every shape X coord up front: the geometry is authored in
@@ -789,12 +809,13 @@ export function createRoom(scene) {
     shape.lineTo(xMin,yMax);
     shape.lineTo(xMin,yMin);
     const hole=new THREE.Path();
-    // Door-sized hole in the back wall, post-mirror X.
-    const hxMin=-doorRight, hxMax=-doorLeft;
+    // Hallway-width hole in the back wall, post-mirror X. Full-height so the
+    // bedroom flows into the hallway as one continuous space with no header.
+    const hxMin=-backOpenRight, hxMax=-backOpenLeft;
     hole.moveTo(hxMin,yMin);
     hole.lineTo(hxMax,yMin);
-    hole.lineTo(hxMax,doorH);
-    hole.lineTo(hxMin,doorH);
+    hole.lineTo(hxMax,yMax);
+    hole.lineTo(hxMin,yMax);
     hole.lineTo(hxMin,yMin);
     shape.holes.push(hole);
     const geo=new THREE.ExtrudeGeometry(shape, {depth:0.5, bevelEnabled:false});
@@ -805,26 +826,68 @@ export function createRoom(scene) {
     return mesh;
   })();
 
-  // Recess/extrusion pieces intentionally omitted — back wall is a single
-  // flat plane at Z=49. Keep these as null so later references (fading array,
-  // closet geometry, etc.) still resolve to "nothing to fade".
-  const returnWallL = null;
+  // Extrusion side walls (going from back wall into room)
+  const returnWallL=roomBox(0.5, 80, recessDepth, 0xd8d4ce, extLeft, floorY+40, 49-recessDepth/2, 0,0,0);
+  // Right side wall omitted — flush with side wall, would clip
+  // (No "top of extrusion" box — the unified bedroom+hallway ceiling plane
+  // already covers this span. A separate box here in wall-color would read
+  // as a visible seam across the doorway ceiling.)
+
+  // Recess front face — solid wall spanning the extrusion width (40"), with a
+  // 32" × 68" door-shaped hole. Built as an ExtrudeGeometry like the back wall
+  // so the hole geometry is real (header above door, 4" jamb on each side).
+  (() => {
+    const mat = new THREE.MeshStandardMaterial({color:0xd8d4ce, roughness:0.7, metalness:0.05});
+    const shape = new THREE.Shape();
+    // Post-mirror world X: extrusion spans -extRight..-extLeft = -51..-11.
+    const xMin = -extRight, xMax = -extLeft;
+    const yMin = 0, yMax = 80;
+    shape.moveTo(xMin, yMin);
+    shape.lineTo(xMax, yMin);
+    shape.lineTo(xMax, yMax);
+    shape.lineTo(xMin, yMax);
+    shape.lineTo(xMin, yMin);
+    const hole = new THREE.Path();
+    const hxMin = -doorRight, hxMax = -doorLeft;
+    hole.moveTo(hxMin, yMin);
+    hole.lineTo(hxMax, yMin);
+    hole.lineTo(hxMax, doorH);
+    hole.lineTo(hxMin, doorH);
+    hole.lineTo(hxMin, yMin);
+    shape.holes.push(hole);
+    const geo = new THREE.ExtrudeGeometry(shape, {depth:0.5, bevelEnabled:false});
+    const mesh = new THREE.Mesh(geo, mat);
+    // Recess front face sits at Z=recessZ=19. 0.5" thick, centered on that.
+    mesh.position.set(0, floorY, recessZ - 0.25);
+    mesh.castShadow = true; mesh.receiveShadow = true; mesh._isRoom = true;
+    addRoom(mesh);
+  })();
+
+  // Back-reference variables kept so the fading array / collision code still
+  // compiles (no separate partial-wall meshes to track anymore).
   const recessWallL = null;
   const recessWallR = null;
-  const baseboardRecessL = null;
-  const baseboardRecessR = null;
 
-  // Back-wall baseboards — split around the 32" door opening.
-  const bbLeftW = (doorLeft) - (-15 - backWallFullW/2);
-  const bbRightW = (-15 + backWallFullW/2) - doorRight;
+  // Baseboards on the recess front face — split around the door opening.
+  const baseboardRecessL = roomBox(doorLeft - extLeft, 3, 0.6, 0xc0bbb4,
+    (extLeft + doorLeft)/2, floorY+1.5, recessZ+0.5, 0, 0, 0);
+  const baseboardRecessR = roomBox(extRight - doorRight, 3, 0.6, 0xc0bbb4,
+    (doorRight + extRight)/2, floorY+1.5, recessZ+0.5, 0, 0, 0);
+
+  // No header above the doorway — the back-wall hole now runs floor to
+  // ceiling so the opening reads as one continuous space with the hallway.
+
+  // Back-wall baseboards — split around the 40" back opening.
+  const bbLeftW = (backOpenLeft) - (-15 - backWallFullW/2);
+  const bbRightW = (-15 + backWallFullW/2) - backOpenRight;
   const baseboardMeshL = roomBox(bbLeftW, 3, 0.6, 0xc0bbb4,
-    (-15 - backWallFullW/2 + doorLeft)/2, floorY+1.5, 48.5, 0,0,0);
+    (-15 - backWallFullW/2 + backOpenLeft)/2, floorY+1.5, 48.5, 0,0,0);
   const baseboardMeshR = roomBox(bbRightW, 3, 0.6, 0xc0bbb4,
-    (doorRight + (-15 + backWallFullW/2))/2, floorY+1.5, 48.5, 0,0,0);
-  const baseboardRetL = null; // no recess return to trim
-
+    (backOpenRight + (-15 + backWallFullW/2))/2, floorY+1.5, 48.5, 0,0,0);
+  const baseboardRetL=roomBox(0.6, 3, recessDepth, 0xc0bbb4, extLeft+0.5, floorY+1.5, 49-recessDepth/2, 0,0,0);
+  
   // ─── Door ───
-  const doorThick=1.5, doorFrameW=2.5, doorFrameD=0.5;
+  const doorThick=1.5, doorFrameW=2.5, doorFrameD=recessDepth>4?4:recessDepth;
   const doorColor=0xf0ebe4; // warm off-white painted door
   const doorFrameColor=0xf5f5f0;
 
@@ -836,7 +899,7 @@ export function createRoom(scene) {
   // pass it extends in +X from the pivot toward the nightstand. With that
   // geometry, a positive rotation.y swings the free edge toward -Z → the
   // door opens INTO the room.
-  const doorPanelZ=recessZ-doorThick/2-0.25; // 48.5
+  const doorPanelZ=recessZ-doorThick/2;
   const doorPanelW=doorW-1;
   const doorPanelH=doorH-0.5;
   const cornerDoorPivot=new THREE.Group();
@@ -869,9 +932,11 @@ export function createRoom(scene) {
   knobBack.position.set(knobX, knobY, doorThick/2);
   tagAll(knobBack, { _isRoom:true, _isCornerDoorHandle:true });
   cornerDoorPivot.add(knobBack);
+  // Track standardized knobs so game-fp can give them landing collision.
+  doorKnobs.push(knobFront, knobBack);
 
-  // Door frame — thin casing around the opening on the bedroom face only.
-  const frameZ = 49 - 0.25 - doorFrameD/2; // just in front of the back wall
+  // Door frame (trim around opening — spans from recessed wall into room)
+  const frameZ=recessZ-doorFrameD/2;
   const doorFrame = buildDoorFrame({
     width: doorW, height: doorH, depth: doorFrameD,
     frameW: doorFrameW, color: doorFrameColor
@@ -903,8 +968,13 @@ export function createRoom(scene) {
     _cornerDoorAnim=requestAnimationFrame(_stepCornerDoor);
   }
   
-  // Collect all back wall meshes for fading
-  const backWallParts=[wallMeshL, baseboardMeshL, baseboardMeshR].filter(Boolean);
+  // Collect all back wall + recess meshes for fading
+  const backWallParts=[wallMeshL,returnWallL,
+    baseboardMeshL,baseboardMeshR,baseboardRetL];
+  if(recessWallL) backWallParts.push(recessWallL);
+  if(recessWallR) backWallParts.push(recessWallR);
+  if(baseboardRecessL) backWallParts.push(baseboardRecessL);
+  if(baseboardRecessR) backWallParts.push(baseboardRecessR);
 
   // ─── Hallway beyond the bedroom door ──────────────────────────────
   // 20 ft long hallway extruded out through the back wall, aligned to the
@@ -927,90 +997,57 @@ export function createRoom(scene) {
   const _hallDoorH = 68;
   const _hallBbColor = 0xc0bbb4;
 
-  // Hardwood plank floor — 5" wide planks running along the hallway length
-  // (+Z). Starts inside the bedroom doorway opening (at the door panel) so
-  // the hardwood is visible the instant the door swings open, and continues
-  // through the door recess and all the way to the end of the hallway. Sits
-  // 0.05" above the main carpet floor to hide the carpet underneath.
-  // doorPanelZ = recessZ - doorThick/2 = 19 - 0.75 = 18.25 (pre-mirror Z of
-  // the door panel). Recompute here to keep this block self-contained.
-  const _hwStartZ = recessZ - 1.5/2; // 18.25
-  {
-    // Build a single non-repeating texture that covers the whole hallway
-    // floor (hwW × hwL inches). Using repeat=(1,1) avoids the obvious
-    // "same grain every 5 feet" tiling signature the old 60"-tall tile had.
-    const hwW = 40;
-    const hwL = 289 - _hwStartZ; // from door panel through end of hallway
-    const PLANK_W_IN = 5;                       // plank width in inches
-    const N_PLANKS = Math.max(1, Math.round(hwW / PLANK_W_IN)); // 8 planks
-    const PX_PER_IN = 10;                       // canvas resolution
-    const HW_RES_W = N_PLANKS * PLANK_W_IN * PX_PER_IN; // 400
-    const HW_RES_H = Math.round(hwL * PX_PER_IN);       // ~2707
+  // ── Hardwood plank material factory — reused for hallway + guest room ──
+  // Builds a single non-repeating canvas texture that covers hwW × hwL
+  // inches of floor (no tiling, so plank grain never repeats across the
+  // space). Returns a MeshStandardMaterial ready to apply to a plane.
+  function _makeHardwoodMaterial(hwW, hwL) {
+    const PLANK_W_IN = 5;
+    const N_PLANKS = Math.max(1, Math.round(hwW / PLANK_W_IN));
+    const PX_PER_IN = 10;
+    const HW_RES_W = N_PLANKS * PLANK_W_IN * PX_PER_IN;
+    const HW_RES_H = Math.max(1, Math.round(hwL * PX_PER_IN));
     const cvs = document.createElement('canvas');
     cvs.width = HW_RES_W; cvs.height = HW_RES_H;
     const ctx = cvs.getContext('2d');
-    // Gap color behind everything — shows at plank seams & butt joints.
-    // Medium warm brown so seams read as shadow lines, not black slots.
     ctx.fillStyle = '#6b4a2a';
     ctx.fillRect(0, 0, HW_RES_W, HW_RES_H);
-
-    // Helper: HSL-ish wood tone. Returns an #rrggbb string.
     const woodTone = (l, warm) => {
-      // l: 0..1 lightness bias, warm: -1..1 red/yellow shift
-      // Stained golden/honey oak — lighter & warmer than before.
-      const base = 150 + l * 70;                // 150..220 (honey oak)
+      const base = 150 + l * 70;
       const r = Math.max(0, Math.min(255, base + 28 + warm * 20));
       const g = Math.max(0, Math.min(255, base * 0.84 + 8 + warm * 10));
       const b = Math.max(0, Math.min(255, base * 0.58 - 4 - warm * 8));
       return `rgb(${r|0},${g|0},${b|0})`;
     };
-
     const plankPxW = HW_RES_W / N_PLANKS;
     for (let p = 0; p < N_PLANKS; p++) {
       const px0 = p * plankPxW;
-      const px1 = (p + 1) * plankPxW;
-      // Build this column's stack of butt joints (plank end-to-end cuts).
-      // Highly variable lengths: 28"–84" with a bimodal-ish distribution so
-      // short (~30") and long (~65"+) boards both show up prominently rather
-      // than everything clustering around the mean.
       const joints = [0];
-      let y = Math.random() * 40 * PX_PER_IN; // first plank starts partway in
+      let y = Math.random() * 40 * PX_PER_IN;
       while (y < HW_RES_H) {
         joints.push(y);
-        // Mix: ~35% short boards 28–42", ~65% long boards 48–84".
         const lenIn = (Math.random() < 0.35)
           ? (28 + Math.random() * 14)
           : (48 + Math.random() * 36);
         y += lenIn * PX_PER_IN;
       }
       joints.push(HW_RES_H);
-      // Stagger: ensure adjacent columns don't share joint Y. Easy since each
-      // column's joint stack is independently random.
-
       for (let j = 0; j < joints.length - 1; j++) {
-        const y0 = joints[j];
-        const y1 = joints[j + 1];
+        const y0 = joints[j], y1 = joints[j + 1];
         const plankH = y1 - y0;
-        // Per-plank base hue + lightness variation — keep the range tight
-        // so adjacent planks don't read as wildly different shades.
         const lBias = 0.55 + Math.random() * 0.25;
         const warm = (Math.random() - 0.5) * 1.2;
-        // Gentle along-plank gradient so each board has its own tonal arc.
         const grad = ctx.createLinearGradient(0, y0, 0, y1);
         grad.addColorStop(0,   woodTone(lBias + (Math.random()-0.5)*0.06, warm));
         grad.addColorStop(0.5, woodTone(lBias + (Math.random()-0.5)*0.09, warm + (Math.random()-0.5)*0.3));
         grad.addColorStop(1,   woodTone(lBias + (Math.random()-0.5)*0.06, warm));
         ctx.fillStyle = grad;
-        // Leave ~1px gap on all sides for seams/joints.
         ctx.fillRect(px0 + 0.8, y0 + 0.8, plankPxW - 1.6, plankH - 1.6);
-
-        // Long grain streaks (vary per plank).
         const streakCount = 28 + (plankH * 0.02 | 0);
         for (let i = 0; i < streakCount; i++) {
           const sx = px0 + 1 + Math.random() * (plankPxW - 2);
           const sy = y0 + Math.random() * plankH;
           const slen = plankH * (0.15 + Math.random() * 0.7);
-          // Lighter mid-brown grain — subtle tonal streaks rather than near-black lines.
           const shade = 90 + Math.random() * 70;
           const a = 0.05 + Math.random() * 0.18;
           ctx.strokeStyle = `rgba(${shade},${(shade*0.7)|0},${(shade*0.45)|0},${a})`;
@@ -1020,7 +1057,6 @@ export function createRoom(scene) {
           ctx.lineTo(sx + (Math.random() - 0.5) * 3, Math.min(y1 - 0.5, sy + slen));
           ctx.stroke();
         }
-        // Occasional lighter highlight streak.
         if (Math.random() < 0.55) {
           const sx = px0 + 2 + Math.random() * (plankPxW - 4);
           const sy = y0 + Math.random() * plankH * 0.7;
@@ -1030,7 +1066,6 @@ export function createRoom(scene) {
           ctx.lineTo(sx + (Math.random()-0.5)*2, Math.min(y1 - 0.5, sy + plankH * (0.3 + Math.random() * 0.5)));
           ctx.stroke();
         }
-        // Knots — rare, weighted by plank size.
         const knotChance = plankH / (PX_PER_IN * 120);
         if (Math.random() < knotChance) {
           const kx = px0 + 3 + Math.random() * (plankPxW - 6);
@@ -1045,8 +1080,6 @@ export function createRoom(scene) {
         }
       }
     }
-
-    // Fine noise overlay to kill any residual banding.
     const noise = ctx.getImageData(0, 0, HW_RES_W, HW_RES_H);
     const nd = noise.data;
     for (let i = 0; i < nd.length; i += 4) {
@@ -1056,24 +1089,35 @@ export function createRoom(scene) {
       nd[i+2] = Math.max(0, Math.min(255, nd[i+2] + n * 0.5));
     }
     ctx.putImageData(noise, 0, 0);
-
     const hwTex = new THREE.CanvasTexture(cvs);
     hwTex.wrapS = hwTex.wrapT = THREE.ClampToEdgeWrapping;
     hwTex.anisotropy = 16;
     if ('colorSpace' in hwTex) hwTex.colorSpace = THREE.SRGBColorSpace;
-    // One-to-one: canvas covers the whole hallway floor, no tiling.
     hwTex.repeat.set(1, 1);
-    const hwMat = new THREE.MeshStandardMaterial({map: hwTex, roughness: 0.55, metalness: 0.05});
+    return new THREE.MeshStandardMaterial({map: hwTex, roughness: 0.55, metalness: 0.05});
+  }
+
+  // Hardwood plank floor — 5" wide planks running along the hallway length
+  // (+Z). Starts inside the bedroom doorway opening (at the door panel) so
+  // the hardwood is visible the instant the door swings open, and continues
+  // through the door recess and all the way to the end of the hallway. Sits
+  // 1/4" above the main carpet floor — a realistic hardwood-over-carpet
+  // step that reads as a proper threshold instead of a paper-thin decal.
+  // The guest room floor below uses the same Y so the two planes line up
+  // through the guest door opening.
+  const _hwLiftY = 0.25;
+  const _hwStartZ = recessZ + 0.25;
+  {
+    const hwW = 40;
+    const hwL = 289 - _hwStartZ; // from door panel through end of hallway
+    const hwMat = _makeHardwoodMaterial(hwW, hwL);
     const hwCx = 31; // extCenterX (pre-mirror X) — between the recess walls
     const hwCz = _hwStartZ + hwL/2;
-    const hwGeo = new THREE.PlaneGeometry(hwW, hwL);
-    const hw = new THREE.Mesh(hwGeo, hwMat);
+    const hw = new THREE.Mesh(new THREE.PlaneGeometry(hwW, hwL), hwMat);
     hw.rotation.x = -Math.PI/2;
-    hw.position.set(hwCx, floorY + 0.05, hwCz);
+    hw.position.set(hwCx, floorY + _hwLiftY, hwCz);
     hw.receiveShadow = true;
-    hw._isRoom = true;
-    hw._isFloor = true;
-    hw._isHallway = true;
+    hw._isRoom = true; hw._isFloor = true; hw._isHallway = true;
     addRoom(hw);
   }
 
@@ -1089,21 +1133,15 @@ export function createRoom(scene) {
     thr._isHallway = true;
   }
 
-  // Ceiling for the hallway — flat panel at the same height as the room ceiling
-  {
-    const ceilGeo = new THREE.BoxGeometry(_hallWidth, 0.5, _hallLen);
-    const ceilMat = new THREE.MeshStandardMaterial({color:_hallCeilColor, roughness:0.9, metalness:0.0});
-    const ceil = new THREE.Mesh(ceilGeo, ceilMat);
-    ceil.position.set(_hallCenterX, floorY+_hallHeight+0.25, _hallCenterZ);
-    ceil.receiveShadow = true;
-    ceil._isRoom = true;
-    ceil._isHallway = true;
-    addRoom(ceil);
-  }
+  // (Hallway ceiling is not a separate mesh — the bedroom's ceiling plane
+  // extends all the way through Z=300 so bedroom + hallway share one
+  // continuous surface with no seam. See `ceiling` above.)
 
-  // Hallway side walls — built as continuous boxes. The two hallway doors are
-  // decorative closed panels attached to the interior face of each wall (not
-  // actual openings), so the walls remain solid for collision and framing.
+  // Hallway side walls — the -X side is a continuous box (its "other room"
+  // door is purely decorative). The +X side has a real 32" × 68" doorway
+  // cut into it at Z=_guestDoorCenterZ so the player can walk into the
+  // guest room beyond. The -X decorative door stays where it is for visual
+  // symmetry.
   const hallWallMat = new THREE.MeshStandardMaterial({color:_hallWallColor, roughness:0.7, metalness:0.05});
   // -X side wall (pre-mirror X=_hallXLeft=11)
   const hallWallL = new THREE.Mesh(
@@ -1114,16 +1152,16 @@ export function createRoom(scene) {
   hallWallL.castShadow = true; hallWallL.receiveShadow = true;
   hallWallL._isRoom = true; hallWallL._isHallway = true;
   addRoom(hallWallL);
-  // +X side wall (pre-mirror X=_hallXRight=51). This is the continuation of
-  // the main room's right wall so its inside face sits at +_hallXRight.
-  const hallWallR = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, _hallHeight, _hallLen),
-    hallWallMat
-  );
-  hallWallR.position.set(_hallXRight+0.25, floorY+_hallHeight/2, _hallCenterZ);
-  hallWallR.castShadow = true; hallWallR.receiveShadow = true;
-  hallWallR._isRoom = true; hallWallR._isHallway = true;
-  addRoom(hallWallR);
+  // +X side wall used to be a separate `hallWallR` mesh, coplanar with the
+  // bedroom's `rightWall` but offset by 0.5" (extruded in the opposite
+  // direction), which produced a visible thickness step at the Z=49 seam.
+  // It is now built as part of `rightWall` below as a single extrude that
+  // spans Z=_sbXMin.._hallZEnd with the guest-door hole cut in one piece.
+  const _guestDoorW = 32;
+  const _guestDoorH = 68;
+  const _guestDoorCenterZ = 50;
+  const _guestDoorZmin = _guestDoorCenterZ - _guestDoorW/2; // 34
+  const _guestDoorZmax = _guestDoorCenterZ + _guestDoorW/2; // 66
   // End wall (Z=_hallZEnd)
   const hallWallEnd = new THREE.Mesh(
     new THREE.BoxGeometry(_hallWidth+1, _hallHeight, 0.5),
@@ -1134,85 +1172,301 @@ export function createRoom(scene) {
   hallWallEnd._isRoom = true; hallWallEnd._isHallway = true;
   addRoom(hallWallEnd);
 
-  // Hallway baseboards — split around each decorative door so they don't
-  // cross the door trim. Ends run from the bedroom-doorway jamb (Z=49) out
-  // to the end wall (Z=_hallZEnd).
+  // Hallway baseboards — split the -X wall around its decorative door, and
+  // split the +X (shared) wall around the guest-door opening that extends
+  // past Z=49.
   {
     const bbColor = _hallBbColor;
-    const doorZmin = _hallDoorCenterZ - _hallDoorW/2 - 2.5;
-    const doorZmax = _hallDoorCenterZ + _hallDoorW/2 + 2.5;
-    const segs = [
-      { zMin: _hallZStart, zMax: doorZmin },
-      { zMin: doorZmax,    zMax: _hallZEnd  },
-    ];
-    for (const s of segs){
-      const w = s.zMax - s.zMin; if (w < 0.5) continue;
-      const zc = (s.zMin+s.zMax)/2;
-      // -X wall (box sits just inside the wall face)
-      roomBox(0.6, 3, w, bbColor, _hallXLeft+0.5, floorY+1.5, zc, 0,0,0);
-      // +X wall
-      roomBox(0.6, 3, w, bbColor, _hallXRight-0.5, floorY+1.5, zc, 0,0,0);
-    }
+    const lDoorMin = _hallDoorCenterZ - _hallDoorW/2 - 2.5;
+    const lDoorMax = _hallDoorCenterZ + _hallDoorW/2 + 2.5;
+    const rDoorMin = _guestDoorZmin - 2.5;
+    const rDoorMax = _guestDoorZmax + 2.5;
+    const addSeg = (x, zMin, zMax) => {
+      const w = zMax - zMin; if (w < 0.5) return;
+      roomBox(0.6, 3, w, bbColor, x, floorY+1.5, (zMin+zMax)/2, 0,0,0);
+    };
+    // -X wall — split around the decorative door
+    addSeg(_hallXLeft+0.5, _hallZStart, lDoorMin);
+    addSeg(_hallXLeft+0.5, lDoorMax,    _hallZEnd );
+    // (+X wall baseboards are handled by the unified right-wall baseboard
+    // loop below, which now spans the full Z=_sbXMin.._hallZEnd range.)
     // Baseboard along the end wall
     roomBox(_hallWidth, 3, 0.6, bbColor, _hallCenterX, floorY+1.5, _hallZEnd-0.5, 0,0,0);
   }
 
-  // Two decorative doors, one on each side wall, ~6 ft in from the room.
-  // Same shared door asset as the bedroom door so they all match; no hinge
-  // animation — they read as "other rooms" off the hallway.
+  // Decorative closed door on the hallway's -X wall (~6 ft in) — still reads
+  // as "some other room" off the hallway. The +X side is a REAL doorway
+  // (built separately below) leading into the guest room.
   {
     const panelThick = 1.4;
-    // sides: -1 → -X wall (door faces +X, into hallway), +1 → +X wall.
-    const _hallwayDoorSides = [-1, +1];
-    for (const side of _hallwayDoorSides){
-      const wallX = side < 0 ? _hallXLeft : _hallXRight;
-      const innerFaceX = wallX + side*0.25;
-      const panelCenterX = innerFaceX - side*(panelThick/2);
-      const panelY = floorY + _hallDoorH/2;
-      const panelZ = _hallDoorCenterZ;
+    const side = -1;
+    const wallX = _hallXLeft;
+    const innerFaceX = wallX + side*0.25;
+    const panelCenterX = innerFaceX - side*(panelThick/2);
+    const panelY = floorY + _hallDoorH/2;
+    const panelZ = _hallDoorCenterZ;
 
-      // Leaf is built canonical (width along X, thickness along Z). Rotating
-      // ±90° around Y swings the width onto the Z axis so it sits flush
-      // inside the hallway wall, thickness becoming the X axis.
-      const leaf = buildDoorLeaf({
-        width: _hallDoorW-1, height: _hallDoorH-1, thickness: panelThick,
-      });
-      leaf.position.set(panelCenterX, panelY, panelZ);
-      leaf.rotation.y = side < 0 ? Math.PI/2 : -Math.PI/2;
-      tagAll(leaf, { _isRoom:true, _isHallway:true });
-      // Need shadows on the slab for a grounded look.
-      leaf.userData.doorLeaf.slab.castShadow = true;
-      addRoom(leaf);
+    const leaf = buildDoorLeaf({
+      width: _hallDoorW-1, height: _hallDoorH-1, thickness: panelThick,
+    });
+    leaf.position.set(panelCenterX, panelY, panelZ);
+    leaf.rotation.y = Math.PI/2;
+    tagAll(leaf, { _isRoom:true, _isHallway:true });
+    leaf.userData.doorLeaf.slab.castShadow = true;
+    addRoom(leaf);
 
-      // Trim frame on the hallway-facing side of the wall. Frame is built in
-      // canonical XY plane; rotate to lie flat against the wall.
-      const trimD = 1;
-      const trimX = innerFaceX - side*(trimD/2 + 0.04);
-      const frame = buildDoorFrame({
-        width: _hallDoorW, height: _hallDoorH, depth: trimD,
-      });
-      frame.position.set(trimX, panelY, panelZ);
-      frame.rotation.y = side < 0 ? Math.PI/2 : -Math.PI/2;
-      tagAll(frame, { _isRoom:true, _isHallway:true });
-      addRoom(frame);
+    const trimD = 1;
+    const trimX = innerFaceX - side*(trimD/2 + 0.04);
+    const frame = buildDoorFrame({
+      width: _hallDoorW, height: _hallDoorH, depth: trimD,
+    });
+    frame.position.set(trimX, panelY, panelZ);
+    frame.rotation.y = Math.PI/2;
+    tagAll(frame, { _isRoom:true, _isHallway:true });
+    addRoom(frame);
 
-      // Knob on the hallway face, offset from the strike edge. Rotation
-      // aligns the knob's local +Z (its protrusion direction) with the
-      // hallway side of the door — for side=-1 the hallway is toward +X so
-      // rotation.y=+π/2 (which maps +Z → +X); for side=+1 the hallway is
-      // toward -X so rotation.y=-π/2. Y is the leaf's lock-rail Y so the
-      // knob sits on the horizontal rail between the tall + short panels.
-      const knobZOffset = _hallDoorW/2 - 4;
-      const knob = buildDoorKnob();
-      knob.position.set(
-        panelCenterX - side*(panelThick/2),
-        panelY + leaf.userData.doorLeaf.lockRailY,
-        panelZ + knobZOffset
-      );
-      knob.rotation.y = side < 0 ? Math.PI/2 : -Math.PI/2;
-      tagAll(knob, { _isRoom:true, _isHallway:true });
-      addRoom(knob);
-    }
+    const knobZOffset = _hallDoorW/2 - 4;
+    const knob = buildDoorKnob();
+    knob.position.set(
+      panelCenterX - side*(panelThick/2),
+      panelY + leaf.userData.doorLeaf.lockRailY,
+      panelZ + knobZOffset
+    );
+    knob.rotation.y = Math.PI/2;
+    tagAll(knob, { _isRoom:true, _isHallway:true });
+    addRoom(knob);
+    doorKnobs.push(knob);
+  }
+
+  // ─── Functional guest-room door (on hallway's +X wall at Z=_guestDoorCenterZ) ───
+  // Frame + hinged leaf + knob, using the shared door asset so it matches
+  // every other door in the scene. Hinge is on the -Z jamb of the opening;
+  // positive rotation.y swings the free edge toward +X (into the guest room).
+  let toggleGuestDoor = null;
+  let _guestDoorPanelMesh = null;
+  {
+    const panelThick = 1.4;
+    const panelH = _guestDoorH - 0.5;
+    const panelW = _guestDoorW - 1;
+    // rightWall occupies X=50.5..51 (inner face = bedroom/extrusion side at
+    // X=50.5). Place the hinge at the -Z jamb on the bedroom-side face, so
+    // the closed panel sits at X=49.1..50.5 (fully inside the bedroom;
+    // flush with the wall inner face, no poking into the hallway-wall
+    // region past X=51).
+    //
+    // The trim jambs overhang the wall opening by 0.5" on each side
+    // (buildDoorFrame inner-face inset), so the visible opening between
+    // trim pieces is 31" — exactly panelW. Shift the hinge +0.5" from the
+    // wall-opening edge so both the hinge edge and the strike edge of the
+    // closed panel sit flush with the trim inner faces (no visible gap).
+    const hingeZ = _guestDoorZmin + 0.5;
+    const hingeX = sideWallX - 0.5;          // 50.5
+    const pivot = new THREE.Group();
+    pivot.position.set(hingeX, floorY + _guestDoorH/2, hingeZ);
+    pivot._isRoom = true;
+    addRoom(pivot);
+
+    // Leaf extends in +Z from the hinge; rotation.y swings the free edge
+    // from +Z toward +X (into the guest room / hallway side). Leaf
+    // position.x = -panelThick/2 offsets the panel's thickness axis so the
+    // closed panel occupies world X = [hingeX - panelThick, hingeX]
+    // = [49.1, 50.5], flush with the bedroom-side wall face.
+    const leaf = buildDoorLeaf({
+      width: panelW, height: panelH, thickness: panelThick,
+    });
+    leaf.rotation.y = -Math.PI/2;            // width axis → world Z
+    leaf.position.set(-panelThick/2, 0, panelW/2);
+    tagAll(leaf, { _isRoom:true, _isGuestDoor:true });
+    leaf.userData.doorLeaf.slab.castShadow = true;
+    pivot.add(leaf);
+    _guestDoorPanelMesh = leaf.userData.doorLeaf.slab;
+
+    // Knobs on both faces, on the lock rail, near the free (strike) edge.
+    // With leaf.position.x=-panelThick/2, the bedroom-side panel face is
+    // at local X=-panelThick and the wall-side face is at local X=0.
+    const knobY = leaf.userData.doorLeaf.lockRailY;
+    const knobZ = panelW - 4;
+    // Bedroom-side knob (points -X, toward the bedroom interior). The knob
+    // group projects along its local +Z; rotation.y=-π/2 sends +Z → pivot -X.
+    const knobBed = buildDoorKnob();
+    knobBed.position.set(-panelThick, knobY, knobZ);
+    knobBed.rotation.y = -Math.PI/2;
+    tagAll(knobBed, { _isRoom:true, _isGuestDoorHandle:true });
+    pivot.add(knobBed);
+    // Guest-room-side knob (points +X, toward the guest room beyond).
+    const knobRoom = buildDoorKnob();
+    knobRoom.position.set(0, knobY, knobZ);
+    knobRoom.rotation.y = Math.PI/2;
+    tagAll(knobRoom, { _isRoom:true, _isGuestDoorHandle:true });
+    pivot.add(knobRoom);
+    doorKnobs.push(knobBed); doorKnobs.push(knobRoom);
+
+    // Door trim around the opening — on the bedroom-facing (inner) side of
+    // the wall. buildDoorFrame builds in the local XY plane with depth
+    // along local Z; rotate -π/2 so depth becomes world -X (into the room).
+    // Trim depth matches panel thickness so the jambs read flush with both
+    // faces of the closed panel (no visible gap between slab and trim).
+    const trimD = panelThick;                // 1.4 — matches door slab
+    const frame = buildDoorFrame({
+      width: _guestDoorW, height: _guestDoorH, depth: trimD,
+    });
+    // Trim sits flush with wall inner face (X=50.5) with a 0.04" pull-back
+    // to avoid z-fighting where the jambs overlap the wall (Z=32..34 and
+    // Z=66..68). After rotate, depth spans X = posX ± depth/2.
+    frame.position.set(sideWallX - 0.5 - 0.04 - trimD/2,
+                       floorY + _guestDoorH/2,
+                       _guestDoorCenterZ);
+    frame.rotation.y = -Math.PI/2;
+    tagAll(frame, { _isRoom:true });
+    addRoom(frame);
+
+    // Hinge animation.
+    let _open = false;
+    let _angle = 0;
+    let _anim = 0;
+    const _openAngle = 82*Math.PI/180;
+    const _step = () => {
+      const target = _open ? _openAngle : 0;
+      _angle += (target - _angle) * 0.22;
+      pivot.rotation.y = _angle;
+      if (Math.abs(target - _angle) > 0.001) {
+        _anim = requestAnimationFrame(_step);
+      } else {
+        _angle = target;
+        pivot.rotation.y = _angle;
+        _anim = 0;
+      }
+    };
+    toggleGuestDoor = (forceOpen) => {
+      _open = (typeof forceOpen === 'boolean') ? forceOpen : !_open;
+      if (_anim) cancelAnimationFrame(_anim);
+      _anim = requestAnimationFrame(_step);
+    };
+  }
+
+  // ─── Guest room (behind the hallway's +X door) ────────────────────
+  // Roughly the same footprint as the main bedroom (132"×127"×80"), but a
+  // bit wider on the Z axis so the swinging guest door has room to open
+  // fully without hitting a side wall. Shared -X wall is the existing
+  // bedroom/hallway right wall (at pre-mirror X=51), which already has the
+  // guest door hole cut into it, so we only build the three new walls
+  // (+X far, -Z, +Z), a hardwood floor, and a ceiling.
+  const _grXmin = 51;              // shared wall (existing sideWall/hallWallR)
+  const _grXmax = 183;             // new far wall (132" deep — matches main)
+  const _grZmin = -30;             // new "-Z" wall
+  const _grZmax = 130;             // new "+Z" wall (160" wide — "a bit wider")
+  const _grCenterX = (_grXmin + _grXmax) / 2;
+  const _grCenterZ = (_grZmin + _grZmax) / 2;
+  const _grWidthX  = _grXmax - _grXmin; // 132
+  const _grWidthZ  = _grZmax - _grZmin; // 160
+  const _grHeight  = 80;
+  const _grWallColor = 0xd8d4ce;
+  const _grBbColor   = 0xc0bbb4;
+  const _grCeilColor = 0xe0ddd6;
+
+  // Hardwood floor — same material factory as the hallway, sized to the
+  // guest-room footprint. Uses the same lift (_hwLiftY) as the hallway so
+  // the two planes meet flush through the guest door opening.
+  {
+    const grMat = _makeHardwoodMaterial(_grWidthX, _grWidthZ);
+    const grFloor = new THREE.Mesh(
+      new THREE.PlaneGeometry(_grWidthX, _grWidthZ),
+      grMat
+    );
+    grFloor.rotation.x = -Math.PI/2;
+    grFloor.position.set(_grCenterX, floorY + _hwLiftY, _grCenterZ);
+    grFloor.receiveShadow = true;
+    grFloor._isRoom = true; grFloor._isFloor = true; grFloor._isGuestRoom = true;
+    addRoom(grFloor);
+  }
+
+  // Ceiling — separate plane covering just the guest-room footprint, at the
+  // same height (+0.05 lift) as the main bedroom/hallway ceiling plane.
+  {
+    const grCeilMat = new THREE.MeshStandardMaterial({
+      color: _grCeilColor, roughness: 0.9, metalness: 0.0, side: THREE.DoubleSide,
+    });
+    const grCeil = new THREE.Mesh(
+      new THREE.PlaneGeometry(_grWidthX, _grWidthZ),
+      grCeilMat
+    );
+    grCeil.rotation.x = Math.PI/2;
+    grCeil.position.set(_grCenterX, floorY + _grHeight + 0.05, _grCenterZ);
+    grCeil.castShadow = false;
+    grCeil.receiveShadow = true;
+    grCeil._isRoom = true; grCeil._isGuestRoom = true;
+    addRoom(grCeil);
+  }
+
+  // New walls — three simple boxes. Thickness 0.5" matches every other wall
+  // in the scene. Baseboards on the interior face, inset slightly so they
+  // don't fight with the corner where two walls meet.
+  const grWallMat = new THREE.MeshStandardMaterial({
+    color: _grWallColor, roughness: 0.7, metalness: 0.05,
+  });
+  // +X far wall (pre-mirror X = _grXmax..+0.5); spans the full Z range.
+  {
+    const w = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, _grHeight, _grWidthZ + 1),
+      grWallMat
+    );
+    w.position.set(_grXmax + 0.25, floorY + _grHeight/2, _grCenterZ);
+    w.castShadow = true; w.receiveShadow = true;
+    w._isRoom = true; w._isGuestRoom = true;
+    addRoom(w);
+  }
+  // -Z wall (behind the door, closer to the main bedroom's TV-wall side).
+  {
+    const w = new THREE.Mesh(
+      new THREE.BoxGeometry(_grWidthX, _grHeight, 0.5),
+      grWallMat
+    );
+    w.position.set(_grCenterX, floorY + _grHeight/2, _grZmin - 0.25);
+    w.castShadow = true; w.receiveShadow = true;
+    w._isRoom = true; w._isGuestRoom = true;
+    addRoom(w);
+  }
+  // +Z wall (far end of the room, past the hallway).
+  {
+    const w = new THREE.Mesh(
+      new THREE.BoxGeometry(_grWidthX, _grHeight, 0.5),
+      grWallMat
+    );
+    w.position.set(_grCenterX, floorY + _grHeight/2, _grZmax + 0.25);
+    w.castShadow = true; w.receiveShadow = true;
+    w._isRoom = true; w._isGuestRoom = true;
+    addRoom(w);
+  }
+
+  // Baseboards on the three new interior wall faces.
+  {
+    const bbH = 3, bbT = 0.6, bbY = floorY + _hwLiftY + bbH/2;
+    // Far wall (+X) baseboard — sits just off the inner face at X=_grXmax.
+    roomBox(bbT, bbH, _grWidthZ, _grBbColor,
+      _grXmax - bbT/2, bbY, _grCenterZ, 0, 0, 0);
+    // -Z wall baseboard.
+    roomBox(_grWidthX, bbH, bbT, _grBbColor,
+      _grCenterX, bbY, _grZmin + bbT/2, 0, 0, 0);
+    // +Z wall baseboard.
+    roomBox(_grWidthX, bbH, bbT, _grBbColor,
+      _grCenterX, bbY, _grZmax - bbT/2, 0, 0, 0);
+  }
+
+  // Simple ceiling fixture + warm point light at the guest-room midpoint so
+  // the space isn't pitch black when you walk in.
+  {
+    const fixMat = new THREE.MeshStandardMaterial({
+      color: 0xf4ead5, emissive: 0xf4ead5, emissiveIntensity: 0.45, roughness: 0.5,
+    });
+    const fix = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.5, 1.2, 24), fixMat);
+    fix.position.set(_grCenterX, floorY + _grHeight - 0.7, _grCenterZ);
+    fix._isRoom = true; fix._isGuestRoom = true;
+    addRoom(fix);
+    const grLight = new THREE.PointLight(0xffe6bb, 320, 260);
+    grLight.position.set(_grCenterX, floorY + _grHeight - 6, _grCenterZ);
+    grLight.castShadow = false;
+    grLight._isRoom = true; grLight._isGuestRoom = true;
+    addRoom(grLight);
   }
 
   // Simple ceiling fixture + point light at the hallway midpoint so it's not
@@ -1863,13 +2117,23 @@ export function createRoom(scene) {
   const _closetW=48, _closetH=66, _closetInteriorH=wallHeight, _closetDepth=36, _closetInteriorW=64;
   const _closetZ=oppWallZ+_closetW/2+8; // = -46 (5.5" trim-to-TV-wall gap)
   const rightWall=(()=>{
-    // Build the wall as an extruded rectangle with a rectangular hole at the
-    // closet opening. Shape lives in Y-Z (the wall's face plane); extrudes along
-    // +X, then positioned so the inward face sits at sideWallX.
+    // Unified right-side wall: spans the full Z range from the TV wall
+    // (Z=_sbXMin) all the way through the hallway to its end cap
+    // (Z=_hallZEnd). Replaces what used to be two coplanar meshes —
+    // the bedroom `rightWall` (Z=-78.5..48.5) and a separate `hallWallR`
+    // (Z=49..289) — which were offset by 0.5" in X (the wall thickness)
+    // because one extruded +X and the other extruded -X. Building them as
+    // one extrude guarantees the inner face stays exactly coplanar across
+    // the entire run, so there's no visible step at the bedroom/hallway
+    // junction.
+    //
+    // Shape lives in Y-Z (the wall's face plane); extrudes along +X, then
+    // positioned so the inward face sits at sideWallX.
     const wallMat=new THREE.MeshStandardMaterial({color:0xd8d4ce,roughness:0.7,metalness:0.05});
     const zCenter=-15;
     const wallShape=new THREE.Shape();
-    const zMin=zCenter-wallDepth/2, zMax=zCenter+wallDepth/2;
+    const zMin=zCenter-wallDepth/2;          // -78.5 (TV wall)
+    const zMax=_hallZEnd;                    // 289   (hallway end cap)
     const yMin=0, yMax=wallHeight;
     wallShape.moveTo(zMin, yMin);
     wallShape.lineTo(zMax, yMin);
@@ -1888,6 +2152,17 @@ export function createRoom(scene) {
     hole.lineTo(hZMin, hYMax);
     hole.lineTo(hZMin, hYMin);
     wallShape.holes.push(hole);
+    // Guest-room doorway hole — now cut in one piece since this single wall
+    // covers the full Z span (previously split across rightWall + hallWallR).
+    {
+      const gHole = new THREE.Path();
+      gHole.moveTo(_guestDoorZmin, 0);
+      gHole.lineTo(_guestDoorZmax, 0);
+      gHole.lineTo(_guestDoorZmax, _guestDoorH);
+      gHole.lineTo(_guestDoorZmin, _guestDoorH);
+      gHole.lineTo(_guestDoorZmin, 0);
+      wallShape.holes.push(gHole);
+    }
     const wallGeo=new THREE.ExtrudeGeometry(wallShape, {depth:0.5, bevelEnabled:false});
     // After extrude: shape axes are (Z,Y) in the local XY plane. Rotate so
     // shape's X-coord → world Z, shape's Y-coord → world Y, extrude → world +X.
@@ -1916,19 +2191,29 @@ export function createRoom(scene) {
     return rightWall;
   })();
 
-  // Corner fill — patch the 0.5" gap between right wall (z=48.5) and back
-  // wall (z=49). Sits flush with the right-wall interior face at X=sideWallX
-  // (pre-mirror) so the bedroom wall, corner fill, and hallway wall all read
-  // as one continuous plane (no step/break at the junction).
-  roomBox(0.5, wallHeight, 0.5, 0xd8d4ce, sideWallX + 0.25, floorY + wallHeight / 2, 48.75, 0, 0, 0);
+  // (No corner fill needed — the unified right wall extends past Z=49 in
+  // one piece, so there's no 0.5" gap between it and the back wall.)
 
-  // Baseboard — break into two pieces so it doesn't cross the closet opening.
-  // Inset by trimW (2.5") to not stick past the door trim.
+  // Baseboard — break into pieces so it doesn't cross the closet opening
+  // OR the guest-room doorway. Inset by trimW (2.5") to not stick past
+  // door trim in either case. Spans the full unified-wall Z range
+  // (_sbXMin .. _hallZEnd), covering the old hallway +X baseboard too.
   const bbTrimInset=2.5;
-  const sideBaseboard1=roomBox(0.6, 3, (_closetZ-_closetW/2-bbTrimInset) - (-15 - wallDepth/2), 0xc0bbb4,
-    sideWallX-0.5, floorY+1.5, (-15 - wallDepth/2 + (_closetZ-_closetW/2-bbTrimInset))/2, 0,0,0);
-  const sideBaseboard2=roomBox(0.6, 3, (-15 + wallDepth/2) - (_closetZ+_closetW/2+bbTrimInset), 0xc0bbb4,
-    sideWallX-0.5, floorY+1.5, (_closetZ+_closetW/2+bbTrimInset + (-15 + wallDepth/2))/2, 0,0,0);
+  const _sbXMin = -15 - wallDepth/2;
+  const _sbXMax = _hallZEnd;
+  const _closetBbMin = _closetZ - _closetW/2 - bbTrimInset;
+  const _closetBbMax = _closetZ + _closetW/2 + bbTrimInset;
+  const _guestBbMin = _guestDoorZmin - bbTrimInset;
+  const _guestBbMax = _guestDoorZmax + bbTrimInset;
+  const _sideBbSegs = [
+    { zMin: _sbXMin,       zMax: _closetBbMin },
+    { zMin: _closetBbMax,  zMax: _guestBbMin  },
+    { zMin: _guestBbMax,   zMax: _sbXMax      },
+  ];
+  for (const s of _sideBbSegs){
+    const w = s.zMax - s.zMin; if (w < 0.5) continue;
+    roomBox(0.6, 3, w, 0xc0bbb4, sideWallX-0.5, floorY+1.5, (s.zMin+s.zMax)/2, 0,0,0);
+  }
   
   // ─── Bifold closet doors on right wall (becomes -X after flip) ───
   {
@@ -2993,6 +3278,9 @@ export function createRoom(scene) {
     toggleCornerDoor,
     getCornerDoorPanelMesh: () => doorPanel,
     getCornerDoorAngle: () => _cornerDoorAngle,
+    toggleGuestDoor: toggleGuestDoor || (() => false),
+    getGuestDoorPanelMesh: () => _guestDoorPanelMesh,
+    doorKnobs,
     toggleTV,
     toggleMacbook,
     setMacbookMuted,
