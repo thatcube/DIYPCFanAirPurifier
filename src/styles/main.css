@@ -1128,6 +1128,41 @@ input[type=range]::-moz-range-thumb {
   color: #fff8d8;
   text-shadow: 0 0 8px rgba(255,210,120,0.7);
 }
+
+/* Super Saiyan active indicator — persistent glow + short entry burst */
+#fpChargeBar.ss-active {
+  border-color: rgba(255, 220, 130, 0.82);
+  box-shadow: 0 10px 34px rgba(255, 160, 52, 0.42),
+              inset 0 1px 0 rgba(255,255,255,0.22),
+              0 0 34px rgba(255, 200, 110, 0.58);
+}
+#fpChargeBar.ss-active .fp-charge-label {
+  color: #fff4ca;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 10px rgba(255, 210, 120, 0.62);
+}
+#fpChargeBar.ss-active .fp-charge-label i {
+  color: #ffd66d;
+  text-shadow: 0 0 10px rgba(255, 210, 120, 0.62);
+}
+#fpChargeBar.ss-active #fpChargeValue {
+  color: #fff8db;
+  text-shadow: 0 0 9px rgba(255, 210, 120, 0.74);
+}
+#fpChargeBar.ss-active #fpChargeFill {
+  background: linear-gradient(90deg, rgba(255,170,68,1), rgba(255,226,145,1), rgba(255,252,205,1));
+  background-size: 220% 100%;
+  animation: fpChargeFlow 0.5s linear infinite;
+  box-shadow: 0 0 28px rgba(255, 210, 120, 0.9);
+}
+#fpChargeBar.ss-active.ss-enter {
+  animation: fpChargeSsEnter 0.55s cubic-bezier(0.2, 0.75, 0.2, 1.25) 1,
+             fpChargeSsPulse 1.05s ease-in-out infinite;
+}
+#fpChargeBar.ss-active:not(.ss-enter) {
+  animation: fpChargeSsPulse 1.05s ease-in-out infinite;
+}
 @keyframes fpChargeShake1 {
   0%, 100% { transform: translate(-50%, 0); }
   25%      { transform: translate(calc(-50% + 1px), -1px); }
@@ -1145,10 +1180,22 @@ input[type=range]::-moz-range-thumb {
   from { background-position: 0% 0%; }
   to   { background-position: 200% 0%; }
 }
+@keyframes fpChargeSsPulse {
+  0%, 100% { transform: translate(-50%, 0) scale(1); }
+  50%      { transform: translate(-50%, -1px) scale(1.013); }
+}
+@keyframes fpChargeSsEnter {
+  0%   { transform: translate(-50%, 0) scale(0.92); }
+  38%  { transform: translate(-50%, -2px) scale(1.045); }
+  100% { transform: translate(-50%, 0) scale(1); }
+}
 @media (prefers-reduced-motion: reduce) {
   #fpChargeBar.tier-2,
-  #fpChargeBar.tier-3 { animation: none; }
-  #fpChargeBar.tier-3 #fpChargeFill { animation: none; }
+  #fpChargeBar.tier-3,
+  #fpChargeBar.ss-active,
+  #fpChargeBar.ss-active.ss-enter { animation: none; }
+  #fpChargeBar.tier-3 #fpChargeFill,
+  #fpChargeBar.ss-active #fpChargeFill { animation: none; }
 }
 
 /* ─── Timer HUD (legacy positioning — now lives inside .run-hud) ─── */

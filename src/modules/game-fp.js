@@ -804,7 +804,7 @@ function _getSkateLiftTrimForModel() {
 
 function _getSkateBoardZTrimForModel() {
   const key = String(catAppearance.catModelKey || '').toLowerCase();
-  if (key === 'bababooey') return -0.62;
+  if (key === 'bababooey') return 1.08;
   return 0;
 }
 
@@ -2308,13 +2308,6 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       const entering = active && ts < _ssHudFlashUntilTs;
       _cachedCbBar.classList.toggle('ss-active', active);
       _cachedCbBar.classList.toggle('ss-enter', entering);
-    }
-    if (active) {
-      if (_cachedCbLabel) _cachedCbLabel.textContent = 'SUPER SAIYAN';
-      if (_cachedCbValue) {
-        const remainSec = Math.max(0, _ssActiveUntilTs - ts) / 1000;
-        _cachedCbValue.textContent = `${remainSec.toFixed(1)}s`;
-      }
     }
     const baseStrength = active ? 1 : chargingStrength;
     // Burst: ease-out quad over SS_BURST_MS at the start of the active window.
