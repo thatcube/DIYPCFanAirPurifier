@@ -1107,6 +1107,12 @@ function animate(ts) {
       gameFp.setPaused(true);
       // Hide the regular pause overlay (finish takes precedence)
       if (_elPauseOv) _elPauseOv.style.display = 'none';
+      // Persist the Totodile unlock if this run was under 2:00 — fire a
+      // celebration toast the very first time it triggers so the player
+      // knows there's a new cat waiting in the character select.
+      if (catAppearance.tryUnlockTotodile(finalTime)) {
+        showToast('🐊 Totodile unlocked! Pick him in Choose Your Cat.');
+      }
       // Open finish screen immediately and let player edit name inline
       // before saving this run.
       leaderboard.openFinishDialogForRun(finalTime, coins.coinTotal, coins.coinSecretScore);

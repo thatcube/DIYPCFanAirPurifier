@@ -199,9 +199,11 @@ function _ensureChargeLight() {
   _catGroup.add(_chargeLight);
 }
 
-// ── Super Saiyan aura (full charge / MEGA tier) ────────────────────
+// ── Super Saiyan mode ──────────────────────────────────────────────
+// Activates after holding the jump bar at 100% charge for 5 seconds.
+// While active (20s): cat gets 2x speed and keeps the gold aura on.
 // Yellow emissive boost on every cat material + a flickering additive
-// sphere/halo around the cat. Only kicks in once chargeTier === 3.
+// sphere/halo around the cat.
 let _ssAura = null;          // additive yellow sphere child of _catGroup
 let _ssHalo = null;          // additive yellow ring/sprite child of _catGroup
 let _ssMatCache = null;      // Map<material, {emissive:Color, intensity:number}>
@@ -209,10 +211,22 @@ let _ssAuraStrength = 0;     // smoothed 0..1 drive value
 const _ssGold = new THREE.Color(0xffe070);
 const _ssGoldHot = new THREE.Color(0xfff8b0);
 
+// Activation gate + active-window timers.
+const SS_HOLD_MS   = 5000;  // how long full charge must be held to activate
+const SS_ACTIVE_MS = 20000; // duration of super saiyan mode once activated
+let _ssFullChargeSinceTs = 0; // ts when chargePct first hit 100% (0 = not holding)
+let _ssActiveUntilTs = 0;     // ts at which the active window ends (0 = not active)
+
+export function isSuperSaiyanActive() {
+  return _ssActiveUntilTs > 0 && performance.now() < _ssActiveUntilTs;
+}
+
 function _ensureSuperSaiyanAura() {
   if (_ssAura || !_catGroup) return;
-  // Soft additive sphere a bit larger than the cat — looks like a body halo.
-  const geom = new THREE.SphereGeometry(7.5, 24, 16);
+  // Soft additive sphere roughly hugging the cat silhouette — looks like a
+  // body halo. Kept smaller than the first pass so it reads as a glow, not a
+  // giant bubble around the player.
+  const geom = new THREE.SphereGeometry(4.5, 24, 16);
   const mat = new THREE.MeshBasicMaterial({
     color: 0xffe070,
     transparent: true,
@@ -235,7 +249,7 @@ function _ensureSuperSaiyanAura() {
     depthWrite: false,
     blending: THREE.AdditiveBlending,
   });
-  _ssHalo = new THREE.Mesh(new THREE.SphereGeometry(10, 20, 12), haloMat);
+  _ssHalo = new THREE.Mesh(new THREE.SphereGeometry(6, 20, 12), haloMat);
   _ssHalo.position.set(0, 4, 0);
   _ssHalo.renderOrder = 999;
   _ssHalo.frustumCulled = false;
@@ -1407,9 +1421,10 @@ function _respawn() {
   _isJumping = false;
   _coyoteFrames = 0;
   _jumpBufferFrames = 0;
-  _spaceWasDown = false;
-  _lastPhysicsTs = 0;
+  _spaceWasDown = false;  _lastPhysicsTs = 0;
   fpPaused = false;
+  _ssFullChargeSinceTs = 0;
+  _ssActiveUntilTs = 0;
 }
 
 // Reset all run-affecting world state (drawers, doors, purifier filters,
@@ -1572,7 +1587,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   // ── Movement ──────────────────────────────────────────────────────
   // Speed mode triples top speed but uses a lower accel rate so you must
   // ramp up to it (heavier feel, longer slide on stop).
-  const speedMul = speedMode ? 3.0 : 1.0;
+  const speedMul = (speedMode ? 3.0 : 1.0) * (isSuperSaiyanActive() ? 2.0 : 1.0);
   const spd = (fpKeys.shift ? 0.65 : 0.30) * speedMul;
   const fwd = _fwd.set(-Math.sin(fpYaw), 0, -Math.cos(fpYaw));
   const right = _right.set(fwd.z, 0, -fwd.x);
@@ -1729,12 +1744,28 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     else _chargeLight.color.setHex(0x88ddff);
   }
 
-  // Super Saiyan aura at MEGA tier — ramps in across the top third of the
-  // charge bar so it builds toward "fully charged" rather than popping in.
+  // Super Saiyan mode — activates after holding full charge for 5s, then
+  // runs for 20s (gold aura + 2x speed). Aura is only shown during the
+  // active window; charging itself does not glow.
   {
-    const ssStrength = chargeTier === 3
-      ? Math.min(1, (chargePct - 0.66) / 0.34)
-      : 0;
+    const atFullCharge = onGround && chargePct >= 0.999;
+    if (atFullCharge) {
+      if (_ssFullChargeSinceTs === 0) _ssFullChargeSinceTs = ts;
+      // Promote to active once the 5s hold completes (only if not already
+      // active — don't restart during the 20s window).
+      if (!isSuperSaiyanActive() && ts - _ssFullChargeSinceTs >= SS_HOLD_MS) {
+        _ssActiveUntilTs = ts + SS_ACTIVE_MS;
+        _ssFullChargeSinceTs = 0;
+        // Consume the hold so we don't immediately fire a MEGA jump on release.
+        _spaceHeld = 0;
+        _jumpBufferFrames = 0;
+        if (_showToast) _showToast('⚡ SUPER SAIYAN ⚡');
+      }
+    } else {
+      _ssFullChargeSinceTs = 0;
+    }
+
+    const ssStrength = isSuperSaiyanActive() ? 1 : 0;
     _applySuperSaiyan(ssStrength, ts);
   }
 
