@@ -1690,24 +1690,18 @@ export function createPurifier(scene) {
       // Exaggerated head nod on every click, regardless of whether we hit an
       // interactive target. Feels playful and confirms the click registered.
       if(typeof _triggerCatNod==='function') _triggerCatNod();
-      // Crosshair click pulse — a quick, subtle ring tap. Keeps the base
-      // dot the same color and just scales/fades a soft halo. Feels like
-      // a UI ping rather than a shooter hit-marker.
+      // Crosshair click pulse — toggle a CSS class so the click animation
+      // doesn't fight the .aiming hover styles managed in game-fp.js.
       const _ch=_el('fpCrosshair');
       if(_ch){
-        const hitting=!!window._fpLookTarget;
-        // Soft, neutral halo — a hair warmer when hovering an interactable.
-        const halo = hitting
-          ? '0 0 0 2px rgba(9,14,20,0.6), 0 0 0 5px rgba(255,255,255,0.15), 0 0 8px 1px rgba(255,255,255,0.2)'
-          : '0 0 0 2px rgba(9,14,20,0.6), 0 0 0 4px rgba(255,255,255,0.1), 0 0 6px 1px rgba(255,255,255,0.12)';
-        _ch.style.transition='transform 80ms ease-out, box-shadow 80ms ease-out';
-        _ch.style.transform='translate(-50%,-50%) scale(1.25)';
-        _ch.style.boxShadow=halo;
+        _ch.classList.remove('click-pulse');
+        // Force reflow so re-adding restarts the animation
+        void _ch.offsetWidth;
+        _ch.classList.add('click-pulse');
         clearTimeout(window._fpCrosshairPulseT);
         window._fpCrosshairPulseT=setTimeout(()=>{
-          _ch.style.transition='border-color 0.2s, transform 0.22s cubic-bezier(.2,.7,.3,1), box-shadow 0.22s';
-          _ch.style.boxShadow='0 0 0 2px rgba(9,14,20,0.6),0 0 10px rgba(0,0,0,0.35)';
-        }, 140);
+          _ch.classList.remove('click-pulse');
+        }, 220);
       }
       // In FP mode, raycast from screen center to find interactive target
       _raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
