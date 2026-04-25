@@ -44,9 +44,39 @@ export let musicMuted = false;
 
 const SFX_MUTE_KEY = 'diy_air_purifier_muted_v2';
 const MUSIC_MUTE_KEY = 'diy_air_purifier_music_muted_v2';
+const MOUSE_SENS_KEY = 'diy_air_purifier_mouse_sens_v1';
 
 try { sfxMuted = localStorage.getItem(SFX_MUTE_KEY) === '1'; } catch (e) {}
 try { musicMuted = localStorage.getItem(MUSIC_MUTE_KEY) === '1'; } catch (e) {}
+
+// ── Mouse sensitivity (1.0 = default) ───────────────────────────────
+export let mouseSens = 1.0;
+try {
+  const raw = localStorage.getItem(MOUSE_SENS_KEY);
+  if (raw != null) {
+    const v = parseFloat(raw);
+    if (isFinite(v)) mouseSens = Math.max(0.25, Math.min(2.5, v));
+  }
+} catch (e) {}
+
+function _syncMouseSensUi() {
+  const slider = document.getElementById('fpPauseMouseSens');
+  const label = document.getElementById('fpPauseMouseSensVal');
+  if (slider && slider.value !== String(mouseSens)) slider.value = String(mouseSens);
+  if (label) label.textContent = `${mouseSens.toFixed(2)}×`;
+}
+
+export function setMouseSens(v) {
+  const n = parseFloat(v);
+  if (!isFinite(n)) return;
+  mouseSens = Math.max(0.25, Math.min(2.5, n));
+  try { localStorage.setItem(MOUSE_SENS_KEY, String(mouseSens)); } catch (e) {}
+  _syncMouseSensUi();
+}
+
+export function syncMouseSensUi() {
+  _syncMouseSensUi();
+}
 
 function _syncAudioToggleUi() {
   const sfxTog = document.getElementById('fpPauseMuteSfx');
@@ -109,7 +139,12 @@ export function getHorizSpeed() {
 
 let _bobPhase = 0;
 let _lastPhysicsTs = 0;
-let _spaceHeld = 0;
+let _spaceHeld = 0;            // total frames space has been held (legacy: jump-hold UI)
+let _jumpHoldFrames = 0;       // frames of variable-height boost applied this jump
+let _isJumping = false;        // true between liftoff and apex of current jump
+let _coyoteFrames = 0;         // frames remaining where a late jump is still allowed
+let _jumpBufferFrames = 0;     // frames remaining where a pre-press will trigger on land
+let _spaceWasDown = false;     // edge-detect for space press
 let _wasBonking = false;
 let _wasGroundedLast = true;
 let _wasAimingAtInteractable = false;
@@ -371,7 +406,7 @@ export function init(refs) {
   _interactiveObjects = [];
   _scene.traverse(obj => {
     if (obj._isLamp || obj._isCeilLight || obj._isFan || obj._isFilterL || obj._isFilterR ||
-        obj._isDrawer || obj._isBifoldLeaf || obj._isCornerDoorHandle || obj._isWindow ||
+        obj._isDrawer || obj._isBifoldLeaf || obj._isCornerDoorHandle || obj._isCornerDoor || obj._isWindow ||
         obj._isMacbook || obj._isTV || obj._isFoodBowl) {
       _interactiveObjects.push(obj);
     }
@@ -756,12 +791,14 @@ function _buildStaticBoxes() {
   );
 
   // ── Guest room walls (behind the hallway's +X door) ──
-  // Pre-mirror footprint X=51..183, Z=-30..130. Shared -X wall is the
-  // existing bedroom/hallway right wall (already in _staticBoxes via the
+  // Pre-mirror footprint X=51..183, Z=-13..130. -Z wall sits just past the
+  // closet's +Z exterior face (closet occupies Z=-78..-14) so it doesn't
+  // clip through the closet body. Shared -X wall is the existing
+  // bedroom/hallway right wall (already in _staticBoxes via the
   // sideWall + hallWallR blocks); we only collide the three new walls here.
   // World X = -183..-51 after mirror.
   {
-    const gXmin = 51, gXmax = 183, gZmin = -30, gZmax = 130;
+    const gXmin = 51, gXmax = 183, gZmin = -13, gZmax = 130;
     _staticBoxes.push(
       // Far wall (pre-mirror X=183..183.5)
       { xMin: -gXmax - 0.5, xMax: -gXmax, zMin: gZmin - 0.5, zMax: gZmax + 0.5, yTop: fy + WALL_HEIGHT, room: true },
@@ -1142,6 +1179,10 @@ export function toggleFirstPerson() {
     // Reset position
     _respawn();
 
+    // Snap doors / drawers / filters / closet leaves back to their default
+    // closed pose so the run starts from a canonical world state.
+    _resetWorldState();
+
     // Reset coins + timer
     coins.fullReset();
     coins.setCoinsVisible(true);
@@ -1219,8 +1260,39 @@ function _respawn() {
   _velZ = 0;
   _bobPhase = 0;
   _spaceHeld = 0;
+  _jumpHoldFrames = 0;
+  _isJumping = false;
+  _coyoteFrames = 0;
+  _jumpBufferFrames = 0;
+  _spaceWasDown = false;
   _lastPhysicsTs = 0;
   fpPaused = false;
+}
+
+// Reset all run-affecting world state (drawers, doors, purifier filters,
+// closet bifold leaves) so each run starts from the same canonical pose.
+function _resetWorldState() {
+  if (_purifierRefs && typeof _purifierRefs.resetWorld === 'function') {
+    _purifierRefs.resetWorld(_roomRefs);
+  }
+  if (_roomRefs) {
+    if (typeof _roomRefs.toggleCornerDoor === 'function') _roomRefs.toggleCornerDoor(false);
+    if (typeof _roomRefs.toggleGuestDoor  === 'function') _roomRefs.toggleGuestDoor(false);
+  }
+  // Filter / drawer collision boxes are cached; force a rebuild.
+  _purifierBoxesDirtyFlag = true;
+}
+
+// In-place run reset: respawn, clear coins, restart timer. Stays in FP.
+export function resetRun() { _resetRun(); }
+function _resetRun() {
+  _respawn();
+  _resetWorldState();
+  coins.fullReset();
+  coins.setCoinsVisible(true);
+  leaderboard.resetTimer();
+  leaderboard.startTimer();
+  void leaderboard.startSharedRun();
 }
 
 // ── Set paused ──────────────────────────────────────────────────────
@@ -1270,6 +1342,7 @@ export function setPaused(paused) {
 
     _setQuickControlsVisible(true);
     _syncAudioToggleUi();
+    _syncMouseSensUi();
 
     // Release pointer lock
     _clearPointerLockRetry();
@@ -1328,7 +1401,9 @@ export function setCamMode(mode) {
 }
 
 export function getJumpHoldFrames() {
-  return _spaceHeld;
+  // Cat-squash anim uses this to drive the ground-charge windup; mirror our
+  // charge progress on a 0..60 scale so existing thresholds keep working.
+  return _spaceHeld * 2;
 }
 
 // ── Physics tick ────────────────────────────────────────────────────
@@ -1348,8 +1423,8 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   fpLookDY -= stepY;
   if (Math.abs(fpLookDX) > maxLookStep * 4) fpLookDX *= 0.5;
   if (Math.abs(fpLookDY) > maxLookStep * 4) fpLookDY *= 0.5;
-  fpYaw -= stepX * 0.0022;
-  fpPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, fpPitch - stepY * 0.0022));
+  fpYaw -= stepX * 0.0022 * mouseSens;
+  fpPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, fpPitch - stepY * 0.0022 * mouseSens));
 
   // ── Movement ──────────────────────────────────────────────────────
   const spd = fpKeys.shift ? 0.65 : 0.30;
@@ -1384,22 +1459,77 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   const moveX = _velX * frameScale;
   const moveZ = _velZ * frameScale;
 
-  // ── Jump (charged) ────────────────────────────────────────────────
-  if (fpKeys.space && Math.abs(fpVy) < 0.01) {
-    _spaceHeld += frameScale;
-  }
-  if (!fpKeys.space && _spaceHeld > 0 && Math.abs(fpVy) < 0.01) {
-    const charge = Math.min(_spaceHeld, 60);
-    const power = 0.4 + charge * 0.025;
-    fpVy = power;
-    _playJumpCue(charge / 60);
+  // ── Jump (charged on ground, with coyote & buffer) ───────────────
+  // Hold space while on the ground to charge; release to fire. Coyote frames
+  // let you still jump for a moment after stepping off; the jump buffer
+  // remembers a press right before landing so you don't lose presses.
+  // Asymmetric gravity (snappier fall) is below in the gravity section.
+  const JUMP_BASE_VY         = 0.55;  // power on a near-zero-charge release
+  const JUMP_MAX_BONUS       = 0.85;  // extra power at full charge
+  const JUMP_CHARGE_FRAMES   = 30;    // frames to reach full charge (~0.5s)
+  const COYOTE_FRAMES        = 6;     // grace frames after walking off a ledge
+  const JUMP_BUFFER_FRAMES   = 8;     // grace frames for a press just before landing
+  const GRAVITY_RISE         = 0.018; // gravity while ascending
+  const GRAVITY_FALL         = 0.028; // stronger gravity while falling — snappier feel
+
+  // Grounded gate matches the old vy≈0 check; _wasGroundedLast is set at the
+  // end of the previous frame and is the most reliable "on something" signal.
+  const onGround = _wasGroundedLast && Math.abs(fpVy) < 0.01;
+
+  // Coyote: full window while grounded, decays once we leave.
+  if (onGround) _coyoteFrames = COYOTE_FRAMES;
+  else _coyoteFrames = Math.max(0, _coyoteFrames - frameScale);
+
+  // Edge-detect space press; refresh the buffer on the press only.
+  const spacePressed = fpKeys.space && !_spaceWasDown;
+  const releasedThisFrame = !fpKeys.space && _spaceWasDown;
+  if (spacePressed) _jumpBufferFrames = JUMP_BUFFER_FRAMES;
+  else _jumpBufferFrames = Math.max(0, _jumpBufferFrames - frameScale);
+
+  // Snapshot charge BEFORE we mutate it below — release-fire reads this.
+  const chargeAtFrameStart = _spaceHeld;
+
+  // Charge while space is held AND we're on the ground (or in coyote window).
+  // Off-ground holds don't accumulate (no air-charge cheese).
+  if (fpKeys.space && (onGround || _coyoteFrames > 0)) {
+    _spaceHeld = Math.min(JUMP_CHARGE_FRAMES, _spaceHeld + frameScale);
+  } else if (!fpKeys.space) {
     _spaceHeld = 0;
   }
-  if (!fpKeys.space) _spaceHeld = 0;
 
-  // Charge bar UI (cached DOM refs)
+  // Fire on release while still groundable, OR if a buffered press lands while
+  // we're standing still (you tapped just before landing — fires now).
+  const canJump = _coyoteFrames > 0 && fpVy <= 0.01;
+  let firedThisFrame = false;
+
+  if (canJump && releasedThisFrame) {
+    // Released — fire with whatever charge had built up (min = base jump).
+    const chargeN = Math.min(1, chargeAtFrameStart / JUMP_CHARGE_FRAMES);
+    fpVy = JUMP_BASE_VY + JUMP_MAX_BONUS * chargeN;
+    _playJumpCue(chargeN);
+    firedThisFrame = true;
+  } else if (canJump && _jumpBufferFrames > 0 && !fpKeys.space) {
+    // Buffered press from before landing — fire a base jump on touchdown.
+    fpVy = JUMP_BASE_VY;
+    _playJumpCue(0);
+    firedThisFrame = true;
+  }
+
+  if (firedThisFrame) {
+    _spaceHeld = 0;
+    _jumpBufferFrames = 0;
+    _coyoteFrames = 0;
+    _isJumping = true;
+  }
+  if (fpVy <= 0) _isJumping = false;
+
+  _spaceWasDown = fpKeys.space;
+
+  // Charge bar UI: shows fill while holding on ground, "Air" while airborne.
   _cacheDom();
-  const chargePct = _spaceHeld > 0 ? Math.min(_spaceHeld / 60, 1) : 0;
+  const chargePct = (onGround && _spaceHeld > 0)
+    ? Math.min(_spaceHeld / JUMP_CHARGE_FRAMES, 1)
+    : 0;
   if (_cachedCbFill) {
     _cachedCbFill.style.width = `${Math.round(chargePct * 100)}%`;
   }
@@ -1408,11 +1538,14 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     _cachedCbBar.classList.toggle('charged', chargePct >= 0.95);
   }
   if (_cachedCbValue) {
-    _cachedCbValue.textContent = chargePct > 0 ? `${Math.round(chargePct * 100)}%` : 'Ready';
+    _cachedCbValue.textContent = onGround
+      ? (chargePct > 0 ? `${Math.round(chargePct * 100)}%` : 'Ready')
+      : 'Air';
   }
 
-  // ── Gravity ───────────────────────────────────────────────────────
-  fpVy -= 0.018 * frameScale;
+  // ── Gravity (asymmetric: fall faster than rise) ───────────────────
+  const g = fpVy > 0 ? GRAVITY_RISE : GRAVITY_FALL;
+  fpVy -= g * frameScale;
   let newY = fpPos.y + fpVy * frameScale;
 
   // ── Collision ─────────────────────────────────────────────────────
@@ -1465,6 +1598,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
           newY = box.yBottom - 0.2 - HEAD_EXTRA;
           fpVy = -0.05;
           _spaceHeld = 0;
+          _isJumping = false;
         } else {
           // Push out in local space, then rotate back to world
           const dist = Math.sqrt(distSq) || 0.001;
@@ -1510,6 +1644,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
         newY = box.yBottom - 0.2 - HEAD_EXTRA;
         fpVy = -0.05;
         _spaceHeld = 0;
+        _isJumping = false;
       } else {
         // XZ push-out
         const pushXL = box.xMax + r - nx;
@@ -1539,6 +1674,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     fpPos.y = ceilMax;
     fpVy = -0.05;
     _spaceHeld = 0;
+    _isJumping = false;
     if (hitVy > 0.05) {
       bonkedThisFrame = true;
       bonkIntensity = Math.max(bonkIntensity, hitVy * 1.2);
@@ -1757,8 +1893,7 @@ function _bindInputs() {
         setCamMode();
         break;
       case 'KeyR':
-        _respawn();
-        coins.fullReset();
+        _resetRun();
         if (_showToast) _showToast('Reset!');
         break;
       case 'KeyG':
