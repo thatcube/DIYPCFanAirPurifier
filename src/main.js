@@ -1175,6 +1175,10 @@ function animate(ts) {
         holdFrames: gameFp.getJumpHoldFrames(),
         modelKey: catAppearance.catModelKey
       });
+      // Click-interaction nod — exaggerated bend-in-half bow when the
+      // player clicks on something interactive. Layered on top of the
+      // jump deform so it works mid-air too.
+      catAnimation.applyClickNod(ts, catAppearance.catModelKey);
     }
   }
 
