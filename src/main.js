@@ -515,7 +515,6 @@ function _refreshBababooeyCardLockState() {
     : 'Locked — go Super Saiyan to unlock';
   if (!unlocked && _selectedModel === 'bababooey') {
     _selectedModel = 'classic';
-  _refreshBababooeyCardLockState();
   }
 }
 
@@ -551,6 +550,7 @@ window._openCharSelect = () => {
   // apply the selection highlights below.
   _refreshSpeedPillLockState();
   _refreshTotodileCardLockState();
+  _refreshBababooeyCardLockState();
   // Highlight the previously selected model (or classic on first open)
   document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
   const activeCard = document.querySelector(`.char-card[data-model="${_selectedModel}"]`);
@@ -576,16 +576,6 @@ document.getElementById('charSelect')?.addEventListener('keydown', e => {
     window._closeCharSelect();
   }
 });
-
-  if (model === 'bababooey' && !catAppearance.isBababooeyUnlocked()) {
-    if (el) {
-      el.classList.remove('shake');
-      void el.offsetWidth;
-      el.classList.add('shake');
-    }
-    showToast('Bababooey locked — go Super Saiyan to unlock');
-    return;
-  }
 if (_PLAY_PATH_AUTO_OPEN) {
   setTimeout(() => {
     if (!gameFp.fpMode) window._openCharSelect();
@@ -620,6 +610,15 @@ window._selectCat = (model, el) => {
       el.classList.add('shake');
     }
     showToast('Totodile locked — beat the game in under 2:00 to unlock');
+    return;
+  }
+  if (model === 'bababooey' && !catAppearance.isBababooeyUnlocked()) {
+    if (el) {
+      el.classList.remove('shake');
+      void el.offsetWidth;
+      el.classList.add('shake');
+    }
+    showToast('Bababooey locked — go Super Saiyan to unlock');
     return;
   }
   _selectedModel = model;
