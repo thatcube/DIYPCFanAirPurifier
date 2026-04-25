@@ -57,7 +57,7 @@ export const TBL_W = 24;
 export const TBL_D = 14;
 export const TBL_H = 27;
 export const TBL_X = BED_X + BED_W / 2 + TBL_W / 2 + 3; // ≈ -3.7
-export const TBL_Z = BACK_WALL_Z - 0.5 - TBL_D / 2 - 2;  // ≈ 39.5
+export const TBL_Z = BACK_WALL_Z - 0.5 - TBL_D / 2 - 0.75;  // ≈ 40.75 (3/4" gap to back wall)
 
 // ── Window ──────────────────────────────────────────────────────────
 export const WIN_W = 36;   // opening width in Z

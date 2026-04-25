@@ -805,9 +805,43 @@ window._toggleIsolate = () => {
 };
 
 // ── Orbit mode keyboard camera ──────────────────────────────────────
-// W/S = tilt up/down, A/D = rotate left/right around the target.
+// Default (orbit): W/S tilt up/down, A/D rotate around target.
+// Fly mode (toggle with F): WASD moves freely relative to look direction,
+// Space = up, Shift = down, hold Ctrl for 3× sprint. Mouse drag still
+// looks around (OrbitControls). No collision, no altitude cap — you can
+// fly through walls, above the ceiling, anywhere.
 
-const _camKeys = { w: false, a: false, s: false, d: false };
+const _camKeys = {
+  w: false, a: false, s: false, d: false,
+  space: false, shift: false, ctrl: false,
+};
+let _flyMode = false;
+// Saved orbit limits so we can restore them when exiting fly mode.
+const _orbitSaved = {
+  maxPolarAngle: controls.maxPolarAngle,
+  minDistance: controls.minDistance,
+  maxDistance: controls.maxDistance,
+};
+
+function setFlyMode(on) {
+  _flyMode = !!on;
+  if (_flyMode) {
+    // Open up the orbit limits so you can look straight up and fly far.
+    controls.maxPolarAngle = Math.PI;       // allow looking fully up/down
+    controls.minDistance = 0.01;            // get right up to things
+    controls.maxDistance = 100000;          // essentially unbounded
+    showToast('Fly mode ON — WASD + Space/Shift, Ctrl to sprint, F to exit');
+  } else {
+    controls.maxPolarAngle = _orbitSaved.maxPolarAngle;
+    controls.minDistance = _orbitSaved.minDistance;
+    controls.maxDistance = _orbitSaved.maxDistance;
+    showToast('Fly mode OFF');
+  }
+  // Clear any stuck keys so we don't keep drifting.
+  _camKeys.w = _camKeys.a = _camKeys.s = _camKeys.d = false;
+  _camKeys.space = _camKeys.shift = _camKeys.ctrl = false;
+}
+
 document.addEventListener('keydown', e => {
   if (gameFp.fpMode) return;
   if (leaderboard.isNameDialogOpen()) return;
@@ -815,15 +849,36 @@ document.addEventListener('keydown', e => {
   if (cs && cs.classList.contains('open')) return;
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+  const code = e.code;
   const k = e.key.toLowerCase();
+  if (k === 'f' && !e.repeat && !e.metaKey && !e.altKey) {
+    setFlyMode(!_flyMode);
+    e.preventDefault();
+    return;
+  }
   if (k === 'w' || k === 'a' || k === 's' || k === 'd') {
     _camKeys[k] = true;
     e.preventDefault();
+    return;
+  }
+  if (_flyMode) {
+    if (code === 'Space') { _camKeys.space = true; e.preventDefault(); }
+    else if (code === 'ShiftLeft' || code === 'ShiftRight') { _camKeys.shift = true; }
+    else if (code === 'ControlLeft' || code === 'ControlRight') { _camKeys.ctrl = true; }
   }
 });
 document.addEventListener('keyup', e => {
+  const code = e.code;
   const k = e.key.toLowerCase();
   if (k === 'w' || k === 'a' || k === 's' || k === 'd') _camKeys[k] = false;
+  if (code === 'Space') _camKeys.space = false;
+  if (code === 'ShiftLeft' || code === 'ShiftRight') _camKeys.shift = false;
+  if (code === 'ControlLeft' || code === 'ControlRight') _camKeys.ctrl = false;
+});
+// If we lose focus (alt-tab, devtools), release all keys.
+window.addEventListener('blur', () => {
+  _camKeys.w = _camKeys.a = _camKeys.s = _camKeys.d = false;
+  _camKeys.space = _camKeys.shift = _camKeys.ctrl = false;
 });
 
 // ── Render loop ─────────────────────────────────────────────────────
@@ -832,6 +887,11 @@ let _lastFrameTs = 0;
 let _fpsFrames = 0;
 let _fpsLast = performance.now();
 let _lastCoinDomUpdate = 0;
+
+// Scratch vectors for fly-mode translation (avoid per-frame allocs)
+const _flyFwd = new THREE.Vector3();
+const _flyRight = new THREE.Vector3();
+const _flyMove = new THREE.Vector3();
 
 // Cached DOM refs for per-frame updates
 const _elRunTimer = document.getElementById('runTimerText');
@@ -852,13 +912,40 @@ function animate(ts) {
   // Controls (only in orbit mode)
   if (!gameFp.fpMode) {
     controls.update();
-    // WASD orbit: A/D rotate around target, W/S tilt up/down
-    if (_camKeys.w || _camKeys.a || _camKeys.s || _camKeys.d) {
-      const rotSpd = 0.025; // radians per frame
-      if (_camKeys.a) controls.rotateLeft(rotSpd);
-      if (_camKeys.d) controls.rotateLeft(-rotSpd);
-      if (_camKeys.w) controls.rotateUp(rotSpd);
-      if (_camKeys.s) controls.rotateUp(-rotSpd);
+    if (_flyMode) {
+      // Free-fly: translate both camera AND orbit target along the
+      // camera's look direction so mouse-drag rotation still works.
+      // WASD = forward/back/strafe (relative to look, full 3D incl. pitch).
+      // Space / Shift = world up / down. Ctrl = 3× sprint.
+      const baseSpd = 60; // inches per second (room is ~175" wide)
+      const sprint = _camKeys.ctrl ? 3.0 : 1.0;
+      const spd = baseSpd * sprint * dtSec;
+      if (_camKeys.w || _camKeys.s || _camKeys.a || _camKeys.d ||
+          _camKeys.space || _camKeys.shift) {
+        const fwd = _flyFwd.subVectors(controls.target, camera.position);
+        const fwdLen = fwd.length();
+        if (fwdLen > 1e-4) fwd.multiplyScalar(1 / fwdLen);
+        else fwd.set(0, 0, -1);
+        const right = _flyRight.crossVectors(fwd, camera.up).normalize();
+        _flyMove.set(0, 0, 0);
+        if (_camKeys.w) _flyMove.addScaledVector(fwd, spd);
+        if (_camKeys.s) _flyMove.addScaledVector(fwd, -spd);
+        if (_camKeys.d) _flyMove.addScaledVector(right, spd);
+        if (_camKeys.a) _flyMove.addScaledVector(right, -spd);
+        if (_camKeys.space) _flyMove.y += spd;
+        if (_camKeys.shift) _flyMove.y -= spd;
+        camera.position.add(_flyMove);
+        controls.target.add(_flyMove);
+      }
+    } else {
+      // Orbit: A/D rotate around target, W/S tilt up/down.
+      if (_camKeys.w || _camKeys.a || _camKeys.s || _camKeys.d) {
+        const rotSpd = 0.025; // radians per frame
+        if (_camKeys.a) controls.rotateLeft(rotSpd);
+        if (_camKeys.d) controls.rotateLeft(-rotSpd);
+        if (_camKeys.w) controls.rotateUp(rotSpd);
+        if (_camKeys.s) controls.rotateUp(-rotSpd);
+      }
     }
   }
 
