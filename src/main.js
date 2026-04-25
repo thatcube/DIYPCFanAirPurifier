@@ -415,6 +415,34 @@ let _selectedColor = 'charcoal';
 let _selectedMode = gameFp.isSpeedMode() ? 'speed' : 'normal';
 const _PLAY_PATH_AUTO_OPEN = /^\/play\/?$/.test(window.location.pathname);
 
+// Refresh the speed-mode pill's locked/unlocked state + progress label every
+// time the character select opens. The unlock progresses across runs.
+function _refreshSpeedPillLockState() {
+  const speedPill = document.querySelector('.mode-pill[data-mode="speed"]');
+  if (!speedPill) return;
+  const unlocked = coins.hasFoundAllSecrets();
+  const found = coins.getSecretFoundCount();
+  const total = coins.getSecretTotal();
+  speedPill.classList.toggle('locked', !unlocked);
+  speedPill.setAttribute('aria-disabled', unlocked ? 'false' : 'true');
+  // Swap the icon: lightning when unlocked, padlock when locked.
+  const icon = speedPill.querySelector('i');
+  if (icon) icon.className = unlocked ? 'ph ph-lightning' : 'ph ph-lock-simple';
+  const sub = speedPill.querySelector('.mode-pill__sub');
+  if (sub) {
+    sub.textContent = unlocked
+      ? '3× top speed · +12 coins'
+      : `Find all secret coins to unlock (${found}/${total})`;
+  }
+  speedPill.title = unlocked
+    ? 'Speed Mode: 3× top speed, 12 extra floating coins'
+    : `Find all ${total} secret coins to unlock Speed Mode (${found}/${total} found)`;
+  // If currently selected but no longer allowed, snap back to Normal.
+  if (!unlocked && _selectedMode === 'speed') {
+    _selectedMode = 'normal';
+  }
+}
+
 let _previewsInited = false;
 let _charSelectFocusTrap = null;
 let _charSelectSavedFocus = null;
@@ -450,6 +478,9 @@ window._openCharSelect = () => {
   const colorSection = document.getElementById('classicColors');
   if (colorSection) colorSection.style.visibility = _selectedModel === 'classic' ? 'visible' : 'hidden';
   // Highlight current mode
+  document.querySelectorAll('.mode-pill').forEach(p => p.classList.toggle('on', p.dataset.mode === _selectedMode));
+  // Refresh Speed Mode lock state + progress label
+  _refreshSpeedPillLockState();
   document.querySelectorAll('.mode-pill').forEach(p => p.classList.toggle('on', p.dataset.mode === _selectedMode));
 };
 

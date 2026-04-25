@@ -44,9 +44,33 @@ const SPEED_MODE_KEY = 'diy_air_purifier_speed_mode_v1';
 let _speedMode = false;
 try { _speedMode = localStorage.getItem(SPEED_MODE_KEY) === '1'; } catch (e) {}
 
-export function isSpeedMode() { return !!_speedMode; }
+// ── Secret-coin "ever found" persistence (unlock gate for Speed Mode) ──
+const SECRET_FOUND_KEY = 'diy_air_purifier_secrets_found_v1';
+const _secretFoundIds = new Set();
+try {
+  const raw = localStorage.getItem(SECRET_FOUND_KEY);
+  if (raw) {
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) for (const id of arr) if (typeof id === 'string') _secretFoundIds.add(id);
+  }
+} catch (e) {}
+
+export function getSecretFoundCount() { return _secretFoundIds.size; }
+export function getSecretTotal() { return TOTAL_SECRETS; }
+export function hasFoundAllSecrets() { return _secretFoundIds.size >= TOTAL_SECRETS; }
+function _markSecretFound(id) {
+  if (!id || _secretFoundIds.has(id)) return;
+  _secretFoundIds.add(id);
+  try { localStorage.setItem(SECRET_FOUND_KEY, JSON.stringify([..._secretFoundIds])); } catch (e) {}
+}
+
+export function isSpeedMode() {
+  // Speed mode is gated behind finding every secret coin at least once.
+  return !!_speedMode && hasFoundAllSecrets();
+}
 export function setSpeedMode(enabled) {
-  _speedMode = !!enabled;
+  // Refuse to enable speed mode until all secrets have been found.
+  _speedMode = !!enabled && hasFoundAllSecrets();
   try { localStorage.setItem(SPEED_MODE_KEY, _speedMode ? '1' : '0'); } catch (e) {}
   _applyQuickCoinMode();
 }
@@ -590,8 +614,14 @@ export function updateCoins(ts, playerPos) {
         c.mesh.visible = false;
         if (c.secret) {
           coinSecretScore++;
+          const wasComplete = hasFoundAllSecrets();
+          _markSecretFound(c.id);
           playChime(true);
-          _showToast('Secret coin found!');
+          if (!wasComplete && hasFoundAllSecrets()) {
+            _showToast('All secrets found — Speed Mode unlocked!');
+          } else {
+            _showToast('Secret coin found!');
+          }
         } else {
           coinScore++;
           playChime(false);
