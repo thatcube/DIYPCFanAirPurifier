@@ -542,15 +542,39 @@ async function getNormalizedLeaderboard(db, cfg) {
 
 async function pruneLeaderboard(db, cfg, normalizedRows) {
   const keepIds = new Set((normalizedRows || []).map((row) => row.id));
-  const scanLimit = Math.max(cfg.LB_MAX * cfg.LB_PER_PLAYER * 8, 300);
-  const rows = await db
-    .prepare(`SELECT id FROM leaderboard_entries ORDER BY time_ms ASC, at_ms ASC LIMIT ?`)
-    .bind(scanLimit)
+
+  // Preserve every distinct player's single best entry, even if it doesn't
+  // fit in the displayed leaderboard. New people who finish a run always
+  // get at least one row in the DB regardless of their time. Group by
+  // stable player_id when present, falling back to display name for legacy
+  // rows with no playerId.
+  const allRows = await db
+    .prepare(
+      `SELECT id, name, time_ms, at_ms, player_id
+       FROM leaderboard_entries ORDER BY time_ms ASC, at_ms ASC`
+    )
     .all();
 
+  const bestPerPlayer = new Map();
+  for (const row of allRows.results || []) {
+    if (!row) continue;
+    const id = String(row.id || '').trim();
+    if (!id) continue;
+    const playerId = sanitizePlayerId(row.player_id);
+    const name = sanitizeName(row.name || '', DEFAULTS.MAX_NAME_LEN);
+    const key = playerId ? `id:${playerId}` : `name:${name}`;
+    if (!key || key === 'name:') continue;
+    // Rows are already ordered by (time_ms ASC, at_ms ASC), so the first
+    // row we see per key is that player's best run.
+    if (!bestPerPlayer.has(key)) bestPerPlayer.set(key, id);
+  }
+  for (const id of bestPerPlayer.values()) keepIds.add(id);
+
   const toDelete = [];
-  for (const row of rows.results || []) {
-    if (!keepIds.has(String(row.id))) toDelete.push(String(row.id));
+  for (const row of allRows.results || []) {
+    const id = String(row.id || '');
+    if (!id) continue;
+    if (!keepIds.has(id)) toDelete.push(id);
   }
 
   if (!toDelete.length) return;

@@ -1353,8 +1353,12 @@ export function createRoom(scene) {
   // (+X far, -Z, +Z), a hardwood floor, and a ceiling.
   const _grXmin = 51;              // shared wall (existing sideWall/hallWallR)
   const _grXmax = 183;             // new far wall (132" deep — matches main)
-  const _grZmin = -30;             // new "-Z" wall
-  const _grZmax = 130;             // new "+Z" wall (160" wide — "a bit wider")
+  // The closet protrudes from the main bedroom's side wall into pre-mirror
+  // X=51..87, Z=-78..-14. Keep _grZmin >= -14 so the guest room's -Z wall
+  // doesn't clip through the closet body. -13 gives a 1" clearance and lets
+  // the closet's +Z exterior face sit flush just outside the guest room.
+  const _grZmin = -13;             // new "-Z" wall (clears closet at Z=-14)
+  const _grZmax = 130;             // new "+Z" wall (143" wide)
   const _grCenterX = (_grXmin + _grXmax) / 2;
   const _grCenterZ = (_grZmin + _grZmax) / 2;
   const _grWidthX  = _grXmax - _grXmin; // 132
@@ -2440,22 +2444,25 @@ export function createRoom(scene) {
   const frameT=0.8, frameD=0.6;
   const wallInnerX = leftWallX + 0.25;
   const trimX = wallInnerX + frameD / 2 + 0.04; // back face ~0.04" proud of wall
+  // NOTE: trim pieces intentionally do NOT get _isWindow — only the outdoor
+  // backdrop (the actual glass area visible through the opening) should be
+  // clickable for the day/night toggle.
   // Top
   const wft=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT, winW+frameT*2), frameMat);
-  wft.position.set(trimX, winTop+frameT/2, winCenterZ); wft._isRoom=true; wft._isWindow=true; addRoom(wft);
+  wft.position.set(trimX, winTop+frameT/2, winCenterZ); wft._isRoom=true; addRoom(wft);
   // Bottom (apron) — sits BELOW the sill so it doesn't z-fight with it.
   // Sill spans Y=[winBottom-0.5, winBottom]; place apron top flush with sill bottom.
   const wfb=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT, winW+frameT*2), frameMat);
-  wfb.position.set(trimX, winBottom-0.5-frameT/2, winCenterZ); wfb._isRoom=true; wfb._isWindow=true; addRoom(wfb);
+  wfb.position.set(trimX, winBottom-0.5-frameT/2, winCenterZ); wfb._isRoom=true; addRoom(wfb);
   // Left (toward outside)
   const wfl=new THREE.Mesh(new THREE.BoxGeometry(frameD, winH, frameT), frameMat);
-  wfl.position.set(trimX, winCenterY, winFront-frameT/2); wfl._isRoom=true; wfl._isWindow=true; addRoom(wfl);
+  wfl.position.set(trimX, winCenterY, winFront-frameT/2); wfl._isRoom=true; addRoom(wfl);
   // Right (toward inside)
   const wfr=new THREE.Mesh(new THREE.BoxGeometry(frameD, winH, frameT), frameMat);
-  wfr.position.set(trimX, winCenterY, winBack+frameT/2); wfr._isRoom=true; wfr._isWindow=true; addRoom(wfr);
+  wfr.position.set(trimX, winCenterY, winBack+frameT/2); wfr._isRoom=true; addRoom(wfr);
   // Horizontal mullion (center bar)
   const wfm=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT*0.6, winW), frameMat);
-  wfm.position.set(trimX, winCenterY, winCenterZ); wfm._isRoom=true; wfm._isWindow=true; addRoom(wfm);
+  wfm.position.set(trimX, winCenterY, winCenterZ); wfm._isRoom=true; addRoom(wfm);
   
   // Outdoor scene visible through window — same composition for day + night.
   const _clouds = [[80,90,60,25],[200,70,80,30],[350,100,55,20],[430,60,70,28]];
