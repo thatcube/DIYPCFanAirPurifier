@@ -79,6 +79,43 @@ export function createPurifier(scene) {
     osc.stop(now + dur + 0.02);
   }
 
+  function _playDoorCue(opening, intensity = 1) {
+    if (_sfxMuted) return;
+    const ac = _ensureUiSfxAC();
+    if (!ac) return;
+    const now = ac.currentTime;
+    const vol = Math.max(0.4, Math.min(1.25, intensity));
+
+    // Main wooden swing body.
+    const body = ac.createOscillator();
+    const bodyGain = ac.createGain();
+    const bodyDur = 0.12;
+    body.type = 'triangle';
+    body.frequency.setValueAtTime(opening ? 120 : 170, now);
+    body.frequency.exponentialRampToValueAtTime(opening ? 178 : 114, now + bodyDur);
+    bodyGain.gain.setValueAtTime(0.0001, now);
+    bodyGain.gain.linearRampToValueAtTime(0.010 * vol, now + 0.014);
+    bodyGain.gain.exponentialRampToValueAtTime(0.0001, now + bodyDur);
+    body.connect(bodyGain).connect(ac.destination);
+    body.start(now);
+    body.stop(now + bodyDur + 0.02);
+
+    // Quick latch click so open/close has a crisp endpoint.
+    const latch = ac.createOscillator();
+    const latchGain = ac.createGain();
+    const latchStart = now + (opening ? 0.05 : 0.032);
+    const latchDur = 0.04;
+    latch.type = 'square';
+    latch.frequency.setValueAtTime(opening ? 760 : 980, latchStart);
+    latch.frequency.exponentialRampToValueAtTime(opening ? 520 : 640, latchStart + latchDur);
+    latchGain.gain.setValueAtTime(0.0001, latchStart);
+    latchGain.gain.linearRampToValueAtTime(0.0046 * vol, latchStart + 0.006);
+    latchGain.gain.exponentialRampToValueAtTime(0.0001, latchStart + latchDur);
+    latch.connect(latchGain).connect(ac.destination);
+    latch.start(latchStart);
+    latch.stop(latchStart + latchDur + 0.02);
+  }
+
   // Kibble-pouring sound — short burst of filtered noise to simulate
   // dry food hitting a metal/plastic bowl
   function _playFoodPourSfx() {
@@ -1999,7 +2036,10 @@ export function createPurifier(scene) {
     if(!obj) return;
     // Clicked corner door (handle or panel — the whole leaf opens/closes)
     if(obj._isCornerDoorHandle||obj._isCornerDoor){
-      if(_toggleCornerDoor) _toggleCornerDoor();
+      if(_toggleCornerDoor){
+        const isOpen = _toggleCornerDoor();
+        _playDoorCue(!!isOpen, 1);
+      }
       if(_fpMode) spawnSecretCornerDoorCoin();
       return;
     }
@@ -2109,6 +2149,7 @@ export function createPurifier(scene) {
       if(!leaf) return;
       if(_bifoldLerps.some(bl=>bl.leaf===leaf)) return;
       leaf._leafOpen=!leaf._leafOpen;
+      _playDoorCue(leaf._leafOpen, 0.78);
       // Fold angle: 80° gives a nicely open V without panels intersecting.
       const openAng=80*Math.PI/180;
       leaf._leafTarget=leaf._leafOpen ? openAng : 0;

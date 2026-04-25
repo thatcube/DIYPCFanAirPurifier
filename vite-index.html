@@ -327,6 +327,11 @@
           <span class="mode-pill__label">Speed</span>
           <span class="mode-pill__sub">3× top speed · +12 coins</span>
         </button>
+        <button type="button" class="mode-pill" data-mode="skate" onclick="window._selectMode&&window._selectMode('skate',this)">
+          <i class="ph ph-sneaker-move"></i>
+          <span class="mode-pill__label">Skate</span>
+          <span class="mode-pill__sub">Ride a board · sideways stance</span>
+        </button>
       </div>
       <button class="char-start glass-btn glass-btn--primary" onclick="window._startGame&&window._startGame()">Start run</button>
     </div>
@@ -365,6 +370,7 @@
       <div><kbd>Space</kbd> Jump (hold to charge)</div>
       <div><kbd>Shift</kbd> Sprint</div>
       <div><kbd>V</kbd> Toggle first/third person</div>
+      <div><kbd>K</kbd> Toggle skate mode</div>
       <div><kbd>R</kbd> Reset run</div>
       <div><kbd>H</kbd> Toggle this panel</div>
       <div><kbd>G</kbd> Exit game</div>
@@ -454,6 +460,11 @@
                 <input type="range" id="fpPauseMouseSens" class="pause-range" min="0.25" max="2.5" step="0.05" value="1" aria-label="Mouse sensitivity" oninput="window._setMouseSens&&window._setMouseSens(this.value)">
                 <span class="pause-toggle-state" id="fpPauseMouseSensVal">1.00×</span>
               </div>
+              <div class="pause-toggle-row">
+                <span class="pause-toggle-label"><i class="ph ph-sneaker-move"></i> Skate mode</span>
+                <div class="toggle-sw" id="fpPauseSkateMode" role="switch" aria-checked="false" onclick="window._toggleSkateMode&&window._toggleSkateMode()"></div>
+                <span class="pause-toggle-state off" id="fpPauseSkateModeState">Off</span>
+              </div>
             </div>
           </section>
 
@@ -465,6 +476,7 @@
               <div><kbd>Space</kbd> Jump (hold)</div>
               <div><kbd>Shift</kbd> Sprint</div>
               <div><kbd>V</kbd> Camera</div>
+              <div><kbd>K</kbd> Skate mode</div>
               <div><kbd>R</kbd> Reset run</div>
               <div><kbd>Esc</kbd> Resume</div>
             </div>

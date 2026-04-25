@@ -966,6 +966,7 @@ export function createRoom(scene) {
     _cornerDoorOpen = (typeof forceOpen==='boolean') ? forceOpen : !_cornerDoorOpen;
     if(_cornerDoorAnim) cancelAnimationFrame(_cornerDoorAnim);
     _cornerDoorAnim=requestAnimationFrame(_stepCornerDoor);
+    return _cornerDoorOpen;
   }
   
   // Collect all back wall + recess meshes for fading
@@ -1341,6 +1342,7 @@ export function createRoom(scene) {
       _open = (typeof forceOpen === 'boolean') ? forceOpen : !_open;
       if (_anim) cancelAnimationFrame(_anim);
       _anim = requestAnimationFrame(_step);
+      return _open;
     };
   }
 

@@ -39,18 +39,73 @@ import {
 // Toast notifications
 const _toast = document.createElement('div');
 _toast.className = 'toast';
-_toast.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-12px);opacity:0;pointer-events:none;z-index:10001;background:rgba(8,12,18,0.88);color:#d9f3ff;border:1px solid rgba(145,222,255,0.35);border-radius:14px;padding:9px 16px;font-family:var(--font-ui);font-size:12px;font-weight:700;letter-spacing:0.4px;backdrop-filter:blur(16px);box-shadow:0 12px 32px rgba(0,0,0,0.35);transition:opacity 0.3s cubic-bezier(0.16,1,0.3,1),transform 0.4s cubic-bezier(0.34,1.56,0.64,1)';
+const _TOAST_TRANSITION = [
+  'opacity 0.28s cubic-bezier(0.16,1,0.3,1)',
+  'transform 0.44s cubic-bezier(0.34,1.56,0.64,1)',
+  'filter 0.44s cubic-bezier(0.16,1,0.3,1)'
+].join(',');
+_toast.style.cssText = `position:fixed;left:50%;top:34px;transform:translate(-50%, -18%) scale(0.5);transform-origin:50% 50%;opacity:0;filter:blur(8px);pointer-events:none;z-index:10001;background:rgba(8,12,18,0.88);color:#d9f3ff;border:1px solid rgba(145,222,255,0.35);border-radius:14px;padding:9px 16px;font-family:var(--font-ui);font-size:12px;font-weight:700;letter-spacing:0.4px;text-align:center;max-width:min(84vw,560px);backdrop-filter:blur(16px);box-shadow:0 12px 32px rgba(0,0,0,0.35);will-change:transform,opacity,filter;transition:${_TOAST_TRANSITION}`;
 document.body.appendChild(_toast);
 let _toastTimer = null;
+let _toastRaf = 0;
+
+function _getToastPose() {
+  const hudContainer = document.querySelector('#fpHud .run-hud-center');
+  const timerHud = document.getElementById('runTimerHud');
+  const anchorEl = (hudContainer && hudContainer.getClientRects().length > 0)
+    ? hudContainer
+    : ((timerHud && timerHud.getClientRects().length > 0) ? timerHud : null);
+  if (anchorEl) {
+    const rect = anchorEl.getBoundingClientRect();
+    const gapPx = Math.max(8, Math.round(rect.height * 0.18));
+    const emergeTravelPx = Math.max(16, Math.round(rect.height * 0.62));
+    return {
+      left: rect.left + (rect.width * 0.5),
+      top: rect.bottom + gapPx,
+      origin: '50% 0%',
+      seed: `translate(-50%, ${-emergeTravelPx}px) scale(0.24)`,
+      enter: 'translate(-50%, 0px) scale(1)',
+      exit: 'translate(-50%, 14px) scale(0.9)'
+    };
+  }
+  return {
+    left: window.innerWidth * 0.5,
+    top: 34,
+    origin: '50% 50%',
+    seed: 'translate(-50%, -18%) scale(0.5)',
+    enter: 'translate(-50%, -50%) scale(1)',
+    exit: 'translate(-50%, -76%) scale(0.92)'
+  };
+}
 
 function showToast(text) {
+  const pose = _getToastPose();
   _toast.textContent = text || '';
-  _toast.style.opacity = '1';
-  _toast.style.transform = 'translateX(-50%) translateY(0)';
+  _toast.style.left = `${pose.left}px`;
+  _toast.style.top = `${pose.top}px`;
+  _toast.style.transformOrigin = pose.origin;
+
+  // Restart animation from a compressed, blurred state so the toast
+  // appears to bloom out of the timer instead of popping over it.
+  _toast.style.transition = 'none';
+  _toast.style.opacity = '0';
+  _toast.style.filter = 'blur(8px)';
+  _toast.style.transform = pose.seed;
+  void _toast.offsetWidth;
+  _toast.style.transition = _TOAST_TRANSITION;
+
+  if (_toastRaf) cancelAnimationFrame(_toastRaf);
+  _toastRaf = requestAnimationFrame(() => {
+    _toast.style.opacity = '1';
+    _toast.style.filter = 'blur(0px)';
+    _toast.style.transform = pose.enter;
+  });
+
   if (_toastTimer) clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => {
     _toast.style.opacity = '0';
-    _toast.style.transform = 'translateX(-50%) translateY(-8px)';
+    _toast.style.filter = 'blur(5px)';
+    _toast.style.transform = pose.exit;
   }, 1800);
 }
 
@@ -420,7 +475,7 @@ if (roomRefs && typeof roomRefs.setMacbookMuted === 'function') {
 // Character select screen
 let _selectedModel = 'classic';
 let _selectedColor = 'charcoal';
-let _selectedMode = gameFp.isSpeedMode() ? 'speed' : 'normal';
+let _selectedMode = gameFp.isSpeedMode() ? 'speed' : (gameFp.isSkateMode() ? 'skate' : 'normal');
 const _PLAY_PATH_AUTO_OPEN = /^\/play\/?$/.test(window.location.pathname);
 
 // Refresh the speed-mode pill's locked/unlocked state + progress label every
@@ -552,6 +607,8 @@ window._openCharSelect = () => {
     // moment the modal opens, without waiting for the next rAF tick.
     requestAnimationFrame(() => flushPreviewsOnOpen());
   }
+  // Match character-select mode chips to the current gameplay mode flags.
+  _selectedMode = gameFp.isSpeedMode() ? 'speed' : (gameFp.isSkateMode() ? 'skate' : 'normal');
   // Refresh lock states FIRST — they may downgrade _selectedModel /
   // _selectedMode (e.g. snap totodile→classic, speed→normal) before we
   // apply the selection highlights below.
@@ -646,7 +703,8 @@ window._selectColor = (color, el) => {
 };
 
 window._selectMode = (mode, el) => {
-  const wantSpeed = mode === 'speed';
+  const nextMode = mode === 'speed' ? 'speed' : (mode === 'skate' ? 'skate' : 'normal');
+  const wantSpeed = nextMode === 'speed';
   if (wantSpeed && !coins.hasFoundAllSecrets()) {
     // Locked — give a quick shake + toast and bail.
     if (el) {
@@ -660,7 +718,7 @@ window._selectMode = (mode, el) => {
     showToast(`Speed Mode locked — find all secret coins to unlock (${found}/${total})`);
     return;
   }
-  _selectedMode = wantSpeed ? 'speed' : 'normal';
+  _selectedMode = nextMode;
   document.querySelectorAll('.mode-pill').forEach(p => p.classList.toggle('on', p.dataset.mode === _selectedMode));
 };
 
@@ -677,8 +735,10 @@ window._startGame = () => {
   }
   // Apply movement / coin mode
   const speed = _selectedMode === 'speed';
+  const skate = _selectedMode === 'skate';
   gameFp.setSpeedMode(speed);
   coins.setSpeedMode(speed);
+  gameFp.setSkateMode(skate, { silent: true });
   // Reload cat model with new selection
   catAnimation.loadGameplayCat({
     applyCatColorToModel: catAnimation.applyColorToAll
@@ -746,6 +806,7 @@ window._toggleMuteMusic = (checked) => {
 window._syncAudioUi = () => gameFp.syncAudioToggleUi();
 window._switchCamFP = () => gameFp.setCamMode();
 window._setMouseSens = (v) => gameFp.setMouseSens(v);
+window._toggleSkateMode = () => gameFp.setSkateMode(!gameFp.isSkateMode());
 window._playAgain = () => {
   leaderboard.closeFinishDialog();
   leaderboard.hideShareButton();
@@ -1193,22 +1254,30 @@ function animate(ts) {
     // doesn't depend on frame timing, so it's perfectly stable at any FPS.
     // gameFp.getHorizSpeed() returns inches/sec from the internal _velX/_velZ.
     const svel = gameFp.fpMode ? gameFp.getHorizSpeed() : 0;
+    const skateIdleOnly = gameFp.fpMode && gameFp.isSkateMode();
     const animDt = dtSec * catAnimSpeed;
     const st = catAnimation.catMixer.userData || (catAnimation.catMixer.userData = {});
 
-    if (!Number.isFinite(st._moveBlend)) st._moveBlend = svel > 2 ? 1 : 0;
-    let targetMove = st._moveBlend;
-    if (svel > 2.5) targetMove = 1;
-    else if (svel < 1.0) targetMove = 0;
-    const moveEase = 1 - Math.exp(-animDt * 9.5);
-    st._moveBlend += (targetMove - st._moveBlend) * moveEase;
-    const moveBlend = Math.max(0, Math.min(1, st._moveBlend));
+    let moveBlend = 0;
+    let idleBlend = 1;
+    if (skateIdleOnly) {
+      st._moveBlend = 0;
+      st._idleProceduralBlend = 1;
+    } else {
+      if (!Number.isFinite(st._moveBlend)) st._moveBlend = svel > 2 ? 1 : 0;
+      let targetMove = st._moveBlend;
+      if (svel > 2.5) targetMove = 1;
+      else if (svel < 1.0) targetMove = 0;
+      const moveEase = 1 - Math.exp(-animDt * 9.5);
+      st._moveBlend += (targetMove - st._moveBlend) * moveEase;
+      moveBlend = Math.max(0, Math.min(1, st._moveBlend));
 
-    if (!Number.isFinite(st._idleProceduralBlend)) st._idleProceduralBlend = 0;
-    const idleTarget = Math.max(0, Math.min(1, 1 - moveBlend));
-    const idleEase = 1 - Math.exp(-animDt * 7.0);
-    st._idleProceduralBlend += (idleTarget - st._idleProceduralBlend) * idleEase;
-    const idleBlend = Math.max(0, Math.min(1, st._idleProceduralBlend));
+      if (!Number.isFinite(st._idleProceduralBlend)) st._idleProceduralBlend = 0;
+      const idleTarget = Math.max(0, Math.min(1, 1 - moveBlend));
+      const idleEase = 1 - Math.exp(-animDt * 7.0);
+      st._idleProceduralBlend += (idleTarget - st._idleProceduralBlend) * idleEase;
+      idleBlend = Math.max(0, Math.min(1, st._idleProceduralBlend));
+    }
 
     const sprintMult = Math.max(1, Number(preset.sprintAnimMult) || 1);
     const sprinting = gameFp.fpMode && gameFp.fpKeys.shift && svel > 6;
@@ -1232,21 +1301,40 @@ function animate(ts) {
     }
 
     if (hasWalkClip && hasIdleClip) {
-      const walkW = Math.min(1, svel / 15) * moveBlend;
-      catAnimation.catWalkAction.weight = walkW;
-      catAnimation.catIdleAction.weight = (1 - walkW) * moveBlend;
-      catAnimation.catIdleAction.paused = false;
+      if (skateIdleOnly) {
+        catAnimation.catWalkAction.weight = 0;
+        catAnimation.catWalkAction.paused = true;
+        catAnimation.catIdleAction.weight = 1;
+        catAnimation.catIdleAction.paused = false;
+      } else {
+        const walkW = Math.min(1, svel / 15) * moveBlend;
+        catAnimation.catWalkAction.weight = walkW;
+        catAnimation.catIdleAction.weight = (1 - walkW) * moveBlend;
+        catAnimation.catIdleAction.paused = false;
+      }
     } else if (hasWalkClip && !isBababooey) {
-      // If there's no dedicated idle clip, freeze the walk loop when stationary.
+      // If there's no dedicated idle clip, freeze the walk loop when
+      // stationary. For toon in skate mode, also freeze the walk clip so it
+      // does not look like running-in-place on the board.
       catAnimation.catWalkAction.weight = 1;
-      catAnimation.catWalkAction.paused = moveBlend < 0.03;
+      const freezeWalkInSkate = skateIdleOnly && catAppearance.catModelKey === 'toon';
+      if (skateIdleOnly && !freezeWalkInSkate) {
+        catAnimation.catWalkAction.paused = false;
+        const idleTs = 0.2;
+        const curTs = Number(catAnimation.catWalkAction.timeScale) || idleTs;
+        catAnimation.catWalkAction.timeScale += (idleTs - curTs) * Math.min(1, dtSec * 8);
+      } else {
+        catAnimation.catWalkAction.paused = freezeWalkInSkate || moveBlend < 0.03;
+      }
     }
 
     if (isBababooey) {
       if (!Number.isFinite(st._bababooeyRunBlend)) st._bababooeyRunBlend = 0;
-      const runTarget = Math.min(1, svel / 15) * moveBlend;
-      const runEaseUp = 1 - Math.exp(-dtSec * 3.8);
-      const runEaseDown = 1 - Math.exp(-dtSec * 8.5);
+      // Bababooey's "ball roll" is sprint-only and should be stable.
+      // Keep target deterministic to avoid speed-driven jitter.
+      const runTarget = skateIdleOnly ? 0 : (sprinting ? 1 : 0) * moveBlend;
+      const runEaseUp = 1 - Math.exp(-dtSec * 8.6);
+      const runEaseDown = 1 - Math.exp(-dtSec * 9.0);
       const runEase = runTarget > st._bababooeyRunBlend ? runEaseUp : runEaseDown;
       st._bababooeyRunBlend += (runTarget - st._bababooeyRunBlend) * runEase;
       const runBlend = Math.max(0, Math.min(1, st._bababooeyRunBlend));
@@ -1264,7 +1352,7 @@ function animate(ts) {
     // Bababooey keeps subtle bounce motion at idle; other cats pause clip
     // playback and rely on procedural idle when not moving.
     let mixerDt = animDt;
-    if (!isBababooey) mixerDt *= moveBlend;
+    if (!isBababooey && !skateIdleOnly) mixerDt *= moveBlend;
     catAnimation.catMixer.update(Math.max(0, mixerDt));
 
     if (idleBlend < 0.2) catAnimation.refreshGameplayIdleBasePose();
@@ -1286,12 +1374,17 @@ function animate(ts) {
     // of the breathing baseline.
     if (isTotodile) {
       if (!Number.isFinite(st._totodileRunBlend)) st._totodileRunBlend = 0;
-      const totoRunTarget = Math.min(1, svel / 15) * moveBlend;
-      const totoRunEaseUp = 1 - Math.exp(-dtSec * 3.6);
-      const totoRunEaseDown = 1 - Math.exp(-dtSec * 8.0);
-      const totoRunEase = totoRunTarget > st._totodileRunBlend ? totoRunEaseUp : totoRunEaseDown;
-      st._totodileRunBlend += (totoRunTarget - st._totodileRunBlend) * totoRunEase;
-      const totoRunBlend = Math.max(0, Math.min(1, st._totodileRunBlend));
+      let totoRunBlend = 0;
+      if (!skateIdleOnly) {
+        const totoRunTarget = Math.min(1, svel / 15) * moveBlend;
+        const totoRunEaseUp = 1 - Math.exp(-dtSec * 3.6);
+        const totoRunEaseDown = 1 - Math.exp(-dtSec * 8.0);
+        const totoRunEase = totoRunTarget > st._totodileRunBlend ? totoRunEaseUp : totoRunEaseDown;
+        st._totodileRunBlend += (totoRunTarget - st._totodileRunBlend) * totoRunEase;
+        totoRunBlend = Math.max(0, Math.min(1, st._totodileRunBlend));
+      } else {
+        st._totodileRunBlend = 0;
+      }
 
       if (idleBlend > 0.001) {
         catAnimation.applyTotodileProceduralIdle(ts, idleBlend);
@@ -1302,6 +1395,11 @@ function animate(ts) {
 
     // Reset position/rotation to base each frame
     if (gameFp.fpMode) {
+      // Apply skate lift late so any procedural pass that touches model
+      // position (e.g., bababooey run reset path) can't wipe it out.
+      if (gameFp.isSkateMode() && catAnimation.catModel) {
+        catAnimation.catModel.position.y += gameFp.getSkateModelLift();
+      }
       catAnimation.applyGameplayJumpDeform({
         dtSec,
         vy: gameFp.fpVy,
