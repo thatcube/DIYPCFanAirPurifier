@@ -84,6 +84,19 @@ const babaBase  = { left: null, right: null, up: null, down: null, mid: null };
 const toonLegBones = {};
 const toonLegBase  = {};
 
+// Totodile bone refs (humanoid biped rig from the Pokémon FBX import).
+// Bone names like "LThigh_05", "RForeArm_033", "Tail1_017", "Jaw_029".
+const totoBones = {
+  hips: null, waist: null, spine: null, neck: null, head: null, jaw: null,
+  tail1: null, tail2: null,
+  lThigh: null, lLeg: null, lFoot: null, lToe: null,
+  rThigh: null, rLeg: null, rFoot: null, rToe: null,
+  lShoulder: null, lArm: null, lForeArm: null, lHand: null,
+  rShoulder: null, rArm: null, rForeArm: null, rHand: null
+};
+const totoBase = {};
+for (const k in totoBones) totoBase[k] = null;
+
 // Preview state
 let previewRenderer = null;
 let previewScene    = null;
@@ -355,6 +368,37 @@ function _collectIdleBones(model) {
 
   for (const k in babaBones) { babaBones[k] = null; babaBase[k] = null; }
   for (const k in toonLegBones) { toonLegBones[k] = null; toonLegBase[k] = null; }
+  for (const k in totoBones) { totoBones[k] = null; totoBase[k] = null; }
+
+  // Totodile bone-name → key. Match against the leading semantic
+  // segment so trailing FBX node-id suffixes (e.g. "_05", "_011") are
+  // ignored. All matches are anchored at start of bone name.
+  const totoMap = {
+    hips:      /^Hips(_|$)/i,
+    waist:     /^Waist(_|$)/i,
+    spine:     /^Spine(_|$)/i,
+    neck:      /^Neck(_|$)/i,
+    head:      /^Head(_|$)/i,
+    jaw:       /^Jaw(_|$)/i,
+    tail1:     /^Tail1(_|$)/i,
+    tail2:     /^Tail2(_|$)/i,
+    lThigh:    /^LThigh(_|$)/i,
+    lLeg:      /^LLeg(_|$)/i,
+    lFoot:     /^LFoot(_|$)/i,
+    lToe:      /^LToe(_|$)/i,
+    rThigh:    /^RThigh(_|$)/i,
+    rLeg:      /^RLeg(_|$)/i,
+    rFoot:     /^RFoot(_|$)/i,
+    rToe:      /^RToe(_|$)/i,
+    lShoulder: /^LShoulder(_|$)/i,
+    lArm:      /^LArm(_|$)/i,
+    lForeArm:  /^LForeArm(_|$)/i,
+    lHand:     /^LHand(_|$)/i,
+    rShoulder: /^RShoulder(_|$)/i,
+    rArm:      /^RArm(_|$)/i,
+    rForeArm:  /^RForeArm(_|$)/i,
+    rHand:     /^RHand(_|$)/i
+  };
 
   model.traverse(o => {
     if (!o || !o.isBone) return;
@@ -378,6 +422,12 @@ function _collectIdleBones(model) {
     for (const k in toonMap) {
       if (toonLegBones[k] == null && toonMap[k].test(n)) {
         toonLegBones[k] = o; toonLegBase[k] = o.quaternion.clone();
+      }
+    }
+    // Totodile bones
+    for (const k in totoMap) {
+      if (totoBones[k] == null && totoMap[k].test(n)) {
+        totoBones[k] = o; totoBase[k] = o.quaternion.clone();
       }
     }
   });
