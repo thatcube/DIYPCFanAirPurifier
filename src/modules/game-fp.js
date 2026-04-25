@@ -672,11 +672,28 @@ function _buildStaticBoxes() {
   // Closet shelf
   {
     const shelfCx = SIDE_WALL_X + cD - 0.5 - 0.1 - 7; // 79.4
+    const shelfLen = cIW - 1;
+    const shelfZMin = cZ - shelfLen / 2;
     _staticBoxes.push({
       xMin: -(shelfCx + 7), xMax: -(shelfCx - 7),
-      zMin: cZ - (cIW - 1) / 2, zMax: cZ + (cIW - 1) / 2,
+      zMin: cZ - shelfLen / 2, zMax: cZ + shelfLen / 2,
       yTop: fy + cIH - 24 + 0.4, yBottom: fy + cIH - 24 - 0.4, room: true
     });
+    // Three vertical dividers splitting the shelf into 4 sections.
+    // Match the geometry in room.js: divThick=0.6, full height from
+    // just above the shelf top to just below the closet ceiling, and
+    // X-extent equal to the shelf depth.
+    const divThick = 0.6;
+    const divBotY = fy + cIH - 24 + 0.4;
+    const divTopY = fy + cIH - 0.5;
+    for (let i = 1; i <= 3; i++) {
+      const zC = shelfZMin + (shelfLen * i / 4);
+      _staticBoxes.push({
+        xMin: -(shelfCx + 7), xMax: -(shelfCx - 7),
+        zMin: zC - divThick / 2, zMax: zC + divThick / 2,
+        yTop: divTopY, yBottom: divBotY, room: true
+      });
+    }
   }
   // Clothes rod
   {

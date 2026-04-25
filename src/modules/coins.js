@@ -433,10 +433,14 @@ function _spawnSpeedModeCoins() {
     new THREE.Vector3( -25, fy + 44,  15),  // 7. very high near closet-wall edge
     new THREE.Vector3(  -5, fy + 10,  35),  // 8. low between bed & nightstand area
     new THREE.Vector3(  40, fy + 50,   5),  // 9. ceiling-light height, mid-room
-    // ── Closet — three coins inside the closet at varying heights ──
-    new THREE.Vector3( -65, fy + 12, -35),  // 10. low, closet front
-    new THREE.Vector3( -78, fy + 30, -55),  // 11. mid-height, closet back-left
-    new THREE.Vector3( -70, fy + 50, -20),  // 12. high in closet near front-right
+    // ── Closet — three coins sitting on the upper shelf, in 3 of the 4 sections ──
+    // Shelf top Y ≈ fy + 56.4 (interiorH 80 - drop 24 + 0.4 half-thickness).
+    // Shelf X spans world -86.4 .. -72.4 (centered at -79.4).
+    // Section centers along Z (shelfZMin=-77.5, sectionW=15.75):
+    //   sec1=-69.625, sec2=-53.875, sec3=-38.125, sec4=-22.375.
+    new THREE.Vector3( -79.4, fy + 58.9, -69.6),  // 10. shelf section 1 (back-left)
+    new THREE.Vector3( -79.4, fy + 58.9, -53.9),  // 11. shelf section 2
+    new THREE.Vector3( -79.4, fy + 58.9, -22.4),  // 12. shelf section 4 (front-right)
   ];
   // Apply a small per-session jitter so positions feel "random" but stay
   // inside their hand-picked safe pockets.
