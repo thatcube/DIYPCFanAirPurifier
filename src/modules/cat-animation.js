@@ -1130,8 +1130,7 @@ export function applyClickNod(ts, modelKey) {
       { bone: totoBones.waist, weight: 0.12 },
       { bone: totoBones.spine, weight: 0.24 },
       { bone: totoBones.neck, weight: 0.28 },
-      { bone: totoBones.head, weight: 0.30 },
-      { bone: totoBones.jaw, weight: 0.06 }
+      { bone: totoBones.head, weight: 0.36 }
     ]);
   } else {
     const spineTargets = [];
@@ -1244,7 +1243,7 @@ function _totoApplyModelPitch(bone, baseQ, pitch, strength) {
 
 /**
  * Totodile idle: slow breathing in the spine, soft head sway, lazy
- * tail swish, and a barely-there jaw chomp. Designed to feel like a
+ * tail swish, and relaxed arm sway. Designed to feel like a
  * little Pokémon waiting for its trainer.
  *
  * @param {number} ts - timestamp in ms
@@ -1269,12 +1268,6 @@ export function applyTotodileProceduralIdle(ts, intensity) {
   catModel.updateMatrixWorld(true);
   _totoApplyModelPitch(totoBones.neck, totoBase.neck, headPitch * 0.45, 0.7);
   _totoApplyModelPitch(totoBones.head, totoBase.head, headPitch, 0.75);
-
-  // Jaw — tiny periodic chomp.
-  if (totoBones.jaw) {
-    const chomp = Math.max(0, Math.sin(t * 0.7) - 0.85) * 8.0;
-    _totoApply(totoBones.jaw, totoBase.jaw, chomp * 0.45 * k, 0, 0, 0.8);
-  }
 
   // Tail — wave with phase delay so Tail2 trails Tail1.
   const tailWave1 = Math.sin(t * 1.3) * k;
