@@ -504,7 +504,7 @@ input[type=range]::-moz-range-thumb {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 14px;
+  padding: 12px 14px;
   background-color: var(--glass);
   background-image: var(--glass-specular);
   border: 1px solid rgba(170, 220, 255, 0.26);
@@ -539,7 +539,7 @@ input[type=range]::-moz-range-thumb {
    999px pill so the short label below doesn't look crammed. */
 .run-pill--combo:has(.run-pill__fps:not([hidden])) {
   border-radius: 22px;
-  padding: 10px 16px;
+  padding: 14px 16px;
 }
 .run-pill__icon { font-size: 18px; color: rgba(207, 236, 255, 0.85); }
 .run-pill__icon--gold { color: #ffd700; font-size: 20px; }
@@ -1036,6 +1036,41 @@ input[type=range]::-moz-range-thumb {
 }
 .pause-toggle-state.off { color: rgba(255,183,183,0.86); }
 
+/* Slider row (mouse sensitivity) */
+.pause-toggle-row--slider { flex-wrap: wrap; row-gap: 6px; }
+.pause-range {
+  flex: 1 1 120px;
+  margin-left: auto;
+  min-width: 100px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255,255,255,0.14);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+  accent-color: #5cd8ff;
+}
+.pause-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #9fe3ff;
+  border: 1px solid rgba(9,13,20,0.6);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  cursor: pointer;
+}
+.pause-range::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #9fe3ff;
+  border: 1px solid rgba(9,13,20,0.6);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  cursor: pointer;
+}
+.pause-range:focus-visible { box-shadow: 0 0 0 2px rgba(159,227,255,0.5); }
+
 /* Inline button (e.g. Camera cycle) inside a toggle row */
 .pause-inline-btn {
   display: inline-flex; align-items: center; gap: 6px;
@@ -1156,6 +1191,49 @@ input[type=range]::-moz-range-thumb {
 .name-dialog-actions {
   display: flex; justify-content: flex-end; gap: 8px;
 }
+
+/* ─── Test-run indicator ─────────────────────────────────────────── */
+.run-pill__test-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #ffd27a;
+  background: rgba(255, 170, 40, 0.14);
+  border: 1px solid rgba(255, 200, 90, 0.5);
+  text-shadow: 0 1px 6px rgba(255, 170, 40, 0.35);
+  animation: testBadgePulse 2.2s ease-in-out infinite;
+}
+.run-pill__test-badge i { font-size: 13px; }
+@keyframes testBadgePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,170,40,0.0); }
+  50%      { box-shadow: 0 0 0 4px rgba(255,170,40,0.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .run-pill__test-badge { animation: none; }
+}
+#finishDialogTestBanner {
+  margin: 0 0 12px 0;
+  padding: 9px 14px;
+  border-radius: 10px;
+  font-family: var(--font-ui, system-ui);
+  font-size: 13px;
+  line-height: 1.35;
+  color: #ffd27a;
+  background: rgba(255, 170, 40, 0.10);
+  border: 1px solid rgba(255, 200, 90, 0.45);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#finishDialogTestBanner i { font-size: 16px; }
+#finishDialogTestBanner strong { letter-spacing: 0.1em; }
 
 /* ─── Finish Dialog ──────────────────────────────────────────────── */
 #finishDialogOverlay {
@@ -1316,6 +1394,38 @@ input[type=range]::-moz-range-thumb {
 #finishDialogList li.own-current .tm { color: var(--gold); }
 #finishDialogList li.pending {
   border-style: dashed;
+}
+#finishDialogList li.pending .tm { color: rgba(255, 216, 115, 0.85); }
+#finishDialogList li.pending .rk-pending {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+.finishRankSkel {
+  display: inline-block;
+  width: 28px;
+  height: 12px;
+  border-radius: 5px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 216, 115, 0.12) 0%,
+    rgba(255, 216, 115, 0.42) 50%,
+    rgba(255, 216, 115, 0.12) 100%
+  );
+  background-size: 200% 100%;
+  animation: finishRankShimmer 1.1s linear infinite;
+}
+.finishRankSkel--row {
+  width: 22px;
+  height: 10px;
+}
+@keyframes finishRankShimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .finishRankSkel { animation: none; opacity: 0.55; }
 }
 .finishDialogRowNameInput {
   width: 100%;

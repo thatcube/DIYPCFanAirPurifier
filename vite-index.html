@@ -394,6 +394,18 @@
             </div>
           </section>
 
+          <!-- Controls -->
+          <section class="pause-section">
+            <h3 class="pause-section-title"><i class="ph ph-mouse"></i> Controls</h3>
+            <div class="pause-toggles">
+              <div class="pause-toggle-row pause-toggle-row--slider">
+                <span class="pause-toggle-label"><i class="ph ph-arrows-out-cardinal"></i> Mouse sensitivity</span>
+                <input type="range" id="fpPauseMouseSens" class="pause-range" min="0.25" max="2.5" step="0.05" value="1" aria-label="Mouse sensitivity" oninput="window._setMouseSens&&window._setMouseSens(this.value)">
+                <span class="pause-toggle-state" id="fpPauseMouseSensVal">1.00×</span>
+              </div>
+            </div>
+          </section>
+
           <!-- Keyboard shortcuts -->
           <section class="pause-section pause-section--kbd">
             <h3 class="pause-section-title"><i class="ph ph-keyboard"></i> Keyboard</h3>

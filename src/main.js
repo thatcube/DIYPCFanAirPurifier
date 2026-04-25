@@ -525,13 +525,17 @@ window._resumeFP = () => gameFp.setPaused(false);
 window._resetFP = () => {
   leaderboard.closeFinishDialog();
   leaderboard.hideShareButton();
+  // If not in FP yet, fall back to the character-select entry path.
+  if (!gameFp.fpMode) {
+    leaderboard.resetTimer();
+    coins.fullReset();
+    window._openCharSelect();
+    return;
+  }
+  // In-place reset: stay in FP, restart timer, respawn, reset coins.
   gameFp.releasePauseFocusTrap();
-  gameFp.clearPauseState();
-  leaderboard.resetTimer();
-  coins.fullReset();
-  void leaderboard.startSharedRun();
-  gameFp.toggleFirstPerson();
-  setTimeout(() => window._openCharSelect(), 100);
+  gameFp.setPaused(false);
+  gameFp.resetRun();
 };
 window._exitFP = () => {
   // Close any overlays first
@@ -565,6 +569,7 @@ window._toggleMuteMusic = (checked) => {
 };
 window._syncAudioUi = () => gameFp.syncAudioToggleUi();
 window._switchCamFP = () => gameFp.setCamMode();
+window._setMouseSens = (v) => gameFp.setMouseSens(v);
 window._playAgain = () => {
   leaderboard.closeFinishDialog();
   leaderboard.hideShareButton();
