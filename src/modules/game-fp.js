@@ -220,6 +220,8 @@ let _ssActiveUntilTs = 0;     // ts at which the active window ends (0 = not act
 let _ssBurstStartTs = 0;      // ts when SS activated (drives ~3s burst flash at start of active window)
 const SS_BURST_MS = 3000;     // duration of the post-activation burst
 const SS_CHARGE_HINT_MS = 2500; // ms into a full-charge hold before subtle aura starts hinting
+let _ssChargeShake = 0;       // smoothed 0..1 shake strength while holding full charge
+const _ssShakeOffset = new THREE.Vector3();
 
 export function isSuperSaiyanActive() {
   return _ssActiveUntilTs > 0 && performance.now() < _ssActiveUntilTs;
@@ -319,6 +321,20 @@ function _applySuperSaiyan(strength /* 0..1 sustained */, burst /* 0..1 transien
       }
     }
   });
+}
+
+function _sampleSuperSaiyanChargeShake(ts, strength, out = _ssShakeOffset) {
+  const k = Math.max(0, Math.min(1, strength));
+  if (k <= 0.0001) return out.set(0, 0, 0);
+  // Keep early shake subtle and spike noticeably near activation.
+  const amp = 0.04 + 0.38 * (k * k);
+  const t = ts * 0.001;
+  out.set(
+    (Math.sin(t * 47.3) + 0.45 * Math.sin(t * 93.1 + 1.7)) * 0.5 * amp,
+    (Math.sin(t * 58.9 + 0.4) + 0.35 * Math.sin(t * 117.2 + 2.3)) * 0.34 * amp,
+    (Math.sin(t * 52.6 + 2.1) + 0.5 * Math.sin(t * 88.4 + 0.9)) * 0.5 * amp
+  );
+  return out;
 }
 
 const HUD_IDLE_CONTROLS_MS = 1400;
@@ -1437,6 +1453,8 @@ function _respawn() {
   _ssFullChargeSinceTs = 0;
   _ssActiveUntilTs = 0;
   _ssBurstStartTs = 0;
+  _ssChargeShake = 0;
+  _ssShakeOffset.set(0, 0, 0);
 }
 
 // Reset all run-affecting world state (drawers, doors, purifier filters,
@@ -1764,9 +1782,11 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   {
     const atFullCharge = onGround && chargePct >= 0.999;
     let chargingStrength = 0;
+    let preActivationShake = 0;
     if (atFullCharge) {
       if (_ssFullChargeSinceTs === 0) _ssFullChargeSinceTs = ts;
       const heldMs = ts - _ssFullChargeSinceTs;
+      preActivationShake = Math.min(1, heldMs / SS_HOLD_MS);
       // After 2.5s of full-charge hold, ramp a subtle aura 0 → ~0.4 over
       // the remaining hold window so the player sees something building.
       if (!isSuperSaiyanActive() && heldMs > SS_CHARGE_HINT_MS) {
@@ -1805,6 +1825,9 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
         burst = k * k;
       }
     }
+    const shakeTarget = (!active && atFullCharge) ? preActivationShake : 0;
+    const shakeLerp = 1 - Math.exp(-Math.max(0, dtSec) * 18);
+    _ssChargeShake += (shakeTarget - _ssChargeShake) * shakeLerp;
     _applySuperSaiyan(baseStrength, burst, ts);
   }
 
@@ -2062,6 +2085,12 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       if (_catGroup.parent !== _scene) _scene.add(_catGroup);
       _catGroup.visible = true;
       _catGroup.position.set(fpPos.x, fpPos.y - 4.0, fpPos.z);
+      if (_ssChargeShake > 0.0001) {
+        const shake = _sampleSuperSaiyanChargeShake(ts, _ssChargeShake);
+        _catGroup.position.x += shake.x;
+        _catGroup.position.y += shake.y;
+        _catGroup.position.z += shake.z;
+      }
 
       // Face movement direction
       const moveLenSq = _velX * _velX + _velZ * _velZ;

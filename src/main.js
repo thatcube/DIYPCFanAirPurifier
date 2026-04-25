@@ -1245,7 +1245,9 @@ function animate(ts) {
     if (isBababooey) {
       if (!Number.isFinite(st._bababooeyRunBlend)) st._bababooeyRunBlend = 0;
       const runTarget = Math.min(1, svel / 15) * moveBlend;
-      const runEase = 1 - Math.exp(-dtSec * 5.0);
+      const runEaseUp = 1 - Math.exp(-dtSec * 3.8);
+      const runEaseDown = 1 - Math.exp(-dtSec * 8.5);
+      const runEase = runTarget > st._bababooeyRunBlend ? runEaseUp : runEaseDown;
       st._bababooeyRunBlend += (runTarget - st._bababooeyRunBlend) * runEase;
       const runBlend = Math.max(0, Math.min(1, st._bababooeyRunBlend));
       if (hasWalkClip) catAnimation.catWalkAction.weight *= (1 - runBlend);
@@ -1268,9 +1270,9 @@ function animate(ts) {
     if (idleBlend < 0.2) catAnimation.refreshGameplayIdleBasePose();
     if (idleBlend > 0.001 && !isTotodile) catAnimation.applyGameplayProceduralIdle(ts, idleBlend);
 
-    if (isBababooey && moveBlend > 0.001) {
+    if (isBababooey) {
       const runBlend = Number(st._bababooeyRunBlendSmoothed) || 0;
-      if (runBlend > 0.001) catAnimation.applyBababooeyProceduralRun(ts, svel, runBlend);
+      catAnimation.applyBababooeyProceduralRun(ts, svel, runBlend);
     }
 
     // Bababooey idle squish
@@ -1283,13 +1285,19 @@ function animate(ts) {
     // standing still still has subtle motion and running rides on top
     // of the breathing baseline.
     if (isTotodile) {
+      if (!Number.isFinite(st._totodileRunBlend)) st._totodileRunBlend = 0;
+      const totoRunTarget = Math.min(1, svel / 15) * moveBlend;
+      const totoRunEaseUp = 1 - Math.exp(-dtSec * 3.6);
+      const totoRunEaseDown = 1 - Math.exp(-dtSec * 8.0);
+      const totoRunEase = totoRunTarget > st._totodileRunBlend ? totoRunEaseUp : totoRunEaseDown;
+      st._totodileRunBlend += (totoRunTarget - st._totodileRunBlend) * totoRunEase;
+      const totoRunBlend = Math.max(0, Math.min(1, st._totodileRunBlend));
+
       if (idleBlend > 0.001) {
         catAnimation.applyTotodileProceduralIdle(ts, idleBlend);
         catAnimation.applyTotodileIdleSquish(ts, idleBlend);
       }
-      if (moveBlend > 0.001) {
-        catAnimation.applyTotodileProceduralRun(ts, svel, moveBlend);
-      }
+      catAnimation.applyTotodileProceduralRun(ts, svel, totoRunBlend);
     }
 
     // Reset position/rotation to base each frame
