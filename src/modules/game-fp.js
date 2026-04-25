@@ -181,6 +181,7 @@ const _doorEuler = new THREE.Euler();
 const _macWP = new THREE.Vector3();
 const _macBB = new THREE.Box3();
 const _macSz = new THREE.Vector3();
+const _knobWP = new THREE.Vector3();
 let _macScreenBBCached = false;
 let _macScreenHW = 0, _macScreenHH = 0;
 
@@ -718,23 +719,28 @@ function _buildStaticBoxes() {
   });
 
   // Corner-door recess structure (door by the nightstand).
-  // Keep only the actual wall pieces static; the swinging door panel itself
-  // is added as dynamic collision in _getBoxes().
+  // Extrusion front face at Z=29 (pre-mirror; recessDepth=20) has door hole
+  // X=15..47; solid flanks X=11..15 and X=47..51. After X-mirror these
+  // become world X -15..-11 and -51..-47. Header solid above Y=doorH=68.
+  // Recess side wall (returnWallL) at pre-mirror X=11 spans Z=28.75..49.
   _staticBoxes.push(
-    // Left return wall into the recess
-    { xMin: -11.25, xMax: -10.75, zMin: 18.75, zMax: 49, yTop: fy + WALL_HEIGHT, room: true },
-    // Front face left of the doorway opening
-    { xMin: -15, xMax: -11, zMin: 18.75, zMax: 19.25, yTop: fy + WALL_HEIGHT, room: true },
-    // Front face right of the doorway opening
-    { xMin: -51, xMax: -47, zMin: 18.75, zMax: 19.25, yTop: fy + WALL_HEIGHT, room: true }
+    // Recess return wall (X=-11, Z=28.75..49)
+    { xMin: -11.25, xMax: -10.75, zMin: 28.75, zMax: 49, yTop: fy + WALL_HEIGHT, room: true },
+    // Front face left of doorway (world X=-15..-11, Z=28.75..29.25)
+    { xMin: -15, xMax: -11, zMin: 28.75, zMax: 29.25, yTop: fy + WALL_HEIGHT, room: true },
+    // Front face right of doorway (world X=-51..-47, Z=28.75..29.25)
+    { xMin: -51, xMax: -47, zMin: 28.75, zMax: 29.25, yTop: fy + WALL_HEIGHT, room: true },
+    // Header above door on extrusion front (Y=68..ceiling)
+    { xMin: -47, xMax: -15, zMin: 28.75, zMax: 29.25,
+      yBottom: fy + 68, yTop: fy + WALL_HEIGHT, room: true }
   );
 
-  // ── Back wall solid flanks at Z=49 (around the hallway doorway) ──
-  // Pre-mirror the back wall spans X=-81..51 with a doorway hole at X=15..47.
-  // After mirror, the solid flanks sit at world X=-15..81 and -51..-47.
+  // ── Back wall solid flanks at Z=49 (around the 40" hallway opening) ──
+  // Pre-mirror the back wall spans X=-81..51 with a full-height hole at
+  // X=11..51 (flush with right/side wall). After mirror, solid flank at
+  // world X=-11..81; the other side has zero width and is omitted.
   _staticBoxes.push(
-    { xMin: -15, xMax: 81, zMin: 48.75, zMax: 49.25, yTop: fy + WALL_HEIGHT, room: true },
-    { xMin: -51, xMax: -47, zMin: 48.75, zMax: 49.25, yTop: fy + WALL_HEIGHT, room: true }
+    { xMin: -11, xMax: 81, zMin: 48.75, zMax: 49.25, yTop: fy + WALL_HEIGHT, room: true }
   );
 
   // ── Hallway walls (20 ft extension past the bedroom door) ──
@@ -748,6 +754,23 @@ function _buildStaticBoxes() {
     // End wall at Z=_hallZEnd
     { xMin: -51.5, xMax: -10.5, zMin: hzEnd, zMax: hzEnd + 0.5, yTop: fy + WALL_HEIGHT, room: true }
   );
+
+  // ── Guest room walls (behind the hallway's +X door) ──
+  // Pre-mirror footprint X=51..183, Z=-30..130. Shared -X wall is the
+  // existing bedroom/hallway right wall (already in _staticBoxes via the
+  // sideWall + hallWallR blocks); we only collide the three new walls here.
+  // World X = -183..-51 after mirror.
+  {
+    const gXmin = 51, gXmax = 183, gZmin = -30, gZmax = 130;
+    _staticBoxes.push(
+      // Far wall (pre-mirror X=183..183.5)
+      { xMin: -gXmax - 0.5, xMax: -gXmax, zMin: gZmin - 0.5, zMax: gZmax + 0.5, yTop: fy + WALL_HEIGHT, room: true },
+      // -Z wall (pre-mirror Z=-30.5..-30) spans full interior X range.
+      { xMin: -gXmax, xMax: -gXmin, zMin: gZmin - 0.5, zMax: gZmin, yTop: fy + WALL_HEIGHT, room: true },
+      // +Z wall (pre-mirror Z=130..130.5) spans full interior X range.
+      { xMin: -gXmax, xMax: -gXmin, zMin: gZmax, zMax: gZmax + 0.5, yTop: fy + WALL_HEIGHT, room: true }
+    );
+  }
 }
 
 // ── Get collision boxes (per-frame) ─────────────────────────────────
@@ -951,6 +974,32 @@ function _getBoxes() {
     }
   }
 
+  // Guest door (bedroom right wall, past extrusion) — dynamic OBB collision.
+  if (_roomRefs && _roomRefs.getGuestDoorPanelMesh) {
+    const gPanel = _roomRefs.getGuestDoorPanelMesh();
+    if (gPanel && gPanel.parent) {
+      gPanel.updateMatrixWorld(true);
+      gPanel.getWorldPosition(_doorWP);
+      gPanel.getWorldQuaternion(_doorWQ);
+      _doorEuler.setFromQuaternion(_doorWQ, 'YXZ');
+      const gAngle = -_doorEuler.y;
+      const gHeight = 68 - 0.5;
+      result.push({
+        cx: _doorWP.x,
+        cz: _doorWP.z,
+        hw: (32 - 1) / 2,
+        hd: 1.4 / 2 + 0.12,
+        angle: gAngle,
+        cosA: Math.cos(-gAngle), sinA: Math.sin(-gAngle),
+        cosB: Math.cos(gAngle), sinB: Math.sin(gAngle),
+        yTop: _doorWP.y + gHeight / 2,
+        yBottom: _doorWP.y - gHeight / 2,
+        obb: true,
+        room: true
+      });
+    }
+  }
+
   // MacBook open lid — thin wall matching the screen overlay mesh exactly
   if (_roomRefs && _roomRefs.getMacbookScreenMesh) {
     const scrMesh = _roomRefs.getMacbookScreenMesh();
@@ -1032,6 +1081,26 @@ function _getBoxes() {
           yTop: wy + hh, yBottom: wy - hh
         });
       }
+    }
+  }
+
+  // Door knobs — standardized buildDoorKnob() groups (corner door + hallway
+  // doors). Give each one a small AABB around the ball so the player can
+  // jump up and land on top of them. Ball center is at knob-local (0,0,1.5)
+  // with radius ~1.0.
+  if (_roomRefs && _roomRefs.doorKnobs) {
+    for (const knob of _roomRefs.doorKnobs) {
+      if (!knob || !knob.parent) continue;
+      knob.updateMatrixWorld(true);
+      _knobWP.set(0, 0, 1.5);
+      knob.localToWorld(_knobWP);
+      const r = 1.05;
+      result.push({
+        xMin: _knobWP.x - r, xMax: _knobWP.x + r,
+        zMin: _knobWP.z - r, zMax: _knobWP.z + r,
+        yTop: _knobWP.y + r, yBottom: _knobWP.y - r,
+        room: true
+      });
     }
   }
 

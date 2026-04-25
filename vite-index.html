@@ -346,41 +346,63 @@
       <div class="pause-layout">
         <!-- Left: controls -->
         <div class="pause-left">
-          <h2>Paused</h2>
-          <p class="pause-sub">Timer keeps running...</p>
-          <div class="pause-grid">
-            <button class="pause-btn glass-btn glass-btn--primary" onclick="window._resumeFP&&window._resumeFP()"><i class="ph-fill ph-play"></i> Resume</button>
+          <header class="pause-header">
+            <h2>Paused</h2>
+            <p class="pause-sub">Timer keeps running...</p>
+          </header>
+
+          <!-- Primary actions -->
+          <div class="pause-primary">
+            <button class="pause-btn glass-btn glass-btn--primary" onclick="window._resumeFP&&window._resumeFP()"><i class="ph-fill ph-play"></i> Resume <kbd class="pause-btn-key">Esc</kbd></button>
+            <button class="pause-btn glass-btn" onclick="window._resetFP&&window._resetFP()"><i class="ph ph-arrow-counter-clockwise"></i> Reset run <kbd class="pause-btn-key">R</kbd></button>
             <button class="pause-btn glass-btn glass-btn--danger" onclick="window._exitFP&&window._exitFP()"><i class="ph ph-sign-out"></i> Exit</button>
           </div>
-          <div class="pause-toggles">
-            <div class="pause-toggle-row">
-              <span class="pause-toggle-label"><i class="ph-fill ph-speaker-high"></i> SFX</span>
-              <div class="toggle-sw on" id="fpPauseMuteSfx" role="switch" aria-checked="true" onclick="this.classList.toggle('on');window._toggleMuteSfx&&window._toggleMuteSfx(!this.classList.contains('on'))"></div>
-              <span class="pause-toggle-state" id="fpPauseMuteSfxState">On</span>
+
+          <!-- Audio -->
+          <section class="pause-section">
+            <h3 class="pause-section-title"><i class="ph ph-speaker-high"></i> Audio</h3>
+            <div class="pause-toggles">
+              <div class="pause-toggle-row">
+                <span class="pause-toggle-label"><i class="ph-fill ph-speaker-high"></i> SFX</span>
+                <div class="toggle-sw on" id="fpPauseMuteSfx" role="switch" aria-checked="true" onclick="this.classList.toggle('on');window._toggleMuteSfx&&window._toggleMuteSfx(!this.classList.contains('on'))"></div>
+                <span class="pause-toggle-state" id="fpPauseMuteSfxState">On</span>
+              </div>
+              <div class="pause-toggle-row">
+                <span class="pause-toggle-label"><i class="ph-fill ph-music-notes"></i> Music</span>
+                <div class="toggle-sw on" id="fpPauseMuteMusic" role="switch" aria-checked="true" onclick="this.classList.toggle('on');window._toggleMuteMusic&&window._toggleMuteMusic(!this.classList.contains('on'))"></div>
+                <span class="pause-toggle-state" id="fpPauseMuteMusicState">On</span>
+              </div>
             </div>
-            <div class="pause-toggle-row">
-              <span class="pause-toggle-label"><i class="ph-fill ph-music-notes"></i> Music</span>
-              <div class="toggle-sw on" id="fpPauseMuteMusic" role="switch" aria-checked="true" onclick="this.classList.toggle('on');window._toggleMuteMusic&&window._toggleMuteMusic(!this.classList.contains('on'))"></div>
-              <span class="pause-toggle-state" id="fpPauseMuteMusicState">On</span>
+          </section>
+
+          <!-- Display -->
+          <section class="pause-section">
+            <h3 class="pause-section-title"><i class="ph ph-monitor"></i> Display</h3>
+            <div class="pause-toggles">
+              <div class="pause-toggle-row">
+                <span class="pause-toggle-label"><i class="ph ph-camera-rotate"></i> Camera</span>
+                <button type="button" class="pause-inline-btn" onclick="window._switchCamFP&&window._switchCamFP()"><span id="fpPauseCamLabel">Third person</span> <kbd>V</kbd></button>
+              </div>
+              <div class="pause-toggle-row">
+                <span class="pause-toggle-label"><i class="ph ph-gauge"></i> Show FPS</span>
+                <div class="toggle-sw" id="fpPauseShowFps" role="switch" aria-checked="false" onclick="window._toggleFps&&window._toggleFps()"></div>
+                <span class="pause-toggle-state off" id="fpPauseShowFpsState">Off</span>
+              </div>
             </div>
-            <div class="pause-toggle-row">
-              <span class="pause-toggle-label"><i class="ph ph-gauge"></i> FPS</span>
-              <div class="toggle-sw" id="fpPauseShowFps" role="switch" aria-checked="false" onclick="window._toggleFps&&window._toggleFps()"></div>
-              <span class="pause-toggle-state off" id="fpPauseShowFpsState">Off</span>
+          </section>
+
+          <!-- Keyboard shortcuts -->
+          <section class="pause-section pause-section--kbd">
+            <h3 class="pause-section-title"><i class="ph ph-keyboard"></i> Keyboard</h3>
+            <div class="pause-controls">
+              <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
+              <div><kbd>Space</kbd> Jump (hold)</div>
+              <div><kbd>Shift</kbd> Sprint</div>
+              <div><kbd>V</kbd> Camera</div>
+              <div><kbd>R</kbd> Reset run</div>
+              <div><kbd>Esc</kbd> Resume</div>
             </div>
-          </div>
-          <div class="pause-actions">
-            <button class="pause-pill" onclick="window._resetFP&&window._resetFP()"><i class="ph ph-arrow-counter-clockwise"></i> Reset run</button>
-            <button class="pause-pill" onclick="window._switchCamFP&&window._switchCamFP()"><i class="ph ph-camera-rotate"></i> Switch camera</button>
-          </div>
-          <div class="pause-controls">
-            <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
-            <div><kbd>Space</kbd> Jump (hold)</div>
-            <div><kbd>Shift</kbd> Sprint</div>
-            <div><kbd>V</kbd> Camera</div>
-            <div><kbd>R</kbd> Reset run</div>
-            <div><kbd>Esc</kbd> Resume</div>
-          </div>
+          </section>
         </div>
         <!-- Right: leaderboard -->
         <div class="pause-right">

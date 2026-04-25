@@ -877,7 +877,7 @@ input[type=range]::-moz-range-thumb {
   color: #fff;
   font-size: 28px;
   font-weight: var(--weight-bold);
-  margin-bottom: 4px;
+  margin: 0 0 4px;
   letter-spacing: -0.02em;
 }
 @keyframes bounceIn {
@@ -929,16 +929,63 @@ input[type=range]::-moz-range-thumb {
   font-size: 11px; color: var(--text-dim); opacity: 0.6;
   padding: 12px 0; text-align: center;
 }
-.pause-sub { color: var(--text-dim); font-size: 11px; margin-bottom: 16px; }
-.pause-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-.pause-btn {
-  padding: 12px 20px; font-size: 14px;
+.pause-header { margin-bottom: 14px; }
+.pause-sub { color: var(--text-dim); font-size: 11px; margin: 0; }
+
+/* ─── Grouped sections ─── */
+.pause-section {
+  margin-top: 14px;
+  text-align: left;
 }
+.pause-section-title {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--type-tracking-wide);
+  text-transform: uppercase;
+  color: rgba(220,240,255,0.55);
+  margin: 0 0 8px;
+}
+.pause-section-title i { font-size: 12px; color: rgba(159,227,255,0.85); }
+.pause-section--kbd { border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px; }
+
+/* ─── Primary actions row ─── */
+.pause-primary {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.pause-primary .pause-btn {
+  flex: 1 1 auto;
+  min-width: fit-content;
+}
+.pause-btn {
+  padding: 12px 14px; font-size: 13px;
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+  min-width: 0;
+}
+.pause-btn-key {
+  background: rgba(255,255,255,0.14);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 9px;
+  font-weight: var(--weight-semibold);
+  opacity: 0.85;
+  margin-left: 2px;
+}
+@media (max-width: 520px) {
+  .pause-primary { flex-direction: column; }
+  .pause-primary .pause-btn { width: 100%; }
+}
+
+/* ─── Toggle rows (audio + display) ─── */
 .pause-toggles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 8px;
-  margin-bottom: 14px;
 }
 .pause-toggle-row {
   display: flex; align-items: center; gap: 8px;
@@ -954,6 +1001,7 @@ input[type=range]::-moz-range-thumb {
   font-size: 11px;
 }
 .pause-toggle-row .toggle-sw { margin-left: auto; }
+.pause-toggle-row .pause-inline-btn { margin-left: auto; }
 .pause-toggle-state {
   min-width: 42px;
   text-align: right;
@@ -963,22 +1011,33 @@ input[type=range]::-moz-range-thumb {
   color: rgba(220,240,255,0.84);
 }
 .pause-toggle-state.off { color: rgba(255,183,183,0.86); }
-.pause-actions { display: flex; gap: 8px; justify-content: center; margin-bottom: 14px; }
-.pause-pill {
-  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+
+/* Inline button (e.g. Camera cycle) inside a toggle row */
+.pause-inline-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
   border-radius: var(--r-sm);
-  padding: 7px 16px;
+  padding: 4px 10px;
   font-size: 11px;
   font-weight: var(--weight-medium);
-  letter-spacing: 0.01em;
-  color: var(--text-dim); cursor: pointer; font-family: inherit;
+  color: var(--text); cursor: pointer; font-family: inherit;
   transition: all var(--dur-med) var(--spring);
 }
-.pause-pill:hover { background: rgba(255,255,255,0.14); color: var(--text); }
+.pause-inline-btn:hover { background: rgba(255,255,255,0.14); }
+.pause-inline-btn kbd {
+  background: rgba(0,0,0,0.28);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 3px;
+  padding: 0 4px; font-size: 9px;
+  font-weight: var(--weight-semibold);
+  opacity: 0.8;
+}
+
+/* ─── Keyboard reference grid ─── */
 .pause-controls {
   display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
-  font-size: 10px; color: rgba(255,255,255,0.35); text-align: left;
-  border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;
+  font-size: 10px; color: rgba(255,255,255,0.45); text-align: left;
 }
 .pause-controls kbd {
   background: rgba(255,255,255,0.08); border-radius: 3px;
