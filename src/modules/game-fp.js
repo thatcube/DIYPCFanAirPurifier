@@ -155,6 +155,7 @@ let _isJumping = false;        // true between liftoff and apex of current jump
 let _coyoteFrames = 0;         // frames remaining where a late jump is still allowed
 let _jumpBufferFrames = 0;     // frames remaining where a pre-press will trigger on land
 let _spaceWasDown = false;     // edge-detect for space press
+let _megaCharge = 0;           // 0..1 overcharge accumulated by shaking mouse at full bar
 let _wasBonking = false;
 let _wasGroundedLast = true;
 let _wasAimingAtInteractable = false;
@@ -1283,6 +1284,7 @@ function _respawn() {
   _velZ = 0;
   _bobPhase = 0;
   _spaceHeld = 0;
+  _megaCharge = 0;
   _jumpHoldFrames = 0;
   _isJumping = false;
   _coyoteFrames = 0;
@@ -1495,7 +1497,10 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   // Asymmetric gravity (snappier fall) is below in the gravity section.
   const JUMP_BASE_VY         = 0.55;  // power on a near-zero-charge release
   const JUMP_MAX_BONUS       = 1.25;  // extra power at full charge — enough to bonk the ceiling
-  const JUMP_CHARGE_FRAMES   = 30;    // frames to reach full charge (~0.5s)
+  const JUMP_MEGA_BONUS      = 1.05;  // extra power on top of full charge when fully overcharged
+  const JUMP_CHARGE_FRAMES   = 42;    // frames to reach full charge (~0.7s)
+  const MEGA_SHAKE_REQUIRED  = 520;   // total mouse pixels of shake needed at full bar to fully overcharge
+  const MEGA_DECAY_PER_FRAME = 0.02;  // overcharge bleeds off when not shaking
   const COYOTE_FRAMES        = 6;     // grace frames after walking off a ledge
   const JUMP_BUFFER_FRAMES   = 8;     // grace frames for a press just before landing
   const GRAVITY_RISE         = 0.018; // gravity while ascending
@@ -1517,6 +1522,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
   // Snapshot charge BEFORE we mutate it below — release-fire reads this.
   const chargeAtFrameStart = _spaceHeld;
+  const megaAtFrameStart = _megaCharge;
 
   // Charge while space is held AND we're on the ground (or in coyote window).
   // Off-ground holds don't accumulate (no air-charge cheese).
@@ -1524,6 +1530,21 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     _spaceHeld = Math.min(JUMP_CHARGE_FRAMES, _spaceHeld + frameScale);
   } else if (!fpKeys.space) {
     _spaceHeld = 0;
+  }
+
+  // Overcharge: once the bar is full and we're still holding on the ground,
+  // shaking the mouse (any rapid camera motion) accumulates a MEGA bonus on
+  // top of full charge. Bleeds off when not shaking so you have to actually
+  // wiggle to keep it pinned.
+  const atFullCharge = _spaceHeld >= JUMP_CHARGE_FRAMES;
+  if (atFullCharge && fpKeys.space && (onGround || _coyoteFrames > 0)) {
+    const shakeMag = Math.abs(stepX) + Math.abs(stepY);
+    if (shakeMag > 0) {
+      _megaCharge = Math.min(1, _megaCharge + (shakeMag / MEGA_SHAKE_REQUIRED));
+    }
+    _megaCharge = Math.max(0, _megaCharge - MEGA_DECAY_PER_FRAME * frameScale);
+  } else if (!fpKeys.space) {
+    _megaCharge = 0;
   }
 
   // Fire on release while still groundable, OR if a buffered press lands while
@@ -1534,8 +1555,9 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   if (canJump && releasedThisFrame) {
     // Released — fire with whatever charge had built up (min = base jump).
     const chargeN = Math.min(1, chargeAtFrameStart / JUMP_CHARGE_FRAMES);
-    fpVy = JUMP_BASE_VY + JUMP_MAX_BONUS * chargeN;
-    _playJumpCue(chargeN);
+    const megaN = Math.max(0, Math.min(1, megaAtFrameStart));
+    fpVy = JUMP_BASE_VY + JUMP_MAX_BONUS * chargeN + JUMP_MEGA_BONUS * megaN;
+    _playJumpCue(Math.min(1, chargeN + megaN * 0.5));
     firedThisFrame = true;
   } else if (canJump && _jumpBufferFrames > 0 && !fpKeys.space) {
     // Buffered press from before landing — fire a base jump on touchdown.
@@ -1546,6 +1568,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
   if (firedThisFrame) {
     _spaceHeld = 0;
+    _megaCharge = 0;
     _jumpBufferFrames = 0;
     _coyoteFrames = 0;
     _isJumping = true;
@@ -1561,11 +1584,13 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   const chargePct = (onGround && _spaceHeld > 0)
     ? Math.min(_spaceHeld / JUMP_CHARGE_FRAMES, 1)
     : 0;
+  const megaPct = (onGround && chargePct >= 1) ? Math.max(0, Math.min(1, _megaCharge)) : 0;
   // Tier 0 = no charge, 1 = small (>0–33%), 2 = big (33–66%), 3 = MEGA (66–100%)
   let chargeTier = 0;
   if (chargePct > 0.66)      chargeTier = 3;
   else if (chargePct > 0.33) chargeTier = 2;
   else if (chargePct > 0)    chargeTier = 1;
+  const isMega = megaPct >= 0.999;
 
   if (_cachedCbFill) {
     _cachedCbFill.style.width = `${Math.round(chargePct * 100)}%`;
@@ -1576,21 +1601,28 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     _cachedCbBar.classList.toggle('tier-1', chargeTier === 1);
     _cachedCbBar.classList.toggle('tier-2', chargeTier === 2);
     _cachedCbBar.classList.toggle('tier-3', chargeTier === 3);
+    _cachedCbBar.classList.toggle('tier-mega', isMega);
+    _cachedCbBar.classList.toggle('overcharging', megaPct > 0 && !isMega);
+    _cachedCbBar.style.setProperty('--mega-pct', megaPct.toFixed(3));
   }
   if (_cachedCbLabel) {
     _cachedCbLabel.textContent =
-      chargeTier === 3 ? 'MEGA JUMP!' :
-      chargeTier === 2 ? 'Big jump' :
-      chargeTier === 1 ? 'Small jump' :
+      isMega                ? 'MEGA JUMP!!' :
+      chargeTier === 3      ? 'Shake to MEGA!' :
+      chargeTier === 2      ? 'Big jump' :
+      chargeTier === 1      ? 'Small jump' :
       'Jump charge';
   }
   if (_cachedCbValue) {
     _cachedCbValue.textContent = onGround
-      ? (chargePct > 0 ? `${Math.round(chargePct * 100)}%` : 'Ready')
+      ? (isMega ? 'MEGA'
+        : chargePct >= 1 ? `100% +${Math.round(megaPct * 100)}%`
+        : chargePct > 0 ? `${Math.round(chargePct * 100)}%`
+        : 'Ready')
       : 'Air';
   }
 
-  // Cat charge glow — color blends cyan → teal → gold as tier rises.
+  // Cat charge glow — color blends cyan → teal → gold → white as tier rises.
   if (_chargeLight) {
     // Smoothed target intensity per tier (0, ~6, ~14, ~28). Scales with
     // chargePct within the tier so it ramps in instead of stepping.
@@ -1598,13 +1630,17 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     if (chargeTier === 1)      targetI = 4 + chargePct * 4;
     else if (chargeTier === 2) targetI = 10 + (chargePct - 0.33) * 12;
     else if (chargeTier === 3) targetI = 22 + (chargePct - 0.66) * 22;
+    // Mega overcharge ramps another +28 on top of full tier-3.
+    if (megaPct > 0) targetI += 28 * megaPct;
     // Add a subtle MEGA flicker so it feels alive, not static.
     if (chargeTier === 3) targetI *= 0.85 + 0.15 * Math.sin(ts * 0.05);
+    if (isMega) targetI *= 1 + 0.18 * Math.sin(ts * 0.09);
     _chargeLightTarget = targetI;
     const lerpK = 1 - Math.exp(-Math.max(0, dtSec) * 18);
     _chargeLight.intensity += (_chargeLightTarget - _chargeLight.intensity) * lerpK;
-    // Hue: cyan(0x88ddff) → teal(0x88ffe0) → gold(0xffc870)
-    if (chargeTier === 3) _chargeLight.color.setHex(0xffc870);
+    // Hue: cyan(0x88ddff) → teal(0x88ffe0) → gold(0xffc870) → white-hot(0xffffff)
+    if (isMega)                _chargeLight.color.setHex(0xffffff);
+    else if (chargeTier === 3) _chargeLight.color.setHex(0xffc870);
     else if (chargeTier === 2) _chargeLight.color.setHex(0x88ffe0);
     else _chargeLight.color.setHex(0x88ddff);
   }
