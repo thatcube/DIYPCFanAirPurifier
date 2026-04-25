@@ -1172,7 +1172,7 @@ export function closeFinishDialog() {
   if (_finishFocusTrap) { _finishFocusTrap.release(); _finishFocusTrap = null; }
   if (_finishSavedFocus) { _finishSavedFocus.restore(); _finishSavedFocus = null; }
   const copyBtn = document.getElementById('finishDialogCopy');
-  if (copyBtn) copyBtn.innerHTML = '<i class="ph-fill ph-share-network"></i> Share';
+  if (copyBtn) copyBtn.innerHTML = '<i class="ph-fill ph-share-network"></i> Copy &amp; share result';
 }
 
 function _getFinishRowNameInput() {
@@ -1534,8 +1534,8 @@ function _createFinishDialogDOM() {
       </div>
       <div class="finishDialogActions">
         <button type="button" class="finishDlgBtn glass-btn glass-btn--danger" id="finishDialogExit"><i class="ph ph-sign-out"></i> Exit</button>
-        <button type="button" class="finishDlgBtn glass-btn glass-btn--secondary" id="finishDialogCopy"><i class="ph-fill ph-share-network"></i> Share</button>
-        <button type="button" class="finishDlgBtn finishDlgBtn--cta glass-btn glass-btn--primary" id="finishDialogAgain"><i class="ph-fill ph-play"></i> Play again</button>
+        <button type="button" class="finishDlgBtn glass-btn glass-btn--secondary" id="finishDialogAgain"><i class="ph-fill ph-play"></i> Play again</button>
+        <button type="button" class="finishDlgBtn finishDlgBtn--cta glass-btn glass-btn--primary" id="finishDialogCopy"><i class="ph-fill ph-share-network"></i> Copy &amp; share result</button>
       </div>
     </div>
   `;
@@ -1556,7 +1556,7 @@ function _createFinishDialogDOM() {
   document.getElementById('finishDialogCopy').addEventListener('click', async () => {
     if (!_finishDialogData) return;
     const btn = document.getElementById('finishDialogCopy');
-    const defaultHtml = '<i class="ph-fill ph-share-network"></i> Share';
+    const defaultHtml = '<i class="ph-fill ph-share-network"></i> Copy &amp; share result';
     try {
       await _copyTextToClipboard(_buildShareText(_finishDialogData));
       if (btn) btn.innerHTML = '<i class="ph ph-check"></i> Copied!';

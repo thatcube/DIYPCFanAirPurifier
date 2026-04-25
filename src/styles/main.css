@@ -939,60 +939,10 @@ input[type=range]::-moz-range-thumb {
   from { background-position: 0% 0%; }
   to   { background-position: 200% 0%; }
 }
-/* Tier MEGA — fully overcharged via shake. White-hot, frantic shake, halo. */
-#fpChargeBar.tier-mega {
-  border-color: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 12px 44px rgba(255, 220, 140, 0.7),
-              inset 0 1px 0 rgba(255,255,255,0.28),
-              0 0 56px rgba(255, 240, 200, 0.85);
-  animation: fpChargeShake3 0.06s linear infinite;
-}
-#fpChargeBar.tier-mega #fpChargeFill {
-  background: linear-gradient(90deg, rgba(255,235,180,1), rgba(255,255,255,1), rgba(200,240,255,1));
-  background-size: 200% 100%;
-  animation: fpChargeFlow 0.35s linear infinite;
-  box-shadow: 0 0 36px rgba(255,250,220,1);
-}
-#fpChargeBar.tier-mega .fp-charge-label,
-#fpChargeBar.tier-mega #fpChargeValue {
-  color: #ffffff;
-  text-shadow: 0 0 10px rgba(255,240,200,0.9);
-}
-/* Overcharging (shake started but not yet at MEGA): brighter halo + bar grows
-   a glowing outer ring proportional to --mega-pct so players can see progress. */
-#fpChargeBar.overcharging {
-  box-shadow: 0 10px 36px rgba(255, 200, 110, 0.6),
-              inset 0 1px 0 rgba(255,255,255,0.2),
-              0 0 calc(38px + 24px * var(--mega-pct, 0)) rgba(255, 230, 170, calc(0.6 + 0.3 * var(--mega-pct, 0)));
-  animation-duration: calc(0.09s - 0.04s * var(--mega-pct, 0));
-}
-.fp-charge-track::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  pointer-events: none;
-  box-shadow: 0 0 0 0 rgba(255,255,255,0);
-  transition: box-shadow 0.12s linear;
-}
-#fpChargeBar.overcharging .fp-charge-track::after,
-#fpChargeBar.tier-mega .fp-charge-track::after {
-  box-shadow: 0 0 calc(2px + 10px * var(--mega-pct, 0)) calc(1px + 3px * var(--mega-pct, 0)) rgba(255, 245, 210, calc(0.5 + 0.4 * var(--mega-pct, 0)));
-}
-@keyframes fpChargeShake3 {
-  0%, 100% { transform: translate(-50%, 0); }
-  15%      { transform: translate(calc(-50% + 3px), -2px); }
-  30%      { transform: translate(calc(-50% - 3px),  2px); }
-  45%      { transform: translate(calc(-50% + 2px), -3px); }
-  60%      { transform: translate(calc(-50% - 2px),  3px); }
-  80%      { transform: translate(calc(-50% + 3px),  1px); }
-}
 @media (prefers-reduced-motion: reduce) {
   #fpChargeBar.tier-2,
-  #fpChargeBar.tier-3,
-  #fpChargeBar.tier-mega { animation: none; }
-  #fpChargeBar.tier-3 #fpChargeFill,
-  #fpChargeBar.tier-mega #fpChargeFill { animation: none; }
+  #fpChargeBar.tier-3 { animation: none; }
+  #fpChargeBar.tier-3 #fpChargeFill { animation: none; }
 }
 
 /* ─── Timer HUD (legacy positioning — now lives inside .run-hud) ─── */
@@ -1360,11 +1310,7 @@ input[type=range]::-moz-range-thumb {
 /* ─── Finish Dialog ──────────────────────────────────────────────── */
 #finishDialogOverlay {
   display: none; position: fixed; inset: 0; z-index: 12500;
-  /* Keep the game visible behind the dialog: thin scrim + light blur */
-  background:
-    radial-gradient(120% 90% at 50% 50%, rgba(3,7,12,0.18) 0%, rgba(3,7,12,0.42) 70%, rgba(3,7,12,0.55) 100%);
-  backdrop-filter: blur(2px) saturate(1.05);
-  -webkit-backdrop-filter: blur(2px) saturate(1.05);
+  background: rgba(3,7,12,0.62); backdrop-filter: blur(7px);
   align-items: center; justify-content: center;
   font-family: var(--font-ui);
 }
@@ -1586,35 +1532,23 @@ input[type=range]::-moz-range-thumb {
 }
 .finishDlgBtn--cta {
   margin-left: auto;
-  padding: 14px 26px;
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  padding: 13px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   border-radius: var(--r-md, 10px);
-  color: #052016;
-  background-color: rgba(120, 240, 170, 0.92);
-  background-image:
-    radial-gradient(ellipse at 30% 0%, rgba(220,255,230,0.55) 0%, transparent 60%),
-    radial-gradient(ellipse at 70% 100%, rgba(80,200,140,0.45) 0%, transparent 60%);
-  border-color: rgba(180, 255, 210, 0.7);
-  text-shadow: 0 1px 0 rgba(255,255,255,0.35);
   box-shadow:
-    0 0 0 1px rgba(180,255,210,0.55) inset,
-    0 8px 24px rgba(80,220,140,0.38),
-    0 0 28px rgba(120,240,170,0.32);
+    0 0 0 1px rgba(145,222,255,0.45) inset,
+    0 6px 20px rgba(145,222,255,0.28),
+    0 0 24px rgba(145,222,255,0.22);
 }
-.finishDlgBtn--cta i { font-size: 1.2em; color: #052016; }
+.finishDlgBtn--cta i { font-size: 1.15em; }
 .finishDlgBtn--cta:hover {
   transform: translateY(-1px);
-  filter: brightness(1.06);
   box-shadow:
-    0 0 0 1px rgba(200,255,220,0.8) inset,
-    0 12px 32px rgba(80,220,140,0.5),
-    0 0 40px rgba(120,240,170,0.45);
-}
-.finishDlgBtn--cta:focus-visible {
-  outline: 2px solid rgba(180,255,210,0.9);
-  outline-offset: 3px;
+    0 0 0 1px rgba(145,222,255,0.65) inset,
+    0 8px 26px rgba(145,222,255,0.4),
+    0 0 32px rgba(145,222,255,0.32);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
