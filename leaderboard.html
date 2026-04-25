@@ -24,6 +24,9 @@
       --font-mono: "SF Mono", "IBM Plex Mono", Menlo, Consolas, monospace;
     }
     * { box-sizing: border-box; }
+    /* main.css locks html/body { overflow: hidden; height: 100% } for the 3D
+       game; override here so the share page scrolls when content overflows. */
+    html, body { height: auto; overflow-x: hidden; overflow-y: auto; }
     body {
       margin: 0;
       min-height: 100vh;
@@ -38,7 +41,6 @@
       padding: 24px 18px 40px;
       position: relative;
       z-index: 0;
-      overflow-x: hidden;
     }
     /* Live game scene rendered behind the page */
     #bgFrame {
