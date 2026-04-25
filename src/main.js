@@ -1316,15 +1316,22 @@ function animate(ts) {
       // If there's no dedicated idle clip, freeze the walk loop when
       // stationary. For toon in skate mode, also freeze the walk clip so it
       // does not look like running-in-place on the board.
-      catAnimation.catWalkAction.weight = 1;
-      const freezeWalkInSkate = skateIdleOnly && catAppearance.catModelKey === 'toon';
+      const isToon = catAppearance.catModelKey === 'toon';
+      catAnimation.catWalkAction.weight = isToon ? moveBlend : 1;
+      const freezeWalkInSkate = skateIdleOnly && isToon;
       if (skateIdleOnly && !freezeWalkInSkate) {
         catAnimation.catWalkAction.paused = false;
         const idleTs = 0.2;
         const curTs = Number(catAnimation.catWalkAction.timeScale) || idleTs;
         catAnimation.catWalkAction.timeScale += (idleTs - curTs) * Math.min(1, dtSec * 8);
       } else {
-        catAnimation.catWalkAction.paused = freezeWalkInSkate || moveBlend < 0.03;
+        const shouldFreezeWalk = freezeWalkInSkate || moveBlend < 0.03;
+        if (isToon && shouldFreezeWalk) {
+          // Keep toon idle deterministic so it doesn't get stuck in a
+          // staggered stride frame when movement stops.
+          catAnimation.catWalkAction.time = 0;
+        }
+        catAnimation.catWalkAction.paused = shouldFreezeWalk;
       }
     }
 
@@ -1410,6 +1417,21 @@ function animate(ts) {
       // player clicks on something interactive. Layered on top of the
       // jump deform so it works mid-air too.
       catAnimation.applyClickNod(ts, catAppearance.catModelKey);
+      const skateActive = gameFp.isSkateMode();
+      const skateYawStrength = skateActive ? Math.max(0.45, Math.min(1, svel / 10)) : 0;
+      const skateTurnSignal = skateActive
+        ? ((gameFp.fpKeys.d ? 1 : 0) - (gameFp.fpKeys.a ? 1 : 0))
+        : 0;
+      const skateMoveSignal = skateActive
+        ? Math.max(0, Math.min(1, (svel - 1.0) / 16.0))
+        : 0;
+      catAnimation.applyGameplaySkateUpperBodyForwardYaw(
+        catAppearance.catModelKey,
+        skateYawStrength,
+        ts,
+        skateTurnSignal,
+        skateMoveSignal
+      );
     }
   }
 
