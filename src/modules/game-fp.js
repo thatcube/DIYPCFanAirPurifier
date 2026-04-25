@@ -84,13 +84,9 @@ export function setSkateMode(enabled, opts = {}) {
   }
   skateMode = next;
   try { localStorage.setItem(SKATE_MODE_KEY, skateMode ? '1' : '0'); } catch (e) {}
-  _resetSkateDynamics();
   _syncSkateToggleUi();
   _syncSkateboardVisualState();
-  if (skateMode) {
-    _seedSkateHeadingFromVelocity();
-    _initSkateboard();
-  }
+  if (skateMode) _initSkateboard();
   else {
     _skateModelLift = 0;
     _silenceSkateRoll(false);
@@ -224,32 +220,6 @@ let _wasFootstepMoving = false;
 let _lastUiInteractTs = 0;
 let _quickControlsVisible = false;
 let _skateLean = 0;
-let _skateHeadingYaw = Math.PI;
-let _skateHeadingReady = false;
-
-function _normalizeYawPi(rad) {
-  let a = rad;
-  while (a > Math.PI) a -= Math.PI * 2;
-  while (a < -Math.PI) a += Math.PI * 2;
-  return a;
-}
-
-function _resetSkateDynamics() {
-  _skateHeadingReady = false;
-}
-
-function _seedSkateHeadingFromVelocity() {
-  const speedSq = _velX * _velX + _velZ * _velZ;
-  if (speedSq > 1e-5) {
-    _skateHeadingYaw = Math.atan2(_velX, _velZ);
-  } else {
-    const seedFwdX = -Math.sin(fpYaw);
-    const seedFwdZ = -Math.cos(fpYaw);
-    _skateHeadingYaw = Math.atan2(seedFwdX, seedFwdZ);
-  }
-  _skateHeadingYaw = _normalizeYawPi(_skateHeadingYaw);
-  _skateHeadingReady = true;
-}
 
 // Cached DOM elements (looked up once in init or on first use)
 let _cachedCbBar = null, _cachedCbFill = null, _cachedCbValue = null, _cachedCbLabel = null;
@@ -1796,7 +1766,6 @@ export function toggleFirstPerson() {
     _lastFootstepTs = 0;
     _wasFootstepMoving = false;
     _skateLean = 0;
-    _resetSkateDynamics();
     _silenceSkateRoll(true);
 
     // Enter FP
@@ -1848,7 +1817,6 @@ export function toggleFirstPerson() {
     _lastFootstepTs = 0;
     _wasFootstepMoving = false;
     _skateLean = 0;
-    _resetSkateDynamics();
     _silenceSkateRoll(true);
 
     // Exit FP
@@ -1915,7 +1883,6 @@ function _respawn() {
   _ssHudFlashUntilTs = 0;
   _ssChargeShake = 0;
   _skateLean = 0;
-  _resetSkateDynamics();
   _silenceSkateRoll(true);
   _ssShakeOffset.set(0, 0, 0);
   _setSuperSaiyanEnvLightOff();
@@ -2090,85 +2057,54 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   const inputActive = fpKeys.w || fpKeys.a || fpKeys.s || fpKeys.d;
 
   if (skateMode) {
-    if (!_skateHeadingReady) _seedSkateHeadingFromVelocity();
+    const skateSpd = (fpKeys.shift ? 0.62 : 0.42) * speedMul;
+    let tgtX = 0, tgtZ = 0;
+    if (fpKeys.w) { tgtX += fwd.x * skateSpd; tgtZ += fwd.z * skateSpd; }
+    if (fpKeys.s) { tgtX -= fwd.x * skateSpd; tgtZ -= fwd.z * skateSpd; }
+    if (fpKeys.a) { tgtX += right.x * skateSpd; tgtZ += right.z * skateSpd; }
+    if (fpKeys.d) { tgtX -= right.x * skateSpd; tgtZ -= right.z * skateSpd; }
 
-    const driveInput = (fpKeys.w ? 1 : 0) - (fpKeys.s ? 1 : 0);
-    const steerInput = (fpKeys.d ? 1 : 0) - (fpKeys.a ? 1 : 0);
+    const tgtLen = Math.hypot(tgtX, tgtZ);
     const accelScale = Math.max(0.001, frameScale);
 
-    const maxForward = (fpKeys.shift ? 0.78 : 0.56) * speedMul;
-    const maxReverse = 0.22 * speedMul;
-    const pushAccel = (fpKeys.shift ? 0.019 : 0.0135) * speedMul;
-    const brakeAccel = (fpKeys.shift ? 0.034 : 0.028) * speedMul;
+    if (inputActive && tgtLen > 1e-6) {
+      const dirX = tgtX / tgtLen;
+      const dirZ = tgtZ / tgtLen;
 
-    const hFwdX = Math.sin(_skateHeadingYaw);
-    const hFwdZ = Math.cos(_skateHeadingYaw);
-    const hRightX = hFwdZ;
-    const hRightZ = -hFwdX;
+      let along = _velX * dirX + _velZ * dirZ;
+      let latX = _velX - dirX * along;
+      let latZ = _velZ - dirZ * along;
 
-    let vForward = _velX * hFwdX + _velZ * hFwdZ;
-    let vLateral = _velX * hRightX + _velZ * hRightZ;
+      const baseAccel = speedMode ? 0.052 : 0.078;
+      const brakeBoost = along < 0 ? 1.9 : 1.0;
+      const alongLerp = 1 - Math.pow(1 - Math.min(0.24, baseAccel * brakeBoost), accelScale);
+      along += (skateSpd - along) * alongLerp;
 
-    const speedN = Math.max(0, Math.min(1, Math.abs(vForward) / Math.max(0.001, maxForward)));
-    const turnPerFrame = 0.014 + speedN * 0.048;
-    const turnBoost = 1 + (fpKeys.shift ? 0.14 : 0) + Math.abs(vLateral) * 1.5;
-    const steerSign = vForward >= -0.01 ? 1 : -0.55;
-    _skateHeadingYaw = _normalizeYawPi(
-      _skateHeadingYaw + steerInput * turnPerFrame * turnBoost * accelScale * steerSign
-    );
+      const sideSpeed = Math.hypot(latX, latZ);
+      const sideN = Math.max(0, Math.min(1, sideSpeed / Math.max(0.001, skateSpd)));
+      const sideGripBase = (fpKeys.shift ? 0.085 : 0.11) + sideN * 0.05;
+      const sideGrip = 1 - Math.pow(1 - Math.min(0.22, sideGripBase), accelScale);
+      const sideKeep = Math.max(0, 1 - sideGrip);
+      latX *= sideKeep;
+      latZ *= sideKeep;
 
-    if (driveInput > 0) {
-      vForward += pushAccel * accelScale;
-    } else if (driveInput < 0) {
-      if (vForward > 0) vForward -= brakeAccel * accelScale;
-      else vForward -= (pushAccel * 0.58) * accelScale;
+      _velX = dirX * along + latX;
+      _velZ = dirZ * along + latZ;
+    } else {
+      const glideDrag = Math.pow(0.988, accelScale);
+      _velX *= glideDrag;
+      _velZ *= glideDrag;
     }
 
-    const rollDrag = Math.pow(driveInput === 0 ? 0.989 : 0.994, accelScale);
-    vForward *= rollDrag;
-    if (driveInput < 0 && vForward > 0) {
-      vForward *= Math.pow(0.93, accelScale);
-    }
-
-    const carveLoss = 1 - Math.min(0.18, Math.abs(steerInput) * 0.025 * accelScale);
-    vForward *= carveLoss;
-
-    const lateralDamp = Math.pow(0.34, accelScale);
-    vLateral *= lateralDamp;
-    vLateral += steerInput * Math.abs(vForward) * 0.016 * accelScale;
-
-    if (Math.abs(vForward) < 0.0012 && driveInput === 0) vForward = 0;
-    if (Math.abs(vLateral) < 0.0007) vLateral = 0;
-
-    vForward = Math.max(-maxReverse, Math.min(maxForward, vForward));
-    const maxSlip = maxForward * 0.18 + 0.02;
-    vLateral = Math.max(-maxSlip, Math.min(maxSlip, vLateral));
-
-    const newHFwdX = Math.sin(_skateHeadingYaw);
-    const newHFwdZ = Math.cos(_skateHeadingYaw);
-    const newHRightX = newHFwdZ;
-    const newHRightZ = -newHFwdX;
-    _velX = newHFwdX * vForward + newHRightX * vLateral;
-    _velZ = newHFwdZ * vForward + newHRightZ * vLateral;
-
-    const speedCap = maxForward * 1.04;
+    const maxVel = skateSpd * 1.08;
     const velMag = Math.hypot(_velX, _velZ);
-    if (velMag > speedCap && velMag > 1e-5) {
-      const k = speedCap / velMag;
-      _velX *= k;
-      _velZ *= k;
+    if (velMag > maxVel && velMag > 1e-6) {
+      const clamp = maxVel / velMag;
+      _velX *= clamp;
+      _velZ *= clamp;
     }
 
-    // At low speed, settle heading toward camera-forward so reorientation
-    // from near-stop feels responsive instead of drifting.
-    if (Math.abs(vForward) < 0.08) {
-      const camYaw = Math.atan2(fwd.x, fwd.z);
-      const d = _normalizeYawPi(camYaw - _skateHeadingYaw);
-      const settle = Math.min(1, (0.02 + Math.abs(steerInput) * 0.03) * accelScale);
-      _skateHeadingYaw = _normalizeYawPi(_skateHeadingYaw + d * settle);
-    }
-
-    if (!inputActive && Math.hypot(_velX, _velZ) < 0.0016) {
+    if (!inputActive && Math.hypot(_velX, _velZ) < 0.0018) {
       _velX = 0;
       _velZ = 0;
     }
@@ -2190,11 +2126,6 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     _velZ += (tgtZ - _velZ) * accel;
     // Lower dead zone so momentum carries further before stopping
     if (!inputActive && Math.hypot(_velX, _velZ) < 0.002) { _velX = 0; _velZ = 0; }
-
-    if (_velX * _velX + _velZ * _velZ > 1e-5) {
-      _skateHeadingYaw = Math.atan2(_velX, _velZ);
-      _skateHeadingReady = true;
-    }
   }
 
   const isInteracting = inputActive
