@@ -35,6 +35,7 @@ const MODEL_MAP = {
   classic:   { src: 'assets/cat.glb' },
   toon:      { src: 'assets/tooncat.glb' },
   bababooey: { src: 'assets/bababooey_cat.glb' },
+  totodile:  { src: 'assets/totodile.glb' },
 };
 
 /**
@@ -256,6 +257,7 @@ export function initPreviews() {
     { key: 'classic',   canvasId: 'previewClassic' },
     { key: 'toon',      canvasId: 'previewToon' },
     { key: 'bababooey', canvasId: 'previewBababooey' },
+    { key: 'totodile',  canvasId: 'previewTotodile' },
   ];
 
   for (const entry of entries) {

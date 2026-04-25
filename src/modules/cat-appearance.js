@@ -350,5 +350,5 @@ export function applyAppearanceToModel(model, baseScale) {
 // ── Leaderboard helpers ─────────────────────────────────────────────
 
 export const CAT_COLOR_EMOJI = { charcoal: '⚫', cream: '🟡', midnight: '🔵', snow: '⚪' };
-export const CAT_MODEL_EMOJI = { classic: '🐱', toon: '🐾', bababooey: '😺' };
-export const CAT_MODEL_LABELS_SHORT = { classic: 'Classic', toon: 'Toon', bababooey: 'Bababooey' };
+export const CAT_MODEL_EMOJI = { classic: '🐱', toon: '🐾', bababooey: '😺', totodile: '🐊' };
+export const CAT_MODEL_LABELS_SHORT = { classic: 'Classic', toon: 'Toon', bababooey: 'Bababooey', totodile: 'Totodile' };
