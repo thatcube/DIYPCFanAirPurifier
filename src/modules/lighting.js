@@ -225,8 +225,9 @@ export function applyTimeOfDay(minuteOfDay, refs) {
   scene.fog.color.copy(clearCol);
   scene.fog.density = mix(0.003, 0.0015, sun);
   // Exposure curve — lower at night so surfaces darken naturally via lighting
-  // instead of forcing dark material colors.
-  renderer.toneMappingExposure = mix(1.0, 1.84, sun);
+  // instead of forcing dark material colors. Daytime peak dialed down ~20%
+  // so clicking the window to switch to day isn't blinding.
+  renderer.toneMappingExposure = mix(1.0, 1.47, sun);
 
   // Key / window sun
   const keyColor = warm > 0.1
