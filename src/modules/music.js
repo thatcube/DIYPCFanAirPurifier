@@ -10,10 +10,10 @@
 // To add a song: drop audio into assets/songs/ and push an entry here.
 
 export const PLAYLIST = [
-  { kind: 'audio', name: 'Octodad Theme',        src: 'assets/songs/Octodad (Nobody Suspects a Thing).mp3',        volume: 0.28 },
-  { kind: 'audio', name: 'Escape from the City', src: 'assets/songs/Escape From The City ... for City Escape.mp3', volume: 0.28 },
-  { kind: 'audio', name: 'Warthog Run',          src: 'assets/songs/H3 Warthog Run OST - Copyright Free.mp3',      volume: 0.28 },
-  { kind: 'audio', name: 'Gerudo Valley',        src: 'assets/songs/Gerudo Valley - The Legend of Zelda_ Ocarina Of Time Copyright free.mp3', volume: 0.28 },
+  { kind: 'audio', name: 'Octodad Theme',        src: 'assets/songs/Octodad (Nobody Suspects a Thing).mp3',        volume: 0.22 },
+  { kind: 'audio', name: 'Escape from the City', src: 'assets/songs/Escape From The City ... for City Escape.mp3', volume: 0.22 },
+  { kind: 'audio', name: 'Warthog Run',          src: 'assets/songs/H3 Warthog Run OST - Copyright Free.mp3',      volume: 0.22 },
+  { kind: 'audio', name: 'Gerudo Valley',        src: 'assets/songs/Gerudo Valley - The Legend of Zelda_ Ocarina Of Time Copyright free.mp3', volume: 0.22 },
 ];
 
 // ── State ───────────────────────────────────────────────────────────

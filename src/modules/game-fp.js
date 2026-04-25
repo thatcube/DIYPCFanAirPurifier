@@ -744,7 +744,7 @@ function _setSkateRollTarget(speedNorm, grounded) {
 
   const n = Math.max(0, Math.min(1, speedNorm));
   const now = ac.currentTime;
-  const targetGain = 0.002 + n * 0.014;
+  const targetGain = 0.003 + n * 0.019;
   const targetFreq = 130 + n * 300;
   const targetQ = 0.45 + n * 1.15;
   const lfoHz = 1.3 + n * 4.4;
