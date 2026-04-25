@@ -2000,7 +2000,6 @@ export function createRoom(scene) {
     innerBowl.position.set(feederX, topOfBox + trayH + 0.01, trayZ + bowlOffsetZ);
     innerBowl.castShadow = true; innerBowl.receiveShadow = true;
     addRoom(innerBowl);
-    _foodBowlMesh = innerBowl;
 
     // Invisible hitboxes — tight-fitting to the feeder silhouette so the
     // hover pointer matches the visible shape (not a giant invisible cube).
@@ -2083,6 +2082,10 @@ export function createRoom(scene) {
     bowlMesh.position.set(bowlX, topOfBox + bowlH, feederZ);
     bowlMesh.castShadow = true; bowlMesh.receiveShadow = true;
     addRoom(bowlMesh);
+    // Anchor the secret blue coin to the stainless water bowl (sits next to
+    // the food tray) — the food bowl already has visible kibble in it, so the
+    // empty silver bowl reads as the surprise spot.
+    _foodBowlMesh = bowlMesh;
     // Expose the bowl material so lighting.js can dim its env reflections
     // at night (otherwise the mirror stays lit up by the PMREM env even
     // when the room is pitch black).
