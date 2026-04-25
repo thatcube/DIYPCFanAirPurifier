@@ -69,6 +69,8 @@ let _babaRunLastTs = -1;
 let _totoRunPhase = 0;
 let _totoRunLastTs = -1;
 let _babaRollAnchorReady = false;
+// Half-height offset so the spin pivot sits at body center, not the feet.
+let _babaRollHalfHeight = 0;
 
 // Bone references for procedural animation
 const idleTailBones  = [];
@@ -81,8 +83,6 @@ const tmpQuatC = new THREE.Quaternion();
 const tmpQuatD = new THREE.Quaternion();
 const tmpVecA = new THREE.Vector3();
 const tmpVecB = new THREE.Vector3();
-const babaRollAnchorLocal = new THREE.Vector3();
-const babaRollAnchorBaseLocal = new THREE.Vector3();
 const groundTmpParentPos = new THREE.Vector3();
 const boxTmp = new THREE.Box3();
 
@@ -371,8 +371,7 @@ function _pinToGround(model, baseLPos) {
 
 function _resetBababooeyRollAnchor() {
   _babaRollAnchorReady = false;
-  babaRollAnchorLocal.set(0, 0, 0);
-  babaRollAnchorBaseLocal.set(0, 0, 0);
+  _babaRollHalfHeight = 0;
 }
 
 function _cacheBababooeyRollAnchor(model, src) {
@@ -381,40 +380,13 @@ function _cacheBababooeyRollAnchor(model, src) {
   if (!/bababooey/i.test(String(src || ''))) return;
 
   model.updateMatrixWorld(true);
-  // Prefer torso-bone center for a stable in-body pivot. Bounding-box center
-  // can drift if pose geometry is asymmetric.
-  let anchorFound = false;
-  tmpVecA.set(0, 0, 0);
-  let anchorCount = 0;
-  const torsoBones = [babaBones.down, babaBones.mid, babaBones.up];
-  for (const b of torsoBones) {
-    if (!b || !b.isBone) continue;
-    b.getWorldPosition(tmpVecB);
-    tmpVecA.add(tmpVecB);
-    anchorCount++;
-  }
-  if (anchorCount > 0) {
-    tmpVecA.multiplyScalar(1 / anchorCount);
-    model.worldToLocal(tmpVecA);
-    babaRollAnchorLocal.copy(tmpVecA);
-    anchorFound = true;
-  }
-
-  if (!anchorFound) {
-    boxTmp.setFromObject(model);
-    if (!Number.isFinite(boxTmp.min.y)) return;
-    boxTmp.getCenter(tmpVecA);
-    model.worldToLocal(tmpVecA);
-    babaRollAnchorLocal.copy(tmpVecA);
-  }
-
-  babaRollAnchorBaseLocal
-    .copy(babaRollAnchorLocal)
-    .applyQuaternion(baseLocalQuat)
-    .add(baseLocalPos);
-  // Upward bias keeps the spin center high enough that the curled body
-  // doesn't sink into the floor during the fastest part of the roll.
-  babaRollAnchorBaseLocal.y += 0.28;
+  boxTmp.setFromObject(model);
+  if (!Number.isFinite(boxTmp.min.y)) return;
+  boxTmp.getCenter(tmpVecA);
+  model.worldToLocal(tmpVecA);
+  // The model is grounded (origin at feet), so the center Y in local
+  // space tells us exactly how far up to shift the pivot for spinning.
+  _babaRollHalfHeight = tmpVecA.y - baseLocalPos.y;
   _babaRollAnchorReady = true;
 }
 
@@ -654,19 +626,22 @@ export function applyBababooeyProceduralRun(ts, moveSpeed, moveBlend) {
     apply(babaBones.mid, babaBase.mid, tmpEuler, 0.7);
   }
 
-  // Pure local-X spin with a locked anchor point.
+  // Spin around body center, not feet. Shift up by half-height so the
+  // pivot is mid-body, apply the spin, then shift back down so the
+  // model stays in the same visual spot without orbiting wildly.
   const spin = phase;
   tmpEuler.set(spin, 0, 0);
   tmpQuat.setFromEuler(tmpEuler);
   tmpQuatB.copy(baseLocalQuat).multiply(tmpQuat);
   catModel.quaternion.copy(tmpQuatB);
 
-  if (_babaRollAnchorReady) {
-    tmpVecA.copy(babaRollAnchorLocal).applyQuaternion(catModel.quaternion);
-    catModel.position.copy(babaRollAnchorBaseLocal).sub(tmpVecA);
-  } else {
-    catModel.position.copy(baseLocalPos);
-  }
+  const hh = _babaRollAnchorReady ? _babaRollHalfHeight : 0;
+  // Offset in local space before rotation: (0, hh, 0)
+  // After rotation that becomes tmpQuat * (0, hh, 0).
+  // We need: finalPos = basePos + (0, hh, 0) - rotated(0, hh, 0)
+  tmpVecA.set(0, hh, 0);
+  tmpVecB.copy(tmpVecA).applyQuaternion(tmpQuat);
+  catModel.position.copy(baseLocalPos).add(tmpVecA).sub(tmpVecB);
 }
 
 function _applyToonJumpLegs(squash) {

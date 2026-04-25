@@ -847,6 +847,21 @@ input[type=range]::-moz-range-thumb {
 @media (prefers-reduced-motion: reduce) {
   #fpCrosshair.click-pulse { animation: none; }
 }
+/* Crosshair tooltip — shows contextual label below the crosshair */
+#fpCrosshairTooltip {
+  display: none; position: fixed;
+  top: calc(50% + 18px); left: 50%;
+  transform: translateX(-50%);
+  z-index: 301; pointer-events: none;
+  font-size: 12px; font-weight: 600;
+  color: rgba(255,255,255,0.92);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+  white-space: nowrap;
+  transition: opacity 0.15s ease;
+}
+#fpCrosshairTooltip.visible {
+  display: block;
+}
 #fpControls {
   display: none; position: fixed; bottom: 16px; left: 16px;
   background: var(--glass-light); color: var(--text-dim);
@@ -1129,6 +1144,15 @@ input[type=range]::-moz-range-thumb {
   text-shadow: 0 0 8px rgba(255,210,120,0.7);
 }
 
+/* At-gate pulse — bar pulses when holding at a tier threshold */
+#fpChargeBar.at-gate .fp-charge-label {
+  animation: fpGatePulse 0.5s ease-in-out infinite;
+}
+@keyframes fpGatePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 /* Super Saiyan active indicator — persistent glow + short entry burst */
 #fpChargeBar.ss-active {
   border-color: rgba(255, 220, 130, 0.82);
@@ -1192,6 +1216,7 @@ input[type=range]::-moz-range-thumb {
 @media (prefers-reduced-motion: reduce) {
   #fpChargeBar.tier-2,
   #fpChargeBar.tier-3,
+  #fpChargeBar.at-gate .fp-charge-label,
   #fpChargeBar.ss-active,
   #fpChargeBar.ss-active.ss-enter { animation: none; }
   #fpChargeBar.tier-3 #fpChargeFill,
