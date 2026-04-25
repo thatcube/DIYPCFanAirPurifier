@@ -477,9 +477,8 @@ window._openCharSelect = () => {
   // Show/hide color dots based on current selection
   const colorSection = document.getElementById('classicColors');
   if (colorSection) colorSection.style.visibility = _selectedModel === 'classic' ? 'visible' : 'hidden';
-  // Highlight current mode
-  document.querySelectorAll('.mode-pill').forEach(p => p.classList.toggle('on', p.dataset.mode === _selectedMode));
-  // Refresh Speed Mode lock state + progress label
+  // Refresh Speed Mode lock state + progress label, then highlight current mode
+  // (refresh may downgrade _selectedMode from speed → normal if locked).
   _refreshSpeedPillLockState();
   document.querySelectorAll('.mode-pill').forEach(p => p.classList.toggle('on', p.dataset.mode === _selectedMode));
 };
@@ -543,7 +542,21 @@ window._selectColor = (color, el) => {
 };
 
 window._selectMode = (mode, el) => {
-  _selectedMode = mode === 'speed' ? 'speed' : 'normal';
+  const wantSpeed = mode === 'speed';
+  if (wantSpeed && !coins.hasFoundAllSecrets()) {
+    // Locked — give a quick shake + toast and bail.
+    if (el) {
+      el.classList.remove('shake');
+      // Force reflow so the animation restarts.
+      void el.offsetWidth;
+      el.classList.add('shake');
+    }
+    const found = coins.getSecretFoundCount();
+    const total = coins.getSecretTotal();
+    showToast(`Speed Mode locked — find all secret coins to unlock (${found}/${total})`);
+    return;
+  }
+  _selectedMode = wantSpeed ? 'speed' : 'normal';
   document.querySelectorAll('.mode-pill').forEach(p => p.classList.toggle('on', p.dataset.mode === _selectedMode));
 };
 

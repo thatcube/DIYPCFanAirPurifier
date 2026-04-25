@@ -1807,6 +1807,35 @@ body.play-mode #fps {
   outline-offset: 2px;
 }
 .mode-pill:active { transform: translateY(1px); }
+.mode-pill.locked {
+  border-color: rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.025);
+  color: rgba(255,255,255,0.55);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.mode-pill.locked:hover {
+  border-color: rgba(255,210,74,0.45);
+  color: rgba(255,225,150,0.85);
+  background: rgba(255,210,74,0.05);
+}
+.mode-pill.locked .mode-pill__sub {
+  color: #ffd24a;
+  opacity: 0.95;
+  font-weight: var(--weight-bold);
+}
+.mode-pill.locked i { color: rgba(255,210,74,0.85); }
+@keyframes modePillShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+.mode-pill.shake { animation: modePillShake 0.36s ease-in-out; }
+@media (prefers-reduced-motion: reduce) {
+  .mode-pill.shake { animation: none; }
+}
 body.play-mode #fpControls { display: block; }
 body.play-mode #fpControlsHint { display: none; }
 body.play-mode #fpQuickControls { display: flex; }

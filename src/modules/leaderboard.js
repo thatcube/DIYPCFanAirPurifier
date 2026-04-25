@@ -649,15 +649,12 @@ export function renderLeaderboardPanel() {
 
 // ── Share / Copy result ─────────────────────────────────────────────
 
-function _buildLeaderboardUrl(entryId, timeMs) {
+function _buildLeaderboardUrl(entryId /*, timeMs */) {
   const base = `${location.origin}/leaderboard`;
-  const params = new URLSearchParams();
   const cleanId = String(entryId || '').trim();
-  const ms = Math.floor(Number(timeMs));
-  if (cleanId) params.set('entry', cleanId);
-  if (Number.isFinite(ms) && ms > 0) params.set('timeMs', String(ms));
-  const q = params.toString();
-  return q ? `${base}?${q}` : base;
+  // The leaderboard page resolves name/time from the entry ID via the API,
+  // so we no longer need (or want) a redundant ?timeMs= in shared links.
+  return cleanId ? `${base}?entry=${encodeURIComponent(cleanId)}` : base;
 }
 
 function _buildShareText(data) {

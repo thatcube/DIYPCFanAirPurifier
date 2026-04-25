@@ -21,20 +21,6 @@ import {
 } from './coins.js';
 import { triggerNod as _triggerCatNod } from './cat-animation.js';
 
-// Oversized pointing-hand cursor used when hovering interactive scene objects.
-// 48×48 SVG (white fill, black outline) inlined as a data URI so it ships with
-// the bundle. Hotspot at (16, 4) puts the fingertip on the click target.
-// Falls back to the native `pointer` cursor in browsers that cap cursor size
-// or refuse oversized custom cursors.
-const _BIG_POINTER_SVG =
-  "data:image/svg+xml;utf8," + encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">' +
-    '<path d="M14 4 L14 30 L20 24 L24 36 L29 34 L25 22 L33 22 Z" ' +
-    'fill="#ffffff" stroke="#000000" stroke-width="2.5" stroke-linejoin="round"/>' +
-    '</svg>'
-  );
-const BIG_POINTER_CURSOR = `url("${_BIG_POINTER_SVG}") 16 4, pointer`;
-
 export function createPurifier(scene) {
   const canvas = document.getElementById('c');
   const camera = state.camera;
@@ -1681,7 +1667,7 @@ export function createPurifier(scene) {
   },{passive:false});
   window.addEventListener('mouseup',e=>{
     drag=false;
-    canvas.style.cursor=_hoverInteractive?BIG_POINTER_CURSOR:'grab';
+    canvas.style.cursor=_hoverInteractive?'pointer':'grab';
     const wasDragging=_dragFilter && !_pendingFilterDrag;
     if(wasDragging){
       handleDragEnd();
@@ -1836,7 +1822,7 @@ export function createPurifier(scene) {
         if(!hoveredPartId) hoveredPartId=getPartIdFromAncestors(h.object);
         if(_hoverInteractive || hoveredPartId) break;
       }
-      canvas.style.cursor=_hoverInteractive?BIG_POINTER_CURSOR:'grab';
+      canvas.style.cursor=_hoverInteractive?'pointer':'grab';
       // Tooltip: show after 1.2s hover on same part
       if(hoveredPartId && hoveredPartId!==_hoverPartId){
         hideTooltip();
