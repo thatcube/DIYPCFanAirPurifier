@@ -75,7 +75,35 @@
       #loadingCat { animation: loadingCatSpin 4s linear infinite; }
       #loadingLabel, #loadingLabel::after { animation: none; }
     }
+    /* Background-only mode (?bg=1): used by leaderboard.html iframe so the
+       3D scene shows behind the share card without any chrome.
+       Hide every interactive surface and HUD; keep only the canvas + loader.
+       Inline so the chrome never flashes before main.css loads. */
+    html.is-bg #loading { background: transparent; }
+    html.is-bg .panel,
+    html.is-bg .panel-fab,
+    html.is-bg .part-tooltip,
+    html.is-bg #playDockBtn,
+    html.is-bg #charSelect,
+    html.is-bg #fpHud,
+    html.is-bg #fpCrosshair,
+    html.is-bg #pauseMenu,
+    html.is-bg #finishDlg,
+    html.is-bg #leaderboardDlg,
+    html.is-bg .toast,
+    html.is-bg .secret-banner,
+    html.is-bg .key-hint,
+    html.is-bg .glass-btn { display: none !important; }
+    html.is-bg, html.is-bg body { cursor: default !important; }
   </style>
+  <script>
+    // Run before <body> so the chrome never paints in iframe-bg mode.
+    try {
+      if (new URLSearchParams(location.search).get('bg') === '1') {
+        document.documentElement.classList.add('is-bg');
+      }
+    } catch (e) {}
+  </script>
 </head>
 <body>
   <div id="loading" role="status" aria-live="polite" aria-label="Loading">
