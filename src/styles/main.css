@@ -488,11 +488,22 @@ input[type=range]::-moz-range-thumb {
   display: none; position: fixed; top: 0; left: 0; width: 100%;
   z-index: 300; pointer-events: none;
 }
-/* Run HUD — two glass pills anchored top-left (timer) and top-right (coins)
-   so the secret-coin chip growing the coins pill never shifts the timer. */
-.run-pill {
+/* Run HUD — both pills sit inside a center-anchored container so they
+   stay near the middle of the screen on ultrawide monitors instead of
+   sticking to the far corners. */
+.run-hud-center {
   position: fixed;
   top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 300;
+  pointer-events: none;
+}
+.run-pill {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -519,9 +530,8 @@ input[type=range]::-moz-range-thumb {
 .run-pill__icon--gold { color: #ffd700; font-size: 20px; }
 .run-pill__icon--cyan { color: #4ab8ff; }
 
-/* Timer (left) */
+/* Timer (left of center) */
 .run-pill--timer {
-  left: 16px;
   color: #f4fbff;
 }
 .run-pill--timer #runTimerText {
@@ -558,13 +568,12 @@ input[type=range]::-moz-range-thumb {
 #runTimerHud.finished .run-pill__icon { color: #ffd873; }
 #runTimerHud.running .run-pill__icon  { color: #9fe3ff; }
 
-/* Coins (right) — anchored right so the secret-coin chip grows leftward */
+/* Coins (right of center) — secret-coin chip grows the pill rightward */
 .run-pill--coins {
-  right: 16px;
   color: var(--gold);
   font-size: 17px;
   font-weight: 800;
-  transform-origin: 100% 50%;
+  transform-origin: 0 50%;
 }
 #coinHud.bump { animation: coinBump 0.4s var(--spring); }
 @keyframes coinBump {
@@ -1533,9 +1542,9 @@ body.play-mode #fpChargeBar { display: block; }
   body.play-mode #fpControls { display: none !important; }
   body.play-mode #fpControlsHint { display: none !important; }
   body.play-mode #fpQuickControls { display: none !important; }
-  body.play-mode .run-pill { top: 10px; padding: 6px 12px; }
-  body.play-mode .run-pill--timer { left: 10px; }
-  body.play-mode .run-pill--coins { right: 10px; font-size: 15px; }
+  body.play-mode .run-hud-center { top: 10px; gap: 6px; }
+  body.play-mode .run-pill { padding: 6px 12px; }
+  body.play-mode .run-pill--coins { font-size: 15px; }
   body.play-mode .run-pill--timer #runTimerText { font-size: 22px; }
   body.play-mode #fps { top: 56px; right: 12px; font-size: 10px; padding: 3px 6px; }
   body.play-mode #fpShareRow { top: 56px; left: 12px; right: auto; }
