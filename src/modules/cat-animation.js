@@ -494,7 +494,10 @@ function _collectIdleBones(model) {
       thighBL: /^thigh\.B\.L/i, upperBL: /^leg\.upper\.B\.L/i, lowerBL: /^leg\.lower\.B\.L/i, footBL: /^foot\.B\.L/i,
       thighBR: /^thigh\.B\.R/i, upperBR: /^leg\.upper\.B\.R/i, lowerBR: /^leg\.lower\.B\.R/i, footBR: /^foot\.B\.R/i,
       upperFL: /^leg\.upper\.F\.L/i, lowerFL: /^leg\.lower\.F(\.)?L/i, footFL: /^foot\.F\.L/i,
-      upperFR: /^leg\.upper\.F\.R/i, lowerFR: /^leg\.lower\.F\.R/i, footFR: /^foot\.F\.R/i
+      upperFR: /^leg\.upper\.F\.R/i, lowerFR: /^leg\.lower\.F\.R/i, footFR: /^foot\.F\.R/i,
+      // Toon rig also has animated IK foot controls that influence stance.
+      footIkFL: /^foot\.F\.IK\.L/i, footIkBL: /^foot\.B\.IK\.L/i,
+      footIkFR: /^foot\.F\.IK\.R/i, footIkBR: /^foot\.B\.IK\.R/i
     };
     for (const k in toonMap) {
       if (toonLegBones[k] == null && toonMap[k].test(n)) {
@@ -686,7 +689,9 @@ function _applyToonJumpLegs(squash) {
     'lowerBL', 'lowerBR', 'lowerFL', 'lowerFR',
     // Include feet so paused walk poses don't leave the toon stance
     // permanently staggered when the player stops moving.
-    'footBL', 'footBR', 'footFL', 'footFR'];
+    'footBL', 'footBR', 'footFL', 'footFR',
+    // Keep IK controls in lockstep with neutral pose too.
+    'footIkFL', 'footIkBL', 'footIkFR', 'footIkBR'];
   for (const k of boneKeys) {
     const bone = L[k];
     const baseQ = B[k];
@@ -812,6 +817,267 @@ function _applyWeightedBoneModelPitch(pitch, targets) {
   return applied;
 }
 
+function _applyWeightedBoneModelYaw(yaw, targets) {
+  if (!catModel) return 0;
+  let total = 0;
+  for (const t of targets) {
+    if (!t || !t.bone || !t.bone.isBone || !t.bone.parent) continue;
+    const w = Number(t.weight) || 0;
+    if (w <= 0) continue;
+    total += w;
+  }
+  if (total <= 0) return 0;
+
+  catModel.updateMatrixWorld(true);
+  const modelUpWorld = tmpVecA
+    .set(0, 1, 0)
+    .applyQuaternion(catModel.getWorldQuaternion(tmpQuatC))
+    .normalize();
+
+  let applied = 0;
+  for (const t of targets) {
+    if (!t || !t.bone || !t.bone.isBone || !t.bone.parent) continue;
+    const w = Number(t.weight) || 0;
+    if (w <= 0) continue;
+
+    const parentWorld = t.bone.parent.getWorldQuaternion(tmpQuatD);
+    const axisLocal = tmpVecB.copy(modelUpWorld).applyQuaternion(parentWorld.invert()).normalize();
+    tmpQuat.setFromAxisAngle(axisLocal, yaw * (w / total));
+    const baseQ = (t.baseQ && t.baseQ.isQuaternion) ? t.baseQ : null;
+    if (baseQ) {
+      tmpQuatB.copy(baseQ).multiply(tmpQuat);
+      const strengthRaw = Number(t.strength);
+      if (Number.isFinite(strengthRaw)) {
+        const strength = Math.max(0, Math.min(1, strengthRaw));
+        t.bone.quaternion.slerp(tmpQuatB, strength);
+      } else {
+        t.bone.quaternion.copy(tmpQuatB);
+      }
+    } else {
+      t.bone.quaternion.multiply(tmpQuat);
+    }
+    applied++;
+  }
+  return applied;
+}
+
+function _applyWeightedBoneModelRoll(roll, targets) {
+  if (!catModel) return 0;
+  let total = 0;
+  for (const t of targets) {
+    if (!t || !t.bone || !t.bone.isBone || !t.bone.parent) continue;
+    const w = Number(t.weight) || 0;
+    if (w <= 0) continue;
+    total += w;
+  }
+  if (total <= 0) return 0;
+
+  catModel.updateMatrixWorld(true);
+  const modelForwardWorld = tmpVecA
+    .set(0, 0, 1)
+    .applyQuaternion(catModel.getWorldQuaternion(tmpQuatC))
+    .normalize();
+
+  let applied = 0;
+  for (const t of targets) {
+    if (!t || !t.bone || !t.bone.isBone || !t.bone.parent) continue;
+    const w = Number(t.weight) || 0;
+    if (w <= 0) continue;
+
+    const parentWorld = t.bone.parent.getWorldQuaternion(tmpQuatD);
+    const axisLocal = tmpVecB.copy(modelForwardWorld).applyQuaternion(parentWorld.invert()).normalize();
+    tmpQuat.setFromAxisAngle(axisLocal, roll * (w / total));
+    t.bone.quaternion.multiply(tmpQuat);
+    applied++;
+  }
+  return applied;
+}
+
+/**
+ * Skate pose helper for sideways-stance models.
+ * Turns only upper body bones toward movement so the board can stay
+ * sideways while the head/chest look more forward.
+ */
+export function applyGameplaySkateUpperBodyForwardYaw(modelKey, amount = 1, ts = 0, turnSignal = 0, moveSignal = 0) {
+  if (!catModel) return 0;
+  const k = Math.max(0, Math.min(1, Number(amount) || 0));
+
+  if (modelKey === 'totodile' && k <= 0.001) {
+    // Skate just turned off: explicitly relax Totodile's arm chain back to
+    // base so shoulders/hands don't stay stuck in the balance pose.
+    const relax = 0.52;
+    _totoApply(totoBones.lShoulder, totoBase.lShoulder, 0, 0, 0, relax);
+    _totoApply(totoBones.rShoulder, totoBase.rShoulder, 0, 0, 0, relax);
+    _totoApply(totoBones.lArm, totoBase.lArm, 0, 0, 0, relax);
+    _totoApply(totoBones.rArm, totoBase.rArm, 0, 0, 0, relax);
+    _totoApply(totoBones.lForeArm, totoBase.lForeArm, 0, 0, 0, relax);
+    _totoApply(totoBones.rForeArm, totoBase.rForeArm, 0, 0, 0, relax);
+    _totoApply(totoBones.lHand, totoBase.lHand, 0, 0, 0, relax);
+    _totoApply(totoBones.rHand, totoBase.rHand, 0, 0, 0, relax);
+    return 0;
+  }
+
+  if (k <= 0.001) return 0;
+
+  if (modelKey === 'bababooey') {
+    // Keep Bababooey mostly forward-facing on the board even at lower speed.
+    const torsoK = Math.max(0.82, k);
+    const yaw = -1.25 * torsoK;
+    return _applyWeightedBoneModelYaw(yaw, [
+      { bone: babaBones.down, baseQ: babaBase.down, weight: 0.08, strength: 0.74 },
+      { bone: babaBones.mid, baseQ: babaBase.mid, weight: 0.28, strength: 0.74 },
+      { bone: babaBones.up, baseQ: babaBase.up, weight: 0.64, strength: 0.74 }
+    ]);
+  }
+
+  if (modelKey === 'totodile') {
+    const t = (Number.isFinite(ts) ? ts : 0) * 0.001;
+    const turn = Math.max(-1, Math.min(1, Number(turnSignal) || 0));
+    const move = Math.max(0, Math.min(1, Number(moveSignal) || 0));
+    const animState = catModel.userData || (catModel.userData = {});
+    if (!Number.isFinite(animState._totoSkateMoveBlend)) animState._totoSkateMoveBlend = move;
+    animState._totoSkateMoveBlend += (move - animState._totoSkateMoveBlend) * 0.18;
+    const moveK = animState._totoSkateMoveBlend;
+    const rideKRaw = Math.max(0, Math.min(1, (moveK - 0.06) / 0.94));
+    const rideK = rideKRaw * rideKRaw * (3 - 2 * rideKRaw); // smoothstep
+    const rideCadence = 0.95 + rideK * 1.05;
+    const rideSway = Math.sin(t * rideCadence + 0.35);
+    const rideSwayFine = Math.sin(t * (rideCadence * 1.32) + 1.05);
+    const rideBob = Math.sin(t * (rideCadence * 1.55) + 0.55);
+    // Keep feet planted by avoiding hip rotation in skate pose.
+    // Drive turn/lean from waist upward so mid/upper torso carries motion.
+    const swayYaw =
+      (Math.sin(t * 0.62 + 0.35) * 0.018) +
+      (Math.sin(t * 1.05 + 1.1) * 0.010) +
+      ((rideSway * 0.050) + (rideSwayFine * 0.020)) * rideK;
+    const bodyYaw = (-0.94 + swayYaw) * k;
+
+    let applied = _applyWeightedBoneModelYaw(bodyYaw, [
+      { bone: totoBones.waist, weight: 0.30 },
+      { bone: totoBones.spine, weight: 0.40 },
+      { bone: totoBones.neck, weight: 0.16 },
+      { bone: totoBones.head, weight: 0.14 }
+    ]);
+
+    const torsoLean = (-0.24 + Math.sin(t * 0.6 + 0.2) * 0.030 + rideBob * 0.058 * rideK) * k;
+    applied += _applyWeightedBoneModelPitch(torsoLean, [
+      { bone: totoBones.waist, weight: 0.36 },
+      { bone: totoBones.spine, weight: 0.48 },
+      { bone: totoBones.neck, weight: 0.11 },
+      { bone: totoBones.head, weight: 0.05 }
+    ]);
+
+    const torsoPulse = (Math.sin(t * (rideCadence * 1.35) + 0.12) * 0.028 + rideSway * 0.012) * rideK * k;
+    applied += _applyWeightedBoneModelPitch(torsoPulse, [
+      { bone: totoBones.waist, weight: 0.40 },
+      { bone: totoBones.spine, weight: 0.46 },
+      { bone: totoBones.neck, weight: 0.09 },
+      { bone: totoBones.head, weight: 0.05 }
+    ]);
+
+    const headLeadYaw = (0.30 + Math.sin(t * 0.62 + 0.4) * 0.020 + rideSway * 0.036 * rideK) * k;
+    applied += _applyWeightedBoneModelYaw(-headLeadYaw, [
+      { bone: totoBones.neck, weight: 0.50 },
+      { bone: totoBones.head, weight: 0.50 }
+    ]);
+
+    // Clear, slower head scan while riding so the look-around reads.
+    const lookRate = 0.62 + rideK * 0.22;
+    const lookSweepRaw = Math.sin(t * lookRate + 2.1);
+    const lookSweep = lookSweepRaw * (0.55 + 0.45 * Math.abs(lookSweepRaw));
+    const lookYaw = lookSweep * (0.090 + rideK * 0.110) * rideK * k;
+    applied += _applyWeightedBoneModelYaw(lookYaw, [
+      { bone: totoBones.neck, weight: 0.44 },
+      { bone: totoBones.head, weight: 0.56 }
+    ]);
+
+    const headNod = (Math.sin(t * 0.52 + 0.9) * (0.046 + rideK * 0.028) + rideBob * 0.018 * rideK) * k;
+    applied += _applyWeightedBoneModelPitch(headNod, [
+      { bone: totoBones.neck, weight: 0.46 },
+      { bone: totoBones.head, weight: 0.54 }
+    ]);
+
+    // Keep Totodile's skate gaze naturally lifted so he reads as looking ahead,
+    // not down at the board.
+    const headUpBias = (-0.105 - rideK * 0.045) * k;
+    applied += _applyWeightedBoneModelPitch(headUpBias, [
+      { bone: totoBones.neck, weight: 0.54 },
+      { bone: totoBones.head, weight: 0.46 }
+    ]);
+
+    // Flip the lateral head cant to the opposite side while keeping the
+    // forward-facing look and up-bias intact.
+    const headCantFlip = -(0.082 + rideK * 0.046) * k;
+    applied += _applyWeightedBoneModelRoll(headCantFlip, [
+      { bone: totoBones.neck, weight: 0.62 },
+      { bone: totoBones.head, weight: 0.38 }
+    ]);
+
+    // Balance-arms layer: keep the riding pose as-is while moving, then add
+    // an extra downward shoulder/arm drop only when nearly stationary.
+    const armPoseK = 0 + moveK * 0.42;
+    const idleDropRaw = Math.max(0, Math.min(1, (0.22 - moveK) / 0.22));
+    const idleDrop = idleDropRaw * idleDropRaw * (3 - 2 * idleDropRaw); // smoothstep
+    const steerLift = turn * (0.06 + moveK * 0.18);
+    const shoulderRideSway = ((rideSway * 0.038) + (rideSwayFine * 0.015)) * rideK;
+    const armWave = Math.sin(t * 0.55 + 0.5) * (0.006 + moveK * 0.018);
+    const applyBalanceArm = (shoulder, shoulderBase, arm, armBase, foreArm, foreArmBase, hand, handBase, sideSign) => {
+      const lift = steerLift * sideSign;
+      const spreadSign = -sideSign;
+      _totoApply(
+        shoulder,
+        shoulderBase,
+        (0.10 + lift * 0.8 + armWave * sideSign + shoulderRideSway * sideSign) * armPoseK - 0.34 * idleDrop,
+        0,
+        (0.92 * spreadSign) * armPoseK,
+        0.78
+      );
+      _totoApply(
+        arm,
+        armBase,
+        (0.04 + lift * 0.65 + armWave * sideSign * 0.6) * armPoseK - 0.26 * idleDrop,
+        0,
+        (0.68 * spreadSign) * armPoseK,
+        0.74
+      );
+      _totoApply(
+        foreArm,
+        foreArmBase,
+        (-0.06 + lift * 0.28) * armPoseK - 0.12 * idleDrop,
+        0,
+        0,
+        0.64
+      );
+      _totoApply(
+        hand,
+        handBase,
+        (0.02 + lift * 0.12) * armPoseK - 0.05 * idleDrop,
+        0,
+        0,
+        0.52
+      );
+    };
+
+    applyBalanceArm(
+      totoBones.lShoulder, totoBase.lShoulder,
+      totoBones.lArm, totoBase.lArm,
+      totoBones.lForeArm, totoBase.lForeArm,
+      totoBones.lHand, totoBase.lHand,
+      -1
+    );
+    applyBalanceArm(
+      totoBones.rShoulder, totoBase.rShoulder,
+      totoBones.rArm, totoBase.rArm,
+      totoBones.rForeArm, totoBase.rForeArm,
+      totoBones.rHand, totoBase.rHand,
+      1
+    );
+    return applied;
+  }
+
+  return 0;
+}
+
 /**
  * Apply the click-interaction nod — a fast, exaggerated forward bow that
  * bends the upper half of the cat toward the click target, then springs back.
@@ -849,7 +1115,8 @@ export function applyClickNod(ts, modelKey) {
   }
   // Forward pitch is distributed over upper-body bones so the lower half
   // does not hinge forward as a single rigid block.
-  const pitch = bend * NOD_PEAK_PITCH;
+  const nodPitchSign = modelKey === 'classic' ? -1 : 1;
+  const pitch = bend * NOD_PEAK_PITCH * nodPitchSign;
 
   let applied = 0;
   if (modelKey === 'bababooey') {
@@ -1035,7 +1302,7 @@ export function applyTotodileProceduralRun(ts, moveSpeed, moveBlend) {
   const sp = Math.max(0, moveSpeed);
   // ~27 in/s is a confident jog (matches bababooey normalization).
   const spN = Math.min(1, sp / 27);
-  const blend = Math.max(0, Math.min(1, moveBlend)) * Math.max(0.38, spN);
+  const blend = Math.max(0, Math.min(1, moveBlend)) * Math.max(0.52, spN);
   if (!Number.isFinite(_totoRunLastTs) || _totoRunLastTs < 0) _totoRunLastTs = ts;
   const phaseDt = Math.max(0, Math.min(0.05, (ts - _totoRunLastTs) * 0.001));
   _totoRunLastTs = ts;
@@ -1052,13 +1319,16 @@ export function applyTotodileProceduralRun(ts, moveSpeed, moveBlend) {
   const phase = _totoRunPhase;
   const sL = Math.sin(phase);
   const sR = Math.sin(phase + Math.PI);
+  const walkN = 1 - spN;
+  const waddleBoost = 1 + walkN * 0.45 + spN * 0.18;
+  const legBlend = blend * waddleBoost;
   // Strength of a single stride peak (0..1 nominal).
-  const stride = (0.55 + spN * 0.55) * blend;
-  const legSwing = (0.22 + spN * 0.18) * blend;
-  const kneeTuck = (0.34 + spN * 0.28) * blend;
-  const ankleCycle = (0.08 + spN * 0.07) * blend;
-  const toeCycle = (0.05 + spN * 0.05) * blend;
-  const liftStrength = 0.78;
+  const stride = (0.62 + spN * 0.64) * legBlend;
+  const legSwing = (0.30 + spN * 0.24) * legBlend;
+  const kneeTuck = (0.43 + spN * 0.35) * legBlend;
+  const ankleCycle = (0.12 + spN * 0.10) * legBlend;
+  const toeCycle = (0.08 + spN * 0.07) * legBlend;
+  const liftStrength = 0.82;
   const lSide = -1;
   const rSide = +1;
   const latCancel = (side, v, k) => -side * v * k;
@@ -1085,10 +1355,10 @@ export function applyTotodileProceduralRun(ts, moveSpeed, moveBlend) {
   const footR = (-shinR * 0.62) - (sR * ankleCycle);
   const toeL = (-shinL * 0.34) - (sL * toeCycle);
   const toeR = (-shinR * 0.34) - (sR * toeCycle);
-  _totoApply(totoBones.lFoot, totoBase.lFoot, 0, footL, 0, 0.62);
-  _totoApply(totoBones.rFoot, totoBase.rFoot, 0, footR, 0, 0.62);
-  _totoApply(totoBones.lToe, totoBase.lToe, 0, toeL, 0, 0.56);
-  _totoApply(totoBones.rToe, totoBase.rToe, 0, toeR, 0, 0.56);
+  _totoApply(totoBones.lFoot, totoBase.lFoot, 0, footL, 0, 0.68);
+  _totoApply(totoBones.rFoot, totoBase.rFoot, 0, footR, 0, 0.68);
+  _totoApply(totoBones.lToe, totoBase.lToe, 0, toeL, 0, 0.62);
+  _totoApply(totoBones.rToe, totoBase.rToe, 0, toeR, 0, 0.62);
 
   // ── Arms (counter-swing) ──
   const armSwing = 0.55 * stride;
@@ -1107,9 +1377,11 @@ export function applyTotodileProceduralRun(ts, moveSpeed, moveBlend) {
   // counter-twist so the shoulders stay relatively stable.
   const strideBob = Math.sin(phase * 2.0);
   const hipTwist = sL * 0.11 * blend;
-  _totoApply(totoBones.hips,  totoBase.hips,  strideBob * 0.012 * blend, hipTwist, 0, 0.46);
-  _totoApply(totoBones.waist, totoBase.waist, 0, -hipTwist * 0.45, sL * 0.018 * blend, 0.44);
-  _totoApply(totoBones.spine, totoBase.spine, -strideBob * 0.016 * blend, -hipTwist * 0.3, 0, 0.46);
+  const hipRoll = sL * (0.040 + walkN * 0.055) * blend;
+  const torsoCounterRoll = -hipRoll * 0.62;
+  _totoApply(totoBones.hips,  totoBase.hips,  strideBob * 0.012 * blend, hipTwist, hipRoll, 0.5);
+  _totoApply(totoBones.waist, totoBase.waist, 0, -hipTwist * 0.45, torsoCounterRoll + sL * 0.020 * blend, 0.48);
+  _totoApply(totoBones.spine, totoBase.spine, -strideBob * 0.016 * blend, -hipTwist * 0.3, torsoCounterRoll * 0.45, 0.5);
 
   // ── Head ──
   // Keep stride bob vertical; side-twist here made Totodile "look sideways"

@@ -796,7 +796,7 @@ function _getSkateLiftTrimForModel() {
   switch (key) {
     case 'classic': return 0.95;
     case 'toon': return 0;
-    case 'totodile': return 0.6;
+    case 'totodile': return 0.44;
     case 'bababooey': return 0.9;
     default: return 1.0;
   }
@@ -805,6 +805,7 @@ function _getSkateLiftTrimForModel() {
 function _getSkateBoardZTrimForModel() {
   const key = String(catAppearance.catModelKey || '').toLowerCase();
   if (key === 'bababooey') return 1.08;
+  if (key === 'totodile') return -0.5;
   return 0;
 }
 
