@@ -873,6 +873,78 @@ input[type=range]::-moz-range-thumb {
   box-shadow: 0 0 16px rgba(255,216,115,0.45);
 }
 
+/* ─── Charge tiers (Small / Big / MEGA) ─── */
+.fp-charge-ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.fp-charge-track { position: relative; }
+.fp-charge-tick {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: rgba(255,255,255,0.28);
+  transform: translateX(-1px);
+}
+/* Tier 2 — bigger jump, cyan/teal pulse + small shake */
+#fpChargeBar.tier-2 {
+  border-color: rgba(140, 230, 255, 0.55);
+  box-shadow: 0 8px 28px rgba(80, 180, 255, 0.35),
+              inset 0 1px 0 rgba(255,255,255,0.14),
+              0 0 24px rgba(120, 210, 255, 0.35);
+  animation: fpChargeShake1 0.18s linear infinite;
+}
+#fpChargeBar.tier-2 #fpChargeFill {
+  background: linear-gradient(90deg, rgba(110,235,255,0.9), rgba(180,255,235,1));
+  box-shadow: 0 0 18px rgba(140,235,255,0.6);
+}
+/* Tier 3 — MEGA jump, gold + violent shake + glow ring */
+#fpChargeBar.tier-3 {
+  border-color: rgba(255, 220, 130, 0.7);
+  box-shadow: 0 10px 36px rgba(255, 170, 60, 0.5),
+              inset 0 1px 0 rgba(255,255,255,0.18),
+              0 0 38px rgba(255, 200, 110, 0.6);
+  animation: fpChargeShake2 0.09s linear infinite;
+}
+#fpChargeBar.tier-3 #fpChargeFill {
+  background: linear-gradient(90deg, rgba(255,180,80,1), rgba(255,235,160,1), rgba(255,255,200,1));
+  background-size: 200% 100%;
+  animation: fpChargeFlow 0.6s linear infinite;
+  box-shadow: 0 0 26px rgba(255,210,120,0.85);
+}
+#fpChargeBar.tier-3 .fp-charge-label {
+  color: #fff3c8;
+  text-shadow: 0 0 8px rgba(255,210,120,0.6);
+}
+#fpChargeBar.tier-3 #fpChargeValue {
+  color: #fff8d8;
+  text-shadow: 0 0 8px rgba(255,210,120,0.7);
+}
+@keyframes fpChargeShake1 {
+  0%, 100% { transform: translate(-50%, 0); }
+  25%      { transform: translate(calc(-50% + 1px), -1px); }
+  50%      { transform: translate(calc(-50% - 1px),  0); }
+  75%      { transform: translate(calc(-50% + 1px),  1px); }
+}
+@keyframes fpChargeShake2 {
+  0%, 100% { transform: translate(-50%, 0); }
+  20%      { transform: translate(calc(-50% + 2px), -2px); }
+  40%      { transform: translate(calc(-50% - 2px),  1px); }
+  60%      { transform: translate(calc(-50% + 2px),  2px); }
+  80%      { transform: translate(calc(-50% - 2px), -1px); }
+}
+@keyframes fpChargeFlow {
+  from { background-position: 0% 0%; }
+  to   { background-position: 200% 0%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #fpChargeBar.tier-2,
+  #fpChargeBar.tier-3 { animation: none; }
+  #fpChargeBar.tier-3 #fpChargeFill { animation: none; }
+}
+
 /* ─── Timer HUD (legacy positioning — now lives inside .run-hud) ─── */
 #runTimerState.running { color: #9fe3ff; }
 #runTimerState.finished { color: #ffd873; }
@@ -1654,6 +1726,67 @@ body.play-mode #fps {
   letter-spacing: 0.02em;
 }
 .char-start:active { transform: translateY(1px); }
+
+/* Movement-mode toggle (Normal vs Speed) — sits between the grid and Start */
+.mode-select {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: stretch;
+  margin: 4px 0 4px;
+  flex-wrap: wrap;
+}
+.mode-pill {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 10px 22px;
+  min-width: 140px;
+  border-radius: 999px;
+  border: 2px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.78);
+  font: inherit;
+  font-weight: var(--weight-bold);
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color var(--dur-med), color var(--dur-med),
+              background var(--dur-med), box-shadow var(--dur-med),
+              transform var(--dur-med);
+}
+.mode-pill i { font-size: 18px; line-height: 1; }
+.mode-pill__label { display: block; line-height: 1.1; }
+.mode-pill__sub {
+  display: block;
+  font-size: 10.5px;
+  font-weight: var(--weight-med);
+  letter-spacing: 0.02em;
+  opacity: 0.7;
+  text-transform: none;
+}
+.mode-pill:hover {
+  border-color: rgba(255,255,255,0.4);
+  color: #fff;
+}
+.mode-pill.on {
+  border-color: var(--accent);
+  color: #fff;
+  background: rgba(145,222,255,0.12);
+  box-shadow: 0 0 12px rgba(145,222,255,0.35);
+}
+.mode-pill.on[data-mode="speed"] {
+  border-color: #ffd24a;
+  background: rgba(255,210,74,0.14);
+  box-shadow: 0 0 14px rgba(255,179,0,0.45);
+}
+.mode-pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.mode-pill:active { transform: translateY(1px); }
 body.play-mode #fpControls { display: block; }
 body.play-mode #fpControlsHint { display: none; }
 body.play-mode #fpQuickControls { display: flex; }

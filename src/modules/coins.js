@@ -40,6 +40,17 @@ const QUICK_COIN_MODE_KEY = 'diy_air_purifier_quick_coin_mode';
 let _quickCoinMode = false;
 try { _quickCoinMode = localStorage.getItem(QUICK_COIN_MODE_KEY) === '1'; } catch (e) {}
 
+const SPEED_MODE_KEY = 'diy_air_purifier_speed_mode_v1';
+let _speedMode = false;
+try { _speedMode = localStorage.getItem(SPEED_MODE_KEY) === '1'; } catch (e) {}
+
+export function isSpeedMode() { return !!_speedMode; }
+export function setSpeedMode(enabled) {
+  _speedMode = !!enabled;
+  try { localStorage.setItem(SPEED_MODE_KEY, _speedMode ? '1' : '0'); } catch (e) {}
+  _applyQuickCoinMode();
+}
+
 export function setSfxMuted(muted) {
   _sfxMuted = !!muted;
   try { localStorage.setItem(SFX_MUTE_KEY, _sfxMuted ? '1' : '0'); } catch (e) {}
@@ -112,7 +123,8 @@ export function addCoin(parent, localPos, opts) {
     consoleProp: !!(opts && opts.consoleProp),
     secret,
     isDynamic: !!(opts && opts.isDynamic),
-    highJump: !!(opts && opts.highJump)
+    highJump: !!(opts && opts.highJump),
+    speedModeOnly: !!(opts && opts.speedModeOnly)
   });
   if (!secret) coinTotal++;
 }
@@ -129,6 +141,8 @@ export function resetScores() {
     c.mesh.visible = true;
     c.mesh.position.copy(c.basePos);
   }
+  // Re-apply quick/speed mode filters (may hide speed-only coins again).
+  _applyQuickCoinMode();
 }
 
 /**
@@ -371,7 +385,45 @@ export function spawnRoomCoins(roomRefs) {
     coinTotal++;
   }
 
+  _spawnSpeedModeCoins();
+
   _applyQuickCoinMode();
+}
+
+// 12 extra coins that only spawn in Speed Mode. Floating in the air through
+// the main room and inside the closet — no guest-room hallway since it's
+// inaccessible. Heights vary so some require jumps off furniture.
+function _spawnSpeedModeCoins() {
+  const fy = getFloorY();
+  // World-space (post-mirror) coords. Room ≈ X[-51..+80], Z[-78..+49].
+  // Closet interior ≈ X[-87..-51], Z[-78..-14]. Avoid solid furniture by
+  // staying mid-air or above known walkable spots.
+  const positions = [
+    // ── Main room — air coins along a meandering trail ──
+    new THREE.Vector3(  10, fy + 22,  30),  // 1. above center, near back wall
+    new THREE.Vector3(  35, fy + 38,  20),  // 2. high over middle-window side
+    new THREE.Vector3(  60, fy + 28, -10),  // 3. window side, mid-room
+    new THREE.Vector3(  55, fy + 14, -45),  // 4. low near window/TV corner
+    new THREE.Vector3(  20, fy + 32, -55),  // 5. high mid-room, TV side
+    new THREE.Vector3( -10, fy + 18, -30),  // 6. mid-air, TV-wall side
+    new THREE.Vector3( -25, fy + 44,  15),  // 7. very high near closet-wall edge
+    new THREE.Vector3(  -5, fy + 10,  35),  // 8. low between bed & nightstand area
+    new THREE.Vector3(  40, fy + 50,   5),  // 9. ceiling-light height, mid-room
+    // ── Closet — three coins inside the closet at varying heights ──
+    new THREE.Vector3( -65, fy + 12, -35),  // 10. low, closet front
+    new THREE.Vector3( -78, fy + 30, -55),  // 11. mid-height, closet back-left
+    new THREE.Vector3( -70, fy + 50, -20),  // 12. high in closet near front-right
+  ];
+  // Apply a small per-session jitter so positions feel "random" but stay
+  // inside their hand-picked safe pockets.
+  for (let i = 0; i < positions.length; i++) {
+    const p = positions[i];
+    const jx = (Math.random() - 0.5) * 6;
+    const jy = (Math.random() - 0.5) * 4;
+    const jz = (Math.random() - 0.5) * 6;
+    addCoin(_coinGroup, new THREE.Vector3(p.x + jx, p.y + jy, p.z + jz),
+      { speedModeOnly: true, id: `coin_speed_${i + 1}` });
+  }
 }
 
 // ── Secret coin system ──────────────────────────────────────────────
@@ -552,15 +604,25 @@ export function updateCoins(ts, playerPos) {
 }
 
 function _applyQuickCoinMode() {
-  const regularCoins = coins.filter(c => !c.secret);
-  if (!regularCoins.length) {
+  // Speed-mode coins only count/show when speed mode is enabled.
+  const allRegular = coins.filter(c => !c.secret);
+  const activeRegular = allRegular.filter(c => _speedMode || !c.speedModeOnly);
+  // Hide (and mark collected to avoid pickup) any speed-only coin that
+  // shouldn't be active this run.
+  for (const c of allRegular) {
+    if (c.speedModeOnly && !_speedMode) {
+      c.collected = true;
+      c.mesh.visible = false;
+    }
+  }
+  if (!activeRegular.length) {
     coinTotal = 0;
     return;
   }
 
   if (!_quickCoinMode) {
-    coinTotal = regularCoins.length;
-    for (const c of regularCoins) {
+    coinTotal = activeRegular.length;
+    for (const c of activeRegular) {
       c.collected = false;
       c.mesh.visible = !!(_coinGroup && _coinGroup.visible);
       c.mesh.position.copy(c.basePos);
@@ -568,11 +630,11 @@ function _applyQuickCoinMode() {
     return;
   }
 
-  const keep = regularCoins.find(c => c.id === 'coin_3')
-    || regularCoins.find(c => !c.inDrawer && !c.insidePurifier)
-    || regularCoins[0];
+  const keep = activeRegular.find(c => c.id === 'coin_3')
+    || activeRegular.find(c => !c.inDrawer && !c.insidePurifier)
+    || activeRegular[0];
 
-  for (const c of regularCoins) {
+  for (const c of activeRegular) {
     if (c === keep) {
       c.collected = false;
       c.mesh.visible = !!(_coinGroup && _coinGroup.visible);

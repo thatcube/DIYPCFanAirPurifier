@@ -45,9 +45,19 @@ export let musicMuted = false;
 const SFX_MUTE_KEY = 'diy_air_purifier_muted_v2';
 const MUSIC_MUTE_KEY = 'diy_air_purifier_music_muted_v2';
 const MOUSE_SENS_KEY = 'diy_air_purifier_mouse_sens_v1';
+const SPEED_MODE_KEY = 'diy_air_purifier_speed_mode_v1';
 
 try { sfxMuted = localStorage.getItem(SFX_MUTE_KEY) === '1'; } catch (e) {}
 try { musicMuted = localStorage.getItem(MUSIC_MUTE_KEY) === '1'; } catch (e) {}
+
+// ── Speed mode (3x top speed, slower acceleration) ──────────────────
+export let speedMode = false;
+try { speedMode = localStorage.getItem(SPEED_MODE_KEY) === '1'; } catch (e) {}
+export function isSpeedMode() { return speedMode; }
+export function setSpeedMode(enabled) {
+  speedMode = !!enabled;
+  try { localStorage.setItem(SPEED_MODE_KEY, speedMode ? '1' : '0'); } catch (e) {}
+}
 
 // ── Mouse sensitivity (1.0 = default) ───────────────────────────────
 export let mouseSens = 1.0;
@@ -157,7 +167,7 @@ let _lastUiInteractTs = 0;
 let _quickControlsVisible = false;
 
 // Cached DOM elements (looked up once in init or on first use)
-let _cachedCbBar = null, _cachedCbFill = null, _cachedCbValue = null;
+let _cachedCbBar = null, _cachedCbFill = null, _cachedCbValue = null, _cachedCbLabel = null;
 let _cachedCrosshair = null;
 let _domCached = false;
 
@@ -167,7 +177,20 @@ function _cacheDom() {
   _cachedCbBar = document.getElementById('fpChargeBar');
   _cachedCbFill = document.getElementById('fpChargeFill');
   _cachedCbValue = document.getElementById('fpChargeValue');
+  _cachedCbLabel = document.getElementById('fpChargeLabel');
   _cachedCrosshair = document.getElementById('fpCrosshair');
+}
+
+// Charge glow light parented to the cat — intensity ramps with charge tier.
+let _chargeLight = null;
+let _chargeLightTarget = 0;
+function _ensureChargeLight() {
+  if (_chargeLight || !_catGroup) return;
+  // PointLight at the cat's belly height; tinted toward gold as it intensifies
+  // (driven by per-frame .color updates in the charge UI block).
+  _chargeLight = new THREE.PointLight(0x88ddff, 0, 60, 1.6);
+  _chargeLight.position.set(0, 4, 0);
+  _catGroup.add(_chargeLight);
 }
 
 const HUD_IDLE_CONTROLS_MS = 1400;
@@ -1427,7 +1450,10 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   fpPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, fpPitch - stepY * 0.0022 * mouseSens));
 
   // ── Movement ──────────────────────────────────────────────────────
-  const spd = fpKeys.shift ? 0.65 : 0.30;
+  // Speed mode triples top speed but uses a lower accel rate so you must
+  // ramp up to it (heavier feel, longer slide on stop).
+  const speedMul = speedMode ? 3.0 : 1.0;
+  const spd = (fpKeys.shift ? 0.65 : 0.30) * speedMul;
   const fwd = _fwd.set(-Math.sin(fpYaw), 0, -Math.cos(fpYaw));
   const right = _right.set(fwd.z, 0, -fwd.x);
 
@@ -1438,8 +1464,11 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   if (fpKeys.d) { tgtX -= right.x * spd; tgtZ -= right.z * spd; }
 
   const inputActive = fpKeys.w || fpKeys.a || fpKeys.s || fpKeys.d;
-  // Slower accel = weightier start, slower decel = more slide/momentum
-  const accelBase = inputActive ? 0.12 : 0.10;
+  // Slower accel = weightier start, slower decel = more slide/momentum.
+  // Speed mode further reduces accel so the 3x top speed must be earned.
+  const accelBase = speedMode
+    ? (inputActive ? 0.045 : 0.035)
+    : (inputActive ? 0.12 : 0.10);
   const accel = 1 - Math.pow(1 - accelBase, frameScale);
   _velX += (tgtX - _velX) * accel;
   _velZ += (tgtZ - _velZ) * accel;
@@ -1465,7 +1494,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   // remembers a press right before landing so you don't lose presses.
   // Asymmetric gravity (snappier fall) is below in the gravity section.
   const JUMP_BASE_VY         = 0.55;  // power on a near-zero-charge release
-  const JUMP_MAX_BONUS       = 0.85;  // extra power at full charge
+  const JUMP_MAX_BONUS       = 1.25;  // extra power at full charge — enough to bonk the ceiling
   const JUMP_CHARGE_FRAMES   = 30;    // frames to reach full charge (~0.5s)
   const COYOTE_FRAMES        = 6;     // grace frames after walking off a ledge
   const JUMP_BUFFER_FRAMES   = 8;     // grace frames for a press just before landing
