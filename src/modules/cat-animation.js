@@ -54,8 +54,7 @@ const TARGET_HEIGHT = 4.0; // desired visual height in inches
 // springs back. Fast-out / slow-back so the bend reads as "snap, hold,
 // recover" rather than a polite head bob.
 const NOD_DUR_MS = 520;
-const NOD_PEAK_PITCH = 1.45;   // radians (~83°). Cat folds nearly in half.
-const NOD_SQUASH_AMP = 0.55;   // 0..1, how much extra squash on top of jump deform
+const NOD_PEAK_PITCH = 1.35;   // radians (~77°) distributed across upper-body bones
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -65,6 +64,10 @@ const baseLocalPos  = new THREE.Vector3();
 const baseLocalQuat = new THREE.Quaternion();
 let gameLoadNonce = 0;
 let nodStartTs = -1e9;
+let _babaRunPhase = 0;
+let _babaRunLastTs = -1;
+let _totoRunPhase = 0;
+let _totoRunLastTs = -1;
 
 // Bone references for procedural animation
 const idleTailBones  = [];
@@ -227,6 +230,10 @@ export function clearGameplayCat() {
   catWalkAction = null; catIdleAction = null;
   if (catModel && catModel.parent) catModel.parent.remove(catModel);
   catModel = null;
+  _babaRunPhase = 0;
+  _babaRunLastTs = -1;
+  _totoRunPhase = 0;
+  _totoRunLastTs = -1;
   _resetIdleBones();
 }
 
@@ -537,15 +544,22 @@ export function applyGameplayProceduralIdle(ts, intensity) {
 
 export function applyBababooeyProceduralRun(ts, moveSpeed, moveBlend) {
   if (!babaBones.left && !babaBones.right && !babaBones.down && !babaBones.up && !babaBones.mid) return;
-  const t = ts * 0.001;
   const sp = Math.max(0, moveSpeed);
   // moveSpeed is in inches/sec; normalize to 0..1 where ~27 in/s is full sprint
   const spN = Math.min(1, sp / 27);
   const blend = Math.max(0, Math.min(1, moveBlend)) * spN;
-  if (blend <= 0.001) return;
+  if (!Number.isFinite(_babaRunLastTs) || _babaRunLastTs < 0) _babaRunLastTs = ts;
+  const phaseDt = Math.max(0, Math.min(0.05, (ts - _babaRunLastTs) * 0.001));
+  _babaRunLastTs = ts;
+  if (blend <= 0.001) {
+    _babaRunPhase = 0;
+    return;
+  }
 
   const cadence = 6.0 + spN * 5.5;
-  const phase = t * cadence;
+  _babaRunPhase += cadence * phaseDt;
+  if (_babaRunPhase > Math.PI * 2) _babaRunPhase %= (Math.PI * 2);
+  const phase = _babaRunPhase;
   const pawAmp = (0.55 + spN * 0.55) * 0.5;
   const liftL = Math.sin(phase);
   const liftR = Math.sin(phase + Math.PI);
@@ -669,9 +683,32 @@ export function applyGameplayJumpDeform({ dtSec, vy, holdFrames, modelKey }) {
   }
 }
 
+function _applyWeightedBonePitch(pitch, targets) {
+  let total = 0;
+  for (const t of targets) {
+    if (!t || !t.bone || !t.bone.isBone) continue;
+    const w = Number(t.weight) || 0;
+    if (w <= 0) continue;
+    total += w;
+  }
+  if (total <= 0) return 0;
+
+  let applied = 0;
+  for (const t of targets) {
+    if (!t || !t.bone || !t.bone.isBone) continue;
+    const w = Number(t.weight) || 0;
+    if (w <= 0) continue;
+    tmpEuler.set(pitch * (w / total), 0, 0);
+    tmpQuat.setFromEuler(tmpEuler);
+    t.bone.quaternion.multiply(tmpQuat);
+    applied++;
+  }
+  return applied;
+}
+
 /**
  * Apply the click-interaction nod — a fast, exaggerated forward bow that
- * makes the entire cat fold toward the click target, then springs back.
+ * bends the upper half of the cat toward the click target, then springs back.
  *
  * Driven by `nodStartTs` set in triggerNod(). Returns the current nod
  * progress (0..1) so callers can layer additional effects if desired.
@@ -680,13 +717,11 @@ export function applyGameplayJumpDeform({ dtSec, vy, holdFrames, modelKey }) {
  * back with a slight overshoot bounce (decaying sine).
  *
  * Effect on the model:
- *   - rotation.x pitched forward by up to NOD_PEAK_PITCH (~83°). The
- *     pivot is the model origin (paws), so the head dives down and
- *     forward — reads as "bowing to investigate the click target".
- *   - scale.y compressed and scale.xz stretched in proportion to the
- *     bend, layered on top of any existing jump squash.
- *   - Bababooey gets extra squish (slime body); toon and detailed cats
- *     get the standard amount.
+ *   - weighted local X rotations on upper-body bones (spine/neck/head,
+ *     plus model-specific torso bones) so lower body and paws stay mostly
+ *     planted.
+ *   - falls back to a mild root tilt only if a model has no matching
+ *     upper-body bones.
  */
 export function applyClickNod(ts, modelKey) {
   if (!catModel) return 0;
@@ -706,25 +741,74 @@ export function applyClickNod(ts, modelKey) {
     const decay = Math.exp(-3.2 * x);
     bend = decay * Math.cos(x * Math.PI * 1.15);
   }
-  // Apply forward pitch on top of base orientation. Pivot point is the
-  // model origin (paws), which keeps the feet planted while the body
-  // dives forward.
+  // Forward pitch is distributed over upper-body bones so the lower half
+  // does not hinge forward as a single rigid block.
   const pitch = bend * NOD_PEAK_PITCH;
-  // Compose: existing baseLocalQuat * nod-pitch (X axis).
-  tmpEuler.set(pitch, 0, 0);
-  tmpQuat.setFromEuler(tmpEuler);
-  catModel.quaternion.copy(baseLocalQuat).multiply(tmpQuat);
 
-  // Squash on top of whatever jump deform already set. Bababooey is
-  // squishier; detailed/toon cats get a milder squish (rigid bodies).
-  const isBaba = modelKey === 'bababooey';
-  const isToto = modelKey === 'totodile';
-  const squashStrength = (isBaba || isToto) ? NOD_SQUASH_AMP * 1.4 : NOD_SQUASH_AMP;
-  const squash = Math.max(0, bend) * squashStrength;
-  // Multiply onto existing scale (set by applyGameplayJumpDeform).
-  catModel.scale.x *= (1 + squash * 0.55);
-  catModel.scale.y *= (1 - squash * 0.65);
-  catModel.scale.z *= (1 + squash * 0.55);
+  let applied = 0;
+  if (modelKey === 'bababooey') {
+    applied = _applyWeightedBonePitch(pitch, [
+      { bone: babaBones.down, weight: 0.14 },
+      { bone: babaBones.mid, weight: 0.30 },
+      { bone: babaBones.up, weight: 0.56 }
+    ]);
+  } else if (modelKey === 'totodile') {
+    applied = _applyWeightedBonePitch(pitch, [
+      { bone: totoBones.waist, weight: 0.12 },
+      { bone: totoBones.spine, weight: 0.24 },
+      { bone: totoBones.neck, weight: 0.28 },
+      { bone: totoBones.head, weight: 0.30 },
+      { bone: totoBones.jaw, weight: 0.06 }
+    ]);
+  } else {
+    const spineTargets = [];
+    const headTargets = [];
+    let spineWeightSum = 0;
+
+    if (idleSpineBones.length) {
+      const n = idleSpineBones.length;
+      const denom = (n * (n + 1)) * 0.5;
+      for (let i = 0; i < n; i++) {
+        const w = 0.38 * ((i + 1) / Math.max(1e-6, denom));
+        spineTargets.push({ bone: idleSpineBones[i], weight: w });
+        spineWeightSum += w;
+      }
+    }
+
+    let neckCount = 0;
+    let headCount = 0;
+    for (let i = 0; i < idleHeadBones.length; i++) {
+      const b = idleHeadBones[i];
+      if (!b || !b.isBone) continue;
+      if (/neck/i.test(String(b.name || ''))) neckCount++;
+      else headCount++;
+    }
+
+    const remaining = Math.max(0, 1 - spineWeightSum);
+    if (neckCount > 0 && headCount > 0) {
+      const neckW = (remaining * 0.38) / neckCount;
+      const headW = (remaining * 0.62) / headCount;
+      for (let i = 0; i < idleHeadBones.length; i++) {
+        const b = idleHeadBones[i];
+        if (!b || !b.isBone) continue;
+        if (/neck/i.test(String(b.name || ''))) headTargets.push({ bone: b, weight: neckW });
+        else headTargets.push({ bone: b, weight: headW });
+      }
+    } else if (idleHeadBones.length > 0) {
+      const each = remaining / idleHeadBones.length;
+      for (let i = 0; i < idleHeadBones.length; i++) {
+        headTargets.push({ bone: idleHeadBones[i], weight: each });
+      }
+    }
+
+    applied = _applyWeightedBonePitch(pitch, [...spineTargets, ...headTargets]);
+  }
+
+  if (applied <= 0) {
+    tmpEuler.set(pitch * 0.35, 0, 0);
+    tmpQuat.setFromEuler(tmpEuler);
+    catModel.quaternion.copy(baseLocalQuat).multiply(tmpQuat);
+  }
 
   return Math.abs(bend);
 }
@@ -793,11 +877,11 @@ export function applyTotodileProceduralIdle(ts, intensity) {
   _totoApply(totoBones.waist, totoBase.waist, breath * 0.018 * k, 0, 0, 0.5);
   _totoApply(totoBones.hips,  totoBase.hips,  breath * 0.012 * k, Math.sin(t * 0.6) * 0.015 * k, 0, 0.45);
 
-  // Head: combined slow sweep + faster jitter so it doesn't read robotic.
-  const headYaw   = (Math.sin(t * 0.85) * 0.18 + Math.sin(t * 1.6 + 0.4) * 0.05) * k;
+  // Head bob should read as nodding, not side-looking. Keep it pitch-dominant
+  // and let torso/tail provide most lateral motion.
   const headPitch = (Math.sin(t * 0.65 + 1.1) * 0.10 + Math.sin(t * 1.4 + 0.7) * 0.03) * k;
-  _totoApply(totoBones.neck, totoBase.neck, headPitch * 0.45, headYaw * 0.45, 0, 0.7);
-  _totoApply(totoBones.head, totoBase.head, headPitch, headYaw, 0, 0.75);
+  _totoApply(totoBones.neck, totoBase.neck, headPitch * 0.45, 0, 0, 0.7);
+  _totoApply(totoBones.head, totoBase.head, headPitch, 0, 0, 0.75);
 
   // Jaw — tiny periodic chomp.
   if (totoBones.jaw) {
@@ -832,13 +916,20 @@ export function applyTotodileProceduralRun(ts, moveSpeed, moveBlend) {
   // ~27 in/s is a confident jog (matches bababooey normalization).
   const spN = Math.min(1, sp / 27);
   const blend = Math.max(0, Math.min(1, moveBlend)) * Math.max(0.38, spN);
-  if (blend <= 0.001) return;
-  const t = ts * 0.001;
+  if (!Number.isFinite(_totoRunLastTs) || _totoRunLastTs < 0) _totoRunLastTs = ts;
+  const phaseDt = Math.max(0, Math.min(0.05, (ts - _totoRunLastTs) * 0.001));
+  _totoRunLastTs = ts;
+  if (blend <= 0.001) {
+    _totoRunPhase = 0;
+    return;
+  }
 
   // Stride cadence — a touch quicker than baba so the little legs read
   // as "scampering".
   const cadence = 7.0 + spN * 6.0;
-  const phase = t * cadence;
+  _totoRunPhase += cadence * phaseDt;
+  if (_totoRunPhase > Math.PI * 2) _totoRunPhase %= (Math.PI * 2);
+  const phase = _totoRunPhase;
   const sL = Math.sin(phase);
   const sR = Math.sin(phase + Math.PI);
   // Strength of a single stride peak (0..1 nominal).
@@ -894,15 +985,17 @@ export function applyTotodileProceduralRun(ts, moveSpeed, moveBlend) {
   // ── Hips & spine ──
   // Hips twist around Y opposite to the planted leg; spine adds a small
   // counter-twist so the shoulders stay relatively stable.
-  const hipTwist = sL * 0.18 * blend;
-  _totoApply(totoBones.hips,  totoBase.hips,  Math.abs(sL) * 0.05 * blend, hipTwist, 0, 0.55);
-  _totoApply(totoBones.waist, totoBase.waist, 0, -hipTwist * 0.55, sL * 0.04 * blend, 0.5);
-  _totoApply(totoBones.spine, totoBase.spine, -Math.abs(sL) * 0.06 * blend, -hipTwist * 0.4, 0, 0.55);
+  const strideBob = Math.sin(phase * 2.0);
+  const hipTwist = sL * 0.11 * blend;
+  _totoApply(totoBones.hips,  totoBase.hips,  strideBob * 0.012 * blend, hipTwist, 0, 0.46);
+  _totoApply(totoBones.waist, totoBase.waist, 0, -hipTwist * 0.45, sL * 0.018 * blend, 0.44);
+  _totoApply(totoBones.spine, totoBase.spine, -strideBob * 0.016 * blend, -hipTwist * 0.3, 0, 0.46);
 
   // ── Head ──
-  // Tiny head bob in sync with stride (so it doesn't drift mid-air).
-  _totoApply(totoBones.neck, totoBase.neck, Math.abs(sL) * 0.05 * blend, hipTwist * 0.25, 0, 0.55);
-  _totoApply(totoBones.head, totoBase.head, Math.abs(sL) * 0.06 * blend, hipTwist * 0.35, 0, 0.6);
+  // Keep stride bob vertical; side-twist here made Totodile "look sideways"
+  // while running and read as a broken head bob.
+  _totoApply(totoBones.neck, totoBase.neck, strideBob * 0.010 * blend, 0, 0, 0.46);
+  _totoApply(totoBones.head, totoBase.head, strideBob * 0.014 * blend, 0, 0, 0.5);
 
   // ── Tail (counter-sway, exaggerated) ──
   const tailSway = -hipTwist * 2.4;
