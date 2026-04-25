@@ -1554,7 +1554,7 @@ function _createFinishDialogDOM() {
     const defaultHtml = '<i class="ph-fill ph-share-network"></i> Copy &amp; share result';
     try {
       await _copyTextToClipboard(_buildShareText(_finishDialogData));
-      if (btn) btn.innerHTML = '<i class="ph-fill ph-check"></i> Copied!';
+      if (btn) btn.innerHTML = '<i class="ph ph-check"></i> Copied!';
       setTimeout(() => { if (btn) btn.innerHTML = defaultHtml; }, 1300);
     } catch (err) {
       if (btn) btn.innerHTML = '<i class="ph ph-x"></i> Copy failed';

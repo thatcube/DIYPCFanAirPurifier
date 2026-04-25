@@ -1530,6 +1530,34 @@ input[type=range]::-moz-range-thumb {
   letter-spacing: 0.01em;
   border-radius: var(--r-sm);
 }
+.finishDlgBtn--cta {
+  margin-left: auto;
+  padding: 13px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border-radius: var(--r-md, 10px);
+  box-shadow:
+    0 0 0 1px rgba(145,222,255,0.45) inset,
+    0 6px 20px rgba(145,222,255,0.28),
+    0 0 24px rgba(145,222,255,0.22);
+  animation: finishCtaPulse 2.4s ease-in-out infinite;
+}
+.finishDlgBtn--cta i { font-size: 1.15em; }
+.finishDlgBtn--cta:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1px rgba(145,222,255,0.65) inset,
+    0 8px 26px rgba(145,222,255,0.4),
+    0 0 32px rgba(145,222,255,0.32);
+}
+@keyframes finishCtaPulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(145,222,255,0.45) inset, 0 6px 20px rgba(145,222,255,0.28), 0 0 24px rgba(145,222,255,0.22); }
+  50%      { box-shadow: 0 0 0 1px rgba(145,222,255,0.6) inset,  0 8px 26px rgba(145,222,255,0.42), 0 0 36px rgba(145,222,255,0.36); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .finishDlgBtn--cta { animation: none; }
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    MOBILE CONTROLS

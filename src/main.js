@@ -341,6 +341,22 @@ function _syncQuickCoinToggleState() {
   tog.setAttribute('aria-checked', isOn ? 'true' : 'false');
 }
 
+// Quick coin mode is a dev-only toggle — only show the row on localhost so
+// non-dev visitors can't accidentally flip it (their runs would then be
+// flagged as test runs and hidden from the public leaderboard).
+(function _gateQuickCoinRowToLocalhost() {
+  const row = document.getElementById('rowQuickCoin');
+  if (!row) return;
+  const host = String(window.location.hostname || '').toLowerCase();
+  const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.local');
+  if (isLocal) row.hidden = false;
+  else {
+    // Force-disable any stale flag from previous visits so non-dev users
+    // who toggled it before stop submitting test runs.
+    if (coins.isQuickCoinMode()) coins.setQuickCoinMode(false);
+  }
+})();
+
 _syncQuickCoinToggleState();
 
 // ── Cat ─────────────────────────────────────────────────────────────

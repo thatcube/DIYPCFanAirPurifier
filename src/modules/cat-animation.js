@@ -530,7 +530,7 @@ function _applyToonJumpLegs(squash) {
   if (!L.upperBL && !L.upperBR && !L.upperFL && !L.upperFR) return;
 
   const s = Math.max(-0.45, Math.min(1, squash));
-  const legScale = s >= 0 ? (1 - s * 0.55) : (1 + (-s) * 0.33);
+  const legScale = s >= 0 ? (1 - s * 0.85) : (1 + (-s) * 0.33);
   const shinScale = 1 - (1 - legScale) * 0.8;
 
   const setScale = (bone, v) => { if (bone) bone.scale.y = v; };
@@ -587,7 +587,7 @@ export function applyGameplayJumpDeform({ dtSec, vy, holdFrames, modelKey }) {
 
   let target = 0;
   if (grounded && held > 0) {
-    target = 0.55 * chargeN;
+    target = (isToon ? 1.0 : 0.55) * chargeN;
   } else if (vY > 0.05) {
     target = Math.max(-0.45, -vY * 3.2);
   } else if (vY < -0.03 && !isToon) {
@@ -599,8 +599,8 @@ export function applyGameplayJumpDeform({ dtSec, vy, holdFrames, modelKey }) {
   st._squashBlend += (target - st._squashBlend) * ease;
   const s = st._squashBlend;
 
-  const syK = isBaba ? 0.55 : (isToon ? 0.12 : 0.35);
-  const sxzK = isBaba ? 0.40 : (isToon ? 0.06 : 0.22);
+  const syK = isBaba ? 0.55 : (isToon ? 0.60 : 0.35);
+  const sxzK = isBaba ? 0.40 : (isToon ? 0.30 : 0.22);
   const sy = 1 - s * syK;
   const sxz = 1 + s * sxzK;
   catModel.scale.set(baseScale.x * sxz, baseScale.y * sy, baseScale.z * sxz);
