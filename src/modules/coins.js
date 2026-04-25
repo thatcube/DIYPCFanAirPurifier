@@ -319,8 +319,8 @@ export function spawnRoomCoins(roomRefs) {
   addCoin(_coinGroup, new THREE.Vector3(-msX_r, msY_r + msH_r / 2 + 2.2, msZ_r), {});
   // 11. On top of TV
   addCoin(_coinGroup, new THREE.Vector3(-tvCenterX, tvCenterY + tvH / 2 + bezel + 2.2, tvZ - tvD / 2 + 1.2), {});
-  // 12. In the far corner of the closet (back wall, window-wall side)
-  addCoin(_coinGroup, new THREE.Vector3(-(SIDE_WALL_X + CLOSET_DEPTH - 3), fy + 3, CLOSET_Z + CLOSET_INTERIOR_W / 2 - 4), {});
+  // 12. In the far corner of the closet (back wall, TV-wall side)
+  addCoin(_coinGroup, new THREE.Vector3(-(SIDE_WALL_X + CLOSET_DEPTH - 3), fy + 3, CLOSET_Z - CLOSET_INTERIOR_W / 2 + 4), {});
   // 13. On top of lamp shade
   addCoin(_coinGroup, new THREE.Vector3(-(TBL_X + TBL_W / 2 - 6), fy + TBL_H + 28.5, TBL_Z + TBL_D / 2 - 6), {});
   // 14. Inside the purifier, floating in the middle (accessible when filter is open)
