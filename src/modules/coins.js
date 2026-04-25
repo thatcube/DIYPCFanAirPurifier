@@ -328,6 +328,9 @@ export function spawnRoomCoins(roomRefs) {
   // 14b. On top of the cat feeder hopper (jump from the shoe box to grab it)
   //   Pre-mirror feeder X = 28 + 6 = 34, Z = -74, stack = box(5) + body(8) + hopper(6) = 19
   addCoin(_coinGroup, new THREE.Vector3(-34, fy + 19 + 2.5, -74), {});
+  // 14c. End of the hallway — centered in the 40" wide corridor, just shy
+  //   of the end wall. Hallway runs Z=49..289, X=-51..-11 (post-mirror).
+  addCoin(_coinGroup, new THREE.Vector3(-31, fy + 3, 285), {});
 
   // 15. Hidden inside a random nightstand drawer (moves with the drawer when opened)
   if (roomRefs && roomRefs.drawers && roomRefs.drawers.length > 0) {
