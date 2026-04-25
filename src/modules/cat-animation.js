@@ -638,6 +638,8 @@ export function applyGameplayJumpDeform({ dtSec, vy, holdFrames, modelKey }) {
   const chargeN = Math.min(1, held / 60);
   const isBaba = modelKey === 'bababooey';
   const isToon = modelKey === 'toon';
+  const isToto = modelKey === 'totodile';
+  const isSquishy = isBaba || isToto;
 
   let target = 0;
   if (grounded && held > 0) {
@@ -645,7 +647,7 @@ export function applyGameplayJumpDeform({ dtSec, vy, holdFrames, modelKey }) {
   } else if (vY > 0.05) {
     target = Math.max(-0.45, -vY * 3.2);
   } else if (vY < -0.03 && !isToon) {
-    const k = isBaba ? 11 : 7;
+    const k = isSquishy ? 11 : 7;
     target = Math.min(1, (-vY) * k);
   }
 
@@ -653,8 +655,8 @@ export function applyGameplayJumpDeform({ dtSec, vy, holdFrames, modelKey }) {
   st._squashBlend += (target - st._squashBlend) * ease;
   const s = st._squashBlend;
 
-  const syK = isBaba ? 0.55 : (isToon ? 0.60 : 0.35);
-  const sxzK = isBaba ? 0.40 : (isToon ? 0.30 : 0.22);
+  const syK = isSquishy ? 0.55 : (isToon ? 0.60 : 0.35);
+  const sxzK = isSquishy ? 0.40 : (isToon ? 0.30 : 0.22);
   const sy = 1 - s * syK;
   const sxz = 1 + s * sxzK;
   catModel.scale.set(baseScale.x * sxz, baseScale.y * sy, baseScale.z * sxz);
@@ -713,7 +715,8 @@ export function applyClickNod(ts, modelKey) {
   // Squash on top of whatever jump deform already set. Bababooey is
   // squishier; detailed/toon cats get a milder squish (rigid bodies).
   const isBaba = modelKey === 'bababooey';
-  const squashStrength = isBaba ? NOD_SQUASH_AMP * 1.4 : NOD_SQUASH_AMP;
+  const isToto = modelKey === 'totodile';
+  const squashStrength = (isBaba || isToto) ? NOD_SQUASH_AMP * 1.4 : NOD_SQUASH_AMP;
   const squash = Math.max(0, bend) * squashStrength;
   // Multiply onto existing scale (set by applyGameplayJumpDeform).
   catModel.scale.x *= (1 + squash * 0.55);
@@ -739,6 +742,169 @@ export function applyBababooeyIdleSquish(ts, intensity) {
     baseScale.x * (1 + squish * 0.6),
     baseScale.y * (1 - squish),
     baseScale.z * (1 + squish * 0.6)
+  );
+}
+
+// ── Totodile procedural animation ───────────────────────────────────
+//
+// The totodile.glb model ships with a full humanoid skeleton (Hips,
+// Spine, Neck, Head, Jaw, Tail1/2, plus L/R Thigh/Leg/Foot/Toe and
+// L/R Shoulder/Arm/ForeArm/Hand) but ZERO baked animation clips. So
+// every bit of motion has to be driven procedurally, similar to the
+// bababooey path.
+//
+// Conventions (validated empirically):
+//   - Limb "swing forward/back" is rotation around X.
+//   - Limb "splay in/out" (lateral) is rotation around Z.
+//   - Body twist is rotation around Y.
+// All rotations are applied as base * offset so the rest pose is the
+// neutral state and amplitudes stay model-relative.
+
+function _totoApply(bone, baseQ, ex, ey, ez, strength) {
+  if (!bone || !baseQ) return;
+  tmpEuler.set(ex, ey, ez);
+  tmpQuat.setFromEuler(tmpEuler);
+  tmpQuatB.copy(baseQ).multiply(tmpQuat);
+  bone.quaternion.slerp(tmpQuatB, Math.min(1, strength));
+}
+
+/**
+ * Totodile idle: slow breathing in the spine, soft head sway, lazy
+ * tail swish, and a barely-there jaw chomp. Designed to feel like a
+ * little Pokémon waiting for its trainer.
+ *
+ * @param {number} ts - timestamp in ms
+ * @param {number} intensity - 0..1 idle blend
+ */
+export function applyTotodileProceduralIdle(ts, intensity) {
+  if (!catModel || intensity <= 0.001) return;
+  if (!totoBones.hips && !totoBones.spine && !totoBones.head && !totoBones.tail1) return;
+  const t = ts * 0.001;
+  const k = Math.min(1, intensity);
+
+  // Breathing: spine bobs back-and-forth, hips counter slightly so the
+  // chest puffs without the whole body see-sawing.
+  const breath = Math.sin(t * 1.7) * 0.5 + Math.sin(t * 2.6 + 0.6) * 0.18;
+  _totoApply(totoBones.spine, totoBase.spine, -breath * 0.045 * k, 0, Math.sin(t * 0.9) * 0.025 * k, 0.55);
+  _totoApply(totoBones.waist, totoBase.waist, breath * 0.018 * k, 0, 0, 0.5);
+  _totoApply(totoBones.hips,  totoBase.hips,  breath * 0.012 * k, Math.sin(t * 0.6) * 0.015 * k, 0, 0.45);
+
+  // Head: combined slow sweep + faster jitter so it doesn't read robotic.
+  const headYaw   = (Math.sin(t * 0.85) * 0.18 + Math.sin(t * 1.6 + 0.4) * 0.05) * k;
+  const headPitch = (Math.sin(t * 0.65 + 1.1) * 0.10 + Math.sin(t * 1.4 + 0.7) * 0.03) * k;
+  _totoApply(totoBones.neck, totoBase.neck, headPitch * 0.45, headYaw * 0.45, 0, 0.7);
+  _totoApply(totoBones.head, totoBase.head, headPitch, headYaw, 0, 0.75);
+
+  // Jaw — tiny periodic chomp.
+  if (totoBones.jaw) {
+    const chomp = Math.max(0, Math.sin(t * 0.7) - 0.85) * 8.0;
+    _totoApply(totoBones.jaw, totoBase.jaw, chomp * 0.45 * k, 0, 0, 0.8);
+  }
+
+  // Tail — wave with phase delay so Tail2 trails Tail1.
+  const tailWave1 = Math.sin(t * 1.3) * k;
+  const tailWave2 = Math.sin(t * 1.3 - 0.7) * k;
+  _totoApply(totoBones.tail1, totoBase.tail1, 0, tailWave1 * 0.32, tailWave1 * 0.10, 0.7);
+  _totoApply(totoBones.tail2, totoBase.tail2, 0, tailWave2 * 0.42, tailWave2 * 0.14, 0.7);
+
+  // Arms — slight relaxed sway. Counter-phase L/R.
+  const armSway = Math.sin(t * 1.1) * 0.10 * k;
+  _totoApply(totoBones.lArm, totoBase.lArm,  armSway,  0, 0, 0.45);
+  _totoApply(totoBones.rArm, totoBase.rArm, -armSway, 0, 0, 0.45);
+}
+
+/**
+ * Totodile run cycle: alternating thigh swings, knee bends, opposite
+ * arm swings, hip counter-twist, spine bob, tail counter-sway.
+ *
+ * @param {number} ts - timestamp in ms
+ * @param {number} moveSpeed - inches/sec
+ * @param {number} moveBlend - 0..1 blend factor (use moveBlend)
+ */
+export function applyTotodileProceduralRun(ts, moveSpeed, moveBlend) {
+  if (!catModel) return;
+  if (!totoBones.lThigh && !totoBones.rThigh) return;
+  const sp = Math.max(0, moveSpeed);
+  // ~27 in/s is a confident jog (matches bababooey normalization).
+  const spN = Math.min(1, sp / 27);
+  const blend = Math.max(0, Math.min(1, moveBlend)) * Math.max(0.25, spN);
+  if (blend <= 0.001) return;
+  const t = ts * 0.001;
+
+  // Stride cadence — a touch quicker than baba so the little legs read
+  // as "scampering".
+  const cadence = 7.0 + spN * 6.0;
+  const phase = t * cadence;
+  const sL = Math.sin(phase);
+  const sR = Math.sin(phase + Math.PI);
+  // Strength of a single stride peak (0..1 nominal).
+  const stride = (0.55 + spN * 0.55) * blend;
+  const liftStrength = 0.70;
+
+  // ── Legs ──
+  // Thighs swing forward/back on X. Negative X = forward swing.
+  const thighL = -sL * 0.95 * stride;
+  const thighR = -sR * 0.95 * stride;
+  _totoApply(totoBones.lThigh, totoBase.lThigh, thighL, 0, 0, liftStrength);
+  _totoApply(totoBones.rThigh, totoBase.rThigh, thighR, 0, 0, liftStrength);
+
+  // Shins bend most when the leg is recovering (back-swing). Use a
+  // half-rectified signal so the knee tucks during lift but stays
+  // straight on the planted leg.
+  const shinL = Math.max(0, sL) * 1.05 * stride;
+  const shinR = Math.max(0, sR) * 1.05 * stride;
+  _totoApply(totoBones.lLeg, totoBase.lLeg, shinL, 0, 0, liftStrength);
+  _totoApply(totoBones.rLeg, totoBase.rLeg, shinR, 0, 0, liftStrength);
+
+  // Feet kick forward as the shin recovers (heel-strike feel).
+  _totoApply(totoBones.lFoot, totoBase.lFoot, -shinL * 0.55, 0, 0, 0.55);
+  _totoApply(totoBones.rFoot, totoBase.rFoot, -shinR * 0.55, 0, 0, 0.55);
+
+  // ── Arms (counter-swing) ──
+  const armSwing = 0.55 * stride;
+  _totoApply(totoBones.lShoulder, totoBase.lShoulder, sR * 0.18 * stride, 0, sR * 0.06 * stride, 0.5);
+  _totoApply(totoBones.rShoulder, totoBase.rShoulder, sL * 0.18 * stride, 0, -sL * 0.06 * stride, 0.5);
+  _totoApply(totoBones.lArm,      totoBase.lArm,      sR * armSwing, 0, 0, 0.6);
+  _totoApply(totoBones.rArm,      totoBase.rArm,      sL * armSwing, 0, 0, 0.6);
+  // Forearms tuck on the up-swing.
+  const foreL = Math.max(0, sR) * 0.5 * stride;
+  const foreR = Math.max(0, sL) * 0.5 * stride;
+  _totoApply(totoBones.lForeArm, totoBase.lForeArm, -foreL, 0, 0, 0.55);
+  _totoApply(totoBones.rForeArm, totoBase.rForeArm, -foreR, 0, 0, 0.55);
+
+  // ── Hips & spine ──
+  // Hips twist around Y opposite to the planted leg; spine adds a small
+  // counter-twist so the shoulders stay relatively stable.
+  const hipTwist = sL * 0.18 * blend;
+  _totoApply(totoBones.hips,  totoBase.hips,  Math.abs(sL) * 0.05 * blend, hipTwist, 0, 0.55);
+  _totoApply(totoBones.waist, totoBase.waist, 0, -hipTwist * 0.55, sL * 0.04 * blend, 0.5);
+  _totoApply(totoBones.spine, totoBase.spine, -Math.abs(sL) * 0.06 * blend, -hipTwist * 0.4, 0, 0.55);
+
+  // ── Head ──
+  // Tiny head bob in sync with stride (so it doesn't drift mid-air).
+  _totoApply(totoBones.neck, totoBase.neck, Math.abs(sL) * 0.05 * blend, hipTwist * 0.25, 0, 0.55);
+  _totoApply(totoBones.head, totoBase.head, Math.abs(sL) * 0.06 * blend, hipTwist * 0.35, 0, 0.6);
+
+  // ── Tail (counter-sway, exaggerated) ──
+  const tailSway = -hipTwist * 2.4;
+  _totoApply(totoBones.tail1, totoBase.tail1, 0, tailSway * 0.6, sL * 0.10 * blend, 0.7);
+  _totoApply(totoBones.tail2, totoBase.tail2, 0, tailSway * 0.95, sL * 0.16 * blend, 0.7);
+}
+
+/**
+ * Totodile breathing/squish during idle — chubby Pokémon belly.
+ * Identical shape to bababooey's idle squish but shallower so the
+ * skeletal animation still reads.
+ */
+export function applyTotodileIdleSquish(ts, intensity) {
+  if (!catModel || intensity <= 0.001) return;
+  const t = ts * 0.001;
+  const wave = Math.sin(t * 1.5) * 0.7 + Math.sin(t * 2.4 + 0.5) * 0.3;
+  const squish = wave * 0.022 * intensity;
+  catModel.scale.set(
+    baseScale.x * (1 + squish * 0.5),
+    baseScale.y * (1 - squish),
+    baseScale.z * (1 + squish * 0.5)
   );
 }
 

@@ -396,6 +396,17 @@ function _animate() {
         p.baseScale * (1 + sq * 0.6)
       );
     }
+    // Totodile idle squish — shallower since the bone idle still reads.
+    if (p.key === 'totodile' && p.model && p.baseScale) {
+      const t = performance.now() * 0.001;
+      const wave = Math.sin(t * 1.5) * 0.7 + Math.sin(t * 2.4 + 0.5) * 0.3;
+      const sq = wave * 0.022;
+      p.model.scale.set(
+        p.baseScale * (1 + sq * 0.5),
+        p.baseScale * (1 - sq),
+        p.baseScale * (1 + sq * 0.5)
+      );
+    }
 
     p.renderer.render(p.scene, p.camera);
   }

@@ -12,6 +12,35 @@ export let catModelKey  = 'classic';
 export let catColorKey  = 'charcoal';
 export let catHairKey   = 'short';
 
+// ── Totodile unlock ─────────────────────────────────────────────────
+// Totodile is locked until the player beats the game (collects all the
+// regular coins) in under 2 minutes. Unlock state persists in
+// localStorage so it survives reloads.
+export const TOTODILE_UNLOCK_TIME_MS = 120000; // 2:00.000
+const TOTODILE_UNLOCK_KEY = 'diy_totodile_unlocked';
+
+export function isTotodileUnlocked() {
+  try { return localStorage.getItem(TOTODILE_UNLOCK_KEY) === '1'; }
+  catch (e) { return false; }
+}
+export function setTotodileUnlocked(v) {
+  try {
+    if (v) localStorage.setItem(TOTODILE_UNLOCK_KEY, '1');
+    else   localStorage.removeItem(TOTODILE_UNLOCK_KEY);
+  } catch (e) { /* private mode etc. */ }
+}
+/**
+ * Call when a run finishes. Returns true if this finish newly unlocked
+ * Totodile (so callers can fire a celebration toast).
+ */
+export function tryUnlockTotodile(timeMs) {
+  const t = Number(timeMs);
+  if (!Number.isFinite(t) || t <= 0 || t >= TOTODILE_UNLOCK_TIME_MS) return false;
+  if (isTotodileUnlocked()) return false;
+  setTotodileUnlocked(true);
+  return true;
+}
+
 export function setCatModelKeyRaw(k) { catModelKey = k; }
 export function setCatColorKeyRaw(k) { catColorKey = k; }
 export function setCatHairKeyRaw(k)  { catHairKey = k; }
