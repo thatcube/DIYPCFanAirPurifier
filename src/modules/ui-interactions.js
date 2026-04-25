@@ -83,11 +83,66 @@ export function toggleSwitch(el) {
 }
 
 /**
- * Coin bump — triggers the bounce animation on the coin HUD.
+ * Coin bump — flips the gold coin icon, pops the count, and spawns a
+ * small gold sparkle burst anchored to the icon. Subtler than the
+ * secret-coin burst (fewer, smaller, faster sparks; warm gold palette).
  */
 export function coinBump() {
   const hud = document.getElementById('coinHud');
-  if (hud) animateClass(hud, 'bump', 400);
+  if (hud) animateClass(hud, 'bump', 600);
+
+  // Anchor sparkles on the gold icon if we can find it; fall back to the
+  // count, then the whole pill.
+  const anchor =
+    (hud && hud.querySelector('.run-pill__icon--gold')) ||
+    document.getElementById('coinCount') ||
+    hud;
+  if (!anchor) return;
+  const r = anchor.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  const cx = r.left + r.width / 2;
+  const cy = r.top + r.height / 2;
+
+  const reduced = window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduced) return;
+
+  const burst = document.createElement('div');
+  burst.className = 'coin-burst';
+  burst.style.left = cx + 'px';
+  burst.style.top  = cy + 'px';
+
+  // A handful of tiny 4-point sparkle stars + dust dots that drift out
+  // and slightly upward, fading as they spin. Smaller travel distance
+  // and shorter lifetime than the secret burst keeps it understated.
+  const SPARK_COUNT = 8;
+  for (let i = 0; i < SPARK_COUNT; i++) {
+    const s = document.createElement('div');
+    // Mix sparkle stars (sharp 4-point) with simple round dust motes.
+    const isStar = i % 2 === 0;
+    s.className = 'coin-burst__spark' + (isStar ? ' coin-burst__spark--star' : '');
+    const angle = (i / SPARK_COUNT) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+    const dist  = 18 + Math.random() * 22;          // 18–40px
+    const size  = (isStar ? 6 : 3) + Math.random() * 2;
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist - 4;          // bias upward
+    // Warm gold spectrum; occasional white-hot pop.
+    const hue = 42 + Math.random() * 12;            // 42–54 (gold→amber)
+    const light = 60 + Math.random() * 20;
+    const color = Math.random() < 0.15
+      ? '#fffbe0'
+      : `hsl(${hue}, 100%, ${light}%)`;
+    s.style.setProperty('--dx', dx + 'px');
+    s.style.setProperty('--dy', dy + 'px');
+    s.style.setProperty('--sz', size + 'px');
+    s.style.setProperty('--c',  color);
+    s.style.setProperty('--rot', (Math.random() * 360 - 180) + 'deg');
+    s.style.animationDelay = (Math.random() * 50) + 'ms';
+    burst.appendChild(s);
+  }
+
+  document.body.appendChild(burst);
+  setTimeout(() => { burst.remove(); }, 800);
 }
 
 /**
