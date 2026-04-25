@@ -16,6 +16,7 @@ import {
   spawnSecretDrawerCoin,
   spawnSecretMacbookCoin,
   spawnSecretTvCoin,
+  spawnSecretFoodBowlCoin,
   getAudioCtx as _getAudioCtx,
   setAudioCtx as _setAudioCtx
 } from './coins.js';
@@ -42,6 +43,7 @@ export function createPurifier(scene) {
   let _toggleTV = null;
   let _toggleCornerDoor = null;
   let _toggleFoodBowl = null;
+  let _getFoodBowlMesh = null;
   let _uiSfxAC = null;
 
   function _ensureUiSfxAC() {
@@ -2131,6 +2133,17 @@ export function createPurifier(scene) {
         const nowVisible = _toggleFoodBowl();
         if(nowVisible) _playFoodPourSfx();
       }
+      if(_fpMode && _getFoodBowlMesh){
+        const bowl = _getFoodBowlMesh();
+        if(bowl){
+          const wp = new THREE.Vector3();
+          bowl.getWorldPosition(wp);
+          // Float the coin a few inches above the bowl rim so it sits in
+          // the silver dish rather than clipping through the bottom.
+          wp.y += 3.5;
+          spawnSecretFoodBowlCoin(wp);
+        }
+      }
       return;
     }
   }
@@ -3533,6 +3546,7 @@ export function createPurifier(scene) {
     if (refs.toggleTV) _toggleTV = refs.toggleTV;
     if (refs.toggleCornerDoor) _toggleCornerDoor = refs.toggleCornerDoor;
     if (refs.toggleFoodBowl) _toggleFoodBowl = refs.toggleFoodBowl;
+    if (refs.getFoodBowlMesh) _getFoodBowlMesh = refs.getFoodBowlMesh;
   }
 
   // Apply initial wood species (ash) so panels start with correct texture

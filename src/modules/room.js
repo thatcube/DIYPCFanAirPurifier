@@ -1636,6 +1636,7 @@ export function createRoom(scene) {
 
   // ─── Cat food feeder on black shoe box (TV wall / closet corner) ────
   let _foodGroup = null;
+  let _foodBowlMesh = null;
   {
     // Placement: between TV wall and closet opening, ~1.5ft from closet wall.
     // Pre-mirror coords: sideWallX=51, oppWallZ=-78, closet edge at Z=-70.
@@ -1999,6 +2000,7 @@ export function createRoom(scene) {
     innerBowl.position.set(feederX, topOfBox + trayH + 0.01, trayZ + bowlOffsetZ);
     innerBowl.castShadow = true; innerBowl.receiveShadow = true;
     addRoom(innerBowl);
+    _foodBowlMesh = innerBowl;
 
     // Invisible hitboxes — tight-fitting to the feeder silhouette so the
     // hover pointer matches the visible shape (not a giant invisible cube).
@@ -3283,6 +3285,7 @@ export function createRoom(scene) {
       for (const k of _foodGroup) { k.visible = show; k.matrixAutoUpdate = true; k.updateMatrixWorld(true); k.matrixAutoUpdate = false; }
       return show;
     },
-    isFoodVisible: () => _foodGroup && _foodGroup.length ? _foodGroup[0].visible : false
+    isFoodVisible: () => _foodGroup && _foodGroup.length ? _foodGroup[0].visible : false,
+    getFoodBowlMesh: () => _foodBowlMesh
   };
 }

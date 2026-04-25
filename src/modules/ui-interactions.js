@@ -91,14 +91,82 @@ export function coinBump() {
 }
 
 /**
- * Secret coin bump — flashier pulse + cyan glow on the whole coin pill,
- * and a pop-in animation on the secret chip itself.
+ * Secret coin bump — spawns a body-level particle burst anchored to the
+ * secret-coin chip. The chip is nested two containers deep inside the
+ * combo run pill, so animating its parents was scaling unrelated layout
+ * and clipping the glow. This effect lives on a fixed-position overlay
+ * appended to <body> so it can sparkle freely outside that hierarchy.
  */
 export function secretCoinBump() {
-  const hud = document.getElementById('coinHud');
-  if (hud) animateClass(hud, 'secret-bump', 700);
   const chip = document.getElementById('secretCoinHud');
-  if (chip) animateClass(chip, 'pop', 500);
+  if (!chip) return;
+
+  // Tiny chip pop so the number itself reacts.
+  animateClass(chip, 'pop', 500);
+
+  // Locate chip in viewport coords; bail if it's hidden / off-screen.
+  const r = chip.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  const cx = r.left + r.width / 2;
+  const cy = r.top + r.height / 2;
+
+  // Respect reduced-motion users — give them a single soft flash, no spray.
+  const reduced = window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const burst = document.createElement('div');
+  burst.className = 'secret-burst';
+  burst.style.left = cx + 'px';
+  burst.style.top  = cy + 'px';
+
+  // Radial flash disc behind the sparks.
+  const flash = document.createElement('div');
+  flash.className = 'secret-burst__flash';
+  burst.appendChild(flash);
+
+  // Expanding ring.
+  const ring = document.createElement('div');
+  ring.className = 'secret-burst__ring';
+  burst.appendChild(ring);
+
+  // Floating "+1" rising upward.
+  const plus = document.createElement('div');
+  plus.className = 'secret-burst__plus';
+  plus.textContent = '+1';
+  burst.appendChild(plus);
+
+  // Sparks fly out radially with random distance / size / hue.
+  if (!reduced) {
+    const SPARK_COUNT = 14;
+    for (let i = 0; i < SPARK_COUNT; i++) {
+      const s = document.createElement('div');
+      s.className = 'secret-burst__spark';
+      // Even angular distribution + small jitter so it doesn't look gridded.
+      const angle = (i / SPARK_COUNT) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+      const dist  = 38 + Math.random() * 38;       // 38–76px travel
+      const size  = 4 + Math.random() * 4;         // 4–8px
+      const dx = Math.cos(angle) * dist;
+      const dy = Math.sin(angle) * dist;
+      // Cyan family with occasional white-hot spark.
+      const hue = 195 + Math.random() * 25;
+      const light = 60 + Math.random() * 25;
+      const color = Math.random() < 0.18
+        ? '#ffffff'
+        : `hsl(${hue}, 100%, ${light}%)`;
+      s.style.setProperty('--dx', dx + 'px');
+      s.style.setProperty('--dy', dy + 'px');
+      s.style.setProperty('--sz', size + 'px');
+      s.style.setProperty('--c',  color);
+      s.style.setProperty('--rot', (Math.random() * 540 - 270) + 'deg');
+      s.style.animationDelay = (Math.random() * 60) + 'ms';
+      burst.appendChild(s);
+    }
+  }
+
+  document.body.appendChild(burst);
+
+  // Cleanup after the longest animation completes.
+  setTimeout(() => { burst.remove(); }, 1200);
 }
 
 /**

@@ -596,15 +596,98 @@ input[type=range]::-moz-range-thumb {
   40% { transform: scale(1.15); }
   100% { transform: scale(1); }
 }
-/* Secret coin pickup — stronger scale + cyan glow ring sweep. */
-#coinHud.secret-bump {
-  animation: secretCoinBump 0.7s var(--spring);
+/* Secret coin pickup — body-level particle burst (see ui-interactions.js
+ * secretCoinBump). The burst is a fixed-position layer anchored to the
+ * chip's viewport center; its children animate independently so the
+ * sparkle isn't constrained by the nested .run-pill > #coinHud chain. */
+.secret-burst {
+  position: fixed;
+  width: 0; height: 0;
+  pointer-events: none;
+  z-index: 400;
+  /* All children are positioned relative to this 0x0 anchor. */
 }
-@keyframes secretCoinBump {
-  0%   { transform: scale(1);    box-shadow: 0 10px 30px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.22), 0 0 0 0 rgba(74,184,255,0); }
-  25%  { transform: scale(1.28); box-shadow: 0 12px 36px rgba(0,0,0,0.3),  inset 0 1px 0 rgba(255,255,255,0.35), 0 0 28px 6px rgba(74,184,255,0.65); }
-  60%  { transform: scale(0.98); box-shadow: 0 10px 30px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.3),  0 0 18px 2px rgba(74,184,255,0.35); }
-  100% { transform: scale(1);    box-shadow: 0 10px 30px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.22), 0 0 0 0 rgba(74,184,255,0); }
+.secret-burst__flash {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 14px; height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(255,255,255,0.95) 0%,
+    rgba(170,230,255,0.85) 30%,
+    rgba(74,184,255,0.55) 55%,
+    rgba(74,184,255,0) 75%);
+  filter: blur(1px);
+  animation: secretFlash 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes secretFlash {
+  0%   { transform: scale(0.3); opacity: 0; }
+  18%  { transform: scale(1);   opacity: 1; }
+  100% { transform: scale(6);   opacity: 0; }
+}
+.secret-burst__ring {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 18px; height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 50%;
+  border: 2px solid rgba(145, 222, 255, 0.9);
+  box-shadow:
+    0 0 12px rgba(74, 184, 255, 0.7),
+    inset 0 0 8px rgba(145, 222, 255, 0.5);
+  animation: secretRing 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes secretRing {
+  0%   { transform: scale(0.4); opacity: 0; border-width: 3px; }
+  20%  { transform: scale(1);   opacity: 1; }
+  100% { transform: scale(4.5); opacity: 0; border-width: 1px; }
+}
+.secret-burst__spark {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: var(--sz, 6px);
+  height: var(--sz, 6px);
+  margin-left: calc(var(--sz, 6px) * -0.5);
+  margin-top:  calc(var(--sz, 6px) * -0.5);
+  background: var(--c, #9fe3ff);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--c, #9fe3ff), 0 0 14px rgba(74,184,255,0.5);
+  animation: secretSpark 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+@keyframes secretSpark {
+  0%   { transform: translate(0, 0) scale(0.2) rotate(0deg); opacity: 0; }
+  15%  { opacity: 1; transform: translate(calc(var(--dx) * 0.2), calc(var(--dy) * 0.2)) scale(1.1) rotate(calc(var(--rot) * 0.2)); }
+  100% { transform: translate(var(--dx), calc(var(--dy) + 18px)) scale(0.3) rotate(var(--rot)); opacity: 0; }
+}
+.secret-burst__plus {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 800;
+  font-size: 18px;
+  color: #d6f3ff;
+  text-shadow:
+    0 0 8px rgba(74, 184, 255, 0.95),
+    0 0 16px rgba(74, 184, 255, 0.6),
+    0 1px 2px rgba(0,0,0,0.5);
+  letter-spacing: 0.5px;
+  animation: secretPlus 1.1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+@keyframes secretPlus {
+  0%   { transform: translate(-50%, -50%)     scale(0.4); opacity: 0; }
+  20%  { transform: translate(-50%, -120%)    scale(1.25); opacity: 1; }
+  60%  { transform: translate(-50%, -260%)    scale(1);    opacity: 1; }
+  100% { transform: translate(-50%, -380%)    scale(0.9);  opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .secret-burst__flash, .secret-burst__ring {
+    animation-duration: 0.4s;
+  }
+  .secret-burst__plus { animation-duration: 0.6s; }
 }
 .run-pill__secret {
   display: inline-flex;
