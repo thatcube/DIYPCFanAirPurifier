@@ -648,7 +648,7 @@ input[type=range]::-moz-range-thumb {
  */
 #fpCrosshair {
   display: none; position: fixed; top: 50%; left: 50%;
-  width: 16px; height: 16px;
+  width: 18px; height: 18px;
   transform: translate(-50%,-50%);
   z-index: 301; pointer-events: none;
   /* Dot is drawn via radial-gradient so the element bounds stay constant. */
@@ -660,7 +660,7 @@ input[type=range]::-moz-range-thumb {
       transparent 2.5px
     );
   /* Hollow ring border — invisible by default, lights up on .aiming. */
-  border: 1.5px solid transparent;
+  border: 2.5px solid transparent;
   border-radius: 50%;
   box-sizing: border-box;
   filter: drop-shadow(0 0 1px rgba(0,0,0,0.6));
@@ -670,15 +670,17 @@ input[type=range]::-moz-range-thumb {
     filter 0.18s ease;
 }
 #fpCrosshair.aiming {
-  border-color: rgba(145, 222, 255, 0.95);
+  border-color: #91deff;
   background:
     radial-gradient(
       circle,
       rgba(145, 222, 255, 1) 0,
-      rgba(145, 222, 255, 1) 1.5px,
-      transparent 2px
+      rgba(145, 222, 255, 1) 2px,
+      transparent 2.5px
     );
-  filter: drop-shadow(0 0 4px rgba(145, 222, 255, 0.55));
+  filter:
+    drop-shadow(0 0 6px rgba(145, 222, 255, 0.8))
+    drop-shadow(0 0 1px rgba(0, 0, 0, 0.7));
 }
 /* Click pulse — quick outward shockwave that doesn't fight the hover state. */
 #fpCrosshair.click-pulse {

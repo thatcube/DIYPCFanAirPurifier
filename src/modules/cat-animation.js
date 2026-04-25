@@ -50,8 +50,12 @@ export function updateCatBlobShadow() {}
 // ── Constants ───────────────────────────────────────────────────────
 
 const TARGET_HEIGHT = 4.0; // desired visual height in inches
-const NOD_DUR_MS = 620;
-const NOD_AMP = 1.35;      // peak pitch in radians (~77°)
+// Click nod — exaggerated bow that bends the cat ~90° forward, then
+// springs back. Fast-out / slow-back so the bend reads as "snap, hold,
+// recover" rather than a polite head bob.
+const NOD_DUR_MS = 520;
+const NOD_PEAK_PITCH = 1.45;   // radians (~83°). Cat folds nearly in half.
+const NOD_SQUASH_AMP = 0.55;   // 0..1, how much extra squash on top of jump deform
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -608,6 +612,65 @@ export function applyGameplayJumpDeform({ dtSec, vy, holdFrames, modelKey }) {
   if (isToon) {
     _applyToonJumpLegs(s);
   }
+}
+
+/**
+ * Apply the click-interaction nod — a fast, exaggerated forward bow that
+ * makes the entire cat fold toward the click target, then springs back.
+ *
+ * Driven by `nodStartTs` set in triggerNod(). Returns the current nod
+ * progress (0..1) so callers can layer additional effects if desired.
+ *
+ * Curve: 0..0.30 = fast bend down (ease-out cubic), 0.30..1.0 = spring
+ * back with a slight overshoot bounce (decaying sine).
+ *
+ * Effect on the model:
+ *   - rotation.x pitched forward by up to NOD_PEAK_PITCH (~83°). The
+ *     pivot is the model origin (paws), so the head dives down and
+ *     forward — reads as "bowing to investigate the click target".
+ *   - scale.y compressed and scale.xz stretched in proportion to the
+ *     bend, layered on top of any existing jump squash.
+ *   - Bababooey gets extra squish (slime body); toon and detailed cats
+ *     get the standard amount.
+ */
+export function applyClickNod(ts, modelKey) {
+  if (!catModel) return 0;
+  const elapsed = ts - nodStartTs;
+  if (elapsed < 0 || elapsed >= NOD_DUR_MS) return 0;
+  const t = elapsed / NOD_DUR_MS; // 0..1
+  // Two-phase curve: fast bend out, springy return.
+  let bend;
+  if (t < 0.30) {
+    // Fast ease-out: 1 - (1-x)^3 at remap x=t/0.30
+    const x = t / 0.30;
+    bend = 1 - Math.pow(1 - x, 3);
+  } else {
+    // Spring back with one small overshoot wobble.
+    const x = (t - 0.30) / 0.70; // 0..1
+    // Decaying cosine: starts at 1, ends at 0, with a small bounce.
+    const decay = Math.exp(-3.2 * x);
+    bend = decay * Math.cos(x * Math.PI * 1.15);
+  }
+  // Apply forward pitch on top of base orientation. Pivot point is the
+  // model origin (paws), which keeps the feet planted while the body
+  // dives forward.
+  const pitch = bend * NOD_PEAK_PITCH;
+  // Compose: existing baseLocalQuat * nod-pitch (X axis).
+  tmpEuler.set(pitch, 0, 0);
+  tmpQuat.setFromEuler(tmpEuler);
+  catModel.quaternion.copy(baseLocalQuat).multiply(tmpQuat);
+
+  // Squash on top of whatever jump deform already set. Bababooey is
+  // squishier; detailed/toon cats get a milder squish (rigid bodies).
+  const isBaba = modelKey === 'bababooey';
+  const squashStrength = isBaba ? NOD_SQUASH_AMP * 1.4 : NOD_SQUASH_AMP;
+  const squash = Math.max(0, bend) * squashStrength;
+  // Multiply onto existing scale (set by applyGameplayJumpDeform).
+  catModel.scale.x *= (1 + squash * 0.55);
+  catModel.scale.y *= (1 - squash * 0.65);
+  catModel.scale.z *= (1 + squash * 0.55);
+
+  return Math.abs(bend);
 }
 
 /**
