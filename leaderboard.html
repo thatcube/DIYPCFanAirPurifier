@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>DIY Air Purifier Leaderboard</title>
+  <title>DIY Air Purifier — Speedrun Challenge</title>
+  <meta name="description" content="A first-person coin-collecting speedrun in a tiny bedroom. Can you beat the time?" />
   <!-- Share the same stylesheet (and design tokens) the in-game UI uses -->
   <link rel="stylesheet" href="./src/styles/main.css" />
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
@@ -12,8 +13,8 @@
     :root {
       --bg0: #07121d;
       --bg1: #122637;
-      --card: rgba(6, 14, 24, 0.82);
-      --edge: rgba(128, 197, 243, 0.35);
+      --card: rgba(8, 16, 27, 0.78);
+      --edge: rgba(128, 197, 243, 0.32);
       --text: #e6f3ff;
       --muted: #a8c0d6;
       --accent: #9fe3ff;
@@ -21,8 +22,6 @@
       --goldEdge: rgba(255, 216, 115, 0.45);
       --font-ui: "Nunito Sans Variable", "Nunito Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
       --font-mono: "SF Mono", "IBM Plex Mono", Menlo, Consolas, monospace;
-      --tracking-base: 0.01em;
-      --tracking-wide: 0.045em;
     }
     * { box-sizing: border-box; }
     body {
@@ -31,145 +30,165 @@
       font-family: var(--font-ui);
       color: var(--text);
       line-height: 1.45;
-      letter-spacing: var(--tracking-base);
       text-rendering: optimizeLegibility;
       /* Fallback gradient in case the iframe fails to load */
       background: radial-gradient(1200px 700px at 18% -12%, #244868 0%, transparent 58%),
                   radial-gradient(900px 560px at 110% 10%, #1f3e56 0%, transparent 65%),
                   linear-gradient(180deg, var(--bg1), var(--bg0));
-      padding: 18px;
-      /* Establish a stacking context so the iframe + scrim layer
-         predictably between the body background and the leaderboard card. */
+      padding: 24px 18px 40px;
       position: relative;
       z-index: 0;
       overflow-x: hidden;
     }
-    /* Live game scene rendered behind the leaderboard */
+    /* Live game scene rendered behind the page */
     #bgFrame {
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      border: 0;
-      z-index: 0;
-      pointer-events: none;
+      position: fixed; inset: 0; width: 100vw; height: 100vh;
+      border: 0; z-index: 0; pointer-events: none;
       filter: saturate(1.05);
-      opacity: 0;
-      transition: opacity 0.6s ease;
+      opacity: 0; transition: opacity 0.6s ease;
     }
     #bgFrame.ready { opacity: 1; }
-    /* Dark scrim so leaderboard text stays legible over the live scene */
     #bgScrim {
-      position: fixed;
-      inset: 0;
-      z-index: 1;
-      pointer-events: none;
-      background:
-        radial-gradient(120% 80% at 50% 30%, rgba(7,18,29,0.35) 0%, rgba(7,18,29,0.7) 70%, rgba(7,18,29,0.88) 100%);
+      position: fixed; inset: 0; z-index: 1; pointer-events: none;
+      background: radial-gradient(120% 80% at 50% 30%, rgba(7,18,29,0.4) 0%, rgba(7,18,29,0.78) 70%, rgba(7,18,29,0.92) 100%);
       backdrop-filter: blur(2px) saturate(1.05);
       -webkit-backdrop-filter: blur(2px) saturate(1.05);
     }
-    .wrap { position: relative; z-index: 2; }
-    @media (prefers-reduced-motion: reduce) {
-      #bgFrame { display: none; }
-    }
-    .wrap {
-      width: min(960px, 100%);
+    @media (prefers-reduced-motion: reduce) { #bgFrame { display: none; } }
+
+    .page {
+      position: relative;
+      z-index: 2;
+      width: min(720px, 100%);
       margin: 0 auto;
+      display: grid;
+      gap: 20px;
+    }
+
+    /* ── Hero challenge card ──────────────────────────────────── */
+    .hero {
       background: var(--card);
       border: 1px solid var(--edge);
-      border-radius: 16px;
-      box-shadow: 0 20px 44px rgba(0, 0, 0, 0.42);
+      border-radius: 22px;
+      box-shadow: 0 24px 56px rgba(0, 0, 0, 0.5);
       backdrop-filter: blur(12px);
-      overflow: hidden;
+      -webkit-backdrop-filter: blur(12px);
+      padding: 28px 26px 26px;
+      display: grid;
+      gap: 18px;
     }
-    .head {
-      padding: 16px 16px 10px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-    }
-    h1 {
-      margin: 0;
-      font-size: clamp(20px, 2.4vw, 30px);
-      font-weight: 800;
-      letter-spacing: -0.01em;
+    .hero__eyebrow {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 800;
+      letter-spacing: 0.18em; text-transform: uppercase;
       color: var(--accent);
+      opacity: 0.92;
     }
-    .sub {
+    .hero__eyebrow i { font-size: 13px; }
+    .hero__headline {
+      margin: 0;
+      font-size: clamp(22px, 3.4vw, 32px);
+      font-weight: 800;
+      line-height: 1.18;
+      letter-spacing: -0.01em;
+    }
+    .hero__headline .who { color: var(--gold); }
+    .hero__headline .time {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+      color: var(--gold);
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+    }
+    .hero__pitch {
       margin: 0;
       color: var(--muted);
-      font-size: 13px;
-      line-height: 1.4;
+      font-size: 14px;
+      line-height: 1.55;
+      max-width: 56ch;
     }
-    .right {
-      margin-left: auto;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
+    .hero__pitch b { color: #d9ebff; font-weight: 700; }
+    .hero__cta {
+      display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+      margin-top: 4px;
     }
-    .btn {
-      /* Inherits .glass-btn base from main.css; just sizes it for this page */
-      padding: 8px 14px;
-      font-size: 12px;
-      letter-spacing: 0.01em;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
+    .playBtn {
+      flex: 0 1 auto;
+      padding: 16px 32px;
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      display: inline-flex; align-items: center; gap: 10px;
       text-decoration: none;
     }
-    .btn--play {
-      padding: 11px 22px;
-      font-size: 14px;
-      font-weight: var(--weight-bold, 700);
-    }
-    .btn--play i { font-size: 1.1em; }
-    .meta {
+    .playBtn i { font-size: 1.15em; }
+    .miniBtn {
       padding: 11px 16px;
-      color: var(--muted);
-      font-size: 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 13px;
+      font-weight: 700;
+      display: inline-flex; align-items: center; gap: 8px;
+      text-decoration: none;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.16);
+      color: #d9ebff;
+      border-radius: var(--r-md, 12px);
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color 0.2s, background 0.2s;
     }
-    .list {
-      list-style: none;
+    .miniBtn:hover { border-color: rgba(255,255,255,0.36); background: rgba(255,255,255,0.04); }
+    .miniBtn i { font-size: 14px; }
+
+    /* ── Leaderboard section (social proof) ───────────────────── */
+    .board {
+      background: var(--card);
+      border: 1px solid var(--edge);
+      border-radius: 18px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      overflow: hidden;
+    }
+    .board__head {
+      padding: 14px 18px 10px;
+      display: flex; align-items: baseline; gap: 10px; justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .board__head h2 {
       margin: 0;
-      padding: 10px;
-      display: grid;
-      gap: 7px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
     }
+    .board__meta {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+    .list { list-style: none; margin: 0; padding: 8px; display: grid; gap: 6px; }
     .row {
       display: grid;
-      grid-template-columns: 48px 1fr auto auto;
-      gap: 10px;
-      align-items: center;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      grid-template-columns: 38px 1fr auto auto;
+      gap: 10px; align-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.07);
       border-radius: 10px;
-      background: rgba(255, 255, 255, 0.03);
-      padding: 9px 11px;
+      background: rgba(255, 255, 255, 0.025);
+      padding: 8px 11px;
       font-size: 13px;
       line-height: 1.35;
       scroll-margin-top: 22px;
     }
-    .rank { color: var(--muted); font-weight: 600; }
-    .name {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+    .rank { color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .catBadge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 10.5px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
       padding: 2px 8px 2px 6px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.09);
       color: #cdd7e5;
       white-space: nowrap;
     }
@@ -189,24 +208,29 @@
       letter-spacing: 0.02em;
     }
     .row.hit {
-      background: rgba(255, 216, 115, 0.14);
+      background: rgba(255, 216, 115, 0.13);
       border-color: var(--goldEdge);
-      box-shadow: 0 0 0 2px rgba(255, 216, 115, 0.2) inset;
+      box-shadow: 0 0 0 1px rgba(255, 216, 115, 0.18) inset;
     }
-    .row.hit .time,
-    .row.hit .name { color: var(--gold); }
-    .empty {
-      padding: 18px;
+    .row.hit .time, .row.hit .name { color: var(--gold); }
+    .empty { padding: 18px; color: var(--muted); font-size: 13px; }
+
+    .footnote {
+      text-align: center;
+      font-size: 11px;
       color: var(--muted);
-      font-size: 13px;
+      letter-spacing: 0.04em;
+      opacity: 0.85;
     }
+    .footnote a { color: var(--accent); text-decoration: none; }
+    .footnote a:hover { text-decoration: underline; }
+
     @media (max-width: 640px) {
-      body { padding: 12px; }
-      .head { padding: 13px 12px 9px; }
-      .meta { padding: 10px 12px; }
-      .list { padding: 8px; }
-      .row { grid-template-columns: 42px 1fr auto auto; padding: 8px 9px; }
-      .right { margin-left: 0; }
+      body { padding: 16px 12px 32px; }
+      .hero { padding: 22px 18px 20px; border-radius: 18px; }
+      .playBtn { width: 100%; justify-content: center; }
+      .miniBtn { width: 100%; justify-content: center; }
+      .row { grid-template-columns: 32px 1fr auto auto; padding: 7px 9px; }
     }
   </style>
 </head>
@@ -221,40 +245,47 @@
     referrerpolicy="same-origin"
   ></iframe>
   <div id="bgScrim" aria-hidden="true"></div>
-  <main class="wrap">
-    <div class="head">
-      <div>
-        <h1>Leaderboard</h1>
-        <p class="sub">DIY PC Fan Air Purifier</p>
+
+  <main class="page">
+    <section class="hero" aria-labelledby="heroHeadline">
+      <span id="heroEyebrow" class="hero__eyebrow"><i class="ph-fill ph-trophy"></i> Speedrun Challenge</span>
+      <h1 id="heroHeadline" class="hero__headline">Loading challenge…</h1>
+      <p class="hero__pitch">
+        <b>DIY Air Purifier</b> is a first-person speedrun in a tiny bedroom. Grab every coin
+        as fast as you can — no install, plays in your browser.
+      </p>
+      <div class="hero__cta">
+        <a class="playBtn glass-btn glass-btn--primary" href="/play"><i class="ph-fill ph-play"></i> Play now</a>
+        <button id="copyLinkBtn" class="miniBtn" type="button"><i class="ph ph-link"></i> Copy link</button>
       </div>
-      <div class="right">
-        <button id="copyLinkBtn" class="btn glass-btn glass-btn--secondary" type="button"><i class="ph ph-link"></i> Copy link</button>
-        <a class="btn btn--play glass-btn glass-btn--primary" href="/play"><i class="ph-fill ph-play"></i> Play</a>
-      </div>
-    </div>
-    <div id="meta" class="meta">Loading...</div>
-    <ol id="rows" class="list" aria-live="polite"></ol>
-    <div id="empty" class="empty" style="display:none">No runs yet. Be the first to post a time.</div>
+    </section>
+
+    <section class="board" aria-labelledby="boardHeadline">
+      <header class="board__head">
+        <h2 id="boardHeadline">Top times</h2>
+        <span id="boardMeta" class="board__meta"></span>
+      </header>
+      <ol id="rows" class="list" aria-live="polite"></ol>
+      <div id="empty" class="empty" style="display:none">No runs yet — be the first.</div>
+    </section>
+
+    <p class="footnote">A weekend project by <a href="https://brandonmoore.design" target="_blank" rel="noopener">Brandon</a>.</p>
   </main>
 
   <script>
     const rowsEl = document.getElementById('rows');
-    const metaEl = document.getElementById('meta');
     const emptyEl = document.getElementById('empty');
+    const heroHeadline = document.getElementById('heroHeadline');
+    const heroEyebrow = document.getElementById('heroEyebrow');
+    const boardMeta = document.getElementById('boardMeta');
     const copyBtn = document.getElementById('copyLinkBtn');
+
     const query = new URLSearchParams(location.search);
     const hitId = query.get('entry') || '';
-    const _queryTimeRaw = query.get('timeMs') || query.get('time') || '';
-    const _queryTimeMsNum = Math.floor(Number(_queryTimeRaw));
-    const queryTimeMs = Number.isFinite(_queryTimeMsNum) && _queryTimeMsNum > 0 ? _queryTimeMsNum : 0;
 
     function escapeHtml(v) {
       return String(v || '').replace(/[&<>"']/g, (ch) => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;'
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
       }[ch]));
     }
 
@@ -266,7 +297,6 @@
       return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(z).padStart(3, '0')}`;
     }
 
-    // Cat model → emoji/label. Kept in sync with index.html's _CAT_MODEL_EMOJI.
     const CAT_MODEL_EMOJI = { classic: '🐱', toon: '🦁', bababooey: '🐿️' };
     const CAT_MODEL_LABEL = { classic: 'Classic', toon: 'Toon', bababooey: 'Bababooey' };
     const CAT_COLOR_HEX = { charcoal: '#3a3a42', cream: '#e8d9b3', midnight: '#1a2030', snow: '#e8e8e8', ginger: '#d97a2a', tuxedo: '#151a22' };
@@ -296,71 +326,80 @@
       ta.remove();
     }
 
+    function renderHero({ challenger, time, isTopTime }) {
+      if (challenger && time) {
+        const eyebrow = isTopTime ? 'Top time on the board' : 'A friend challenged you';
+        heroEyebrow.innerHTML = `<i class="ph-fill ph-trophy"></i> ${escapeHtml(eyebrow)}`;
+        heroHeadline.innerHTML = `Beat <span class="who">${escapeHtml(challenger)}</span>'s <span class="time">${escapeHtml(time)}</span>`;
+      } else {
+        heroEyebrow.innerHTML = `<i class="ph-fill ph-trophy"></i> Speedrun Challenge`;
+        heroHeadline.textContent = 'How fast can you grab every coin?';
+      }
+    }
+
     async function loadLeaderboard() {
+      let rows = [];
       try {
         const res = await fetch('/api/leaderboard', { credentials: 'same-origin' });
         const data = await res.json();
         if (!res.ok || data.ok === false) throw new Error((data && data.message) || `API ${res.status}`);
-
-        const rows = Array.isArray(data.leaderboard) ? data.leaderboard : [];
-        if (!rows.length) {
-          rowsEl.innerHTML = '';
-          emptyEl.style.display = 'block';
-          metaEl.textContent = queryTimeMs
-            ? `Shared leaderboard is live. No runs yet. Your time: ${fmtRun(queryTimeMs)}`
-            : 'Shared leaderboard is live. No runs yet.';
-          return;
-        }
-
-        rowsEl.innerHTML = rows.map((r, i) => {
-          const rowId = String(r.id || '');
-          const hit = hitId && rowId === hitId;
-          return `<li class="row${hit ? ' hit' : ''}" data-entry-id="${escapeHtml(rowId)}">
-            <div class="rank">#${i + 1}</div>
-            <div class="name">${escapeHtml(r.name)}</div>
-            ${catBadgeHtml(r)}
-            <div class="time">${fmtRun(r.timeMs)}</div>
-          </li>`;
-        }).join('');
-
-        emptyEl.style.display = 'none';
-        metaEl.textContent = queryTimeMs
-          ? `Fastest first | Top ${data.maxEntries || 25} | Max ${data.perPlayer || 3} per player | Your time ${fmtRun(queryTimeMs)}`
-          : `Fastest first | Top ${data.maxEntries || 25} | Max ${data.perPlayer || 3} per player`;
-
-        if (hitId) {
-          const allRows = rowsEl.querySelectorAll('[data-entry-id]');
-          let hitEl = null;
-          for (const rowEl of allRows) {
-            if (rowEl.getAttribute('data-entry-id') === hitId) {
-              hitEl = rowEl;
-              break;
-            }
-          }
-          if (hitEl) {
-            setTimeout(() => hitEl.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
-          }
-        }
+        rows = Array.isArray(data.leaderboard) ? data.leaderboard : [];
+        boardMeta.textContent = `Top ${data.maxEntries || 25} · max ${data.perPlayer || 3}/player`;
       } catch (err) {
+        rows = [];
+        boardMeta.textContent = 'Connection issue';
+      }
+
+      // Resolve hero target: the shared entry, falling back to #1.
+      let hitRow = null;
+      if (hitId) hitRow = rows.find((r) => String(r.id || '') === hitId) || null;
+      const heroRow = hitRow || rows[0] || null;
+      if (heroRow) {
+        renderHero({
+          challenger: heroRow.name || 'Someone',
+          time: fmtRun(heroRow.timeMs),
+          isTopTime: !hitRow && heroRow === rows[0]
+        });
+      } else {
+        renderHero({});
+      }
+
+      if (!rows.length) {
         rowsEl.innerHTML = '';
         emptyEl.style.display = 'block';
-        emptyEl.textContent = 'Could not load leaderboard right now.';
-        metaEl.textContent = 'Connection issue';
+        return;
+      }
+      emptyEl.style.display = 'none';
+
+      rowsEl.innerHTML = rows.map((r, i) => {
+        const rowId = String(r.id || '');
+        const hit = hitId && rowId === hitId;
+        return `<li class="row${hit ? ' hit' : ''}" data-entry-id="${escapeHtml(rowId)}">
+          <div class="rank">#${i + 1}</div>
+          <div class="name">${escapeHtml(r.name)}</div>
+          ${catBadgeHtml(r)}
+          <div class="time">${fmtRun(r.timeMs)}</div>
+        </li>`;
+      }).join('');
+
+      if (hitId) {
+        const hitEl = rowsEl.querySelector(`[data-entry-id="${CSS.escape(hitId)}"]`);
+        if (hitEl) setTimeout(() => hitEl.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
       }
     }
 
     copyBtn.addEventListener('click', async () => {
+      const original = copyBtn.innerHTML;
       try {
         await copyText(location.href);
-        copyBtn.textContent = 'Copied!';
-        setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1200);
+        copyBtn.innerHTML = '<i class="ph ph-check"></i> Copied!';
       } catch (err) {
-        copyBtn.textContent = 'Copy failed';
-        setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1400);
+        copyBtn.innerHTML = '<i class="ph ph-warning"></i> Copy failed';
       }
+      setTimeout(() => { copyBtn.innerHTML = original; }, 1400);
     });
 
-    // Fade in the background scene once it loads (or skip on small/mobile devices to save battery)
+    // Skip the live-scene iframe on touch / narrow devices to save battery.
     const bgFrame = document.getElementById('bgFrame');
     const _isCoarse = matchMedia('(pointer: coarse)').matches;
     const _isNarrow = window.innerWidth < 720;
@@ -368,7 +407,6 @@
       bgFrame.remove();
     } else if (bgFrame) {
       bgFrame.addEventListener('load', () => bgFrame.classList.add('ready'), { once: true });
-      // Safety fade-in if load event never fires
       setTimeout(() => bgFrame.classList.add('ready'), 4000);
     }
 

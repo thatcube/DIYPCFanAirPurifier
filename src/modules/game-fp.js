@@ -1910,7 +1910,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     }
 
     const desiredBg = _crosshairAimingAtInteractable ? '#91deff' : 'rgba(255,255,255,0.8)';
-    const desiredTransform = _crosshairAimingAtInteractable ? 'translate(-50%,-50%) scale(1.5)' : 'translate(-50%,-50%) scale(1)';
+    const desiredTransform = _crosshairAimingAtInteractable ? 'translate(-50%,-50%) scale(3)' : 'translate(-50%,-50%) scale(1)';
     const crosshair = _cachedCrosshair;
     if (crosshair.style.background !== desiredBg) crosshair.style.background = desiredBg;
     if (crosshair.style.transform !== desiredTransform) crosshair.style.transform = desiredTransform;
