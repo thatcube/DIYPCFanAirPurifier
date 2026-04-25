@@ -444,6 +444,45 @@ function _refreshSpeedPillLockState() {
   }
 }
 
+// Refresh the Totodile char-card's locked state + hint label. Mirrors the
+// speed-pill flow: padlock when locked, plain card when unlocked. If the
+// player currently has Totodile selected and somehow it's locked, snap
+// the selection back to Classic so they can't start a run as a locked cat.
+function _refreshTotodileCardLockState() {
+  const card = document.querySelector('.char-card[data-model="totodile"]');
+  if (!card) return;
+  const unlocked = catAppearance.isTotodileUnlocked();
+  card.classList.toggle('locked', !unlocked);
+  card.setAttribute('aria-disabled', unlocked ? 'false' : 'true');
+  // Replace the name with a hint when locked. Cache the original name on
+  // first run so we can restore it cleanly.
+  const nameEl = card.querySelector('.char-name');
+  if (nameEl) {
+    if (!nameEl.dataset.origName) nameEl.dataset.origName = nameEl.textContent || 'Totodile';
+    nameEl.textContent = unlocked
+      ? nameEl.dataset.origName
+      : 'Beat the game in under 2:00';
+  }
+  // Lock badge — gold padlock chip in the corner. Created lazily.
+  let badge = card.querySelector('.char-card__lock');
+  if (!unlocked) {
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.className = 'char-card__lock';
+      badge.innerHTML = '<i class="ph ph-lock-simple"></i>';
+      card.appendChild(badge);
+    }
+  } else if (badge) {
+    badge.remove();
+  }
+  card.title = unlocked
+    ? 'Totodile'
+    : 'Locked — beat the game in under 2:00 to unlock';
+  if (!unlocked && _selectedModel === 'totodile') {
+    _selectedModel = 'classic';
+  }
+}
+
 let _previewsInited = false;
 let _charSelectFocusTrap = null;
 let _charSelectSavedFocus = null;
@@ -471,6 +510,11 @@ window._openCharSelect = () => {
     // moment the modal opens, without waiting for the next rAF tick.
     requestAnimationFrame(() => flushPreviewsOnOpen());
   }
+  // Refresh lock states FIRST — they may downgrade _selectedModel /
+  // _selectedMode (e.g. snap totodile→classic, speed→normal) before we
+  // apply the selection highlights below.
+  _refreshSpeedPillLockState();
+  _refreshTotodileCardLockState();
   // Highlight the previously selected model (or classic on first open)
   document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
   const activeCard = document.querySelector(`.char-card[data-model="${_selectedModel}"]`);
@@ -478,9 +522,6 @@ window._openCharSelect = () => {
   // Show/hide color dots based on current selection
   const colorSection = document.getElementById('classicColors');
   if (colorSection) colorSection.style.visibility = _selectedModel === 'classic' ? 'visible' : 'hidden';
-  // Refresh Speed Mode lock state + progress label, then highlight current mode
-  // (refresh may downgrade _selectedMode from speed → normal if locked).
-  _refreshSpeedPillLockState();
   document.querySelectorAll('.mode-pill').forEach(p => p.classList.toggle('on', p.dataset.mode === _selectedMode));
 };
 
@@ -525,6 +566,17 @@ if ('requestIdleCallback' in window) {
 }
 
 window._selectCat = (model, el) => {
+  // Block selection of locked Totodile — same shake+toast pattern as
+  // the locked Speed Mode pill.
+  if (model === 'totodile' && !catAppearance.isTotodileUnlocked()) {
+    if (el) {
+      el.classList.remove('shake');
+      void el.offsetWidth;
+      el.classList.add('shake');
+    }
+    showToast('Totodile locked — beat the game in under 2:00 to unlock');
+    return;
+  }
   _selectedModel = model;
   document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
   if (el) el.classList.add('selected');
@@ -1066,6 +1118,7 @@ function animate(ts) {
     const preset = catAppearance.getSelectedModelPreset();
     const catAnimSpeed = Math.max(0.12, Number(preset.animSpeed) || 1);
     const isBababooey = catAppearance.catModelKey === 'bababooey';
+    const isTotodile = catAppearance.catModelKey === 'totodile';
     const hasWalkClip = !!catAnimation.catWalkAction;
     const hasIdleClip = !!catAnimation.catIdleAction;
 
@@ -1156,7 +1209,7 @@ function animate(ts) {
     catAnimation.catMixer.update(Math.max(0, mixerDt));
 
     if (idleBlend < 0.2) catAnimation.refreshGameplayIdleBasePose();
-    if (idleBlend > 0.001) catAnimation.applyGameplayProceduralIdle(ts, idleBlend);
+    if (idleBlend > 0.001 && !isTotodile) catAnimation.applyGameplayProceduralIdle(ts, idleBlend);
 
     if (isBababooey && moveBlend > 0.001) {
       const runBlend = Number(st._bababooeyRunBlendSmoothed) || 0;
@@ -1166,6 +1219,20 @@ function animate(ts) {
     // Bababooey idle squish
     if (isBababooey && idleBlend > 0.001) {
       catAnimation.applyBababooeyIdleSquish(ts, idleBlend);
+    }
+
+    // Totodile has no baked clips — drive everything procedurally.
+    // Idle bone sway + body squish are layered with the run cycle so
+    // standing still still has subtle motion and running rides on top
+    // of the breathing baseline.
+    if (isTotodile) {
+      if (idleBlend > 0.001) {
+        catAnimation.applyTotodileProceduralIdle(ts, idleBlend);
+        catAnimation.applyTotodileIdleSquish(ts, idleBlend);
+      }
+      if (moveBlend > 0.001) {
+        catAnimation.applyTotodileProceduralRun(ts, svel, moveBlend);
+      }
     }
 
     // Reset position/rotation to base each frame
