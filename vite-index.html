@@ -283,6 +283,17 @@
           <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
         </div>
       </div>
+      <div class="mode-select" role="group" aria-label="Movement mode">
+        <button type="button" class="mode-pill on" data-mode="normal" onclick="window._selectMode&&window._selectMode('normal',this)">
+          <i class="ph ph-person-simple-walk"></i>
+          <span class="mode-pill__label">Normal</span>
+        </button>
+        <button type="button" class="mode-pill" data-mode="speed" onclick="window._selectMode&&window._selectMode('speed',this)">
+          <i class="ph ph-lightning"></i>
+          <span class="mode-pill__label">Speed</span>
+          <span class="mode-pill__sub">3× top speed · +12 coins</span>
+        </button>
+      </div>
       <button class="char-start glass-btn glass-btn--primary" onclick="window._startGame&&window._startGame()">Start run</button>
     </div>
   </div>
@@ -336,10 +347,16 @@
   </div>
   <div id="fpChargeBar" aria-label="Jump charge">
     <div class="fp-charge-head">
-      <span class="fp-charge-label"><i class="ph ph-arrow-fat-up"></i> Jump charge</span>
+      <span class="fp-charge-label"><i class="ph ph-arrow-fat-up"></i> <span id="fpChargeLabel">Jump charge</span></span>
       <span id="fpChargeValue">Ready</span>
     </div>
-    <div class="fp-charge-track"><div id="fpChargeFill"></div></div>
+    <div class="fp-charge-track">
+      <div id="fpChargeFill"></div>
+      <div class="fp-charge-ticks" aria-hidden="true">
+        <span class="fp-charge-tick" style="left: 33.3%"></span>
+        <span class="fp-charge-tick" style="left: 66.6%"></span>
+      </div>
+    </div>
     <div id="fpChargeHint"><kbd>Hold Space</kbd> then release for a higher jump</div>
   </div>
 

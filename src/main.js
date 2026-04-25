@@ -396,6 +396,7 @@ if (roomRefs && typeof roomRefs.setMacbookMuted === 'function') {
 // Character select screen
 let _selectedModel = 'classic';
 let _selectedColor = 'charcoal';
+let _selectedMode = gameFp.isSpeedMode() ? 'speed' : 'normal';
 const _PLAY_PATH_AUTO_OPEN = /^\/play\/?$/.test(window.location.pathname);
 
 let _previewsInited = false;
@@ -432,6 +433,8 @@ window._openCharSelect = () => {
   // Show/hide color dots based on current selection
   const colorSection = document.getElementById('classicColors');
   if (colorSection) colorSection.style.visibility = _selectedModel === 'classic' ? 'visible' : 'hidden';
+  // Highlight current mode
+  document.querySelectorAll('.mode-pill').forEach(p => p.classList.toggle('on', p.dataset.mode === _selectedMode));
 };
 
 window._closeCharSelect = () => {
@@ -492,6 +495,11 @@ window._selectColor = (color, el) => {
   recolorClassicPreview(colorMap[color] || 0x0a0a12);
 };
 
+window._selectMode = (mode, el) => {
+  _selectedMode = mode === 'speed' ? 'speed' : 'normal';
+  document.querySelectorAll('.mode-pill').forEach(p => p.classList.toggle('on', p.dataset.mode === _selectedMode));
+};
+
 window._startGame = () => {
   const cs = document.getElementById('charSelect');
   if (cs) cs.classList.remove('open');
@@ -503,6 +511,10 @@ window._startGame = () => {
   if (catAppearance.isColorable(_selectedModel)) {
     catAppearance.setCatColorKeyRaw(_selectedColor);
   }
+  // Apply movement / coin mode
+  const speed = _selectedMode === 'speed';
+  gameFp.setSpeedMode(speed);
+  coins.setSpeedMode(speed);
   // Reload cat model with new selection
   catAnimation.loadGameplayCat({
     applyCatColorToModel: catAnimation.applyColorToAll
