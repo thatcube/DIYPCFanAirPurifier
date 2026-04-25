@@ -1733,7 +1733,7 @@ body.play-mode #fps {
   gap: 12px;
   justify-content: center;
   align-items: stretch;
-  margin: 4px 0 4px;
+  margin: 4px 0 20px;
   flex-wrap: wrap;
 }
 .mode-pill {

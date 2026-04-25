@@ -1554,22 +1554,59 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
   _spaceWasDown = fpKeys.space;
 
-  // Charge bar UI: shows fill while holding on ground, "Air" while airborne.
+  // Charge bar UI: shows fill + tier visuals while holding on ground; drives
+  // a glowing point light parented to the cat that ramps with charge tier.
   _cacheDom();
+  _ensureChargeLight();
   const chargePct = (onGround && _spaceHeld > 0)
     ? Math.min(_spaceHeld / JUMP_CHARGE_FRAMES, 1)
     : 0;
+  // Tier 0 = no charge, 1 = small (>0–33%), 2 = big (33–66%), 3 = MEGA (66–100%)
+  let chargeTier = 0;
+  if (chargePct > 0.66)      chargeTier = 3;
+  else if (chargePct > 0.33) chargeTier = 2;
+  else if (chargePct > 0)    chargeTier = 1;
+
   if (_cachedCbFill) {
     _cachedCbFill.style.width = `${Math.round(chargePct * 100)}%`;
   }
   if (_cachedCbBar) {
     _cachedCbBar.classList.toggle('charging', chargePct > 0);
     _cachedCbBar.classList.toggle('charged', chargePct >= 0.95);
+    _cachedCbBar.classList.toggle('tier-1', chargeTier === 1);
+    _cachedCbBar.classList.toggle('tier-2', chargeTier === 2);
+    _cachedCbBar.classList.toggle('tier-3', chargeTier === 3);
+  }
+  if (_cachedCbLabel) {
+    _cachedCbLabel.textContent =
+      chargeTier === 3 ? 'MEGA JUMP!' :
+      chargeTier === 2 ? 'Big jump' :
+      chargeTier === 1 ? 'Small jump' :
+      'Jump charge';
   }
   if (_cachedCbValue) {
     _cachedCbValue.textContent = onGround
       ? (chargePct > 0 ? `${Math.round(chargePct * 100)}%` : 'Ready')
       : 'Air';
+  }
+
+  // Cat charge glow — color blends cyan → teal → gold as tier rises.
+  if (_chargeLight) {
+    // Smoothed target intensity per tier (0, ~6, ~14, ~28). Scales with
+    // chargePct within the tier so it ramps in instead of stepping.
+    let targetI = 0;
+    if (chargeTier === 1)      targetI = 4 + chargePct * 4;
+    else if (chargeTier === 2) targetI = 10 + (chargePct - 0.33) * 12;
+    else if (chargeTier === 3) targetI = 22 + (chargePct - 0.66) * 22;
+    // Add a subtle MEGA flicker so it feels alive, not static.
+    if (chargeTier === 3) targetI *= 0.85 + 0.15 * Math.sin(ts * 0.05);
+    _chargeLightTarget = targetI;
+    const lerpK = 1 - Math.exp(-Math.max(0, dtSec) * 18);
+    _chargeLight.intensity += (_chargeLightTarget - _chargeLight.intensity) * lerpK;
+    // Hue: cyan(0x88ddff) → teal(0x88ffe0) → gold(0xffc870)
+    if (chargeTier === 3) _chargeLight.color.setHex(0xffc870);
+    else if (chargeTier === 2) _chargeLight.color.setHex(0x88ffe0);
+    else _chargeLight.color.setHex(0x88ddff);
   }
 
   // ── Gravity (asymmetric: fall faster than rise) ───────────────────
