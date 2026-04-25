@@ -29,10 +29,41 @@
       line-height: 1.45;
       letter-spacing: var(--tracking-base);
       text-rendering: optimizeLegibility;
+      /* Fallback gradient sits behind the iframe in case it fails to load */
       background: radial-gradient(1200px 700px at 18% -12%, #244868 0%, transparent 58%),
                   radial-gradient(900px 560px at 110% 10%, #1f3e56 0%, transparent 65%),
                   linear-gradient(180deg, var(--bg1), var(--bg0));
       padding: 18px;
+      position: relative;
+      overflow-x: hidden;
+    }
+    /* Live game scene rendered behind the leaderboard */
+    #bgFrame {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      border: 0;
+      z-index: -2;
+      pointer-events: none;
+      filter: saturate(1.05);
+      opacity: 0;
+      transition: opacity 0.6s ease;
+    }
+    #bgFrame.ready { opacity: 1; }
+    /* Dark scrim so leaderboard text stays legible over the live scene */
+    #bgScrim {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background:
+        radial-gradient(120% 80% at 50% 30%, rgba(7,18,29,0.35) 0%, rgba(7,18,29,0.7) 70%, rgba(7,18,29,0.88) 100%);
+      backdrop-filter: blur(2px) saturate(1.05);
+      -webkit-backdrop-filter: blur(2px) saturate(1.05);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #bgFrame { display: none; }
     }
     .wrap {
       width: min(960px, 100%);
@@ -87,6 +118,62 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    }
+    /* Big, obvious green Play CTA */
+    .btn--play {
+      padding: 12px 22px;
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: #052016;
+      background: linear-gradient(180deg, #b6ffd4 0%, #6fe8a3 55%, #3ed089 100%);
+      border: 1px solid rgba(220, 255, 230, 0.85);
+      border-radius: 12px;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+      box-shadow:
+        0 0 0 1px rgba(180, 255, 210, 0.6) inset,
+        0 10px 28px rgba(80, 220, 140, 0.45),
+        0 0 36px rgba(120, 240, 170, 0.4);
+      animation: playPulse 2.2s ease-in-out infinite;
+    }
+    .btn--play::before {
+      content: "▶";
+      font-size: 11px;
+      line-height: 1;
+      display: inline-block;
+      transform: translateY(-1px);
+    }
+    .btn--play:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+      box-shadow:
+        0 0 0 1px rgba(220, 255, 235, 0.9) inset,
+        0 14px 36px rgba(80, 220, 140, 0.55),
+        0 0 48px rgba(120, 240, 170, 0.5);
+    }
+    .btn--play:active { transform: translateY(0); }
+    .btn--play:focus-visible {
+      outline: 2px solid rgba(220, 255, 235, 0.95);
+      outline-offset: 3px;
+    }
+    @keyframes playPulse {
+      0%, 100% {
+        box-shadow:
+          0 0 0 1px rgba(180, 255, 210, 0.6) inset,
+          0 10px 28px rgba(80, 220, 140, 0.45),
+          0 0 36px rgba(120, 240, 170, 0.4);
+      }
+      50% {
+        box-shadow:
+          0 0 0 1px rgba(200, 255, 220, 0.8) inset,
+          0 12px 34px rgba(80, 220, 140, 0.6),
+          0 0 56px rgba(120, 240, 170, 0.6);
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .btn--play { animation: none; }
     }
     .meta {
       padding: 11px 16px;
@@ -172,6 +259,16 @@
   </style>
 </head>
 <body>
+  <iframe
+    id="bgFrame"
+    src="/?bg=1"
+    title=""
+    aria-hidden="true"
+    tabindex="-1"
+    loading="lazy"
+    referrerpolicy="same-origin"
+  ></iframe>
+  <div id="bgScrim" aria-hidden="true"></div>
   <main class="wrap">
     <div class="head">
       <div>
@@ -180,7 +277,7 @@
       </div>
       <div class="right">
         <button id="copyLinkBtn" class="btn" type="button">Copy link</button>
-        <a class="btn" href="/play">Play</a>
+        <a class="btn btn--play" href="/play">Play</a>
       </div>
     </div>
     <div id="meta" class="meta">Loading...</div>
@@ -310,6 +407,18 @@
         setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1400);
       }
     });
+
+    // Fade in the background scene once it loads (or skip on small/mobile devices to save battery)
+    const bgFrame = document.getElementById('bgFrame');
+    const _isCoarse = matchMedia('(pointer: coarse)').matches;
+    const _isNarrow = window.innerWidth < 720;
+    if (bgFrame && (_isCoarse || _isNarrow)) {
+      bgFrame.remove();
+    } else if (bgFrame) {
+      bgFrame.addEventListener('load', () => bgFrame.classList.add('ready'), { once: true });
+      // Safety fade-in if load event never fires
+      setTimeout(() => bgFrame.classList.add('ready'), 4000);
+    }
 
     loadLeaderboard();
   </script>
