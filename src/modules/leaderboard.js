@@ -1476,12 +1476,9 @@ function _createFinishDialogDOM() {
       setTimeout(() => { if (btn) btn.textContent = 'Copy result'; }, 1500);
     }
   });
-  overlay.addEventListener('click', async e => {
-    if (e.target !== overlay) return;
-    await _submitPendingFinishRun();
-    if (_finishPendingRun || (_finishNameDirty && _finishSaveStatus === 'error')) return;
-    closeFinishDialog();
-  });
+  // Intentionally no backdrop-click-to-close: dragging to select text in the
+  // name input can end on the overlay and would otherwise dismiss the dialog.
+  // Use Escape or the Exit / Play again buttons to close.
   overlay.addEventListener('keydown', e => e.stopPropagation());
   document.addEventListener('keydown', e => {
     if (!_finishDialogOpen) return;
