@@ -437,7 +437,7 @@ async function handleAdminLeaderboard(request, env, cfg) {
   const auth = await requireAdmin(request, env);
   if (auth) return auth;
 
-  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg);
+  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg, { includeTests: true });
   return jsonResponse(200, {
     ok: true,
     leaderboard,
@@ -527,15 +527,15 @@ async function getRunCoinCount(db, runId) {
   return Number(row?.c || 0);
 }
 
-async function getNormalizedLeaderboard(db, cfg) {
+async function getNormalizedLeaderboard(db, cfg, options = {}) {
+  const includeTests = options.includeTests === true;
   const scanLimit = Math.max(cfg.LB_MAX * cfg.LB_PER_PLAYER * 6, 200);
-  const rows = await db
-    .prepare(
-      `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, is_test
+  const sql = includeTests
+    ? `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, is_test
        FROM leaderboard_entries ORDER BY time_ms ASC, at_ms ASC LIMIT ?`
-    )
-    .bind(scanLimit)
-    .all();
+    : `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, is_test
+       FROM leaderboard_entries WHERE is_test = 0 ORDER BY time_ms ASC, at_ms ASC LIMIT ?`;
+  const rows = await db.prepare(sql).bind(scanLimit).all();
 
   return normalizeLeaderboard(rows.results || [], cfg.LB_MAX, cfg.LB_PER_PLAYER);
 }
