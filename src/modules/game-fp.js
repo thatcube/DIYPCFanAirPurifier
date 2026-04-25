@@ -211,6 +211,10 @@ let _jumpBufferFrames = 0;     // frames remaining where a pre-press will trigge
 let _spaceWasDown = false;     // edge-detect for space press
 let _wasBonking = false;
 let _wasGroundedLast = true;
+let _wallContactNx = 0;       // wall-push normal X from last frame (0 = no wall)
+let _wallContactNz = 0;       // wall-push normal Z from last frame
+let _wallJumpCooldown = 0;     // frames remaining before next wall jump allowed
+let _preCollisionSpd = 0;     // horizontal speed snapshot before collision kills it
 let _wasAimingAtInteractable = false;
 let _lastAimToneTs = 0;
 let _lastCrosshairRaycastTs = 0;
@@ -1809,7 +1813,7 @@ export function toggleFirstPerson() {
     if (_markShadowsDirty) _markShadowsDirty();
     document.body.classList.add('play-mode');
     _playModeCue(true);
-    if (_showToast) _showToast('Game mode! WASD to move, Space to jump');
+    if (_showToast) _showToast('Game mode! WASD to move, Space to jump (wall jump too!)');
   } else {
     _toggleHelp(false);
     _setQuickControlsVisible(false);
@@ -1877,6 +1881,7 @@ function _respawn() {
   _coyoteFrames = 0;
   _jumpBufferFrames = 0;
   _spaceWasDown = false;  _lastPhysicsTs = 0;
+  _wallContactNx = 0; _wallContactNz = 0; _wallJumpCooldown = 0; _preCollisionSpd = 0;
   fpPaused = false;
   _ssFullChargeSinceTs = 0;
   _ssActiveUntilTs = 0;
@@ -2147,13 +2152,18 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   // let you still jump for a moment after stepping off; the jump buffer
   // remembers a press right before landing so you don't lose presses.
   // Asymmetric gravity (snappier fall) is below in the gravity section.
-  const JUMP_BASE_VY         = 0.55;  // power on a near-zero-charge release
-  const JUMP_MAX_BONUS       = 1.25;  // extra power at full charge — enough to bonk the ceiling
+  const JUMP_BASE_VY         = 0.28;  // power on a near-zero-charge release
+  const JUMP_MAX_BONUS       = 0.52;  // extra power at full charge
   const JUMP_CHARGE_FRAMES   = 30;    // frames to reach full charge (~0.5s)
   const COYOTE_FRAMES        = 6;     // grace frames after walking off a ledge
   const JUMP_BUFFER_FRAMES   = 8;     // grace frames for a press just before landing
   const GRAVITY_RISE         = 0.018; // gravity while ascending
   const GRAVITY_FALL         = 0.028; // stronger gravity while falling — snappier feel
+  const WALL_JUMP_VY_MIN     = 0.55;  // vertical boost at zero speed
+  const WALL_JUMP_VY_MAX     = 1.00;  // vertical boost at full sprint into wall
+  const WALL_JUMP_PUSH_MIN   = 0.30;  // horizontal push at zero speed
+  const WALL_JUMP_PUSH_MAX   = 0.75;  // horizontal push at full sprint
+  const WALL_JUMP_COOLDOWN   = 18;    // frames between wall jumps (anti-spam)
 
   // Grounded gate matches the old vy≈0 check; _wasGroundedLast is set at the
   // end of the previous frame and is the most reliable "on something" signal.
@@ -2204,6 +2214,30 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     _coyoteFrames = 0;
     _isJumping = true;
   }
+
+  // ── Wall jump ─────────────────────────────────────────────────────
+  // If airborne, touching a wall, and space is pressed — bounce off the wall.
+  // Momentum matters: faster approach = bigger bounce.
+  _wallJumpCooldown = Math.max(0, _wallJumpCooldown - frameScale);
+  const touchingWall = (_wallContactNx !== 0 || _wallContactNz !== 0);
+  if (!firedThisFrame && !onGround && touchingWall && spacePressed && _wallJumpCooldown <= 0) {
+    // Use pre-collision speed so wall-killed velocity doesn't read as zero
+    const spdNorm = Math.min(1, _preCollisionSpd / 0.35);
+    const wallVy = WALL_JUMP_VY_MIN + (WALL_JUMP_VY_MAX - WALL_JUMP_VY_MIN) * spdNorm;
+    const wallPush = WALL_JUMP_PUSH_MIN + (WALL_JUMP_PUSH_MAX - WALL_JUMP_PUSH_MIN) * spdNorm;
+    fpVy = wallVy;
+    // Push away from wall
+    const nLen = Math.hypot(_wallContactNx, _wallContactNz) || 1;
+    _velX = (_wallContactNx / nLen) * wallPush;
+    _velZ = (_wallContactNz / nLen) * wallPush;
+    _wallJumpCooldown = WALL_JUMP_COOLDOWN;
+    _isJumping = true;
+    _spaceHeld = 0;
+    _jumpBufferFrames = 0;
+    _playJumpCue(0.2 + spdNorm * 0.5);
+    firedThisFrame = true;
+  }
+
   if (fpVy <= 0) _isJumping = false;
 
   _spaceWasDown = fpKeys.space;
@@ -2337,13 +2371,17 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   let nx = fpPos.x + moveX;
   let nz = fpPos.z + moveZ;
   const r = BODY_R;
+  // Snapshot speed before collision kills it — wall jump needs this.
+  _preCollisionSpd = Math.hypot(_velX, _velZ);
+  _wallContactNx = 0;
+  _wallContactNz = 0;
 
   // Wall bounds — room stays at origin, use pre-computed base bounds
   const bounds = boundsBase;
-  if (nx < bounds.xMin + r) { nx = bounds.xMin + r; _velX = Math.max(_velX, 0); }
-  else if (nx > bounds.xMax - r) { nx = bounds.xMax - r; _velX = Math.min(_velX, 0); }
-  if (nz < bounds.zMin + r) { nz = bounds.zMin + r; _velZ = Math.max(_velZ, 0); }
-  else if (nz > bounds.zMax - r) { nz = bounds.zMax - r; _velZ = Math.min(_velZ, 0); }
+  if (nx < bounds.xMin + r) { nx = bounds.xMin + r; _velX = Math.max(_velX, 0); _wallContactNx = 1; }
+  else if (nx > bounds.xMax - r) { nx = bounds.xMax - r; _velX = Math.min(_velX, 0); _wallContactNx = -1; }
+  if (nz < bounds.zMin + r) { nz = bounds.zMin + r; _velZ = Math.max(_velZ, 0); _wallContactNz = 1; }
+  else if (nz > bounds.zMax - r) { nz = bounds.zMax - r; _velZ = Math.min(_velZ, 0); _wallContactNz = -1; }
 
   // Furniture AABBs (+ OBBs)
   let bonkedThisFrame = false;
@@ -2400,6 +2438,8 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
           const nPX = pushWX / pushLen, nPZ = pushWZ / pushLen;
           const velDot = _velX * nPX + _velZ * nPZ;
           if (velDot < 0) { _velX -= velDot * nPX; _velZ -= velDot * nPZ; }
+          _wallContactNx = nPX;
+          _wallContactNz = nPZ;
         }
       }
       continue; // skip AABB path
@@ -2437,10 +2477,10 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
         const pushZF = box.zMax + r - nz;
         const pushZB = nz + r - box.zMin;
         const minPush = Math.min(pushXL, pushXR, pushZF, pushZB);
-        if (minPush === pushXL) { nx = box.xMax + r; _velX = Math.max(_velX, 0); }
-        else if (minPush === pushXR) { nx = box.xMin - r; _velX = Math.min(_velX, 0); }
-        else if (minPush === pushZF) { nz = box.zMax + r; _velZ = Math.max(_velZ, 0); }
-        else { nz = box.zMin - r; _velZ = Math.min(_velZ, 0); }
+        if (minPush === pushXL) { nx = box.xMax + r; _velX = Math.max(_velX, 0); _wallContactNx = 1; }
+        else if (minPush === pushXR) { nx = box.xMin - r; _velX = Math.min(_velX, 0); _wallContactNx = -1; }
+        else if (minPush === pushZF) { nz = box.zMax + r; _velZ = Math.max(_velZ, 0); _wallContactNz = 1; }
+        else { nz = box.zMin - r; _velZ = Math.min(_velZ, 0); _wallContactNz = -1; }
       }
     }
   }

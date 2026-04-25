@@ -940,10 +940,10 @@ export function applyGameplaySkateUpperBodyForwardYaw(modelKey, amount = 1, ts =
     const moveK = animState._totoSkateMoveBlend;
     const rideKRaw = Math.max(0, Math.min(1, (moveK - 0.06) / 0.94));
     const rideK = rideKRaw * rideKRaw * (3 - 2 * rideKRaw); // smoothstep
-    const rideCadence = 0.95 + rideK * 1.05;
+    const rideCadence = 0.52 + rideK * 0.48;
     const rideSway = Math.sin(t * rideCadence + 0.35);
-    const rideSwayFine = Math.sin(t * (rideCadence * 1.32) + 1.05);
-    const rideBob = Math.sin(t * (rideCadence * 1.55) + 0.55);
+    const rideSwayFine = Math.sin(t * (rideCadence * 1.15) + 1.05);
+    const rideBob = Math.sin(t * (rideCadence * 1.25) + 0.55);
     // Keep feet planted by avoiding hip rotation in skate pose.
     // Drive turn/lean from waist upward so mid/upper torso carries motion.
     const swayYaw =
@@ -967,7 +967,7 @@ export function applyGameplaySkateUpperBodyForwardYaw(modelKey, amount = 1, ts =
       { bone: totoBones.head, weight: 0.05 }
     ]);
 
-    const torsoPulse = (Math.sin(t * (rideCadence * 1.35) + 0.12) * 0.028 + rideSway * 0.012) * rideK * k;
+    const torsoPulse = (Math.sin(t * (rideCadence * 1.15) + 0.12) * 0.020 + rideSway * 0.010) * rideK * k;
     applied += _applyWeightedBoneModelPitch(torsoPulse, [
       { bone: totoBones.waist, weight: 0.40 },
       { bone: totoBones.spine, weight: 0.46 },
@@ -975,23 +975,23 @@ export function applyGameplaySkateUpperBodyForwardYaw(modelKey, amount = 1, ts =
       { bone: totoBones.head, weight: 0.05 }
     ]);
 
-    const headLeadYaw = (0.30 + Math.sin(t * 0.62 + 0.4) * 0.020 + rideSway * 0.036 * rideK) * k;
+    const headLeadYaw = (0.30 + Math.sin(t * 0.34 + 0.4) * 0.026 + rideSway * 0.062 * rideK) * k;
     applied += _applyWeightedBoneModelYaw(-headLeadYaw, [
       { bone: totoBones.neck, weight: 0.50 },
       { bone: totoBones.head, weight: 0.50 }
     ]);
 
     // Clear, slower head scan while riding so the look-around reads.
-    const lookRate = 0.62 + rideK * 0.22;
+    const lookRate = 0.34 + rideK * 0.12;
     const lookSweepRaw = Math.sin(t * lookRate + 2.1);
     const lookSweep = lookSweepRaw * (0.55 + 0.45 * Math.abs(lookSweepRaw));
-    const lookYaw = lookSweep * (0.090 + rideK * 0.110) * rideK * k;
+    const lookYaw = lookSweep * (0.140 + rideK * 0.175) * rideK * k;
     applied += _applyWeightedBoneModelYaw(lookYaw, [
       { bone: totoBones.neck, weight: 0.44 },
       { bone: totoBones.head, weight: 0.56 }
     ]);
 
-    const headNod = (Math.sin(t * 0.52 + 0.9) * (0.046 + rideK * 0.028) + rideBob * 0.018 * rideK) * k;
+    const headNod = (Math.sin(t * 0.26 + 0.9) * (0.038 + rideK * 0.022) + rideBob * 0.012 * rideK) * k;
     applied += _applyWeightedBoneModelPitch(headNod, [
       { bone: totoBones.neck, weight: 0.46 },
       { bone: totoBones.head, weight: 0.54 }
