@@ -321,7 +321,8 @@ purifierRefs.setRoomRefs({
   toggleMacbook: roomRefs.toggleMacbook,
   toggleTV: roomRefs.toggleTV,
   toggleCornerDoor: roomRefs.toggleCornerDoor,
-  toggleFoodBowl: roomRefs.toggleFoodBowl
+  toggleFoodBowl: roomRefs.toggleFoodBowl,
+  getFoodBowlMesh: roomRefs.getFoodBowlMesh
 });
 
 // ── Wire module cross-references ────────────────────────────────────

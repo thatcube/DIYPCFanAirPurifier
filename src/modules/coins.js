@@ -542,6 +542,11 @@ export function spawnSecretTvCoin() {
     new THREE.Vector3(-BED_X, fy + 6, tvZ), {});
 }
 
+export function spawnSecretFoodBowlCoin(worldPos) {
+  if (!worldPos) return;
+  _spawnSecretIfUntriggered('foodBowl', _coinGroup, worldPos.clone(), {});
+}
+
 // ── Full reset for new run ──────────────────────────────────────────
 
 export function fullReset() {
