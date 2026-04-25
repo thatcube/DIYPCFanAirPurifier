@@ -3014,6 +3014,7 @@ export function createRoom(scene) {
     { name: 'Octodad Theme', src: 'assets/songs/Octodad (Nobody Suspects a Thing).mp3', volume: 0.28 },
     { name: 'Escape from the City', src: 'assets/songs/Escape From The City ... for City Escape.mp3', volume: 0.28 },
     { name: 'Warthog Run', src: 'assets/songs/H3 Warthog Run OST - Copyright Free.mp3', volume: 0.28 },
+    { name: 'Gerudo Valley', src: 'assets/songs/Gerudo Valley - The Legend of Zelda_ Ocarina Of Time Copyright free.mp3', volume: 0.28 },
   ];
   let _mbLastSongIdx = -1;
   // Cache one HTMLAudioElement per song so the browser streams it
