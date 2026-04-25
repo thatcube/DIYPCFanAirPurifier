@@ -41,6 +41,32 @@ export function tryUnlockTotodile(timeMs) {
   return true;
 }
 
+// ── Bababooey unlock ────────────────────────────────────────────────
+// Bababooey is locked until the player goes Super Saiyan in first-person
+// mode. How that happens is not explained in-game. Unlock state persists
+// in localStorage.
+const BABABOOEY_UNLOCK_KEY = 'diy_bababooey_unlocked';
+
+export function isBababooeyUnlocked() {
+  try { return localStorage.getItem(BABABOOEY_UNLOCK_KEY) === '1'; }
+  catch (e) { return false; }
+}
+export function setBababooeyUnlocked(v) {
+  try {
+    if (v) localStorage.setItem(BABABOOEY_UNLOCK_KEY, '1');
+    else   localStorage.removeItem(BABABOOEY_UNLOCK_KEY);
+  } catch (e) { /* private mode etc. */ }
+}
+/**
+ * Call when Super Saiyan activates. Returns true if this call newly
+ * unlocked Bababooey (so callers can fire a celebration toast).
+ */
+export function tryUnlockBababooey() {
+  if (isBababooeyUnlocked()) return false;
+  setBababooeyUnlocked(true);
+  return true;
+}
+
 export function setCatModelKeyRaw(k) { catModelKey = k; }
 export function setCatColorKeyRaw(k) { catColorKey = k; }
 export function setCatHairKeyRaw(k)  { catHairKey = k; }

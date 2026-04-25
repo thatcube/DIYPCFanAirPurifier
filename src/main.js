@@ -483,6 +483,42 @@ function _refreshTotodileCardLockState() {
   }
 }
 
+// Refresh the Bababooey char-card's locked state. Unlocks when the
+// player goes Super Saiyan in FP mode. Intentionally vague hint text —
+// we don't want to tell them how to trigger it.
+function _refreshBababooeyCardLockState() {
+  const card = document.querySelector('.char-card[data-model="bababooey"]');
+  if (!card) return;
+  const unlocked = catAppearance.isBababooeyUnlocked();
+  card.classList.toggle('locked', !unlocked);
+  card.setAttribute('aria-disabled', unlocked ? 'false' : 'true');
+  const nameEl = card.querySelector('.char-name');
+  if (nameEl) {
+    if (!nameEl.dataset.origName) nameEl.dataset.origName = nameEl.textContent || 'Bababooey';
+    nameEl.textContent = unlocked
+      ? nameEl.dataset.origName
+      : 'Go Super Saiyan to unlock';
+  }
+  let badge = card.querySelector('.char-card__lock');
+  if (!unlocked) {
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.className = 'char-card__lock';
+      badge.innerHTML = '<i class="ph ph-lock-simple"></i>';
+      card.appendChild(badge);
+    }
+  } else if (badge) {
+    badge.remove();
+  }
+  card.title = unlocked
+    ? 'Bababooey'
+    : 'Locked — go Super Saiyan to unlock';
+  if (!unlocked && _selectedModel === 'bababooey') {
+    _selectedModel = 'classic';
+  _refreshBababooeyCardLockState();
+  }
+}
+
 let _previewsInited = false;
 let _charSelectFocusTrap = null;
 let _charSelectSavedFocus = null;
@@ -541,6 +577,15 @@ document.getElementById('charSelect')?.addEventListener('keydown', e => {
   }
 });
 
+  if (model === 'bababooey' && !catAppearance.isBababooeyUnlocked()) {
+    if (el) {
+      el.classList.remove('shake');
+      void el.offsetWidth;
+      el.classList.add('shake');
+    }
+    showToast('Bababooey locked — go Super Saiyan to unlock');
+    return;
+  }
 if (_PLAY_PATH_AUTO_OPEN) {
   setTimeout(() => {
     if (!gameFp.fpMode) window._openCharSelect();

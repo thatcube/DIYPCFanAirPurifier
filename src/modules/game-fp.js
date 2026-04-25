@@ -18,6 +18,7 @@ import { getBounds, boundsBase, acquireBox, resetBoxPool, easeAlpha, BODY_R, EYE
 import * as coins from './coins.js';
 import * as leaderboard from './leaderboard.js';
 import * as catAnimation from './cat-animation.js';
+import * as catAppearance from './cat-appearance.js';
 import { trapFocus, saveFocus } from './a11y.js';
 import { RAYCAST_INTERVAL_MS } from './constants.js';
 
@@ -266,15 +267,15 @@ function _applySuperSaiyan(strength /* 0..1 */, ts) {
 
   // Aura visibility + flicker
   const flicker = 0.85 + 0.15 * Math.sin(ts * 0.06) + 0.05 * Math.sin(ts * 0.013);
-  const auraOpacity = Math.min(1, s * 0.55) * flicker;
+  const auraOpacity = Math.min(1, s * 0.22) * flicker;
   _ssAura.material.opacity = auraOpacity;
   _ssAura.visible = auraOpacity > 0.005;
   const pulse = 1 + 0.08 * Math.sin(ts * 0.02);
-  const baseScale = 0.85 + s * 0.55;
+  const baseScale = (0.85 + s * 0.55) * 0.6;
   _ssAura.scale.setScalar(baseScale * pulse);
 
   if (_ssHalo) {
-    const haloOpacity = Math.min(1, s * 0.32) * flicker;
+    const haloOpacity = Math.min(1, s * 0.13) * flicker;
     _ssHalo.material.opacity = haloOpacity;
     _ssHalo.visible = haloOpacity > 0.005;
     _ssHalo.scale.setScalar(baseScale * (1.05 + 0.06 * Math.sin(ts * 0.018)));
@@ -300,8 +301,8 @@ function _applySuperSaiyan(strength /* 0..1 */, ts) {
       }
       if (wantOverride) {
         // Blend original emissive toward gold based on strength.
-        m.emissive.copy(entry.emissive).lerp(_ssGoldHot, Math.min(1, s));
-        m.emissiveIntensity = entry.intensity + s * 1.4 * flicker;
+        m.emissive.copy(entry.emissive).lerp(_ssGoldHot, Math.min(1, s * 0.5));
+        m.emissiveIntensity = entry.intensity + s * 0.55 * flicker;
       } else {
         m.emissive.copy(entry.emissive);
         m.emissiveIntensity = entry.intensity;
@@ -1759,6 +1760,12 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
         // Consume the hold so we don't immediately fire a MEGA jump on release.
         _spaceHeld = 0;
         _jumpBufferFrames = 0;
+        // Going Super Saiyan unlocks Bababooey. Fire a second toast the
+        // first time it happens so the player knows there's a new cat
+        // waiting in Choose Your Cat.
+        if (catAppearance.tryUnlockBababooey() && _showToast) {
+          _showToast('🐸 Bababooey unlocked! Pick him in Choose Your Cat.');
+        }
         if (_showToast) _showToast('⚡ SUPER SAIYAN ⚡');
       }
     } else {
