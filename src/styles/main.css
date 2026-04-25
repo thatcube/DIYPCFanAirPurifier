@@ -590,11 +590,30 @@ input[type=range]::-moz-range-thumb {
   font-weight: 800;
   transform-origin: 0 50%;
 }
-#coinHud.bump { animation: coinBump 0.4s var(--spring); }
-@keyframes coinBump {
-  0% { transform: scale(1); }
-  40% { transform: scale(1.15); }
-  100% { transform: scale(1); }
+/* Yellow-coin pickup: flip the gold coin icon like a tossed coin and pop
+ * the count number with a brief warm gold glow. Scoped to the gold icon
+ * + #coinCount only so the nested #secretCoinHud (blue chip) doesn't
+ * get dragged along. */
+#coinHud.bump .run-pill__icon--gold {
+  display: inline-block;
+  transform-origin: 50% 50%;
+  animation: coinFlip 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#coinHud.bump #coinCount {
+  display: inline-block;
+  transform-origin: 50% 60%;
+  animation: coinCountPop 0.45s var(--spring);
+}
+@keyframes coinFlip {
+  0%   { transform: rotateY(0deg)   scale(1); filter: drop-shadow(0 0 0 rgba(255,215,0,0)); }
+  35%  { transform: rotateY(180deg) scale(1.18); filter: drop-shadow(0 0 8px rgba(255,215,0,0.95)); }
+  70%  { transform: rotateY(360deg) scale(1.06); filter: drop-shadow(0 0 6px rgba(255,200,80,0.55)); }
+  100% { transform: rotateY(360deg) scale(1); filter: drop-shadow(0 0 0 rgba(255,215,0,0)); }
+}
+@keyframes coinCountPop {
+  0%   { transform: scale(1) translateY(0); color: var(--gold); text-shadow: none; }
+  35%  { transform: scale(1.22) translateY(-1px); color: #fff7c8; text-shadow: 0 0 10px rgba(255,215,0,0.9), 0 0 20px rgba(255,180,60,0.5); }
+  100% { transform: scale(1) translateY(0); color: var(--gold); text-shadow: none; }
 }
 /* Secret coin pickup — body-level particle burst (see ui-interactions.js
  * secretCoinBump). The burst is a fixed-position layer anchored to the
@@ -1792,8 +1811,11 @@ body.play-mode #fps {
   transform: translateY(-50%) scale(1.1);
 }
 .char-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr);
+  display: grid; grid-template-columns: repeat(4, 1fr);
   gap: 12px; margin-bottom: 24px;
+}
+@media (max-width: 720px) {
+  .char-grid { grid-template-columns: repeat(2, 1fr); }
 }
 .char-card {
   background-color: var(--glass);

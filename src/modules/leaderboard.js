@@ -240,7 +240,7 @@ function _catBadgeHtml(entry) {
   const model = String((entry && entry.catModel) || 'classic').toLowerCase();
   const emoji = CAT_MODEL_EMOJI[model] || CAT_MODEL_EMOJI.classic;
   const label = CAT_MODEL_LABELS_SHORT[model] || 'Cat';
-  const colorable = (model !== 'bababooey');
+  const colorable = (model !== 'bababooey' && model !== 'totodile');
   const colorKey = (entry && entry.catColor) || 'charcoal';
   const dot = colorable ? `<span class="catDot" style="background:${_catColorHex(colorKey)}"></span>` : '';
   return `<span class="catBadge" title="${_escapeHtml(colorable ? label + ' · ' + colorKey : label)}"><span class="catEmoji">${emoji}</span>${dot}<span class="catLabel">${label}</span></span>`;
@@ -668,7 +668,7 @@ function _buildShareText(data) {
   const catModel = sanitizeModelKey(row.catModel || catModelKey);
   const modelEmoji = CAT_MODEL_EMOJI[catModel] || '🐱';
   const modelLabel = CAT_MODEL_LABELS_SHORT[catModel] || 'Cat';
-  const colorChip = (catModel !== 'bababooey')
+  const colorChip = (catModel !== 'bababooey' && catModel !== 'totodile')
     ? ` ${CAT_COLOR_EMOJI[catColor] || ''} ${catColor.charAt(0).toUpperCase() + catColor.slice(1)}`
     : '';
   const url = _buildLeaderboardUrl(row.entryId || '', row.timeMs || 0);

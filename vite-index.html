@@ -13,6 +13,7 @@
        fetches. Order matches relative size so the lightest cats render first. -->
   <link rel="preload" as="fetch" type="model/gltf-binary" crossorigin="anonymous" href="/assets/cat.glb">
   <link rel="preload" as="fetch" type="model/gltf-binary" crossorigin="anonymous" href="/assets/tooncat.glb">
+  <link rel="preload" as="fetch" type="model/gltf-binary" crossorigin="anonymous" href="/assets/totodile.glb">
   <link rel="preload" as="fetch" type="model/gltf-binary" crossorigin="anonymous" href="/assets/bababooey_cat.glb">
   <!-- Loading-screen styles inlined so the spinner is pretty from the very
        first paint, before the main CSS bundle arrives. -->
@@ -308,6 +309,11 @@
         <div class="char-card" data-model="bababooey" role="button" tabindex="0" aria-label="Bababooey cat" onclick="window._selectCat&&window._selectCat('bababooey',this)">
           <canvas class="char-preview" id="previewBababooey"></canvas>
           <div class="char-name">Bababooey</div>
+          <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
+        </div>
+        <div class="char-card" data-model="totodile" role="button" tabindex="0" aria-label="Totodile" onclick="window._selectCat&&window._selectCat('totodile',this)">
+          <canvas class="char-preview" id="previewTotodile"></canvas>
+          <div class="char-name">Totodile</div>
           <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
         </div>
       </div>

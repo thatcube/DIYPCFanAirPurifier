@@ -693,7 +693,7 @@ function sanitizeCatHair(value) {
 
 function sanitizeCatModel(value) {
   const key = String(value || '').trim().toLowerCase();
-  return key === 'classic' || key === 'toon' || key === 'bababooey' ? key : 'classic';
+  return key === 'classic' || key === 'toon' || key === 'bababooey' || key === 'totodile' ? key : 'classic';
 }
 
 function sanitizePlayerId(value) {
