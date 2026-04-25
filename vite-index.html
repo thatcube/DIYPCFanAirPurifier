@@ -289,21 +289,23 @@
 
   <!-- FP HUD -->
   <div id="fpHud" role="status" aria-live="polite" aria-atomic="false">
-    <div id="runTimerHud" class="run-pill run-pill--timer" aria-label="Run timer">
-      <i class="ph ph-stopwatch run-pill__icon"></i>
-      <div class="run-pill__stack">
-        <span id="runTimerText">00:00.000</span>
-        <span id="fpsInline" class="run-pill__fps" hidden></span>
+    <div class="run-hud-center">
+      <div id="runTimerHud" class="run-pill run-pill--timer" aria-label="Run timer">
+        <i class="ph ph-stopwatch run-pill__icon"></i>
+        <div class="run-pill__stack">
+          <span id="runTimerText">00:00.000</span>
+          <span id="fpsInline" class="run-pill__fps" hidden></span>
+        </div>
       </div>
-    </div>
-    <div id="coinHud" class="run-pill run-pill--coins" aria-label="Coins collected">
-      <i class="ph-fill ph-coins run-pill__icon run-pill__icon--gold"></i>
-      <span id="coinCount">0/0</span>
-      <span id="secretCoinHud" class="run-pill__secret" aria-label="Secret coins" style="display:none">
-        <span class="run-pill__sep" aria-hidden="true"></span>
-        <i class="ph-fill ph-coin run-pill__icon run-pill__icon--cyan"></i>
-        <span id="secretCoinCount">0</span>
-      </span>
+      <div id="coinHud" class="run-pill run-pill--coins" aria-label="Coins collected">
+        <i class="ph-fill ph-coins run-pill__icon run-pill__icon--gold"></i>
+        <span id="coinCount">0/0</span>
+        <span id="secretCoinHud" class="run-pill__secret" aria-label="Secret coins" style="display:none">
+          <span class="run-pill__sep" aria-hidden="true"></span>
+          <i class="ph-fill ph-coin run-pill__icon run-pill__icon--cyan"></i>
+          <span id="secretCoinCount">0</span>
+        </span>
+      </div>
     </div>
     <span id="runTimerState" class="run-timer-state" hidden></span>
     <div id="fpShareRow" style="display:none"><button id="fpShareBtn" type="button"><i class="ph ph-copy"></i> Copy result</button></div>
