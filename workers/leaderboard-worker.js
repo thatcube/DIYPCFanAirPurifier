@@ -294,6 +294,8 @@ async function handleRunFinish(request, env, cfg) {
   const catModel = sanitizeCatModel(body?.catModel);
   const playerId = sanitizePlayerId(body?.playerId);
   const isTest = body?.isTest === true || body?.isTest === 1 ? 1 : 0;
+  const rawClientTime = Number(body?.timeMs);
+  const clientTimeMs = Number.isFinite(rawClientTime) && rawClientTime > 0 ? Math.floor(rawClientTime) : 0;
   if (!runId) return apiError(400, 'bad_request', 'runId is required');
 
   const run = await env.LB_DB.prepare(
@@ -319,11 +321,22 @@ async function handleRunFinish(request, env, cfg) {
     return apiError(400, 'incomplete_run', 'Not all coins were claimed on the server');
   }
 
-  const elapsed = now - Number(run.started_at);
+  const serverElapsed = now - Number(run.started_at);
+  if (serverElapsed > cfg.MAX_RUN_MS) return apiError(400, 'run_too_long', 'Run time exceeded maximum allowed threshold');
+
+  // Prefer the client-reported timer (it stops the moment the last coin is
+  // grabbed; the request itself can take seconds for coin-claim reconciliation
+  // and network round trips). Cap it at the server-measured elapsed plus a
+  // small slack for clock skew so a malicious client can't claim a faster
+  // time than physically possible.
+  const CLOCK_SLACK_MS = 2000;
+  let elapsed = serverElapsed;
+  if (clientTimeMs > 0 && clientTimeMs <= serverElapsed + CLOCK_SLACK_MS) {
+    elapsed = Math.min(clientTimeMs, serverElapsed);
+  }
   if (!isTest && elapsed < cfg.MIN_RUN_MS) {
     return apiError(400, 'run_too_fast', 'Run time below minimum allowed threshold');
   }
-  if (elapsed > cfg.MAX_RUN_MS) return apiError(400, 'run_too_long', 'Run time exceeded maximum allowed threshold');
 
   const finalName = name || 'Player';
   const entryId = await makeEntryId(finalName, Math.floor(elapsed), now);
