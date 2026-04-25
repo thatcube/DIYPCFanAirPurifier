@@ -199,6 +199,103 @@ function _ensureChargeLight() {
   _catGroup.add(_chargeLight);
 }
 
+// ── Super Saiyan aura (full charge / MEGA tier) ────────────────────
+// Yellow emissive boost on every cat material + a flickering additive
+// sphere/halo around the cat. Only kicks in once chargeTier === 3.
+let _ssAura = null;          // additive yellow sphere child of _catGroup
+let _ssHalo = null;          // additive yellow ring/sprite child of _catGroup
+let _ssMatCache = null;      // Map<material, {emissive:Color, intensity:number}>
+let _ssAuraStrength = 0;     // smoothed 0..1 drive value
+const _ssGold = new THREE.Color(0xffe070);
+const _ssGoldHot = new THREE.Color(0xfff8b0);
+
+function _ensureSuperSaiyanAura() {
+  if (_ssAura || !_catGroup) return;
+  // Soft additive sphere a bit larger than the cat — looks like a body halo.
+  const geom = new THREE.SphereGeometry(7.5, 24, 16);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xffe070,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.BackSide, // glow is brighter on the silhouette edge
+  });
+  _ssAura = new THREE.Mesh(geom, mat);
+  _ssAura.position.set(0, 4, 0);
+  _ssAura.renderOrder = 999;
+  _ssAura.frustumCulled = false;
+  _catGroup.add(_ssAura);
+
+  // Outer flickery halo — slightly bigger, front side, lower opacity.
+  const haloMat = new THREE.MeshBasicMaterial({
+    color: 0xfff2a0,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  _ssHalo = new THREE.Mesh(new THREE.SphereGeometry(10, 20, 12), haloMat);
+  _ssHalo.position.set(0, 4, 0);
+  _ssHalo.renderOrder = 999;
+  _ssHalo.frustumCulled = false;
+  _catGroup.add(_ssHalo);
+}
+
+function _applySuperSaiyan(strength /* 0..1 */, ts) {
+  _ensureSuperSaiyanAura();
+  if (!_ssAura) return;
+  // Smooth strength so leaving tier-3 fades out instead of popping.
+  const lerpK = 0.18;
+  _ssAuraStrength += (strength - _ssAuraStrength) * lerpK;
+  const s = _ssAuraStrength;
+
+  // Aura visibility + flicker
+  const flicker = 0.85 + 0.15 * Math.sin(ts * 0.06) + 0.05 * Math.sin(ts * 0.013);
+  const auraOpacity = Math.min(1, s * 0.55) * flicker;
+  _ssAura.material.opacity = auraOpacity;
+  _ssAura.visible = auraOpacity > 0.005;
+  const pulse = 1 + 0.08 * Math.sin(ts * 0.02);
+  const baseScale = 0.85 + s * 0.55;
+  _ssAura.scale.setScalar(baseScale * pulse);
+
+  if (_ssHalo) {
+    const haloOpacity = Math.min(1, s * 0.32) * flicker;
+    _ssHalo.material.opacity = haloOpacity;
+    _ssHalo.visible = haloOpacity > 0.005;
+    _ssHalo.scale.setScalar(baseScale * (1.05 + 0.06 * Math.sin(ts * 0.018)));
+  }
+
+  // Walk meshes once and patch emissive. Cache originals so we can restore
+  // when the strength falls back to ~0.
+  if (!_ssMatCache) _ssMatCache = new Map();
+  const wantOverride = s > 0.005;
+  _catGroup.traverse((obj) => {
+    if (!obj.isMesh || !obj.material) return;
+    if (obj === _ssAura || obj === _ssHalo) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (const m of mats) {
+      if (!m || !('emissive' in m)) continue;
+      let entry = _ssMatCache.get(m);
+      if (!entry) {
+        entry = {
+          emissive: m.emissive.clone(),
+          intensity: m.emissiveIntensity ?? 1,
+        };
+        _ssMatCache.set(m, entry);
+      }
+      if (wantOverride) {
+        // Blend original emissive toward gold based on strength.
+        m.emissive.copy(entry.emissive).lerp(_ssGoldHot, Math.min(1, s));
+        m.emissiveIntensity = entry.intensity + s * 1.4 * flicker;
+      } else {
+        m.emissive.copy(entry.emissive);
+        m.emissiveIntensity = entry.intensity;
+      }
+    }
+  });
+}
+
 const HUD_IDLE_CONTROLS_MS = 1400;
 
 const PITCH_MIN = -1.45;
@@ -1630,6 +1727,15 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     if (chargeTier === 3) _chargeLight.color.setHex(0xffc870);
     else if (chargeTier === 2) _chargeLight.color.setHex(0x88ffe0);
     else _chargeLight.color.setHex(0x88ddff);
+  }
+
+  // Super Saiyan aura at MEGA tier — ramps in across the top third of the
+  // charge bar so it builds toward "fully charged" rather than popping in.
+  {
+    const ssStrength = chargeTier === 3
+      ? Math.min(1, (chargePct - 0.66) / 0.34)
+      : 0;
+    _applySuperSaiyan(ssStrength, ts);
   }
 
   // ── Gravity (asymmetric: fall faster than rise) ───────────────────
