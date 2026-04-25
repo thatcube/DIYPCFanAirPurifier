@@ -1773,7 +1773,7 @@ export function createPurifier(scene) {
   function getInteractiveTarget(obj){
     let p=obj;
     while(p){
-      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isCornerDoorHandle||p._isMacbook||p._isWindow||p._isTV||p._isFoodBowl) return p;
+      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isCornerDoorHandle||p._isCornerDoor||p._isMacbook||p._isWindow||p._isTV||p._isFoodBowl) return p;
       p=p.parent;
     }
     return null;
@@ -2001,8 +2001,8 @@ export function createPurifier(scene) {
   
   function handleClickObject(obj){
     if(!obj) return;
-    // Clicked corner door handle (door by the nightstand) → open/close
-    if(obj._isCornerDoorHandle){
+    // Clicked corner door (handle or panel — the whole leaf opens/closes)
+    if(obj._isCornerDoorHandle||obj._isCornerDoor){
       if(_toggleCornerDoor) _toggleCornerDoor();
       if(_fpMode) spawnSecretCornerDoorCoin();
       return;
@@ -3557,6 +3557,54 @@ export function createPurifier(scene) {
     toggleFilter,
     isFilterOn() { return filterOn; },
     areFiltersSlid() { return { left: filterLOut, right: filterROut }; },
+    resetWorld(roomRefs) {
+      // Snap all run-affecting moving parts back to their default closed state.
+      // Used when entering / resetting a run so the world is reproducible.
+
+      // Filters: slid in and visible.
+      _filterLerps.length = 0;
+      filterL.position.copy(filterLOrigin);
+      filterR.position.copy(filterROrigin);
+      filterLOut = false;
+      filterROut = false;
+      if (!filterOn) {
+        filterOn = true;
+        parts.filterL.visible = true;
+        parts.filterR.visible = true;
+        const el = _el('togFilter');
+        if (el) el.classList.toggle('on', filterOn);
+      }
+
+      // Drawers: snap fully closed.
+      _drawerLerps.length = 0;
+      const drawers = roomRefs && roomRefs.drawers;
+      if (drawers && drawers.length) {
+        for (const grp of drawers) {
+          if (!grp) continue;
+          if (typeof grp._drawerBaseZ === 'number') {
+            grp.matrixAutoUpdate = true;
+            grp.position.z = grp._drawerBaseZ;
+            grp.updateMatrixWorld(true);
+          }
+          grp._drawerSlide = 0;
+          grp._drawerOpen = false;
+        }
+      }
+
+      // Bifold closet leaves: snap fully closed (angle=0).
+      _bifoldLerps.length = 0;
+      const leaves = (typeof window !== 'undefined') ? window._bifoldLeavesRef : null;
+      if (leaves && leaves.length) {
+        for (const leaf of leaves) {
+          if (!leaf) continue;
+          leaf._leafAngle = 0;
+          leaf._leafTarget = 0;
+          leaf._leafOpen = false;
+          leaf.rotation.y = 0;
+          if (leaf._innerGroup) leaf._innerGroup.rotation.y = 0;
+        }
+      }
+    },
     toggleGrills,
     setGrillColor,
     setStain,

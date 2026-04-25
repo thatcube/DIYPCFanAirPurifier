@@ -321,6 +321,9 @@ export function spawnRoomCoins(roomRefs) {
   addCoin(_coinGroup, new THREE.Vector3(-tvCenterX, tvCenterY + tvH / 2 + bezel + 2.2, tvZ - tvD / 2 + 1.2), {});
   // 12. In the far corner of the closet (back wall, TV-wall side)
   addCoin(_coinGroup, new THREE.Vector3(-(SIDE_WALL_X + CLOSET_DEPTH - 3), fy + 3, CLOSET_Z - CLOSET_INTERIOR_W / 2 + 4), {});
+  // 12b/12c. On top of the closet (high jump challenge — two coins along its length)
+  addCoin(_coinGroup, new THREE.Vector3(-(SIDE_WALL_X + CLOSET_DEPTH / 2), fy + 66 + 2.5, CLOSET_Z - CLOSET_INTERIOR_W / 4), {});
+  addCoin(_coinGroup, new THREE.Vector3(-(SIDE_WALL_X + CLOSET_DEPTH / 2), fy + 66 + 2.5, CLOSET_Z + CLOSET_INTERIOR_W / 4), {});
   // 13. On top of lamp shade
   addCoin(_coinGroup, new THREE.Vector3(-(TBL_X + TBL_W / 2 - 6), fy + TBL_H + 28.5, TBL_Z + TBL_D / 2 - 6), {});
   // 14. Inside the purifier, floating in the middle (accessible when filter is open)
@@ -360,7 +363,9 @@ export function spawnRoomCoins(roomRefs) {
       consoleProp: false,
       secret: false,
       isDynamic: false,
-      _drawerRef: drw
+      _drawerRef: drw,
+      _allDrawers: roomRefs.drawers,
+      _wasAnyOpen: false
     };
     coins.push(drawerCoinEntry);
     coinTotal++;
@@ -497,8 +502,26 @@ export function updateCoins(ts, playerPos) {
 
     // Drawer coins: track the drawer's slide position
     if (c.inDrawer && c._drawerRef) {
+      // Reshuffle to a different drawer when all drawers transition to closed.
+      if (c._allDrawers && c._allDrawers.length > 1) {
+        let anyOpen = false;
+        for (const d of c._allDrawers) {
+          if (d._drawerSlide > 0.01 || d._drawerOpen) { anyOpen = true; break; }
+        }
+        if (c._wasAnyOpen && !anyOpen) {
+          // Pick a different drawer than the current one
+          const others = c._allDrawers.filter(d => d !== c._drawerRef);
+          if (others.length > 0) {
+            c._drawerRef = others[Math.floor(Math.random() * others.length)];
+          }
+        }
+        c._wasAnyOpen = anyOpen;
+      }
       const drw = c._drawerRef;
       const dwz = drw.position.z + (drw._drawerTrayD || 10) / 2 + 0.4;
+      c.mesh.position.x = drw.position.x;
+      c.basePos.x = drw.position.x;
+      c.basePos.y = drw.position.y;
       c.mesh.position.z = dwz;
       c.basePos.z = dwz;
     }

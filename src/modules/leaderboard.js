@@ -49,6 +49,39 @@ function _isTestSubmission() {
   return _isQuickCoinMode() || _isLocalTestMode();
 }
 
+export function isTestRun() { return _isTestSubmission(); }
+
+function _testRunReason() {
+  if (_isQuickCoinMode()) return 'Quick-coin mode';
+  if (_isLocalTestMode()) return 'Local dev';
+  return '';
+}
+
+function _syncTestRunBadge() {
+  try {
+    const isTest = _isTestSubmission();
+    if (typeof document === 'undefined') return;
+    document.body && document.body.classList.toggle('is-test-run', !!isTest);
+    const combo = document.querySelector('.run-pill--combo');
+    if (combo) {
+      let badge = document.getElementById('runTestBadge');
+      if (isTest) {
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.id = 'runTestBadge';
+          badge.className = 'run-pill__test-badge';
+          badge.setAttribute('aria-label', 'Test run — not submitted to public leaderboard');
+          badge.innerHTML = '<i class="ph ph-flask"></i><span>TEST</span>';
+          combo.appendChild(badge);
+        }
+        badge.title = `Test run (${_testRunReason()}) — not submitted to the public leaderboard`;
+      } else if (badge) {
+        badge.remove();
+      }
+    }
+  } catch (e) { /* ignore */ }
+}
+
 // ── Shared API state ────────────────────────────────────────────────
 
 let _sharedOnline = false;
@@ -77,6 +110,7 @@ function _setTimerHudState(text, cls) {
     pill.classList.remove('running', 'finished', 'ready');
     if (cls) pill.classList.add(cls);
   }
+  _syncTestRunBadge();
 }
 
 export function startTimer() {
@@ -1229,6 +1263,15 @@ function _renderFinishDialog() {
   const saveHint = document.getElementById('finishDialogSaveHint');
   const copyBtn = document.getElementById('finishDialogCopy');
   const list = document.getElementById('finishDialogList');
+  const testBanner = document.getElementById('finishDialogTestBanner');
+  const testReasonEl = document.getElementById('finishDialogTestReason');
+  const isTest = _isTestSubmission();
+  const card = document.getElementById('finishDialogCard');
+  if (card) card.classList.toggle('is-test-run', isTest);
+  if (testBanner) {
+    testBanner.hidden = !isTest;
+    if (testReasonEl) testReasonEl.textContent = isTest ? `(${_testRunReason()})` : '';
+  }
 
   const runTimeMs = Math.floor(Number(data.timeMs) || Number(_finishPendingRun?.timeMs) || 0);
   const rank = Math.floor(Number(data.rank) || 0);
@@ -1236,9 +1279,13 @@ function _renderFinishDialog() {
 
   if (summaryTime) summaryTime.textContent = formatRunTime(runTimeMs);
   if (summaryRank) {
-    summaryRank.textContent = pending
-      ? 'Saving...'
-      : (rank > 0 ? `#${rank}` : 'Unranked');
+    if (pending) {
+      summaryRank.innerHTML = '<span class="finishRankSkel" aria-hidden="true"></span>';
+      summaryRank.setAttribute('aria-label', 'Saving rank');
+    } else {
+      summaryRank.textContent = rank > 0 ? `#${rank}` : 'Unranked';
+      summaryRank.removeAttribute('aria-label');
+    }
   }
   if (summarySecret) {
     summarySecret.textContent = `${secretCount} found`;
@@ -1257,13 +1304,14 @@ function _renderFinishDialog() {
   if (saveHint) {
     if (pending) {
       if (_finishSaveStatus === 'error') saveHint.textContent = 'Save failed. Please wait and it will retry.';
-      else saveHint.textContent = 'Saving run...';
+      else saveHint.textContent = isTest ? 'Recording test run...' : 'Saving run...';
     } else if (canRenameSavedEntry) {
       if (_finishSaveStatus === 'saving') saveHint.textContent = 'Saving...';
       else if (_finishSaveStatus === 'error') saveHint.textContent = 'Save failed. Leave the field again to retry.';
+      else if (isTest) saveHint.textContent = 'Test run recorded (hidden from the public leaderboard). Edit and leave the row to rename.';
       else saveHint.textContent = 'Saved. Edit and leave your leaderboard row to update this run.';
     } else if (Math.floor(Number(data.rank) || 0) > 0 || _finishSaveStatus === 'saved') {
-      saveHint.textContent = 'Saved.';
+      saveHint.textContent = isTest ? 'Test run recorded (hidden from the public leaderboard).' : 'Saved.';
     } else {
       saveHint.textContent = '';
     }
@@ -1280,8 +1328,41 @@ function _renderFinishDialog() {
     const editableEntryId = canRenameSavedEntry ? _finishEditableEntryId : '';
     const rows = [];
 
-    if (_leaderboard.length) {
+    if (_leaderboard.length || pending) {
+      // Build an optimistic "pending" row (own-current + pending) so the
+      // player can see where their entry is going while the API save is
+      // in flight. Position it by time among the local leaderboard; the
+      // real rank/position will refresh when the save resolves.
+      let pendingInsertAt = -1;
+      let pendingHtml = '';
+      if (pending) {
+        const pendingName = _sanitizePlayerName(
+          _finishDialogData?.name || _readPlayerName() || _playerName || 'Player'
+        ) || 'Player';
+        const pendingTimeMs = Math.floor(Number(_finishPendingRun?.timeMs) || Number(data.timeMs) || 0);
+        const pendingEntry = {
+          catModel: data.catModel || catModelKey,
+          catColor: data.catColor || catColorKey,
+          catHair: data.catHair || catHairKey
+        };
+        pendingInsertAt = _leaderboard.length;
+        for (let i = 0; i < _leaderboard.length; i++) {
+          if (pendingTimeMs < _leaderboard[i].timeMs) { pendingInsertAt = i; break; }
+        }
+        pendingHtml = `<li class="own-current pending" data-entry-id="">
+          <span class="rk rk-pending" aria-label="Saving rank">
+            <span class="finishRankSkel finishRankSkel--row" aria-hidden="true"></span>
+          </span>
+          <span class="nm nm-edit">
+            <input type="text" class="finishDialogRowNameInput" maxlength="24" value="${_escapeHtml(pendingName)}" autocomplete="off" spellcheck="false" disabled aria-label="Your name (saving)" />
+          </span>
+          ${_catBadgeHtml(pendingEntry)}
+          <span class="tm">${formatRunTime(pendingTimeMs)}</span>
+        </li>`;
+      }
+
       for (let i = 0; i < _leaderboard.length; i++) {
+        if (pending && i === pendingInsertAt) rows.push(pendingHtml);
         const r = _leaderboard[i];
         const isHistory = !!r.playerId && r.playerId === _playerId;
         const isCurrent = !!ownId && r.id === ownId;
@@ -1297,8 +1378,7 @@ function _renderFinishDialog() {
           <span class="tm">${formatRunTime(r.timeMs)}</span>
         </li>`);
       }
-    } else if (pending) {
-      rows.push('<li style="opacity:0.72;padding:8px 10px">Saving run...</li>');
+      if (pending && pendingInsertAt >= _leaderboard.length) rows.push(pendingHtml);
     } else {
       rows.push('<li style="opacity:0.62;padding:8px 10px">No runs yet.</li>');
     }
@@ -1344,6 +1424,7 @@ export function init() {
   _createNameDialogDOM();
   _createFinishDialogDOM();
   renderLeaderboardPanel();
+  _syncTestRunBadge();
   // Fetch shared leaderboard from API (non-blocking)
   void refreshSharedLeaderboard();
 }
@@ -1413,6 +1494,7 @@ function _createFinishDialogDOM() {
   overlay.id = 'finishDialogOverlay';
   overlay.innerHTML = `
     <div id="finishDialogCard" role="dialog" aria-modal="true" aria-label="Run complete">
+      <div id="finishDialogTestBanner" hidden><i class="ph ph-flask"></i> <strong>TEST RUN</strong> <span id="finishDialogTestReason"></span> — not submitted to the public leaderboard.</div>
       <div id="finishDialogHeader">
         <div id="finishDialogSummaryGrid">
           <div class="finishDialogSummaryItem finishDialogSummaryItemTime">
