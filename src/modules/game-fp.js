@@ -217,6 +217,9 @@ const SS_HOLD_MS   = 5000;  // how long full charge must be held to activate
 const SS_ACTIVE_MS = 20000; // duration of super saiyan mode once activated
 let _ssFullChargeSinceTs = 0; // ts when chargePct first hit 100% (0 = not holding)
 let _ssActiveUntilTs = 0;     // ts at which the active window ends (0 = not active)
+let _ssBurstStartTs = 0;      // ts when SS activated (drives ~3s burst flash at start of active window)
+const SS_BURST_MS = 3000;     // duration of the post-activation burst
+const SS_CHARGE_HINT_MS = 2500; // ms into a full-charge hold before subtle aura starts hinting
 
 export function isSuperSaiyanActive() {
   return _ssActiveUntilTs > 0 && performance.now() < _ssActiveUntilTs;
@@ -257,25 +260,31 @@ function _ensureSuperSaiyanAura() {
   _catGroup.add(_ssHalo);
 }
 
-function _applySuperSaiyan(strength /* 0..1 */, ts) {
+function _applySuperSaiyan(strength /* 0..1 sustained */, burst /* 0..1 transient */, ts) {
   _ensureSuperSaiyanAura();
   if (!_ssAura) return;
   // Smooth strength so leaving tier-3 fades out instead of popping.
   const lerpK = 0.18;
   _ssAuraStrength += (strength - _ssAuraStrength) * lerpK;
   const s = _ssAuraStrength;
+  const b = Math.max(0, Math.min(1, burst || 0));
+  const total = s + b;
 
   // Aura visibility + flicker
   const flicker = 0.85 + 0.15 * Math.sin(ts * 0.06) + 0.05 * Math.sin(ts * 0.013);
-  const auraOpacity = Math.min(1, s * 0.22) * flicker;
+  // Burst additively boosts opacity back to the original "full-blown" look
+  // for the first few seconds of activation, then decays back to the dim
+  // sustained glow.
+  const auraOpacity = Math.min(1, s * 0.22 + b * 0.55) * flicker;
   _ssAura.material.opacity = auraOpacity;
   _ssAura.visible = auraOpacity > 0.005;
   const pulse = 1 + 0.08 * Math.sin(ts * 0.02);
-  const baseScale = (0.85 + s * 0.55) * 0.6;
+  // Burst also briefly inflates the halo scale so it reads as a flash.
+  const baseScale = (0.85 + s * 0.55) * 0.6 + b * 0.7;
   _ssAura.scale.setScalar(baseScale * pulse);
 
   if (_ssHalo) {
-    const haloOpacity = Math.min(1, s * 0.13) * flicker;
+    const haloOpacity = Math.min(1, s * 0.13 + b * 0.4) * flicker;
     _ssHalo.material.opacity = haloOpacity;
     _ssHalo.visible = haloOpacity > 0.005;
     _ssHalo.scale.setScalar(baseScale * (1.05 + 0.06 * Math.sin(ts * 0.018)));
@@ -284,7 +293,7 @@ function _applySuperSaiyan(strength /* 0..1 */, ts) {
   // Walk meshes once and patch emissive. Cache originals so we can restore
   // when the strength falls back to ~0.
   if (!_ssMatCache) _ssMatCache = new Map();
-  const wantOverride = s > 0.005;
+  const wantOverride = total > 0.005;
   _catGroup.traverse((obj) => {
     if (!obj.isMesh || !obj.material) return;
     if (obj === _ssAura || obj === _ssHalo) return;
@@ -300,9 +309,10 @@ function _applySuperSaiyan(strength /* 0..1 */, ts) {
         _ssMatCache.set(m, entry);
       }
       if (wantOverride) {
-        // Blend original emissive toward gold based on strength.
-        m.emissive.copy(entry.emissive).lerp(_ssGoldHot, Math.min(1, s * 0.5));
-        m.emissiveIntensity = entry.intensity + s * 0.55 * flicker;
+        // Blend original emissive toward gold based on strength + burst.
+        const goldMix = Math.min(1, s * 0.5 + b * 0.5);
+        m.emissive.copy(entry.emissive).lerp(_ssGoldHot, goldMix);
+        m.emissiveIntensity = entry.intensity + (s * 0.55 + b * 0.95) * flicker;
       } else {
         m.emissive.copy(entry.emissive);
         m.emissiveIntensity = entry.intensity;
@@ -1426,6 +1436,7 @@ function _respawn() {
   fpPaused = false;
   _ssFullChargeSinceTs = 0;
   _ssActiveUntilTs = 0;
+  _ssBurstStartTs = 0;
 }
 
 // Reset all run-affecting world state (drawers, doors, purifier filters,
@@ -1746,16 +1757,27 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   }
 
   // Super Saiyan mode — activates after holding full charge for 5s, then
-  // runs for 20s (gold aura + 2x speed). Aura is only shown during the
-  // active window; charging itself does not glow.
+  // runs for 20s (gold aura + 2x speed). Charging hint kicks in after
+  // ~2.5s of held full charge so the player sees the build-up; on
+  // activation a ~3s burst flashes the original full-blown look before
+  // settling into the dim sustained glow.
   {
     const atFullCharge = onGround && chargePct >= 0.999;
+    let chargingStrength = 0;
     if (atFullCharge) {
       if (_ssFullChargeSinceTs === 0) _ssFullChargeSinceTs = ts;
+      const heldMs = ts - _ssFullChargeSinceTs;
+      // After 2.5s of full-charge hold, ramp a subtle aura 0 → ~0.4 over
+      // the remaining hold window so the player sees something building.
+      if (!isSuperSaiyanActive() && heldMs > SS_CHARGE_HINT_MS) {
+        const k = Math.min(1, (heldMs - SS_CHARGE_HINT_MS) / Math.max(1, SS_HOLD_MS - SS_CHARGE_HINT_MS));
+        chargingStrength = k * 0.4;
+      }
       // Promote to active once the 5s hold completes (only if not already
       // active — don't restart during the 20s window).
-      if (!isSuperSaiyanActive() && ts - _ssFullChargeSinceTs >= SS_HOLD_MS) {
+      if (!isSuperSaiyanActive() && heldMs >= SS_HOLD_MS) {
         _ssActiveUntilTs = ts + SS_ACTIVE_MS;
+        _ssBurstStartTs = ts;
         _ssFullChargeSinceTs = 0;
         // Consume the hold so we don't immediately fire a MEGA jump on release.
         _spaceHeld = 0;
@@ -1772,8 +1794,18 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       _ssFullChargeSinceTs = 0;
     }
 
-    const ssStrength = isSuperSaiyanActive() ? 1 : 0;
-    _applySuperSaiyan(ssStrength, ts);
+    const active = isSuperSaiyanActive();
+    const baseStrength = active ? 1 : chargingStrength;
+    // Burst: ease-out quad over SS_BURST_MS at the start of the active window.
+    let burst = 0;
+    if (active && _ssBurstStartTs > 0) {
+      const t = ts - _ssBurstStartTs;
+      if (t >= 0 && t < SS_BURST_MS) {
+        const k = 1 - t / SS_BURST_MS;
+        burst = k * k;
+      }
+    }
+    _applySuperSaiyan(baseStrength, burst, ts);
   }
 
   // ── Gravity (asymmetric: fall faster than rise) ───────────────────

@@ -206,8 +206,15 @@ const todRefs = {
   _markShadowsDirty: markShadowsDirty
 };
 
-// Apply initial time-of-day — use actual clock if nighttime, else 2:30 PM
-const _initMinute = roomRefs.windowIsNight ? (new Date().getHours() * 60 + new Date().getMinutes()) : 870;
+// Apply initial time-of-day from the real local clock so startup lighting
+// matches what the player expects (instead of forcing bright mid-day).
+const _now = new Date();
+const _initMinute = _now.getHours() * 60 + _now.getMinutes();
+const _initWindowIsNight = _initMinute < 360 || _initMinute >= 1140;
+if (roomRefs.outdoor?.material && roomRefs.outdoorDayTex && roomRefs.outdoorNightTex) {
+  roomRefs.outdoor.material.map = _initWindowIsNight ? roomRefs.outdoorNightTex : roomRefs.outdoorDayTex;
+  roomRefs.outdoor.material.color.setHex(_initWindowIsNight ? 0x445566 : 0xfff0d4);
+}
 lighting.applyTimeOfDay(_initMinute, todRefs);
 {
   const todSlider = document.getElementById('todSlider');
@@ -309,7 +316,7 @@ purifierRefs.setRoomRefs({
   outdoor: roomRefs.outdoor,
   outdoorDayTex: roomRefs.outdoorDayTex,
   outdoorNightTex: roomRefs.outdoorNightTex,
-  windowIsNight: roomRefs.windowIsNight,
+  windowIsNight: _initWindowIsNight,
   todRefs,  // so purifier can sync ceilLightOn state
   markShadowsDirty,
   applyTimeOfDay: (minutes) => {

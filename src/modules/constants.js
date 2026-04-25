@@ -57,5 +57,19 @@ export const CAT_MODEL_PRESETS = {
   totodile:  { label: 'Totodile',      sources: ['assets/totodile.glb'],     colorable: false, animSpeed: 0.85, idleLoopPause: 0,   sprintAnimMult: 1.2 }
 };
 
+// Canonical secret-coin IDs used by unlock/progress checks.
+export const SECRET_COIN_IDS = Object.freeze([
+  'secret_cornerDoor',
+  'secret_lamp',
+  'secret_pb1',
+  'secret_pb2',
+  'secret_pb3',
+  'secret_window',
+  'secret_drawer',
+  'secret_macbook',
+  'secret_tv',
+  'secret_foodBowl'
+]);
+
 // Secret coin total (for all-found check)
-export const TOTAL_SECRETS = 9;
+export const TOTAL_SECRETS = SECRET_COIN_IDS.length;
