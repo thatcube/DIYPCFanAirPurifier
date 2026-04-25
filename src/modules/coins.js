@@ -372,6 +372,12 @@ export function spawnRoomCoins(roomRefs) {
   // 14c. End of the hallway — centered in the 40" wide corridor, just shy
   //   of the end wall. Hallway runs Z=49..289, X=-51..-11 (post-mirror).
   addCoin(_coinGroup, new THREE.Vector3(-31, fy + 3, 285), {});
+  // 14d. Resting on top of the doorknob of the decorative "far" hallway
+  //   door (-X wall, 6 ft into the corridor). Door panel center pre-mirror
+  //   X≈11.45, knob ball protrudes ~1.5" into the hallway → world X≈-13.65.
+  //   Lock rail on the 67"-tall leaf sits ~24" off the floor; coin perches
+  //   ~3" above the ball so it reads as balanced on the knob.
+  addCoin(_coinGroup, new THREE.Vector3(-13.65, fy + 27.5, 133), {});
 
   // 15. Hidden inside a random nightstand drawer (moves with the drawer when opened)
   if (roomRefs && roomRefs.drawers && roomRefs.drawers.length > 0) {
