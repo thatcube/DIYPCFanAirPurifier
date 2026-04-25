@@ -1918,6 +1918,42 @@ body.play-mode #fps {
   content: '✓'; position: absolute; top: 8px; right: 10px;
   color: var(--accent); font-size: 16px; font-weight: 900;
 }
+/* Locked Totodile card — desaturated, gold-padlock chip in the corner,
+ * shake animation when an attempt is made to select it. */
+.char-card.locked {
+  filter: grayscale(0.85) brightness(0.65);
+  cursor: not-allowed;
+}
+.char-card.locked:hover {
+  transform: none;
+  border-color: rgba(255,210,74,0.45);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,210,74,0.25) inset;
+  filter: grayscale(0.7) brightness(0.75);
+}
+.char-card.locked:active { transform: none; }
+.char-card.locked .char-name {
+  color: rgba(255,225,150,0.9);
+  font-size: 13px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.02em;
+}
+.char-card__lock {
+  position: absolute;
+  top: 10px; right: 10px;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-circle);
+  background: rgba(255,210,74,0.18);
+  border: 1px solid rgba(255,210,74,0.55);
+  color: #ffd24a;
+  font-size: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  pointer-events: none;
+  z-index: 2;
+}
+.char-card.shake {
+  animation: modePillShake 0.45s var(--spring) both;
+}
 /* 3D preview canvas */
 .char-preview {
   width: 100%; height: clamp(200px, 32vh, 340px); display: block;
