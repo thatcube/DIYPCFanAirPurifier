@@ -84,9 +84,13 @@ export function setSkateMode(enabled, opts = {}) {
   }
   skateMode = next;
   try { localStorage.setItem(SKATE_MODE_KEY, skateMode ? '1' : '0'); } catch (e) {}
+  _resetSkateDynamics();
   _syncSkateToggleUi();
   _syncSkateboardVisualState();
-  if (skateMode) _initSkateboard();
+  if (skateMode) {
+    _seedSkateHeadingFromVelocity();
+    _initSkateboard();
+  }
   else {
     _skateModelLift = 0;
     _silenceSkateRoll(false);
@@ -220,6 +224,32 @@ let _wasFootstepMoving = false;
 let _lastUiInteractTs = 0;
 let _quickControlsVisible = false;
 let _skateLean = 0;
+let _skateHeadingYaw = Math.PI;
+let _skateHeadingReady = false;
+
+function _normalizeYawPi(rad) {
+  let a = rad;
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}
+
+function _resetSkateDynamics() {
+  _skateHeadingReady = false;
+}
+
+function _seedSkateHeadingFromVelocity() {
+  const speedSq = _velX * _velX + _velZ * _velZ;
+  if (speedSq > 1e-5) {
+    _skateHeadingYaw = Math.atan2(_velX, _velZ);
+  } else {
+    const seedFwdX = -Math.sin(fpYaw);
+    const seedFwdZ = -Math.cos(fpYaw);
+    _skateHeadingYaw = Math.atan2(seedFwdX, seedFwdZ);
+  }
+  _skateHeadingYaw = _normalizeYawPi(_skateHeadingYaw);
+  _skateHeadingReady = true;
+}
 
 // Cached DOM elements (looked up once in init or on first use)
 let _cachedCbBar = null, _cachedCbFill = null, _cachedCbValue = null, _cachedCbLabel = null;
@@ -266,9 +296,11 @@ const _ssEnvAnchor = new THREE.Vector3();
 // Activation gate + active-window timers.
 const SS_HOLD_MS   = 5000;  // how long full charge must be held to activate
 const SS_ACTIVE_MS = 20000; // duration of super saiyan mode once activated
+const SS_HUD_ENTER_FLASH_MS = 1200;
 let _ssFullChargeSinceTs = 0; // ts when chargePct first hit 100% (0 = not holding)
 let _ssActiveUntilTs = 0;     // ts at which the active window ends (0 = not active)
 let _ssBurstStartTs = 0;      // ts when SS activated (drives ~3s burst flash at start of active window)
+let _ssHudFlashUntilTs = 0;   // one-shot HUD pulse window when SS activates
 const SS_BURST_MS = 3000;     // duration of the post-activation burst
 const SS_CHARGE_HINT_MS = 1500; // ms into a full-charge hold before subtle aura starts hinting
 let _ssChargeShake = 0;       // smoothed 0..1 shake strength while holding full charge
@@ -1764,6 +1796,7 @@ export function toggleFirstPerson() {
     _lastFootstepTs = 0;
     _wasFootstepMoving = false;
     _skateLean = 0;
+    _resetSkateDynamics();
     _silenceSkateRoll(true);
 
     // Enter FP
@@ -1815,6 +1848,7 @@ export function toggleFirstPerson() {
     _lastFootstepTs = 0;
     _wasFootstepMoving = false;
     _skateLean = 0;
+    _resetSkateDynamics();
     _silenceSkateRoll(true);
 
     // Exit FP
@@ -1878,8 +1912,10 @@ function _respawn() {
   _ssFullChargeSinceTs = 0;
   _ssActiveUntilTs = 0;
   _ssBurstStartTs = 0;
+  _ssHudFlashUntilTs = 0;
   _ssChargeShake = 0;
   _skateLean = 0;
+  _resetSkateDynamics();
   _silenceSkateRoll(true);
   _ssShakeOffset.set(0, 0, 0);
   _setSuperSaiyanEnvLightOff();
@@ -2049,27 +2085,117 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   // Speed mode triples top speed but uses a lower accel rate so you must
   // ramp up to it (heavier feel, longer slide on stop).
   const speedMul = (speedMode ? 3.0 : 1.0) * (isSuperSaiyanActive() ? 2.0 : 1.0);
-  const spd = (fpKeys.shift ? 0.65 : 0.30) * speedMul;
   const fwd = _fwd.set(-Math.sin(fpYaw), 0, -Math.cos(fpYaw));
   const right = _right.set(fwd.z, 0, -fwd.x);
-
-  let tgtX = 0, tgtZ = 0;
-  if (fpKeys.w) { tgtX += fwd.x * spd; tgtZ += fwd.z * spd; }
-  if (fpKeys.s) { tgtX -= fwd.x * spd; tgtZ -= fwd.z * spd; }
-  if (fpKeys.a) { tgtX += right.x * spd; tgtZ += right.z * spd; }
-  if (fpKeys.d) { tgtX -= right.x * spd; tgtZ -= right.z * spd; }
-
   const inputActive = fpKeys.w || fpKeys.a || fpKeys.s || fpKeys.d;
-  // Slower accel = weightier start, slower decel = more slide/momentum.
-  // Speed mode further reduces accel so the 3x top speed must be earned.
-  const accelBase = speedMode
-    ? (inputActive ? 0.045 : 0.035)
-    : (inputActive ? 0.12 : 0.10);
-  const accel = 1 - Math.pow(1 - accelBase, frameScale);
-  _velX += (tgtX - _velX) * accel;
-  _velZ += (tgtZ - _velZ) * accel;
-  // Lower dead zone so momentum carries further before stopping
-  if (!inputActive && Math.hypot(_velX, _velZ) < 0.002) { _velX = 0; _velZ = 0; }
+
+  if (skateMode) {
+    if (!_skateHeadingReady) _seedSkateHeadingFromVelocity();
+
+    const driveInput = (fpKeys.w ? 1 : 0) - (fpKeys.s ? 1 : 0);
+    const steerInput = (fpKeys.d ? 1 : 0) - (fpKeys.a ? 1 : 0);
+    const accelScale = Math.max(0.001, frameScale);
+
+    const maxForward = (fpKeys.shift ? 0.78 : 0.56) * speedMul;
+    const maxReverse = 0.22 * speedMul;
+    const pushAccel = (fpKeys.shift ? 0.019 : 0.0135) * speedMul;
+    const brakeAccel = (fpKeys.shift ? 0.034 : 0.028) * speedMul;
+
+    const hFwdX = Math.sin(_skateHeadingYaw);
+    const hFwdZ = Math.cos(_skateHeadingYaw);
+    const hRightX = hFwdZ;
+    const hRightZ = -hFwdX;
+
+    let vForward = _velX * hFwdX + _velZ * hFwdZ;
+    let vLateral = _velX * hRightX + _velZ * hRightZ;
+
+    const speedN = Math.max(0, Math.min(1, Math.abs(vForward) / Math.max(0.001, maxForward)));
+    const turnPerFrame = 0.014 + speedN * 0.048;
+    const turnBoost = 1 + (fpKeys.shift ? 0.14 : 0) + Math.abs(vLateral) * 1.5;
+    const steerSign = vForward >= -0.01 ? 1 : -0.55;
+    _skateHeadingYaw = _normalizeYawPi(
+      _skateHeadingYaw + steerInput * turnPerFrame * turnBoost * accelScale * steerSign
+    );
+
+    if (driveInput > 0) {
+      vForward += pushAccel * accelScale;
+    } else if (driveInput < 0) {
+      if (vForward > 0) vForward -= brakeAccel * accelScale;
+      else vForward -= (pushAccel * 0.58) * accelScale;
+    }
+
+    const rollDrag = Math.pow(driveInput === 0 ? 0.989 : 0.994, accelScale);
+    vForward *= rollDrag;
+    if (driveInput < 0 && vForward > 0) {
+      vForward *= Math.pow(0.93, accelScale);
+    }
+
+    const carveLoss = 1 - Math.min(0.18, Math.abs(steerInput) * 0.025 * accelScale);
+    vForward *= carveLoss;
+
+    const lateralDamp = Math.pow(0.34, accelScale);
+    vLateral *= lateralDamp;
+    vLateral += steerInput * Math.abs(vForward) * 0.016 * accelScale;
+
+    if (Math.abs(vForward) < 0.0012 && driveInput === 0) vForward = 0;
+    if (Math.abs(vLateral) < 0.0007) vLateral = 0;
+
+    vForward = Math.max(-maxReverse, Math.min(maxForward, vForward));
+    const maxSlip = maxForward * 0.18 + 0.02;
+    vLateral = Math.max(-maxSlip, Math.min(maxSlip, vLateral));
+
+    const newHFwdX = Math.sin(_skateHeadingYaw);
+    const newHFwdZ = Math.cos(_skateHeadingYaw);
+    const newHRightX = newHFwdZ;
+    const newHRightZ = -newHFwdX;
+    _velX = newHFwdX * vForward + newHRightX * vLateral;
+    _velZ = newHFwdZ * vForward + newHRightZ * vLateral;
+
+    const speedCap = maxForward * 1.04;
+    const velMag = Math.hypot(_velX, _velZ);
+    if (velMag > speedCap && velMag > 1e-5) {
+      const k = speedCap / velMag;
+      _velX *= k;
+      _velZ *= k;
+    }
+
+    // At low speed, settle heading toward camera-forward so reorientation
+    // from near-stop feels responsive instead of drifting.
+    if (Math.abs(vForward) < 0.08) {
+      const camYaw = Math.atan2(fwd.x, fwd.z);
+      const d = _normalizeYawPi(camYaw - _skateHeadingYaw);
+      const settle = Math.min(1, (0.02 + Math.abs(steerInput) * 0.03) * accelScale);
+      _skateHeadingYaw = _normalizeYawPi(_skateHeadingYaw + d * settle);
+    }
+
+    if (!inputActive && Math.hypot(_velX, _velZ) < 0.0016) {
+      _velX = 0;
+      _velZ = 0;
+    }
+  } else {
+    const spd = (fpKeys.shift ? 0.65 : 0.30) * speedMul;
+    let tgtX = 0, tgtZ = 0;
+    if (fpKeys.w) { tgtX += fwd.x * spd; tgtZ += fwd.z * spd; }
+    if (fpKeys.s) { tgtX -= fwd.x * spd; tgtZ -= fwd.z * spd; }
+    if (fpKeys.a) { tgtX += right.x * spd; tgtZ += right.z * spd; }
+    if (fpKeys.d) { tgtX -= right.x * spd; tgtZ -= right.z * spd; }
+
+    // Slower accel = weightier start, slower decel = more slide/momentum.
+    // Speed mode further reduces accel so the 3x top speed must be earned.
+    const accelBase = speedMode
+      ? (inputActive ? 0.045 : 0.035)
+      : (inputActive ? 0.12 : 0.10);
+    const accel = 1 - Math.pow(1 - accelBase, frameScale);
+    _velX += (tgtX - _velX) * accel;
+    _velZ += (tgtZ - _velZ) * accel;
+    // Lower dead zone so momentum carries further before stopping
+    if (!inputActive && Math.hypot(_velX, _velZ) < 0.002) { _velX = 0; _velZ = 0; }
+
+    if (_velX * _velX + _velZ * _velZ > 1e-5) {
+      _skateHeadingYaw = Math.atan2(_velX, _velZ);
+      _skateHeadingReady = true;
+    }
+  }
 
   const isInteracting = inputActive
     || fpKeys.space
@@ -2229,6 +2355,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       if (!isSuperSaiyanActive() && heldMs >= SS_HOLD_MS) {
         _ssActiveUntilTs = ts + SS_ACTIVE_MS;
         _ssBurstStartTs = ts;
+        _ssHudFlashUntilTs = ts + SS_HUD_ENTER_FLASH_MS;
         _ssFullChargeSinceTs = 0;
         // Consume the hold so we don't immediately fire a MEGA jump on release.
         _spaceHeld = 0;
@@ -2246,6 +2373,18 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     }
 
     const active = isSuperSaiyanActive();
+    if (_cachedCbBar) {
+      const entering = active && ts < _ssHudFlashUntilTs;
+      _cachedCbBar.classList.toggle('ss-active', active);
+      _cachedCbBar.classList.toggle('ss-enter', entering);
+    }
+    if (active) {
+      if (_cachedCbLabel) _cachedCbLabel.textContent = 'SUPER SAIYAN';
+      if (_cachedCbValue) {
+        const remainSec = Math.max(0, _ssActiveUntilTs - ts) / 1000;
+        _cachedCbValue.textContent = `${remainSec.toFixed(1)}s`;
+      }
+    }
     const baseStrength = active ? 1 : chargingStrength;
     // Burst: ease-out quad over SS_BURST_MS at the start of the active window.
     let burst = 0;
