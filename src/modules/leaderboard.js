@@ -46,6 +46,11 @@ function _isLocalTestMode() {
 }
 
 function _isTestSubmission() {
+  // Test runs are only ever produced when developing locally. On the live
+  // server we never tag a run as a test, so even if Quick Coin Mode somehow
+  // gets toggled on (e.g. via DevTools) the run won't be inserted with
+  // is_test=1 and the worker will reject the under-coin submission outright.
+  if (!_isLocalhost()) return false;
   return _isQuickCoinMode() || _isLocalTestMode();
 }
 
