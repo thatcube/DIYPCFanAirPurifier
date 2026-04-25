@@ -426,6 +426,15 @@ function _resetIdleBones() {
   idleSpineBones.length = 0;
 }
 
+function _getOrInitIdleBaseQuat(bone) {
+  if (!bone || !bone.isBone) return null;
+  if (!bone.userData) bone.userData = {};
+  const cached = bone.userData._catIdleBaseQuat;
+  if (cached && cached.isQuaternion) return cached;
+  bone.userData._catIdleBaseQuat = bone.quaternion.clone();
+  return bone.userData._catIdleBaseQuat;
+}
+
 function _collectIdleBones(model) {
   _resetIdleBones();
   if (!model) return;
@@ -539,13 +548,9 @@ export function refreshGameplayIdleBasePose() {
   const all = [...idleTailBones, ...idleSpineBones, ...idleHeadBones];
   for (const b of all) {
     if (!b || !b.isBone) continue;
-    if (!b.userData) b.userData = {};
-    // Reuse existing Quaternion to avoid GC churn
-    if (b.userData._catIdleBaseQuat) {
-      b.userData._catIdleBaseQuat.copy(b.quaternion);
-    } else {
-      b.userData._catIdleBaseQuat = b.quaternion.clone();
-    }
+    // Reuse existing Quaternion to avoid GC churn.
+    const base = _getOrInitIdleBaseQuat(b);
+    if (base) base.copy(b.quaternion);
   }
 }
 
@@ -557,9 +562,8 @@ export function applyGameplayProceduralIdle(ts, intensity) {
   for (let i = 0; i < idleTailBones.length; i++) {
     const b = idleTailBones[i];
     if (!b || !b.isBone) continue;
-    const base = (b.userData && b.userData._catIdleBaseQuat && b.userData._catIdleBaseQuat.isQuaternion)
-      ? b.userData._catIdleBaseQuat
-      : b.quaternion;
+    const base = _getOrInitIdleBaseQuat(b);
+    if (!base) continue;
     const wave = 0.75 + (i * 0.18);
     const yaw = Math.sin((t * 1.7 * wave) + (i * 0.55)) * 0.065 * intensity;
     const pitch = Math.sin((t * 1.2 * wave) + (i * 0.4)) * 0.025 * intensity;
@@ -573,9 +577,8 @@ export function applyGameplayProceduralIdle(ts, intensity) {
   for (let i = 0; i < idleSpineBones.length; i++) {
     const b = idleSpineBones[i];
     if (!b || !b.isBone) continue;
-    const base = (b.userData && b.userData._catIdleBaseQuat && b.userData._catIdleBaseQuat.isQuaternion)
-      ? b.userData._catIdleBaseQuat
-      : b.quaternion;
+    const base = _getOrInitIdleBaseQuat(b);
+    if (!base) continue;
     const swayScale = 0.65 - (i * 0.12);
     const yaw = Math.sin((t * 0.82) + (i * 0.45)) * 0.012 * intensity * swayScale;
     const pitch = Math.sin((t * 0.62) + (i * 0.35)) * 0.008 * intensity * swayScale;
@@ -588,9 +591,8 @@ export function applyGameplayProceduralIdle(ts, intensity) {
   for (let i = 0; i < idleHeadBones.length; i++) {
     const b = idleHeadBones[i];
     if (!b || !b.isBone) continue;
-    const base = (b.userData && b.userData._catIdleBaseQuat && b.userData._catIdleBaseQuat.isQuaternion)
-      ? b.userData._catIdleBaseQuat
-      : b.quaternion;
+    const base = _getOrInitIdleBaseQuat(b);
+    if (!base) continue;
     const headScale = i === 0 ? 1 : 0.58;
     const yaw = (Math.sin((t * 0.8) + 0.7) * 0.12 + Math.sin((t * 1.55) + 0.2) * 0.036) * intensity * headScale;
     const pitch = (Math.sin((t * 0.62) + 1.1) * 0.072 + Math.sin((t * 1.35) + 0.9) * 0.021) * intensity * headScale * classicHeadPitchSign;
@@ -681,7 +683,10 @@ function _applyToonJumpLegs(squash) {
   setScale(L.lowerFL, shinScale); setScale(L.lowerFR, shinScale);
 
   const boneKeys = ['thighBL', 'thighBR', 'upperBL', 'upperBR', 'upperFL', 'upperFR',
-    'lowerBL', 'lowerBR', 'lowerFL', 'lowerFR'];
+    'lowerBL', 'lowerBR', 'lowerFL', 'lowerFR',
+    // Include feet so paused walk poses don't leave the toon stance
+    // permanently staggered when the player stops moving.
+    'footBL', 'footBR', 'footFL', 'footFR'];
   for (const k of boneKeys) {
     const bone = L[k];
     const baseQ = B[k];
