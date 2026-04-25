@@ -33,12 +33,15 @@
       line-height: 1.45;
       letter-spacing: var(--tracking-base);
       text-rendering: optimizeLegibility;
-      /* Fallback gradient sits behind the iframe in case it fails to load */
+      /* Fallback gradient in case the iframe fails to load */
       background: radial-gradient(1200px 700px at 18% -12%, #244868 0%, transparent 58%),
                   radial-gradient(900px 560px at 110% 10%, #1f3e56 0%, transparent 65%),
                   linear-gradient(180deg, var(--bg1), var(--bg0));
       padding: 18px;
+      /* Establish a stacking context so the iframe + scrim layer
+         predictably between the body background and the leaderboard card. */
       position: relative;
+      z-index: 0;
       overflow-x: hidden;
     }
     /* Live game scene rendered behind the leaderboard */
@@ -48,7 +51,7 @@
       width: 100vw;
       height: 100vh;
       border: 0;
-      z-index: -2;
+      z-index: 0;
       pointer-events: none;
       filter: saturate(1.05);
       opacity: 0;
@@ -59,13 +62,14 @@
     #bgScrim {
       position: fixed;
       inset: 0;
-      z-index: -1;
+      z-index: 1;
       pointer-events: none;
       background:
         radial-gradient(120% 80% at 50% 30%, rgba(7,18,29,0.35) 0%, rgba(7,18,29,0.7) 70%, rgba(7,18,29,0.88) 100%);
       backdrop-filter: blur(2px) saturate(1.05);
       -webkit-backdrop-filter: blur(2px) saturate(1.05);
     }
+    .wrap { position: relative; z-index: 2; }
     @media (prefers-reduced-motion: reduce) {
       #bgFrame { display: none; }
     }

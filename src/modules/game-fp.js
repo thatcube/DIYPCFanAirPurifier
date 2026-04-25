@@ -51,11 +51,17 @@ try { sfxMuted = localStorage.getItem(SFX_MUTE_KEY) === '1'; } catch (e) {}
 try { musicMuted = localStorage.getItem(MUSIC_MUTE_KEY) === '1'; } catch (e) {}
 
 // ── Speed mode (3x top speed, slower acceleration) ──────────────────
+// Gated behind finding every secret coin at least once (see coins.hasFoundAllSecrets).
 export let speedMode = false;
 try { speedMode = localStorage.getItem(SPEED_MODE_KEY) === '1'; } catch (e) {}
-export function isSpeedMode() { return speedMode; }
+// Force-off at boot if the unlock hasn't happened on this device yet.
+if (speedMode && !coins.hasFoundAllSecrets()) {
+  speedMode = false;
+  try { localStorage.setItem(SPEED_MODE_KEY, '0'); } catch (e) {}
+}
+export function isSpeedMode() { return speedMode && coins.hasFoundAllSecrets(); }
 export function setSpeedMode(enabled) {
-  speedMode = !!enabled;
+  speedMode = !!enabled && coins.hasFoundAllSecrets();
   try { localStorage.setItem(SPEED_MODE_KEY, speedMode ? '1' : '0'); } catch (e) {}
 }
 
