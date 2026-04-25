@@ -277,8 +277,8 @@
       <span id="heroEyebrow" class="hero__eyebrow"><i class="ph-fill ph-trophy"></i> Speedrun Challenge</span>
       <h1 id="heroHeadline" class="hero__headline">Loading challenge…</h1>
       <p class="hero__pitch">
-        <b>DIY Air Purifier</b> is a first-person speedrun in a tiny bedroom. Grab every coin
-        as fast as you can — no install, plays in your browser.
+        <b>DIY Air Purifier</b> is a first-person speedrun in Brandon's to-scale bedroom. Grab every coin
+        as fast as you can.
       </p>
       <div class="hero__cta">
         <a class="playBtn glass-btn glass-btn--primary" href="/play"><i class="ph-fill ph-play"></i> Play now</a>
@@ -326,7 +326,7 @@
     const CAT_MODEL_EMOJI = { classic: '🐱', toon: '🦁', bababooey: '🐿️', totodile: '🐊' };
     const CAT_MODEL_LABEL = { classic: 'Classic', toon: 'Toon', bababooey: 'Bababooey', totodile: 'Totodile' };
     const CAT_COLOR_HEX = { charcoal: '#3a3a42', cream: '#e8d9b3', midnight: '#1a2030', snow: '#e8e8e8', ginger: '#d97a2a', tuxedo: '#151a22' };
-    const TOTAL_SECRETS = 9;
+    const BASE_TOTAL_SECRETS = 10;
     function catBadgeHtml(row) {
       const model = String((row && row.catModel) || 'classic').toLowerCase();
       const emoji = CAT_MODEL_EMOJI[model] || CAT_MODEL_EMOJI.classic;
@@ -338,11 +338,12 @@
       return `<span class="catBadge" title="${escapeHtml(title)}"><span class="catEmoji">${emoji}</span>${dot}<span>${label}</span></span>`;
     }
 
-    function secretBadgeHtml(row) {
-      const n = Math.max(0, Math.min(TOTAL_SECRETS, Math.floor(Number(row && row.secretCoins) || 0)));
-      const cls = n === 0 ? ' is-zero' : (n >= TOTAL_SECRETS ? ' is-max' : '');
-      const title = `${n} of ${TOTAL_SECRETS} secret coin${n === 1 ? '' : 's'} found`;
-      return `<span class="secretBadge${cls}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><i class="ph-fill ph-key"></i>${n}/${TOTAL_SECRETS}</span>`;
+    function secretBadgeHtml(row, totalSecrets) {
+      const n = Math.max(0, Math.floor(Number(row && row.secretCoins) || 0));
+      const goal = Math.max(1, Math.floor(Number(totalSecrets) || BASE_TOTAL_SECRETS));
+      const cls = n === 0 ? ' is-zero' : (n >= goal ? ' is-max' : '');
+      const title = `${n} of ${goal} secret coin${n === 1 ? '' : 's'} found`;
+      return `<span class="secretBadge${cls}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><i class="ph-fill ph-key"></i>${n}/${goal}</span>`;
     }
 
     async function copyText(text) {
@@ -405,6 +406,11 @@
       }
       emptyEl.style.display = 'none';
 
+      const secretGoal = rows.reduce((max, row) => {
+        const n = Math.max(0, Math.floor(Number(row && row.secretCoins) || 0));
+        return Math.max(max, n);
+      }, BASE_TOTAL_SECRETS);
+
       rowsEl.innerHTML = rows.map((r, i) => {
         const rowId = String(r.id || '');
         const hit = hitId && rowId === hitId;
@@ -412,7 +418,7 @@
           <div class="rank">#${i + 1}</div>
           <div class="name">${escapeHtml(r.name)}</div>
           ${catBadgeHtml(r)}
-          ${secretBadgeHtml(r)}
+          ${secretBadgeHtml(r, secretGoal)}
           <div class="time">${fmtRun(r.timeMs)}</div>
         </li>`;
       }).join('');

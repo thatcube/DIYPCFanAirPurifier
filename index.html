@@ -11232,8 +11232,8 @@ function _updateCoins(ts,frameScale){
         // Check if all secrets found — use hardcoded total since secrets
         // are spawned dynamically on interaction (counting spawned ones
         // would say "all found" after the very first pickup).
-        // Total: xbox(1) + lamp(1) + powerbi(3) + window(1) + headboardUnderBed(1) + macbook(1) = 8
-        const _TOTAL_SECRETS=8;
+        // Total: cornerDoor(1) + lamp(1) + powerbi(3) + window(1) + drawer(1) + macbook(1) + tv(1) + foodBowl(1) = 10
+        const _TOTAL_SECRETS=10;
         if(_coinSecretScore>=_TOTAL_SECRETS){
           setTimeout(()=>_showFpResetIndicator('✨ ALL SECRETS FOUND! ✨'), 400);
         }

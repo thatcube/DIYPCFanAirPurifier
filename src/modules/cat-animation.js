@@ -185,6 +185,10 @@ export function loadGameplayCat(refs = {}) {
     if (refs.applyCatColorToModel) refs.applyCatColorToModel();
     catGroup.add(catModel);
 
+    // Always create a mixer so procedural-only rigs (like Totodile)
+    // still execute the gameplay animation path.
+    catMixer = new THREE.AnimationMixer(catModel);
+
     // Animations
     if (gltf.animations && gltf.animations.length) {
       // Strip position (translation) tracks from all animation clips.
@@ -202,7 +206,6 @@ export function loadGameplayCat(refs = {}) {
         clip.resetDuration();
       }
 
-      catMixer = new THREE.AnimationMixer(catModel);
       const byName = (names) => {
         for (const n of names) {
           const c = gltf.animations.find(a => a.name.toLowerCase().includes(n));
@@ -374,30 +377,30 @@ function _collectIdleBones(model) {
   // segment so trailing FBX node-id suffixes (e.g. "_05", "_011") are
   // ignored. All matches are anchored at start of bone name.
   const totoMap = {
-    hips:      /^Hips(_|$)/i,
-    waist:     /^Waist(_|$)/i,
-    spine:     /^Spine(_|$)/i,
-    neck:      /^Neck(_|$)/i,
-    head:      /^Head(_|$)/i,
-    jaw:       /^Jaw(_|$)/i,
-    tail1:     /^Tail1(_|$)/i,
-    tail2:     /^Tail2(_|$)/i,
-    lThigh:    /^LThigh(_|$)/i,
-    lLeg:      /^LLeg(_|$)/i,
-    lFoot:     /^LFoot(_|$)/i,
-    lToe:      /^LToe(_|$)/i,
-    rThigh:    /^RThigh(_|$)/i,
-    rLeg:      /^RLeg(_|$)/i,
-    rFoot:     /^RFoot(_|$)/i,
-    rToe:      /^RToe(_|$)/i,
-    lShoulder: /^LShoulder(_|$)/i,
-    lArm:      /^LArm(_|$)/i,
-    lForeArm:  /^LForeArm(_|$)/i,
-    lHand:     /^LHand(_|$)/i,
-    rShoulder: /^RShoulder(_|$)/i,
-    rArm:      /^RArm(_|$)/i,
-    rForeArm:  /^RForeArm(_|$)/i,
-    rHand:     /^RHand(_|$)/i
+    hips:      /^Hips(?:[._]|\d|$)/i,
+    waist:     /^Waist(?:[._]|\d|$)/i,
+    spine:     /^Spine(?:[._]|\d|$)/i,
+    neck:      /^Neck(?:[._]|\d|$)/i,
+    head:      /^Head(?:[._]|\d|$)/i,
+    jaw:       /^Jaw(?:[._]|\d|$)/i,
+    tail1:     /^Tail1(?:[._]|\d|$)/i,
+    tail2:     /^Tail2(?:[._]|\d|$)/i,
+    lThigh:    /^LThigh(?:[._]|\d|$)/i,
+    lLeg:      /^LLeg(?:[._]|\d|$)/i,
+    lFoot:     /^LFoot(?:[._]|\d|$)/i,
+    lToe:      /^LToe(?:[._]|\d|$)/i,
+    rThigh:    /^RThigh(?:[._]|\d|$)/i,
+    rLeg:      /^RLeg(?:[._]|\d|$)/i,
+    rFoot:     /^RFoot(?:[._]|\d|$)/i,
+    rToe:      /^RToe(?:[._]|\d|$)/i,
+    lShoulder: /^LShoulder(?:[._]|\d|$)/i,
+    lArm:      /^LArm(?:[._]|\d|$)/i,
+    lForeArm:  /^LForeArm(?:[._]|\d|$)/i,
+    lHand:     /^LHand(?:[._]|\d|$)/i,
+    rShoulder: /^RShoulder(?:[._]|\d|$)/i,
+    rArm:      /^RArm(?:[._]|\d|$)/i,
+    rForeArm:  /^RForeArm(?:[._]|\d|$)/i,
+    rHand:     /^RHand(?:[._]|\d|$)/i
   };
 
   model.traverse(o => {
@@ -754,8 +757,9 @@ export function applyBababooeyIdleSquish(ts, intensity) {
 // bababooey path.
 //
 // Conventions (validated empirically):
-//   - Limb "swing forward/back" is rotation around X.
-//   - Limb "splay in/out" (lateral) is rotation around Z.
+//   - Totodile leg forward/back swing is primarily rotation around Y.
+//   - Rotation around Z mostly introduces lateral splay, so we use a
+//     small Z counter-term to keep feet tracking fore/aft.
 //   - Body twist is rotation around Y.
 // All rotations are applied as base * offset so the rest pose is the
 // neutral state and amplitudes stay model-relative.
@@ -827,7 +831,7 @@ export function applyTotodileProceduralRun(ts, moveSpeed, moveBlend) {
   const sp = Math.max(0, moveSpeed);
   // ~27 in/s is a confident jog (matches bababooey normalization).
   const spN = Math.min(1, sp / 27);
-  const blend = Math.max(0, Math.min(1, moveBlend)) * Math.max(0.25, spN);
+  const blend = Math.max(0, Math.min(1, moveBlend)) * Math.max(0.38, spN);
   if (blend <= 0.001) return;
   const t = ts * 0.001;
 
@@ -839,26 +843,41 @@ export function applyTotodileProceduralRun(ts, moveSpeed, moveBlend) {
   const sR = Math.sin(phase + Math.PI);
   // Strength of a single stride peak (0..1 nominal).
   const stride = (0.55 + spN * 0.55) * blend;
-  const liftStrength = 0.70;
+  const legSwing = (0.22 + spN * 0.18) * blend;
+  const kneeTuck = (0.34 + spN * 0.28) * blend;
+  const ankleCycle = (0.08 + spN * 0.07) * blend;
+  const toeCycle = (0.05 + spN * 0.05) * blend;
+  const liftStrength = 0.78;
+  const lSide = -1;
+  const rSide = +1;
+  const latCancel = (side, v, k) => -side * v * k;
 
   // ── Legs ──
-  // Thighs swing forward/back on X. Negative X = forward swing.
-  const thighL = -sL * 0.95 * stride;
-  const thighR = -sR * 0.95 * stride;
-  _totoApply(totoBones.lThigh, totoBase.lThigh, thighL, 0, 0, liftStrength);
-  _totoApply(totoBones.rThigh, totoBase.rThigh, thighR, 0, 0, liftStrength);
+  // Totodile's thigh flexion axis is Y (not X). Add a small per-side Z
+  // counter so forward swing does not read as legs flaring outward.
+  const thighL = -sL * legSwing;
+  const thighR = -sR * legSwing;
+  _totoApply(totoBones.lThigh, totoBase.lThigh, 0, thighL, latCancel(lSide, thighL, 0.58), liftStrength);
+  _totoApply(totoBones.rThigh, totoBase.rThigh, 0, thighR, latCancel(rSide, thighR, 0.58), liftStrength);
 
   // Shins bend most when the leg is recovering (back-swing). Use a
   // half-rectified signal so the knee tucks during lift but stays
   // straight on the planted leg.
-  const shinL = Math.max(0, sL) * 1.05 * stride;
-  const shinR = Math.max(0, sR) * 1.05 * stride;
-  _totoApply(totoBones.lLeg, totoBase.lLeg, shinL, 0, 0, liftStrength);
-  _totoApply(totoBones.rLeg, totoBase.rLeg, shinR, 0, 0, liftStrength);
+  const shinL = Math.max(0, sL) * kneeTuck;
+  const shinR = Math.max(0, sR) * kneeTuck;
+  _totoApply(totoBones.lLeg, totoBase.lLeg, 0, shinL, latCancel(lSide, shinL, 0.56), liftStrength);
+  _totoApply(totoBones.rLeg, totoBase.rLeg, 0, shinR, latCancel(rSide, shinR, 0.56), liftStrength);
 
-  // Feet kick forward as the shin recovers (heel-strike feel).
-  _totoApply(totoBones.lFoot, totoBase.lFoot, -shinL * 0.55, 0, 0, 0.55);
-  _totoApply(totoBones.rFoot, totoBase.rFoot, -shinR * 0.55, 0, 0, 0.55);
+  // Ankles/toes follow the knee tuck plus a smooth sinusoidal cycle so
+  // both phases of the stride read clearly (more obvious foot travel).
+  const footL = (-shinL * 0.62) - (sL * ankleCycle);
+  const footR = (-shinR * 0.62) - (sR * ankleCycle);
+  const toeL = (-shinL * 0.34) - (sL * toeCycle);
+  const toeR = (-shinR * 0.34) - (sR * toeCycle);
+  _totoApply(totoBones.lFoot, totoBase.lFoot, 0, footL, 0, 0.62);
+  _totoApply(totoBones.rFoot, totoBase.rFoot, 0, footR, 0, 0.62);
+  _totoApply(totoBones.lToe, totoBase.lToe, 0, toeL, 0, 0.56);
+  _totoApply(totoBones.rToe, totoBase.rToe, 0, toeR, 0, 0.56);
 
   // ── Arms (counter-swing) ──
   const armSwing = 0.55 * stride;

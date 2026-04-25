@@ -91,7 +91,7 @@ const _pvQA = new THREE.Quaternion();
 const _pvQB = new THREE.Quaternion();
 
 function _collectPreviewIdleBones(model) {
-  const tailRe = /(^tail$|^tail[._]|_tail|tail_)/i;
+  const tailRe = /(^tail\d*([._]|$)|_tail|tail_)/i;
   const headRe = /(^head$|^head[._]|_head|head_|^neck$|^neck[._]|_neck|neck_)/i;
   const spineRe = /(^spine$|^spine[._]|_spine|spine_|^chest$|^chest[._]|_chest|chest_)/i;
   const tails = [], heads = [], spines = [];

@@ -50,7 +50,6 @@ const DEFAULTS = {
   MAX_RUN_MS: 20 * 60 * 1000,
   MIN_COIN_INTERVAL_MS: 120,
   COIN_COUNT: 15,
-  MAX_SECRET_COINS: 9,
 };
 
 let dbInitPromise = null;
@@ -303,7 +302,7 @@ async function handleRunFinish(request, env, cfg) {
   const clientTimeMs = Number.isFinite(rawClientTime) && rawClientTime > 0 ? Math.floor(rawClientTime) : 0;
   const rawSecretCoins = Number(body?.secretCoins);
   const secretCoins = Number.isFinite(rawSecretCoins) && rawSecretCoins > 0
-    ? Math.min(Math.floor(rawSecretCoins), DEFAULTS.MAX_SECRET_COINS)
+    ? Math.floor(rawSecretCoins)
     : 0;
   if (!runId) return apiError(400, 'bad_request', 'runId is required');
 
@@ -627,7 +626,7 @@ function normalizeLeaderboard(rows, maxEntries, perPlayer) {
     const isTest = Number(row.is_test ?? row.isTest ?? 0) ? true : false;
     const rawSecret = Number(row.secret_coins ?? row.secretCoins ?? 0);
     const secretCoins = Number.isFinite(rawSecret) && rawSecret > 0
-      ? Math.min(Math.floor(rawSecret), DEFAULTS.MAX_SECRET_COINS)
+      ? Math.floor(rawSecret)
       : 0;
     clean.push({ id, name, timeMs, at: safeAt, catColor, catHair, catModel, playerId, isTest, secretCoins });
   }

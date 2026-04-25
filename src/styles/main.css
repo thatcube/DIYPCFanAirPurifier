@@ -1470,49 +1470,6 @@ input[type=range]::-moz-range-thumb {
   display: flex; justify-content: flex-end; gap: 8px;
 }
 
-/* ─── Test-run indicator ─────────────────────────────────────────── */
-.run-pill__test-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-left: 4px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: #ffd27a;
-  background: rgba(255, 170, 40, 0.14);
-  border: 1px solid rgba(255, 200, 90, 0.5);
-  text-shadow: 0 1px 6px rgba(255, 170, 40, 0.35);
-  animation: testBadgePulse 2.2s ease-in-out infinite;
-}
-.run-pill__test-badge i { font-size: 13px; }
-@keyframes testBadgePulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255,170,40,0.0); }
-  50%      { box-shadow: 0 0 0 4px rgba(255,170,40,0.12); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .run-pill__test-badge { animation: none; }
-}
-#finishDialogTestBanner {
-  margin: 0 0 12px 0;
-  padding: 9px 14px;
-  border-radius: 10px;
-  font-family: var(--font-ui, system-ui);
-  font-size: 13px;
-  line-height: 1.35;
-  color: #ffd27a;
-  background: rgba(255, 170, 40, 0.10);
-  border: 1px solid rgba(255, 200, 90, 0.45);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-#finishDialogTestBanner i { font-size: 16px; }
-#finishDialogTestBanner strong { letter-spacing: 0.1em; }
-
 /* ─── Finish Dialog ──────────────────────────────────────────────── */
 #finishDialogOverlay {
   display: none; position: fixed; inset: 0; z-index: 12500;

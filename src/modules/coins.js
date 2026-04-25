@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { state } from './state.js';
-import { TOTAL_SECRETS } from './constants.js';
+import { TOTAL_SECRETS, SECRET_COIN_IDS } from './constants.js';
 import { reportCoin as _reportCoinToServer } from './leaderboard.js';
 
 // ── State ───────────────────────────────────────────────────────────
@@ -55,9 +55,17 @@ try {
   }
 } catch (e) {}
 
-export function getSecretFoundCount() { return _secretFoundIds.size; }
+function _getFoundRequiredSecretCount() {
+  let found = 0;
+  for (const id of SECRET_COIN_IDS) {
+    if (_secretFoundIds.has(id)) found++;
+  }
+  return found;
+}
+
+export function getSecretFoundCount() { return _getFoundRequiredSecretCount(); }
 export function getSecretTotal() { return TOTAL_SECRETS; }
-export function hasFoundAllSecrets() { return _secretFoundIds.size >= TOTAL_SECRETS; }
+export function hasFoundAllSecrets() { return _getFoundRequiredSecretCount() >= TOTAL_SECRETS; }
 function _markSecretFound(id) {
   if (!id || _secretFoundIds.has(id)) return;
   _secretFoundIds.add(id);
@@ -376,8 +384,8 @@ export function spawnRoomCoins(roomRefs) {
   //   door (-X wall, 6 ft into the corridor). Door panel center pre-mirror
   //   X≈11.45, knob ball protrudes ~1.5" into the hallway → world X≈-13.65.
   //   Lock rail on the 67"-tall leaf sits ~24" off the floor; coin perches
-  //   ~3" above the ball so it reads as balanced on the knob.
-  addCoin(_coinGroup, new THREE.Vector3(-13.65, fy + 27.5, 133), {});
+  //   ~5" above the ball so it reads as balanced on the knob.
+  addCoin(_coinGroup, new THREE.Vector3(-13.65, fy + 29.5, 133), {});
 
   // 15. Hidden inside a random nightstand drawer (moves with the drawer when opened)
   if (roomRefs && roomRefs.drawers && roomRefs.drawers.length > 0) {
