@@ -3,6 +3,7 @@
 // Ported from the monolith (index.html ~L8224-8530, L10595-10830).
 
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { state } from './state.js';
 import {
   PLAYER_EYE_H, PLAYER_BODY_R, PLAYER_HEAD_EXTRA,
@@ -47,6 +48,7 @@ const SFX_MUTE_KEY = 'diy_air_purifier_muted_v2';
 const MUSIC_MUTE_KEY = 'diy_air_purifier_music_muted_v2';
 const MOUSE_SENS_KEY = 'diy_air_purifier_mouse_sens_v1';
 const SPEED_MODE_KEY = 'diy_air_purifier_speed_mode_v1';
+const SKATE_MODE_KEY = 'diy_air_purifier_skate_mode_v1';
 
 try { sfxMuted = localStorage.getItem(SFX_MUTE_KEY) === '1'; } catch (e) {}
 try { musicMuted = localStorage.getItem(MUSIC_MUTE_KEY) === '1'; } catch (e) {}
@@ -64,6 +66,32 @@ export function isSpeedMode() { return speedMode && coins.hasFoundAllSecrets(); 
 export function setSpeedMode(enabled) {
   speedMode = !!enabled && coins.hasFoundAllSecrets();
   try { localStorage.setItem(SPEED_MODE_KEY, speedMode ? '1' : '0'); } catch (e) {}
+}
+
+// ── Skate mode (sideways stance + board visual) ────────────────────
+export let skateMode = false;
+try { skateMode = localStorage.getItem(SKATE_MODE_KEY) === '1'; } catch (e) {}
+export function isSkateMode() { return skateMode; }
+export function getSkateModelLift() { return skateMode ? _skateModelLift : 0; }
+export function setSkateMode(enabled, opts = {}) {
+  const next = !!enabled;
+  const force = !!opts.force;
+  const silent = !!opts.silent;
+  if (!force && skateMode === next) {
+    _syncSkateToggleUi();
+    _syncSkateboardVisualState();
+    return;
+  }
+  skateMode = next;
+  try { localStorage.setItem(SKATE_MODE_KEY, skateMode ? '1' : '0'); } catch (e) {}
+  _syncSkateToggleUi();
+  _syncSkateboardVisualState();
+  if (skateMode) _initSkateboard();
+  else {
+    _skateModelLift = 0;
+    _silenceSkateRoll(false);
+  }
+  if (!silent && _showToast) _showToast(skateMode ? 'Skate mode on' : 'Skate mode off');
 }
 
 // ── Mouse sensitivity (1.0 = default) ───────────────────────────────
@@ -129,9 +157,28 @@ export function syncAudioToggleUi() {
   _syncAudioToggleUi();
 }
 
+function _syncSkateToggleUi() {
+  const skateTog = document.getElementById('fpPauseSkateMode');
+  const skateState = document.getElementById('fpPauseSkateModeState');
+  if (skateTog) {
+    skateTog.classList.toggle('on', skateMode);
+    skateTog.setAttribute('aria-checked', String(skateMode));
+    skateTog.setAttribute('aria-label', skateMode ? 'Skate mode enabled' : 'Skate mode disabled');
+  }
+  if (skateState) {
+    skateState.textContent = skateMode ? 'On' : 'Off';
+    skateState.classList.toggle('off', !skateMode);
+  }
+}
+
+export function syncSkateToggleUi() {
+  _syncSkateToggleUi();
+}
+
 export function setSfxMuted(muted) {
   sfxMuted = !!muted;
   try { localStorage.setItem(SFX_MUTE_KEY, sfxMuted ? '1' : '0'); } catch (e) {}
+  if (sfxMuted) _silenceSkateRoll(true);
   _syncAudioToggleUi();
 }
 
@@ -172,6 +219,7 @@ let _lastFootstepTs = 0;
 let _wasFootstepMoving = false;
 let _lastUiInteractTs = 0;
 let _quickControlsVisible = false;
+let _skateLean = 0;
 
 // Cached DOM elements (looked up once in init or on first use)
 let _cachedCbBar = null, _cachedCbFill = null, _cachedCbValue = null, _cachedCbLabel = null;
@@ -209,8 +257,11 @@ let _ssAura = null;          // additive yellow sphere child of _catGroup
 let _ssHalo = null;          // additive yellow ring/sprite child of _catGroup
 let _ssMatCache = null;      // Map<material, {emissive:Color, intensity:number}>
 let _ssAuraStrength = 0;     // smoothed 0..1 drive value
+let _ssEnvLight = null;      // moving point light that affects room surfaces
+let _ssEnvLightIntensity = 0;
 const _ssGold = new THREE.Color(0xffe070);
 const _ssGoldHot = new THREE.Color(0xfff8b0);
+const _ssEnvAnchor = new THREE.Vector3();
 
 // Activation gate + active-window timers.
 const SS_HOLD_MS   = 5000;  // how long full charge must be held to activate
@@ -219,7 +270,7 @@ let _ssFullChargeSinceTs = 0; // ts when chargePct first hit 100% (0 = not holdi
 let _ssActiveUntilTs = 0;     // ts at which the active window ends (0 = not active)
 let _ssBurstStartTs = 0;      // ts when SS activated (drives ~3s burst flash at start of active window)
 const SS_BURST_MS = 3000;     // duration of the post-activation burst
-const SS_CHARGE_HINT_MS = 2500; // ms into a full-charge hold before subtle aura starts hinting
+const SS_CHARGE_HINT_MS = 1500; // ms into a full-charge hold before subtle aura starts hinting
 let _ssChargeShake = 0;       // smoothed 0..1 shake strength while holding full charge
 const _ssShakeOffset = new THREE.Vector3();
 
@@ -260,6 +311,21 @@ function _ensureSuperSaiyanAura() {
   _ssHalo.renderOrder = 999;
   _ssHalo.frustumCulled = false;
   _catGroup.add(_ssHalo);
+}
+
+function _ensureSuperSaiyanEnvLight() {
+  if (_ssEnvLight || !_scene) return;
+  _ssEnvLight = new THREE.PointLight(0xffe484, 0, 110, 1.25);
+  _ssEnvLight.castShadow = false;
+  _ssEnvLight.visible = false;
+  _scene.add(_ssEnvLight);
+}
+
+function _setSuperSaiyanEnvLightOff() {
+  _ssEnvLightIntensity = 0;
+  if (!_ssEnvLight) return;
+  _ssEnvLight.intensity = 0;
+  _ssEnvLight.visible = false;
 }
 
 function _applySuperSaiyan(strength /* 0..1 sustained */, burst /* 0..1 transient */, ts) {
@@ -323,6 +389,44 @@ function _applySuperSaiyan(strength /* 0..1 sustained */, burst /* 0..1 transien
   });
 }
 
+function _applySuperSaiyanEnvLight(anchor, strength /* 0..1 */, burst /* 0..1 */, ts, dtSec) {
+  _ensureSuperSaiyanEnvLight();
+  if (!_ssEnvLight || !anchor) return;
+
+  const s = Math.max(0, Math.min(1, strength || 0));
+  const b = Math.max(0, Math.min(1, burst || 0));
+  const total = s + b;
+
+  // Subtle during pre-glow, clearly visible during active + burst.
+  let targetI = 0;
+  if (total > 0.001) {
+    targetI = 10 + s * 46 + b * 70;
+    targetI *= 0.9 + 0.1 * Math.sin(ts * 0.041);
+  }
+  const lerpK = 1 - Math.exp(-Math.max(0, dtSec) * 14);
+  _ssEnvLightIntensity += (targetI - _ssEnvLightIntensity) * lerpK;
+  if (!Number.isFinite(_ssEnvLightIntensity)) _ssEnvLightIntensity = 0;
+
+  if (_ssEnvLightIntensity <= 0.05) {
+    _setSuperSaiyanEnvLightOff();
+    return;
+  }
+
+  const t = ts * 0.001;
+  const orbitR = 0.75 + s * 0.85 + b * 1.15;
+  const yWobble = 0.2 + s * 0.35 + b * 0.45;
+
+  _ssEnvLight.visible = true;
+  _ssEnvLight.intensity = _ssEnvLightIntensity;
+  _ssEnvLight.distance = 90 + s * 32 + b * 38;
+  _ssEnvLight.color.copy(_ssGold).lerp(_ssGoldHot, Math.min(1, s * 0.55 + b * 0.75));
+  _ssEnvLight.position.set(
+    anchor.x + Math.sin(t * 5.1) * orbitR,
+    anchor.y + 0.2 + Math.sin(t * 9.3 + 0.8) * yWobble,
+    anchor.z + Math.cos(t * 4.6 + 1.2) * orbitR
+  );
+}
+
 function _sampleSuperSaiyanChargeShake(ts, strength, out = _ssShakeOffset) {
   const k = Math.max(0, Math.min(1, strength));
   if (k <= 0.0001) return out.set(0, 0, 0);
@@ -369,6 +473,22 @@ let _roomRefs = null;
 let _purifierRefs = null;
 let _fpHud = null;
 let _purifierGroup = null;
+
+// Skateboard visual (loaded once, attached under cat feet)
+let _skateboardLoadStarted = false;
+let _skateboardAnchor = null;
+let _skateboardModel = null;
+let _skateboardBaseYaw = 0;
+let _skateboardNativeLen = 1;
+let _skateboardFitCatModel = null;
+let _skateModelLift = 0;
+const _skateboardBounds = new THREE.Box3();
+const _skateboardCenter = new THREE.Vector3();
+const _skateboardSize = new THREE.Vector3();
+const _skateboardFloorPoint = new THREE.Vector3();
+const _skateFootAnchor = new THREE.Vector3();
+const _skateFootTmp = new THREE.Vector3();
+const _skateFootPoints = [];
 
 // Collision boxes from room (set during init)
 let _staticBoxes = [];
@@ -423,6 +543,12 @@ function _pushWorldAabbBox(result, obj, padXZ = 0) {
 
 let _bonkBuffer = null;
 let _bonkAC = null;
+let _skateRollNoiseBuffer = null;
+let _skateRollSrc = null;
+let _skateRollFilter = null;
+let _skateRollGain = null;
+let _skateRollLfo = null;
+let _skateRollLfoGain = null;
 
 function _ensureSfxAudioCtx() {
   let ac = _bonkAC || coins.getAudioCtx();
@@ -545,6 +671,294 @@ function _playFootstepCue(speedNorm, sprinting) {
   });
 }
 
+function _ensureSkateRollBuffer(ac) {
+  if (_skateRollNoiseBuffer && _skateRollNoiseBuffer.sampleRate === ac.sampleRate) return;
+  const sr = ac.sampleRate;
+  const dur = 1.25;
+  const len = Math.floor(sr * dur);
+  const buf = ac.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * 0.42;
+  _skateRollNoiseBuffer = buf;
+}
+
+function _ensureSkateRollAudio() {
+  if (_skateRollSrc && _skateRollGain && _skateRollFilter) return _bonkAC;
+  const ac = _ensureSfxAudioCtx();
+  if (!ac) return null;
+  _ensureSkateRollBuffer(ac);
+
+  const src = ac.createBufferSource();
+  src.buffer = _skateRollNoiseBuffer;
+  src.loop = true;
+
+  const filter = ac.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = 210;
+  filter.Q.value = 0.7;
+
+  const gain = ac.createGain();
+  gain.gain.value = 0;
+
+  const lfo = ac.createOscillator();
+  lfo.type = 'triangle';
+  lfo.frequency.value = 2.2;
+
+  const lfoGain = ac.createGain();
+  lfoGain.gain.value = 20;
+
+  lfo.connect(lfoGain);
+  lfoGain.connect(filter.frequency);
+  src.connect(filter);
+  filter.connect(gain);
+  gain.connect(ac.destination);
+
+  src.start();
+  lfo.start();
+
+  _skateRollSrc = src;
+  _skateRollFilter = filter;
+  _skateRollGain = gain;
+  _skateRollLfo = lfo;
+  _skateRollLfoGain = lfoGain;
+  return ac;
+}
+
+function _setSkateRollTarget(speedNorm, grounded) {
+  const moving = grounded && speedNorm > 0.02;
+  const want = !!(fpMode && !fpPaused && skateMode && moving && !sfxMuted);
+
+  if (!want) {
+    if (_skateRollGain && _bonkAC) {
+      const now = _bonkAC.currentTime;
+      _skateRollGain.gain.cancelScheduledValues(now);
+      _skateRollGain.gain.setTargetAtTime(0, now, 0.035);
+    }
+    return;
+  }
+
+  const ac = _ensureSkateRollAudio();
+  if (!ac || !_skateRollGain || !_skateRollFilter || !_skateRollLfo || !_skateRollLfoGain) return;
+
+  const n = Math.max(0, Math.min(1, speedNorm));
+  const now = ac.currentTime;
+  const targetGain = 0.002 + n * 0.014;
+  const targetFreq = 130 + n * 300;
+  const targetQ = 0.45 + n * 1.15;
+  const lfoHz = 1.3 + n * 4.4;
+  const wobbleDepth = 8 + n * 26;
+
+  _skateRollGain.gain.cancelScheduledValues(now);
+  _skateRollGain.gain.setTargetAtTime(targetGain, now, 0.03);
+
+  _skateRollFilter.frequency.cancelScheduledValues(now);
+  _skateRollFilter.frequency.setTargetAtTime(targetFreq, now, 0.05);
+
+  _skateRollFilter.Q.cancelScheduledValues(now);
+  _skateRollFilter.Q.setTargetAtTime(targetQ, now, 0.07);
+
+  _skateRollLfo.frequency.cancelScheduledValues(now);
+  _skateRollLfo.frequency.setTargetAtTime(lfoHz, now, 0.12);
+
+  _skateRollLfoGain.gain.cancelScheduledValues(now);
+  _skateRollLfoGain.gain.setTargetAtTime(wobbleDepth, now, 0.12);
+}
+
+function _silenceSkateRoll(immediate = false) {
+  if (!_skateRollGain || !_bonkAC) return;
+  const now = _bonkAC.currentTime;
+  _skateRollGain.gain.cancelScheduledValues(now);
+  if (immediate) _skateRollGain.gain.setValueAtTime(0, now);
+  else _skateRollGain.gain.setTargetAtTime(0, now, 0.03);
+}
+
+function _ensureSkateboardAnchor() {
+  if (_skateboardAnchor || !_catGroup) return;
+  _skateboardAnchor = new THREE.Group();
+  _skateboardAnchor.visible = false;
+  _catGroup.add(_skateboardAnchor);
+}
+
+function _syncSkateboardVisualState() {
+  if (!_skateboardAnchor) return;
+  _skateboardAnchor.visible = !!(fpMode && fpCamMode === 'third' && skateMode && _skateboardModel);
+}
+
+function _useForwardSkatePoseForModel() {
+  const key = String(catAppearance.catModelKey || '').toLowerCase();
+  return key === 'classic' || key === 'toon';
+}
+
+function _getSkateLiftTrimForModel() {
+  const key = String(catAppearance.catModelKey || '').toLowerCase();
+  switch (key) {
+    case 'classic': return 0.95;
+    case 'toon': return 0;
+    case 'totodile': return 0.6;
+    case 'bababooey': return 0.9;
+    default: return 1.0;
+  }
+}
+
+function _getSkateBoardZTrimForModel() {
+  const key = String(catAppearance.catModelKey || '').toLowerCase();
+  if (key === 'bababooey') return -0.62;
+  return 0;
+}
+
+function _sampleSkateFootAnchor(out = _skateFootAnchor) {
+  if (!_catGroup || !catAnimation.catModel) return false;
+  const primary = [];
+  const secondary = [];
+  _skateFootPoints.length = 0;
+
+  catAnimation.catModel.updateMatrixWorld(true);
+  catAnimation.catModel.traverse((o) => {
+    if (!o || !o.isBone) return;
+    const name = String(o.name || '');
+    const isPrimary = /foot|paw/i.test(name);
+    const isSecondary = /toe/i.test(name);
+    if (!isPrimary && !isSecondary) return;
+    o.getWorldPosition(_skateFootTmp);
+    _catGroup.worldToLocal(_skateFootTmp);
+    const p = _skateFootTmp.clone();
+    if (isPrimary) primary.push(p);
+    else secondary.push(p);
+  });
+
+  if (primary.length >= 2) _skateFootPoints.push(...primary);
+  else _skateFootPoints.push(...primary, ...secondary);
+
+  if (_skateFootPoints.length < 2) return false;
+
+  _skateFootPoints.sort((a, b) => a.y - b.y);
+  const midIdx = Math.floor((_skateFootPoints.length - 1) * 0.5);
+  const refY = _skateFootPoints[midIdx].y;
+  const footY = refY + 0.055;
+
+  const yBand = 0.42;
+  let sumX = 0;
+  let sumZ = 0;
+  let count = 0;
+
+  for (const p of _skateFootPoints) {
+    if (Math.abs(p.y - refY) > yBand) continue;
+    sumX += p.x;
+    sumZ += p.z;
+    count++;
+  }
+
+  if (count < 1) {
+    sumX = 0;
+    sumZ = 0;
+    count = _skateFootPoints.length;
+    for (const p of _skateFootPoints) {
+      sumX += p.x;
+      sumZ += p.z;
+    }
+  }
+
+  if (count <= 0) return false;
+  out.set(sumX / count, footY, sumZ / count);
+  return true;
+}
+
+function _fitSkateboardToCat(force = false) {
+  if (!_skateboardAnchor || !_skateboardModel || !_catGroup || !catAnimation.catModel) return;
+  if (!force && _skateboardFitCatModel === catAnimation.catModel) return;
+
+  catAnimation.catModel.updateMatrixWorld(true);
+  _skateboardBounds.setFromObject(catAnimation.catModel);
+  if (_skateboardBounds.isEmpty()) return;
+
+  const catLen = Math.max(
+    _skateboardBounds.max.x - _skateboardBounds.min.x,
+    _skateboardBounds.max.z - _skateboardBounds.min.z
+  );
+  const targetLen = Math.max(0.1, catLen * 1.24);
+  const boardScale = Math.max(0.18, Math.min(6, targetLen / Math.max(0.001, _skateboardNativeLen)));
+  _skateboardModel.scale.setScalar(boardScale);
+  const boardTopLocalY = Math.max(0.001, _skateboardSize.y * boardScale);
+
+  _skateboardBounds.getCenter(_skateboardCenter);
+  _skateboardFloorPoint.set(_skateboardCenter.x, _skateboardBounds.min.y, _skateboardCenter.z);
+  _catGroup.worldToLocal(_skateboardCenter);
+  _catGroup.worldToLocal(_skateboardFloorPoint);
+  const boardVisibleMinY = Math.max(0.008, _skateboardFloorPoint.y + 0.008);
+  const skateFootClearance = 0.01;
+
+  let anchorX = _skateboardCenter.x;
+  let anchorY = boardVisibleMinY;
+  let anchorZ = _skateboardCenter.z;
+  let targetModelLift = skateMode ? _getSkateLiftTrimForModel() : 0;
+
+  if (_sampleSkateFootAnchor()) {
+    const unclampedAnchorY = _skateFootAnchor.y - boardTopLocalY - skateFootClearance;
+    const floorDeficit = Math.max(0, boardVisibleMinY - unclampedAnchorY);
+    targetModelLift += floorDeficit;
+    anchorX = _skateFootAnchor.x;
+    anchorY = unclampedAnchorY;
+    anchorZ = _skateFootAnchor.z;
+  }
+
+  anchorZ += _getSkateBoardZTrimForModel();
+  anchorY = Math.max(boardVisibleMinY, anchorY);
+
+  targetModelLift = Math.max(0, Math.min(2.4, targetModelLift));
+  const liftEase = force ? 1 : 0.55;
+  _skateModelLift += (targetModelLift - _skateModelLift) * liftEase;
+
+  _skateboardAnchor.position.set(
+    anchorX,
+    anchorY,
+    anchorZ
+  );
+  _skateboardAnchor.rotation.set(0, _skateboardBaseYaw, 0);
+  _skateboardFitCatModel = catAnimation.catModel;
+}
+
+function _initSkateboard() {
+  if (_skateboardLoadStarted) return;
+  _skateboardLoadStarted = true;
+  _ensureSkateboardAnchor();
+
+  const loader = new GLTFLoader();
+  loader.load('assets/skateboard.glb', (gltf) => {
+    if (!_skateboardAnchor) return;
+    const boardRoot = gltf?.scene;
+    if (!boardRoot) return;
+
+    // Normalize local pivot: center X/Z and pin bottom to local Y=0.
+    _skateboardBounds.setFromObject(boardRoot);
+    _skateboardBounds.getCenter(_skateboardCenter);
+    boardRoot.position.x -= _skateboardCenter.x;
+    boardRoot.position.z -= _skateboardCenter.z;
+    boardRoot.position.y -= _skateboardBounds.min.y;
+
+    boardRoot.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = false;
+      o.receiveShadow = true;
+      if (o.material && o.material.map) o.material.map.colorSpace = THREE.SRGBColorSpace;
+    });
+
+    _skateboardBounds.setFromObject(boardRoot);
+    _skateboardBounds.getSize(_skateboardSize);
+    const lenX = _skateboardSize.x;
+    const lenZ = _skateboardSize.z;
+    _skateboardNativeLen = Math.max(0.001, Math.max(lenX, lenZ));
+    _skateboardBaseYaw = lenX >= lenZ ? (Math.PI * 0.5) : 0;
+
+    _skateboardModel = boardRoot;
+    _skateboardAnchor.add(_skateboardModel);
+    _skateboardFitCatModel = null;
+    _fitSkateboardToCat(true);
+    _syncSkateboardVisualState();
+  }, undefined, (err) => {
+    console.warn('[game-fp] Skateboard model failed to load', err);
+  });
+}
+
 // ── Init ────────────────────────────────────────────────────────────
 
 // Cached list of interactive objects for crosshair raycasting
@@ -582,6 +996,9 @@ export function init(refs) {
   // Bind input
   _bindInputs();
   _syncAudioToggleUi();
+  _syncSkateToggleUi();
+  _initSkateboard();
+  _syncSkateboardVisualState();
 }
 
 function _setQuickControlsVisible(visible) {
@@ -1346,6 +1763,8 @@ export function toggleFirstPerson() {
     _wasGroundedLast = true;
     _lastFootstepTs = 0;
     _wasFootstepMoving = false;
+    _skateLean = 0;
+    _silenceSkateRoll(true);
 
     // Enter FP
     _savedFov = _camera.fov;
@@ -1378,6 +1797,8 @@ export function toggleFirstPerson() {
       _catGroup.visible = fpCamMode === 'third';
       if (_catGroup.parent !== _scene) _scene.add(_catGroup);
     }
+    _fitSkateboardToCat(true);
+    _syncSkateboardVisualState();
     // Disable cat shadow casting — shadow map refreshes at ~8 Hz so the
     // cat's shadow visually trails behind during movement at high FPS.
     catAnimation.setCatShadows(false);
@@ -1393,6 +1814,8 @@ export function toggleFirstPerson() {
     _wasGroundedLast = true;
     _lastFootstepTs = 0;
     _wasFootstepMoving = false;
+    _skateLean = 0;
+    _silenceSkateRoll(true);
 
     // Exit FP
     _camera.fov = _savedFov;
@@ -1419,6 +1842,8 @@ export function toggleFirstPerson() {
       _catGroup.position.set(0, 0, 0);
       _catGroup.rotation.set(0, 0, 0);
     }
+    _syncSkateboardVisualState();
+    _setSuperSaiyanEnvLightOff();
 
     // Restore orbit camera to look at purifier
     if (_controls && _placementOffset) {
@@ -1454,7 +1879,10 @@ function _respawn() {
   _ssActiveUntilTs = 0;
   _ssBurstStartTs = 0;
   _ssChargeShake = 0;
+  _skateLean = 0;
+  _silenceSkateRoll(true);
   _ssShakeOffset.set(0, 0, 0);
+  _setSuperSaiyanEnvLightOff();
 }
 
 // Reset all run-affecting world state (drawers, doors, purifier filters,
@@ -1497,6 +1925,7 @@ export function releasePauseFocusTrap() {
 // Clear pause flag without triggering re-lock (for exit flow)
 export function clearPauseState() {
   fpPaused = false;
+  _silenceSkateRoll(true);
 }
 
 export function setPaused(paused) {
@@ -1515,6 +1944,7 @@ export function setPaused(paused) {
     fpLookDX = 0;
     fpLookDY = 0;
     _lastPhysicsTs = 0;
+    _silenceSkateRoll(true);
 
     // Show pause overlay (unless finish is showing)
     if (overlay && !finishOpen) {
@@ -1581,6 +2011,7 @@ window._toggleHelp = _toggleHelp;
 export function setCamMode(mode) {
   fpCamMode = mode || (fpCamMode === 'first' ? 'third' : 'first');
   if (_catGroup) _catGroup.visible = fpMode && fpCamMode === 'third';
+  _syncSkateboardVisualState();
   const text = fpCamMode === 'first' ? 'First person' : 'Third person';
   const label = document.getElementById('fpQuickCamLabel');
   if (label) label.textContent = text;
@@ -1776,7 +2207,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
   // Super Saiyan mode — activates after holding full charge for 5s, then
   // runs for 20s (gold aura + 2x speed). Charging hint kicks in after
-  // ~2.5s of held full charge so the player sees the build-up; on
+  // ~1.5s of held full charge so the player sees the build-up; on
   // activation a ~3s burst flashes the original full-blown look before
   // settling into the dim sustained glow.
   {
@@ -1787,7 +2218,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       if (_ssFullChargeSinceTs === 0) _ssFullChargeSinceTs = ts;
       const heldMs = ts - _ssFullChargeSinceTs;
       preActivationShake = Math.min(1, heldMs / SS_HOLD_MS);
-      // After 2.5s of full-charge hold, ramp a subtle aura 0 → ~0.4 over
+      // After 1.5s of full-charge hold, ramp a subtle aura 0 → ~0.4 over
       // the remaining hold window so the player sees something building.
       if (!isSuperSaiyanActive() && heldMs > SS_CHARGE_HINT_MS) {
         const k = Math.min(1, (heldMs - SS_CHARGE_HINT_MS) / Math.max(1, SS_HOLD_MS - SS_CHARGE_HINT_MS));
@@ -1829,6 +2260,8 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     const shakeLerp = 1 - Math.exp(-Math.max(0, dtSec) * 18);
     _ssChargeShake += (shakeTarget - _ssChargeShake) * shakeLerp;
     _applySuperSaiyan(baseStrength, burst, ts);
+    _ssEnvAnchor.set(fpPos.x, fpPos.y - EYE_H + 4.0, fpPos.z);
+    _applySuperSaiyanEnvLight(_ssEnvAnchor, baseStrength, burst, ts, dtSec);
   }
 
   // ── Gravity (asymmetric: fall faster than rise) ───────────────────
@@ -1981,7 +2414,8 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   _wasGroundedLast = grounded;
   const horizSpd = Math.hypot(_velX, _velZ);
   const movingOnGround = grounded && horizSpd > 0.03;
-  if (movingOnGround) {
+  const footstepMoving = movingOnGround && !skateMode;
+  if (footstepMoving) {
     const sprintingStep = fpKeys.shift && horizSpd > 0.08;
     const speedNorm = Math.min(1, horizSpd / (sprintingStep ? 0.65 : 0.35));
     const intervalMs = sprintingStep ? 185 : 255;
@@ -1993,7 +2427,9 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   } else {
     _lastFootstepTs = ts;
   }
-  _wasFootstepMoving = movingOnGround;
+  _wasFootstepMoving = footstepMoving;
+  const skateSpeedNorm = Math.max(0, Math.min(1, (horizSpd - 0.02) / 0.58));
+  _setSkateRollTarget(skateSpeedNorm, grounded);
   if (grounded && horizSpd > 0.02) {
     _bobPhase += horizSpd * 0.6 * frameScale;
   }
@@ -2084,6 +2520,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     if (_catGroup) {
       if (_catGroup.parent !== _scene) _scene.add(_catGroup);
       _catGroup.visible = true;
+      _fitSkateboardToCat();
       _catGroup.position.set(fpPos.x, fpPos.y - 4.0, fpPos.z);
       if (_ssChargeShake > 0.0001) {
         const shake = _sampleSuperSaiyanChargeShake(ts, _ssChargeShake);
@@ -2095,12 +2532,25 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       // Face movement direction
       const moveLenSq = _velX * _velX + _velZ * _velZ;
       if (moveLenSq > 0.0009) lastCatFacingYaw = Math.atan2(_velX, _velZ);
-      let dYaw = lastCatFacingYaw - _catGroup.rotation.y;
+      const sidewaysSkatePose = skateMode && !_useForwardSkatePoseForModel();
+      const skateYawOffset = sidewaysSkatePose ? (Math.PI * 0.5) : 0;
+      const targetYaw = lastCatFacingYaw + skateYawOffset;
+      let dYaw = targetYaw - _catGroup.rotation.y;
       while (dYaw > Math.PI) dYaw -= Math.PI * 2;
       while (dYaw < -Math.PI) dYaw += Math.PI * 2;
       _catGroup.rotation.y += dYaw * easeAlpha(19.74, dtSec);
+
+      const lateralInput = (fpKeys.d ? 1 : 0) - (fpKeys.a ? 1 : 0);
+      const speedN = Math.max(0, Math.min(1, horizSpd / 0.5));
+      const leanTarget = skateMode ? (-lateralInput * 0.18 * speedN) : 0;
+      _skateLean += (leanTarget - _skateLean) * easeAlpha(12.5, dtSec);
       _catGroup.rotation.x = 0;
-      _catGroup.rotation.z = 0;
+      _catGroup.rotation.z = _skateLean;
+
+      if (_skateboardAnchor) {
+        _skateboardAnchor.rotation.y = _skateboardBaseYaw + (sidewaysSkatePose ? -(Math.PI * 0.5) : 0);
+      }
+      _syncSkateboardVisualState();
     }
   }
 
@@ -2197,6 +2647,8 @@ function _bindInputs() {
       case 'KeyH':
         _toggleHelp();
         break;
+      case 'KeyK':
+        setSkateMode(!skateMode);
         break;
     }
   });

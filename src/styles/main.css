@@ -1961,7 +1961,7 @@ body.play-mode #fps {
 }
 .char-start:active { transform: translateY(1px); }
 
-/* Movement-mode toggle (Normal vs Speed) — sits between the grid and Start */
+/* Movement-mode toggle (Normal / Speed / Skate) — sits between the grid and Start */
 .mode-select {
   display: flex;
   gap: 12px;
@@ -2015,6 +2015,11 @@ body.play-mode #fps {
   border-color: #ffd24a;
   background: rgba(255,210,74,0.14);
   box-shadow: 0 0 14px rgba(255,179,0,0.45);
+}
+.mode-pill.on[data-mode="skate"] {
+  border-color: #7af5c2;
+  background: rgba(122,245,194,0.14);
+  box-shadow: 0 0 14px rgba(76,230,179,0.4);
 }
 .mode-pill:focus-visible {
   outline: 2px solid var(--accent);

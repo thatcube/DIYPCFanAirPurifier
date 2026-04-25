@@ -68,6 +68,7 @@ let _babaRunPhase = 0;
 let _babaRunLastTs = -1;
 let _totoRunPhase = 0;
 let _totoRunLastTs = -1;
+let _babaRollAnchorReady = false;
 
 // Bone references for procedural animation
 const idleTailBones  = [];
@@ -76,6 +77,12 @@ const idleSpineBones = [];
 const tmpEuler = new THREE.Euler(0, 0, 0, 'XYZ');
 const tmpQuat  = new THREE.Quaternion();
 const tmpQuatB = new THREE.Quaternion();
+const tmpQuatC = new THREE.Quaternion();
+const tmpQuatD = new THREE.Quaternion();
+const tmpVecA = new THREE.Vector3();
+const tmpVecB = new THREE.Vector3();
+const babaRollAnchorLocal = new THREE.Vector3();
+const babaRollAnchorBaseLocal = new THREE.Vector3();
 const groundTmpParentPos = new THREE.Vector3();
 const boxTmp = new THREE.Box3();
 
@@ -160,6 +167,7 @@ export function loadGameplayCat(refs = {}) {
 
     baseLocalPos.copy(catModel.position);
     baseLocalQuat.copy(catModel.quaternion);
+    _cacheBababooeyRollAnchor(catModel, src);
 
     // Shadows + material cleanup
     catModel.traverse(o => {
@@ -234,6 +242,7 @@ export function clearGameplayCat() {
   _babaRunLastTs = -1;
   _totoRunPhase = 0;
   _totoRunLastTs = -1;
+  _resetBababooeyRollAnchor();
   _resetIdleBones();
 }
 
@@ -358,6 +367,55 @@ function _pinToGround(model, baseLPos) {
   const targetLocalMinY = baseLPos.y + 0.002;
   const delta = targetLocalMinY - localMinY;
   model.position.y += delta;
+}
+
+function _resetBababooeyRollAnchor() {
+  _babaRollAnchorReady = false;
+  babaRollAnchorLocal.set(0, 0, 0);
+  babaRollAnchorBaseLocal.set(0, 0, 0);
+}
+
+function _cacheBababooeyRollAnchor(model, src) {
+  _resetBababooeyRollAnchor();
+  if (!model) return;
+  if (!/bababooey/i.test(String(src || ''))) return;
+
+  model.updateMatrixWorld(true);
+  // Prefer torso-bone center for a stable in-body pivot. Bounding-box center
+  // can drift if pose geometry is asymmetric.
+  let anchorFound = false;
+  tmpVecA.set(0, 0, 0);
+  let anchorCount = 0;
+  const torsoBones = [babaBones.down, babaBones.mid, babaBones.up];
+  for (const b of torsoBones) {
+    if (!b || !b.isBone) continue;
+    b.getWorldPosition(tmpVecB);
+    tmpVecA.add(tmpVecB);
+    anchorCount++;
+  }
+  if (anchorCount > 0) {
+    tmpVecA.multiplyScalar(1 / anchorCount);
+    model.worldToLocal(tmpVecA);
+    babaRollAnchorLocal.copy(tmpVecA);
+    anchorFound = true;
+  }
+
+  if (!anchorFound) {
+    boxTmp.setFromObject(model);
+    if (!Number.isFinite(boxTmp.min.y)) return;
+    boxTmp.getCenter(tmpVecA);
+    model.worldToLocal(tmpVecA);
+    babaRollAnchorLocal.copy(tmpVecA);
+  }
+
+  babaRollAnchorBaseLocal
+    .copy(babaRollAnchorLocal)
+    .applyQuaternion(baseLocalQuat)
+    .add(baseLocalPos);
+  // Upward bias keeps the spin center high enough that the curled body
+  // doesn't sink into the floor during the fastest part of the roll.
+  babaRollAnchorBaseLocal.y += 0.28;
+  _babaRollAnchorReady = true;
 }
 
 // ── Bone collection ─────────────────────────────────────────────────
@@ -494,6 +552,7 @@ export function refreshGameplayIdleBasePose() {
 export function applyGameplayProceduralIdle(ts, intensity) {
   if (intensity <= 0) return;
   const t = ts * 0.001;
+  const classicHeadPitchSign = catModelKey === 'classic' ? -1 : 1;
 
   for (let i = 0; i < idleTailBones.length; i++) {
     const b = idleTailBones[i];
@@ -534,7 +593,7 @@ export function applyGameplayProceduralIdle(ts, intensity) {
       : b.quaternion;
     const headScale = i === 0 ? 1 : 0.58;
     const yaw = (Math.sin((t * 0.8) + 0.7) * 0.12 + Math.sin((t * 1.55) + 0.2) * 0.036) * intensity * headScale;
-    const pitch = (Math.sin((t * 0.62) + 1.1) * 0.072 + Math.sin((t * 1.35) + 0.9) * 0.021) * intensity * headScale;
+    const pitch = (Math.sin((t * 0.62) + 1.1) * 0.072 + Math.sin((t * 1.35) + 0.9) * 0.021) * intensity * headScale * classicHeadPitchSign;
     tmpEuler.set(pitch, yaw, 0);
     tmpQuat.setFromEuler(tmpEuler);
     tmpQuatB.copy(base).multiply(tmpQuat);
@@ -543,55 +602,65 @@ export function applyGameplayProceduralIdle(ts, intensity) {
 }
 
 export function applyBababooeyProceduralRun(ts, moveSpeed, moveBlend) {
+  if (!catModel) return;
   if (!babaBones.left && !babaBones.right && !babaBones.down && !babaBones.up && !babaBones.mid) return;
-  const sp = Math.max(0, moveSpeed);
-  // moveSpeed is in inches/sec; normalize to 0..1 where ~27 in/s is full sprint
-  const spN = Math.min(1, sp / 27);
-  const blend = Math.max(0, Math.min(1, moveBlend)) * spN;
+  const blend = Math.max(0, Math.min(1, moveBlend));
   if (!Number.isFinite(_babaRunLastTs) || _babaRunLastTs < 0) _babaRunLastTs = ts;
   const phaseDt = Math.max(0, Math.min(0.05, (ts - _babaRunLastTs) * 0.001));
   _babaRunLastTs = ts;
   if (blend <= 0.001) {
     _babaRunPhase = 0;
+    catModel.quaternion.copy(baseLocalQuat);
+    catModel.position.copy(baseLocalPos);
     return;
   }
 
-  const cadence = 6.0 + spN * 5.5;
+  const cadence = 15.0;
   _babaRunPhase += cadence * phaseDt;
   if (_babaRunPhase > Math.PI * 2) _babaRunPhase %= (Math.PI * 2);
   const phase = _babaRunPhase;
-  const pawAmp = (0.55 + spN * 0.55) * 0.5;
-  const liftL = Math.sin(phase);
-  const liftR = Math.sin(phase + Math.PI);
-  const lL = liftL * pawAmp * blend;
-  const lR = liftR * pawAmp * blend;
+  const tuck = blend;
 
   const apply = (bone, baseQ, euler, strength) => {
     if (!bone || !baseQ) return;
     tmpQuat.setFromEuler(euler);
     tmpQuatB.copy(baseQ).multiply(tmpQuat);
-    const s = Math.min(1, (strength !== undefined ? strength : 0.65) * blend);
+    const s = Math.min(1, (strength !== undefined ? strength : 0.65) * tuck);
     bone.quaternion.slerp(tmpQuatB, s);
   };
 
-  tmpEuler.set(-Math.abs(lL) * 0.4, 0, lL * 0.85);
+  // Sonic-style roll: keep limbs in a fixed tucked pose while root spins.
+  tmpEuler.set(-0.70 * tuck, 0, 0.84 * tuck);
   apply(babaBones.left, babaBase.left, tmpEuler, 0.7);
 
-  tmpEuler.set(-Math.abs(lR) * 0.4, 0, -lR * 0.85);
+  tmpEuler.set(-0.70 * tuck, 0, -0.84 * tuck);
   apply(babaBones.right, babaBase.right, tmpEuler, 0.7);
 
   if (babaBones.down) {
-    tmpEuler.set(Math.sin(phase * 0.5) * 0.09 * blend, Math.sin((phase * 0.5) + 1.2) * 0.175 * blend, 0);
-    apply(babaBones.down, babaBase.down, tmpEuler, 0.6);
+    tmpEuler.set(0.34 * tuck, 0, 0);
+    apply(babaBones.down, babaBase.down, tmpEuler, 0.72);
   }
   if (babaBones.up) {
-    const lean = (0.08 + spN * 0.16) * 0.5;
-    tmpEuler.set(-lean * blend, Math.sin(phase * 0.5) * 0.03 * blend, 0);
-    apply(babaBones.up, babaBase.up, tmpEuler, 0.6);
+    tmpEuler.set(-1.06 * tuck, 0, 0);
+    apply(babaBones.up, babaBase.up, tmpEuler, 0.72);
   }
   if (babaBones.mid) {
-    tmpEuler.set(Math.sin(phase) * 0.02 * blend, Math.sin(phase * 0.5) * 0.035 * blend, Math.sin(phase) * 0.025 * blend);
-    apply(babaBones.mid, babaBase.mid, tmpEuler, 0.5);
+    tmpEuler.set(-0.88 * tuck, 0, 0);
+    apply(babaBones.mid, babaBase.mid, tmpEuler, 0.7);
+  }
+
+  // Pure local-X spin with a locked anchor point.
+  const spin = phase;
+  tmpEuler.set(spin, 0, 0);
+  tmpQuat.setFromEuler(tmpEuler);
+  tmpQuatB.copy(baseLocalQuat).multiply(tmpQuat);
+  catModel.quaternion.copy(tmpQuatB);
+
+  if (_babaRollAnchorReady) {
+    tmpVecA.copy(babaRollAnchorLocal).applyQuaternion(catModel.quaternion);
+    catModel.position.copy(babaRollAnchorBaseLocal).sub(tmpVecA);
+  } else {
+    catModel.position.copy(baseLocalPos);
   }
 }
 
@@ -706,6 +775,38 @@ function _applyWeightedBonePitch(pitch, targets) {
   return applied;
 }
 
+function _applyWeightedBoneModelPitch(pitch, targets) {
+  if (!catModel) return 0;
+  let total = 0;
+  for (const t of targets) {
+    if (!t || !t.bone || !t.bone.isBone || !t.bone.parent) continue;
+    const w = Number(t.weight) || 0;
+    if (w <= 0) continue;
+    total += w;
+  }
+  if (total <= 0) return 0;
+
+  catModel.updateMatrixWorld(true);
+  const modelRightWorld = tmpVecA
+    .set(1, 0, 0)
+    .applyQuaternion(catModel.getWorldQuaternion(tmpQuatC))
+    .normalize();
+
+  let applied = 0;
+  for (const t of targets) {
+    if (!t || !t.bone || !t.bone.isBone || !t.bone.parent) continue;
+    const w = Number(t.weight) || 0;
+    if (w <= 0) continue;
+
+    const parentWorld = t.bone.parent.getWorldQuaternion(tmpQuatD);
+    const axisLocal = tmpVecB.copy(modelRightWorld).applyQuaternion(parentWorld.invert()).normalize();
+    tmpQuat.setFromAxisAngle(axisLocal, pitch * (w / total));
+    t.bone.quaternion.multiply(tmpQuat);
+    applied++;
+  }
+  return applied;
+}
+
 /**
  * Apply the click-interaction nod — a fast, exaggerated forward bow that
  * bends the upper half of the cat toward the click target, then springs back.
@@ -753,7 +854,7 @@ export function applyClickNod(ts, modelKey) {
       { bone: babaBones.up, weight: 0.56 }
     ]);
   } else if (modelKey === 'totodile') {
-    applied = _applyWeightedBonePitch(pitch, [
+    applied = _applyWeightedBoneModelPitch(pitch, [
       { bone: totoBones.waist, weight: 0.12 },
       { bone: totoBones.spine, weight: 0.24 },
       { bone: totoBones.neck, weight: 0.28 },
@@ -856,6 +957,19 @@ function _totoApply(bone, baseQ, ex, ey, ez, strength) {
   bone.quaternion.slerp(tmpQuatB, Math.min(1, strength));
 }
 
+function _totoApplyModelPitch(bone, baseQ, pitch, strength) {
+  if (!bone || !baseQ || !bone.parent || !catModel) return;
+  const modelRightWorld = tmpVecA
+    .set(1, 0, 0)
+    .applyQuaternion(catModel.getWorldQuaternion(tmpQuatC))
+    .normalize();
+  const parentWorld = bone.parent.getWorldQuaternion(tmpQuatD);
+  const axisLocal = tmpVecB.copy(modelRightWorld).applyQuaternion(parentWorld.invert()).normalize();
+  tmpQuat.setFromAxisAngle(axisLocal, pitch);
+  tmpQuatB.copy(baseQ).multiply(tmpQuat);
+  bone.quaternion.slerp(tmpQuatB, Math.min(1, strength));
+}
+
 /**
  * Totodile idle: slow breathing in the spine, soft head sway, lazy
  * tail swish, and a barely-there jaw chomp. Designed to feel like a
@@ -880,8 +994,9 @@ export function applyTotodileProceduralIdle(ts, intensity) {
   // Head bob should read as nodding, not side-looking. Keep it pitch-dominant
   // and let torso/tail provide most lateral motion.
   const headPitch = (Math.sin(t * 0.65 + 1.1) * 0.10 + Math.sin(t * 1.4 + 0.7) * 0.03) * k;
-  _totoApply(totoBones.neck, totoBase.neck, headPitch * 0.45, 0, 0, 0.7);
-  _totoApply(totoBones.head, totoBase.head, headPitch, 0, 0, 0.75);
+  catModel.updateMatrixWorld(true);
+  _totoApplyModelPitch(totoBones.neck, totoBase.neck, headPitch * 0.45, 0.7);
+  _totoApplyModelPitch(totoBones.head, totoBase.head, headPitch, 0.75);
 
   // Jaw — tiny periodic chomp.
   if (totoBones.jaw) {
@@ -994,8 +1109,9 @@ export function applyTotodileProceduralRun(ts, moveSpeed, moveBlend) {
   // ── Head ──
   // Keep stride bob vertical; side-twist here made Totodile "look sideways"
   // while running and read as a broken head bob.
-  _totoApply(totoBones.neck, totoBase.neck, strideBob * 0.010 * blend, 0, 0, 0.46);
-  _totoApply(totoBones.head, totoBase.head, strideBob * 0.014 * blend, 0, 0, 0.5);
+  catModel.updateMatrixWorld(true);
+  _totoApplyModelPitch(totoBones.neck, totoBase.neck, strideBob * 0.010 * blend, 0.46);
+  _totoApplyModelPitch(totoBones.head, totoBase.head, strideBob * 0.014 * blend, 0.5);
 
   // ── Tail (counter-sway, exaggerated) ──
   const tailSway = -hipTwist * 2.4;
