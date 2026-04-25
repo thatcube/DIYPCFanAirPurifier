@@ -1649,7 +1649,6 @@ export function createRoom(scene) {
     const shoeBox = new THREE.Mesh(new THREE.BoxGeometry(boxW, boxH, boxD), boxMat);
     shoeBox.position.set(boxCenterX, boxY, feederZ);
     shoeBox.castShadow = true; shoeBox.receiveShadow = true;
-    shoeBox._isFoodBowl = true;
     addRoom(shoeBox);
 
     // ── WOpet-style automatic cat feeder (offset toward closet = "left" in world) ──
@@ -1978,7 +1977,6 @@ export function createRoom(scene) {
     const trayMesh = new THREE.Mesh(trayGeo, trayMat);
     trayMesh.position.set(feederX, topOfBox, trayZ);
     trayMesh.castShadow = true; trayMesh.receiveShadow = true;
-    trayMesh._isFoodBowl = true;
     addRoom(trayMesh);
 
     // Inner bowl (hollow, sits in the hole we punched in the tray)
@@ -2000,7 +1998,6 @@ export function createRoom(scene) {
     const innerBowl = new THREE.Mesh(ibGeo, ibMat);
     innerBowl.position.set(feederX, topOfBox + trayH + 0.01, trayZ + bowlOffsetZ);
     innerBowl.castShadow = true; innerBowl.receiveShadow = true;
-    innerBowl._isFoodBowl = true;
     addRoom(innerBowl);
 
     // Invisible hitboxes — tight-fitting to the feeder silhouette so the
@@ -2013,14 +2010,7 @@ export function createRoom(scene) {
       transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide
     });
 
-    // 1) Shoe box base (slight padding for forgiving hover at edges)
-    const hbBase = new THREE.Mesh(
-      new THREE.BoxGeometry(boxW + 1, boxH + 0.4, boxD + 1),
-      hbMat
-    );
-    hbBase.position.set(boxCenterX, boxY, feederZ);
-    hbBase._isFoodBowl = true;
-    addRoom(hbBase);
+    // 1) (Shoe box base is intentionally not clickable — only the feeder is.)
 
     // 2) Feeder tower — cylinder covering body + hopper + lid + knob
     const towerH = bodyH + hopperH + 1.6; // body + hopper + lid+knob headroom
@@ -2033,15 +2023,7 @@ export function createRoom(scene) {
     hbTower._isFoodBowl = true;
     addRoom(hbTower);
 
-    // 3) Front tray + bowl area (tight box covering the dish)
-    const hbTrayH = trayH + ibDepth + 0.4; // tray + bowl rim height
-    const hbTray = new THREE.Mesh(
-      new THREE.BoxGeometry(trayW + 0.5, hbTrayH, trayD + 0.5),
-      hbMat
-    );
-    hbTray.position.set(feederX, topOfBox + hbTrayH / 2, trayZ);
-    hbTray._isFoodBowl = true;
-    addRoom(hbTray);
+    // 3) (Front tray + bowl is intentionally not clickable — only the feeder is.)
 
     // Food kibble — hidden by default, toggled on click.
     // Each kibble is a regular _isRoom mesh so it goes through the mirror pass
@@ -2060,7 +2042,6 @@ export function createRoom(scene) {
       const k = new THREE.Mesh(new THREE.SphereGeometry(kSize, 5, 4), kibbleMat);
       k.position.set(kx, ky, kz);
       k.visible = false;
-      k._isFoodBowl = true;
       addRoom(k);
       _foodKibbles.push(k);
     }
