@@ -289,15 +289,16 @@
 
   <!-- FP HUD -->
   <div id="fpHud" role="status" aria-live="polite" aria-atomic="false">
-    <div class="run-hud-center">
-      <div id="runTimerHud" class="run-pill run-pill--timer" aria-label="Run timer">
+    <div class="run-hud-center run-pill run-pill--combo" aria-label="Run status">
+      <div id="runTimerHud" class="run-pill--timer" aria-label="Run timer">
         <i class="ph ph-stopwatch run-pill__icon"></i>
         <div class="run-pill__stack">
           <span id="runTimerText">00:00.000</span>
           <span id="fpsInline" class="run-pill__fps" hidden></span>
         </div>
       </div>
-      <div id="coinHud" class="run-pill run-pill--coins" aria-label="Coins collected">
+      <span class="run-pill__divider" aria-hidden="true"></span>
+      <div id="coinHud" class="run-pill--coins" aria-label="Coins collected">
         <i class="ph-fill ph-coins run-pill__icon run-pill__icon--gold"></i>
         <span id="coinCount">0/0</span>
         <span id="secretCoinHud" class="run-pill__secret" aria-label="Secret coins" style="display:none">
