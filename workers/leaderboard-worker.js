@@ -8,7 +8,8 @@ const SCHEMA_STATEMENTS = [
     cat_hair TEXT NOT NULL DEFAULT 'short',
     cat_model TEXT NOT NULL DEFAULT 'classic',
     player_id TEXT NOT NULL DEFAULT '',
-    is_test INTEGER NOT NULL DEFAULT 0
+    is_test INTEGER NOT NULL DEFAULT 0,
+    secret_coins INTEGER NOT NULL DEFAULT 0
   )`,
   `CREATE INDEX IF NOT EXISTS idx_lb_time ON leaderboard_entries(time_ms ASC, at_ms ASC)`,
   `CREATE INDEX IF NOT EXISTS idx_lb_name ON leaderboard_entries(name, time_ms ASC, at_ms ASC)`,
@@ -49,6 +50,7 @@ const DEFAULTS = {
   MAX_RUN_MS: 20 * 60 * 1000,
   MIN_COIN_INTERVAL_MS: 120,
   COIN_COUNT: 15,
+  MAX_SECRET_COINS: 9,
 };
 
 let dbInitPromise = null;
@@ -154,6 +156,9 @@ async function ensureLeaderboardAppearanceColumns(db) {
   }
   if (!existing.has('is_test')) {
     alters.push(db.prepare(`ALTER TABLE leaderboard_entries ADD COLUMN is_test INTEGER NOT NULL DEFAULT 0`).bind());
+  }
+  if (!existing.has('secret_coins')) {
+    alters.push(db.prepare(`ALTER TABLE leaderboard_entries ADD COLUMN secret_coins INTEGER NOT NULL DEFAULT 0`).bind());
   }
   if (alters.length) await db.batch(alters);
 }
@@ -296,6 +301,10 @@ async function handleRunFinish(request, env, cfg) {
   const isTest = body?.isTest === true || body?.isTest === 1 ? 1 : 0;
   const rawClientTime = Number(body?.timeMs);
   const clientTimeMs = Number.isFinite(rawClientTime) && rawClientTime > 0 ? Math.floor(rawClientTime) : 0;
+  const rawSecretCoins = Number(body?.secretCoins);
+  const secretCoins = Number.isFinite(rawSecretCoins) && rawSecretCoins > 0
+    ? Math.min(Math.floor(rawSecretCoins), DEFAULTS.MAX_SECRET_COINS)
+    : 0;
   if (!runId) return apiError(400, 'bad_request', 'runId is required');
 
   const run = await env.LB_DB.prepare(
@@ -342,7 +351,7 @@ async function handleRunFinish(request, env, cfg) {
   const entryId = await makeEntryId(finalName, Math.floor(elapsed), now);
 
   await env.LB_DB.prepare(
-    `INSERT INTO leaderboard_entries (id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, is_test) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO leaderboard_entries (id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, is_test, secret_coins) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     entryId,
     finalName,
@@ -352,7 +361,8 @@ async function handleRunFinish(request, env, cfg) {
     catHair,
     catModel,
     playerId,
-    isTest
+    isTest,
+    secretCoins
   ).run();
 
   await deleteRun(env.LB_DB, runId);
@@ -544,9 +554,9 @@ async function getNormalizedLeaderboard(db, cfg, options = {}) {
   const includeTests = options.includeTests === true;
   const scanLimit = Math.max(cfg.LB_MAX * cfg.LB_PER_PLAYER * 6, 200);
   const sql = includeTests
-    ? `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, is_test
+    ? `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, is_test, secret_coins
        FROM leaderboard_entries ORDER BY time_ms ASC, at_ms ASC LIMIT ?`
-    : `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, is_test
+    : `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, is_test, secret_coins
        FROM leaderboard_entries WHERE is_test = 0 ORDER BY time_ms ASC, at_ms ASC LIMIT ?`;
   const rows = await db.prepare(sql).bind(scanLimit).all();
 
@@ -615,7 +625,11 @@ function normalizeLeaderboard(rows, maxEntries, perPlayer) {
     const catModel = sanitizeCatModel(row.cat_model ?? row.catModel);
     const playerId = sanitizePlayerId(row.player_id ?? row.playerId);
     const isTest = Number(row.is_test ?? row.isTest ?? 0) ? true : false;
-    clean.push({ id, name, timeMs, at: safeAt, catColor, catHair, catModel, playerId, isTest });
+    const rawSecret = Number(row.secret_coins ?? row.secretCoins ?? 0);
+    const secretCoins = Number.isFinite(rawSecret) && rawSecret > 0
+      ? Math.min(Math.floor(rawSecret), DEFAULTS.MAX_SECRET_COINS)
+      : 0;
+    clean.push({ id, name, timeMs, at: safeAt, catColor, catHair, catModel, playerId, isTest, secretCoins });
   }
 
   clean.sort((a, b) => a.timeMs - b.timeMs || a.at - b.at);

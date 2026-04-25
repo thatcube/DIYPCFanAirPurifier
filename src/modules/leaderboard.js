@@ -261,7 +261,8 @@ function _normalizeLeaderboard(rows) {
       catColor: sanitizeColorKey(r.catColor || ''),
       catHair: sanitizeHairKey(r.catHair || ''),
       catModel: sanitizeModelKey(r.catModel || ''),
-      playerId: _sanitizePlayerId(r.playerId || '')
+      playerId: _sanitizePlayerId(r.playerId || ''),
+      secretCoins: Math.max(0, Math.floor(Number(r.secretCoins) || 0))
     });
   }
   clean.sort((a, b) => a.timeMs - b.timeMs || a.at - b.at);
@@ -440,7 +441,8 @@ async function _recordRunShared(timeMs, coinTotal, secretCoins) {
       catHair: sanitizeHairKey(catHairKey),
       catModel: sanitizeModelKey(catModelKey),
       isTest: _isTestSubmission(),
-      timeMs: Math.max(1, Math.floor(Number(timeMs) || 0))
+      timeMs: Math.max(1, Math.floor(Number(timeMs) || 0)),
+      secretCoins: Math.max(0, Math.floor(Number(secretCoins) || 0))
     });
     _sharedRunId = '';
     _claimedCoinIds.clear();
@@ -474,7 +476,8 @@ async function _recordRunShared(timeMs, coinTotal, secretCoins) {
           catHair: sanitizeHairKey(catHairKey),
           catModel: sanitizeModelKey(catModelKey),
           isTest: _isTestSubmission(),
-          timeMs: Math.max(1, Math.floor(Number(timeMs) || 0))
+          timeMs: Math.max(1, Math.floor(Number(timeMs) || 0)),
+          secretCoins: Math.max(0, Math.floor(Number(secretCoins) || 0))
         });
         _sharedRunId = '';
         _claimedCoinIds.clear();

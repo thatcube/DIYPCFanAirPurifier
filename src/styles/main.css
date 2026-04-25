@@ -634,81 +634,61 @@ input[type=range]::-moz-range-thumb {
   height: 18px;
   background: rgba(170, 220, 255, 0.3);
 }
+/* First-person reticle.
+ *
+ * Default: small white dot (industry standard "neutral" crosshair).
+ * Aiming at an interactive target: dot expands into a hollow cyan ring
+ *   with a tiny inner dot — the "you can interact" indicator pattern used
+ *   in Portal / Half-Life 2 / Apex Legends / Outer Wilds.
+ * Click pulse: a quick outward shockwave via box-shadow keyframe.
+ *
+ * The element is sized 16x16 and centered with translate(-50%,-50%); the
+ * visible dot is drawn with `background` so the box can stay a fixed size
+ * (prevents the visual jumping around as classes toggle).
+ */
 #fpCrosshair {
   display: none; position: fixed; top: 50%; left: 50%;
+  width: 16px; height: 16px;
   transform: translate(-50%,-50%);
-  width: 5px; height: 5px; background: rgba(255,255,255,0.8);
-  border-radius: var(--r-circle); z-index: 301; pointer-events: none;
-  box-shadow: 0 0 8px rgba(255,255,255,0.3), 0 0 2px rgba(0,0,0,0.5);
-  transition: background 0.15s ease, box-shadow 0.15s ease;
-}
-/* Aim-target reticle: a soft cyan ring + four corner brackets that
-   fade in around the dot when looking at something interactive. */
-#fpCrosshair::before,
-#fpCrosshair::after {
-  content: ""; position: absolute; top: 50%; left: 50%;
-  pointer-events: none;
-  opacity: 0; transition: opacity 0.18s ease, transform 0.22s cubic-bezier(.2,.7,.3,1);
-}
-/* Pulsing ring */
-#fpCrosshair::after {
-  width: 22px; height: 22px;
-  margin: -11px 0 0 -11px;
-  border: 1.5px solid rgba(145, 222, 255, 0.85);
-  border-radius: 50%;
-  box-shadow:
-    0 0 10px rgba(145, 222, 255, 0.55),
-    inset 0 0 6px rgba(145, 222, 255, 0.35);
-  transform: scale(0.6);
-}
-/* Four corner brackets, drawn with conic gradient on a square that
-   only paints the corners (transparent middle strip on each edge). */
-#fpCrosshair::before {
-  width: 30px; height: 30px;
-  margin: -15px 0 0 -15px;
-  border-radius: 4px;
+  z-index: 301; pointer-events: none;
+  /* Dot is drawn via radial-gradient so the element bounds stay constant. */
   background:
-    linear-gradient(#91deff, #91deff) top left / 6px 1.5px no-repeat,
-    linear-gradient(#91deff, #91deff) top left / 1.5px 6px no-repeat,
-    linear-gradient(#91deff, #91deff) top right / 6px 1.5px no-repeat,
-    linear-gradient(#91deff, #91deff) top right / 1.5px 6px no-repeat,
-    linear-gradient(#91deff, #91deff) bottom left / 6px 1.5px no-repeat,
-    linear-gradient(#91deff, #91deff) bottom left / 1.5px 6px no-repeat,
-    linear-gradient(#91deff, #91deff) bottom right / 6px 1.5px no-repeat,
-    linear-gradient(#91deff, #91deff) bottom right / 1.5px 6px no-repeat;
-  filter: drop-shadow(0 0 4px rgba(145, 222, 255, 0.6));
-  transform: scale(0.7) rotate(0deg);
+    radial-gradient(
+      circle,
+      rgba(255,255,255,0.92) 0,
+      rgba(255,255,255,0.92) 2px,
+      transparent 2.5px
+    );
+  /* Hollow ring border — invisible by default, lights up on .aiming. */
+  border: 1.5px solid transparent;
+  border-radius: 50%;
+  box-sizing: border-box;
+  filter: drop-shadow(0 0 1px rgba(0,0,0,0.6));
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    filter 0.18s ease;
 }
 #fpCrosshair.aiming {
-  background: #91deff;
-  box-shadow:
-    0 0 0 1px rgba(9,14,20,0.55),
-    0 0 10px rgba(145, 222, 255, 0.6);
+  border-color: rgba(145, 222, 255, 0.95);
+  background:
+    radial-gradient(
+      circle,
+      rgba(145, 222, 255, 1) 0,
+      rgba(145, 222, 255, 1) 1.5px,
+      transparent 2px
+    );
+  filter: drop-shadow(0 0 4px rgba(145, 222, 255, 0.55));
 }
-#fpCrosshair.aiming::after {
-  opacity: 1;
-  transform: scale(1);
-  animation: fpAimRingPulse 1.4s ease-in-out infinite;
-}
-#fpCrosshair.aiming::before {
-  opacity: 1;
-  transform: scale(1) rotate(45deg);
-}
-@keyframes fpAimRingPulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(145, 222, 255, 0.45), inset 0 0 4px rgba(145, 222, 255, 0.3); }
-  50%      { box-shadow: 0 0 14px rgba(145, 222, 255, 0.85), inset 0 0 8px rgba(145, 222, 255, 0.55); }
-}
-/* Click pulse — quick scale-up + fade of an extra halo via outline. */
+/* Click pulse — quick outward shockwave that doesn't fight the hover state. */
 #fpCrosshair.click-pulse {
   animation: fpCrosshairClick 220ms ease-out;
 }
 @keyframes fpCrosshairClick {
-  0%   { box-shadow: 0 0 0 0 rgba(255,255,255,0.7), 0 0 8px rgba(255,255,255,0.3); }
-  60%  { box-shadow: 0 0 0 10px rgba(255,255,255,0), 0 0 14px rgba(255,255,255,0.5); }
-  100% { box-shadow: 0 0 0 0 rgba(255,255,255,0), 0 0 8px rgba(255,255,255,0.3); }
+  0%   { box-shadow: 0 0 0 0 rgba(255,255,255,0.55); }
+  100% { box-shadow: 0 0 0 14px rgba(255,255,255,0); }
 }
 @media (prefers-reduced-motion: reduce) {
-  #fpCrosshair.aiming::after { animation: none; }
   #fpCrosshair.click-pulse { animation: none; }
 }
 #fpControls {

@@ -172,7 +172,7 @@
     .list { list-style: none; margin: 0; padding: 8px; display: grid; gap: 6px; }
     .row {
       display: grid;
-      grid-template-columns: 38px 1fr auto auto;
+      grid-template-columns: 38px 1fr auto auto auto;
       gap: 10px; align-items: center;
       border: 1px solid rgba(255, 255, 255, 0.07);
       border-radius: 10px;
@@ -202,6 +202,29 @@
       flex-shrink: 0;
     }
     .row.hit .catBadge { background: rgba(255,216,115,0.1); border-color: rgba(255,216,115,0.3); color: #ffeab2; }
+    .secretBadge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10.5px; font-weight: 800; letter-spacing: 0.02em;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(255, 216, 115, 0.10);
+      border: 1px solid rgba(255, 216, 115, 0.32);
+      color: var(--gold);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .secretBadge i { font-size: 12px; line-height: 1; }
+    .secretBadge.is-zero {
+      background: rgba(255, 255, 255, 0.03);
+      border-color: rgba(255, 255, 255, 0.08);
+      color: var(--muted);
+      opacity: 0.6;
+    }
+    .secretBadge.is-max {
+      background: rgba(255, 216, 115, 0.18);
+      border-color: rgba(255, 216, 115, 0.55);
+      box-shadow: 0 0 0 1px rgba(255, 216, 115, 0.18) inset;
+    }
     .time {
       font-family: var(--font-mono);
       font-variant-numeric: tabular-nums;
@@ -232,7 +255,8 @@
       .hero { padding: 22px 18px 20px; border-radius: 18px; }
       .playBtn { width: 100%; justify-content: center; }
       .miniBtn { width: 100%; justify-content: center; }
-      .row { grid-template-columns: 32px 1fr auto auto; padding: 7px 9px; }
+      .row { grid-template-columns: 32px 1fr auto auto auto; padding: 7px 9px; gap: 6px; }
+      .catBadge span:last-child { display: none; }
     }
   </style>
 </head>
@@ -271,7 +295,7 @@
       <div id="empty" class="empty" style="display:none">No runs yet — be the first.</div>
     </section>
 
-    <p class="footnote">A weekend project by <a href="https://brandonmoore.design" target="_blank" rel="noopener">Brandon</a>.</p>
+    <p class="footnote">Created by <a href="https://brandonmoore.design" target="_blank" rel="noopener">Brandon</a>.</p>
   </main>
 
   <script>
@@ -302,6 +326,7 @@
     const CAT_MODEL_EMOJI = { classic: '🐱', toon: '🦁', bababooey: '🐿️' };
     const CAT_MODEL_LABEL = { classic: 'Classic', toon: 'Toon', bababooey: 'Bababooey' };
     const CAT_COLOR_HEX = { charcoal: '#3a3a42', cream: '#e8d9b3', midnight: '#1a2030', snow: '#e8e8e8', ginger: '#d97a2a', tuxedo: '#151a22' };
+    const TOTAL_SECRETS = 9;
     function catBadgeHtml(row) {
       const model = String((row && row.catModel) || 'classic').toLowerCase();
       const emoji = CAT_MODEL_EMOJI[model] || CAT_MODEL_EMOJI.classic;
@@ -311,6 +336,13 @@
       const dot = colorable ? `<span class="catDot" style="background:${color}"></span>` : '';
       const title = colorable ? `${label} · ${(row && row.catColor) || 'ginger'}` : label;
       return `<span class="catBadge" title="${escapeHtml(title)}"><span class="catEmoji">${emoji}</span>${dot}<span>${label}</span></span>`;
+    }
+
+    function secretBadgeHtml(row) {
+      const n = Math.max(0, Math.min(TOTAL_SECRETS, Math.floor(Number(row && row.secretCoins) || 0)));
+      const cls = n === 0 ? ' is-zero' : (n >= TOTAL_SECRETS ? ' is-max' : '');
+      const title = `${n} of ${TOTAL_SECRETS} secret coin${n === 1 ? '' : 's'} found`;
+      return `<span class="secretBadge${cls}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><i class="ph-fill ph-key"></i>${n}/${TOTAL_SECRETS}</span>`;
     }
 
     async function copyText(text) {
@@ -380,6 +412,7 @@
           <div class="rank">#${i + 1}</div>
           <div class="name">${escapeHtml(r.name)}</div>
           ${catBadgeHtml(r)}
+          ${secretBadgeHtml(r)}
           <div class="time">${fmtRun(r.timeMs)}</div>
         </li>`;
       }).join('');
