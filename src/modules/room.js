@@ -1144,15 +1144,47 @@ export function createRoom(scene) {
   // guest room beyond. The -X decorative door stays where it is for visual
   // symmetry.
   const hallWallMat = new THREE.MeshStandardMaterial({color:_hallWallColor, roughness:0.7, metalness:0.05});
-  // -X side wall (pre-mirror X=_hallXLeft=11)
-  const hallWallL = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, _hallHeight, _hallLen),
-    hallWallMat
-  );
-  hallWallL.position.set(_hallXLeft-0.25, floorY+_hallHeight/2, _hallCenterZ);
-  hallWallL.castShadow = true; hallWallL.receiveShadow = true;
-  hallWallL._isRoom = true; hallWallL._isHallway = true;
-  addRoom(hallWallL);
+  // -X side wall (pre-mirror X=_hallXLeft=11) — split around an office
+  // doorway opening so the player can walk from the hallway into the
+  // office room. Door opening: 32" wide × 68" tall, centered at Z=80.
+  const _officeDoorCenterZ = 80;
+  const _officeDoorW = 32;
+  const _officeDoorH = 68;
+  const _officeDoorZmin = _officeDoorCenterZ - _officeDoorW / 2; // 64
+  const _officeDoorZmax = _officeDoorCenterZ + _officeDoorW / 2; // 96
+  // Segment before doorway (Z=49..64)
+  {
+    const segLen = _officeDoorZmin - _hallZStart; // 15
+    const seg = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, _hallHeight, segLen), hallWallMat);
+    seg.position.set(_hallXLeft - 0.25, floorY + _hallHeight / 2,
+      _hallZStart + segLen / 2);
+    seg.castShadow = true; seg.receiveShadow = true;
+    seg._isRoom = true; seg._isHallway = true;
+    addRoom(seg);
+  }
+  // Segment after doorway (Z=96..289)
+  {
+    const segLen = _hallZEnd - _officeDoorZmax; // 193
+    const seg = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, _hallHeight, segLen), hallWallMat);
+    seg.position.set(_hallXLeft - 0.25, floorY + _hallHeight / 2,
+      _officeDoorZmax + segLen / 2);
+    seg.castShadow = true; seg.receiveShadow = true;
+    seg._isRoom = true; seg._isHallway = true;
+    addRoom(seg);
+  }
+  // Header above doorway (Y=doorH..ceiling, Z=64..96)
+  {
+    const headerH = _hallHeight - _officeDoorH; // 12
+    const seg = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, headerH, _officeDoorW), hallWallMat);
+    seg.position.set(_hallXLeft - 0.25, floorY + _officeDoorH + headerH / 2,
+      _officeDoorCenterZ);
+    seg.castShadow = true; seg.receiveShadow = true;
+    seg._isRoom = true; seg._isHallway = true;
+    addRoom(seg);
+  }
   // +X side wall used to be a separate `hallWallR` mesh, coplanar with the
   // bedroom's `rightWall` but offset by 0.5" (extruded in the opposite
   // direction), which produced a visible thickness step at the Z=49 seam.
@@ -1186,8 +1218,11 @@ export function createRoom(scene) {
       const w = zMax - zMin; if (w < 0.5) return;
       roomBox(0.6, 3, w, bbColor, x, floorY+1.5, (zMin+zMax)/2, 0,0,0);
     };
-    // -X wall — split around the decorative door
-    addSeg(_hallXLeft+0.5, _hallZStart, lDoorMin);
+    // -X wall — split around the office doorway AND the decorative door
+    const offDoorBBmin = _officeDoorZmin - 2.5;
+    const offDoorBBmax = _officeDoorZmax + 2.5;
+    addSeg(_hallXLeft+0.5, _hallZStart, offDoorBBmin);
+    addSeg(_hallXLeft+0.5, offDoorBBmax,  lDoorMin);
     addSeg(_hallXLeft+0.5, lDoorMax,    _hallZEnd );
     // (+X wall baseboards are handled by the unified right-wall baseboard
     // loop below, which now spans the full Z=_sbXMin.._hallZEnd range.)
@@ -1490,6 +1525,280 @@ export function createRoom(scene) {
     hallLight.castShadow = false;
     hallLight._isRoom = true; hallLight._isHallway = true;
     addRoom(hallLight);
+  }
+
+  // ─── Office room (behind the corner door, off the hallway's -X wall) ──
+  // Accessed through a 32"×68" doorway cut into the hallway's -X wall at
+  // Z=64..96. The office extends from pre-mirror X=-60..11 (world X=-11..60),
+  // Z=55..145 (90" deep ≈ 7.5 ft). Shared wall is the hallway's -X wall at
+  // pre-mirror X=11 (which already has the doorway hole cut above).
+  const _offXmin = -60;           // far wall (pre-mirror)
+  const _offXmax = 11;            // shared wall with hallway
+  const _offZmin = 55;            // -Z wall
+  const _offZmax = 145;           // +Z wall
+  const _offCenterX = (_offXmin + _offXmax) / 2; // -24.5
+  const _offCenterZ = (_offZmin + _offZmax) / 2; // 100
+  const _offWidthX = _offXmax - _offXmin;  // 71
+  const _offWidthZ = _offZmax - _offZmin;  // 90
+  const _offHeight = 80;
+  const _offWallColor = 0xd5d8d2; // slightly greener/cooler than bedroom
+  const _offBbColor = 0xb8b4ae;
+  const _offCeilColor = 0xdeddd8;
+
+  // Office hardwood floor
+  {
+    const offMat = _makeHardwoodMaterial(_offWidthX, _offWidthZ);
+    const offFloor = new THREE.Mesh(
+      new THREE.PlaneGeometry(_offWidthX, _offWidthZ), offMat);
+    offFloor.rotation.x = -Math.PI / 2;
+    offFloor.position.set(_offCenterX, floorY + _hwLiftY, _offCenterZ);
+    offFloor.receiveShadow = true;
+    offFloor._isRoom = true; offFloor._isFloor = true; offFloor._isOffice = true;
+    addRoom(offFloor);
+  }
+
+  // Office ceiling
+  {
+    const ceilMat = new THREE.MeshStandardMaterial({
+      color: _offCeilColor, roughness: 0.9, metalness: 0.0, side: THREE.DoubleSide,
+    });
+    const offCeil = new THREE.Mesh(
+      new THREE.PlaneGeometry(_offWidthX, _offWidthZ), ceilMat);
+    offCeil.rotation.x = Math.PI / 2;
+    offCeil.position.set(_offCenterX, floorY + _offHeight + 0.05, _offCenterZ);
+    offCeil.receiveShadow = true;
+    offCeil._isRoom = true; offCeil._isOffice = true;
+    addRoom(offCeil);
+  }
+
+  // Office walls — three boxes (the 4th is the shared hallway wall).
+  const offWallMat = new THREE.MeshStandardMaterial({
+    color: _offWallColor, roughness: 0.7, metalness: 0.05,
+  });
+  // Far wall (-X side, pre-mirror X=_offXmin)
+  {
+    const w = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, _offHeight, _offWidthZ + 1), offWallMat);
+    w.position.set(_offXmin - 0.25, floorY + _offHeight / 2, _offCenterZ);
+    w.castShadow = true; w.receiveShadow = true;
+    w._isRoom = true; w._isOffice = true;
+    addRoom(w);
+  }
+  // -Z wall (pre-mirror Z=_offZmin)
+  {
+    const w = new THREE.Mesh(
+      new THREE.BoxGeometry(_offWidthX, _offHeight, 0.5), offWallMat);
+    w.position.set(_offCenterX, floorY + _offHeight / 2, _offZmin - 0.25);
+    w.castShadow = true; w.receiveShadow = true;
+    w._isRoom = true; w._isOffice = true;
+    addRoom(w);
+  }
+  // +Z wall (pre-mirror Z=_offZmax)
+  {
+    const w = new THREE.Mesh(
+      new THREE.BoxGeometry(_offWidthX, _offHeight, 0.5), offWallMat);
+    w.position.set(_offCenterX, floorY + _offHeight / 2, _offZmax + 0.25);
+    w.castShadow = true; w.receiveShadow = true;
+    w._isRoom = true; w._isOffice = true;
+    addRoom(w);
+  }
+
+  // Office baseboards
+  {
+    const bbH = 3, bbT = 0.6, bbY = floorY + _hwLiftY + bbH / 2;
+    // Far wall (-X) baseboard
+    roomBox(bbT, bbH, _offWidthZ, _offBbColor,
+      _offXmin + bbT / 2, bbY, _offCenterZ, 0, 0, 0);
+    // -Z wall baseboard
+    roomBox(_offWidthX, bbH, bbT, _offBbColor,
+      _offCenterX, bbY, _offZmin + bbT / 2, 0, 0, 0);
+    // +Z wall baseboard
+    roomBox(_offWidthX, bbH, bbT, _offBbColor,
+      _offCenterX, bbY, _offZmax - bbT / 2, 0, 0, 0);
+    // Shared wall baseboard segments (around the doorway opening)
+    const bbDoorZmin = _officeDoorZmin - 2.5; // trim around door
+    const bbDoorZmax = _officeDoorZmax + 2.5;
+    const segBeforeLen = bbDoorZmin - _offZmin;
+    if (segBeforeLen > 1) {
+      roomBox(bbT, bbH, segBeforeLen, _offBbColor,
+        _offXmax - bbT / 2, bbY, _offZmin + segBeforeLen / 2, 0, 0, 0);
+    }
+    const segAfterLen = _offZmax - bbDoorZmax;
+    if (segAfterLen > 1) {
+      roomBox(bbT, bbH, segAfterLen, _offBbColor,
+        _offXmax - bbT / 2, bbY, bbDoorZmax + segAfterLen / 2, 0, 0, 0);
+    }
+  }
+
+  // Office door frame (trim around the doorway in the shared wall)
+  {
+    const trimD = 1.4;
+    const frame = buildDoorFrame({
+      width: _officeDoorW, height: _officeDoorH, depth: trimD,
+    });
+    // Frame sits at the hallway -X wall (pre-mirror X=11), rotated so depth
+    // spans along the X axis (perpendicular to the wall).
+    frame.position.set(_offXmax - 0.04 - trimD / 2,
+      floorY + _officeDoorH / 2, _officeDoorCenterZ);
+    frame.rotation.y = -Math.PI / 2;
+    tagAll(frame, { _isRoom: true, _isOffice: true });
+    addRoom(frame);
+  }
+
+  // Office ceiling light
+  {
+    const fixMat = new THREE.MeshStandardMaterial({
+      color: 0xf4ead5, emissive: 0xf4ead5, emissiveIntensity: 0.45, roughness: 0.5,
+    });
+    const fix = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 1.2, 24), fixMat);
+    fix.position.set(_offCenterX, floorY + _offHeight - 0.7, _offCenterZ);
+    fix._isRoom = true; fix._isOffice = true;
+    addRoom(fix);
+    const offLight = new THREE.PointLight(0xffe6bb, 300, 200);
+    offLight.position.set(_offCenterX, floorY + _offHeight - 6, _offCenterZ);
+    offLight.castShadow = false;
+    offLight._isRoom = true; offLight._isOffice = true;
+    addRoom(offLight);
+  }
+
+  // ── Office furniture ──────────────────────────────────────────────
+  // All positions in pre-mirror coords. roomBox auto-adds _isRoom + addRoom.
+  {
+    const deskColor = 0x8B6914;   // warm oak
+    const deskLegColor = 0x444444; // dark metal legs
+    const chairColor = 0x333333;
+    const monitorColor = 0x1a1a1a;
+    const shelfColor = 0x6b4226;  // dark walnut
+
+    // ─ Desk — 48"W × 24"D × 30"H, against the far -X wall ─
+    const deskW = 48, deskD = 24, deskH = 2, deskLegH = 28;
+    const deskX = _offXmin + 6 + deskD / 2; // 6" from far wall
+    const deskZ = _offCenterZ + 8;          // slightly off-center toward +Z
+    const deskTopY = floorY + deskLegH + deskH / 2;
+    // Desktop surface
+    const deskTop = roomBox(deskD, deskH, deskW, deskColor,
+      deskX, deskTopY, deskZ, 0, 0, 0);
+    deskTop._isOffice = true;
+    // Desk legs (4 corners)
+    for (const dx of [-1, 1]) {
+      for (const dz of [-1, 1]) {
+        const leg = roomBox(1.5, deskLegH, 1.5, deskLegColor,
+          deskX + dx * (deskD / 2 - 2), floorY + deskLegH / 2,
+          deskZ + dz * (deskW / 2 - 2), 0, 0, 0);
+        leg._isOffice = true;
+      }
+    }
+
+    // ─ Computer monitor — 20"W × 14"H × 2"D on the desk ─
+    const monW = 14, monH = 20, monD = 1.5;
+    const monY = deskTopY + deskH / 2 + 4 + monH / 2; // 4" stand height
+    const monMesh = roomBox(monD, monH, monW, monitorColor,
+      deskX - deskD / 2 + 4, monY, deskZ, 0, 0, 0);
+    monMesh._isOffice = true;
+    monMesh.material.roughness = 0.3;
+    monMesh.material.metalness = 0.4;
+    // Monitor stand
+    const standW = 8, standH = 4, standD = 1;
+    roomBox(standD, standH, standW, monitorColor,
+      deskX - deskD / 2 + 4, deskTopY + deskH / 2 + standH / 2, deskZ, 0, 0, 0);
+    // Monitor screen (emissive blue glow)
+    const screenGeo = new THREE.PlaneGeometry(monH - 2, monW - 2);
+    const screenMat = new THREE.MeshStandardMaterial({
+      color: 0x1a3a5a, emissive: 0x2a4a6a, emissiveIntensity: 0.6,
+      roughness: 0.3, metalness: 0.0,
+    });
+    const screenMesh = new THREE.Mesh(screenGeo, screenMat);
+    // Screen faces -X in pre-mirror (toward the room), which becomes +X in world.
+    screenMesh.rotation.y = Math.PI / 2;
+    screenMesh.position.set(deskX - deskD / 2 + 3.2, monY, deskZ);
+    screenMesh._isRoom = true; screenMesh._isOffice = true;
+    addRoom(screenMesh);
+
+    // ─ Keyboard on desk ─
+    roomBox(6, 0.5, 14, 0x2a2a2a,
+      deskX + 2, deskTopY + deskH / 2 + 0.25, deskZ, 0, 0, 0);
+
+    // ─ Office chair — simple T-shape ─
+    const chairSeatH = 18, chairSeatW = 18, chairSeatD = 18;
+    const chairX = deskX + deskD / 2 + 6; // in front of desk
+    const chairZ = deskZ;
+    // Seat
+    roomBox(chairSeatD, 2, chairSeatW, chairColor,
+      chairX, floorY + chairSeatH, chairZ, 0, 0, 0);
+    // Backrest
+    roomBox(2, 20, chairSeatW, chairColor,
+      chairX + chairSeatD / 2, floorY + chairSeatH + 10, chairZ, 0, 0, 0);
+    // Pedestal (single column)
+    roomBox(3, chairSeatH - 2, 3, deskLegColor,
+      chairX, floorY + (chairSeatH - 2) / 2, chairZ, 0, 0, 0);
+    // Star base legs (5 small boxes radiating out)
+    for (let i = 0; i < 5; i++) {
+      const angle = (i / 5) * Math.PI * 2;
+      const legLen = 8;
+      const lx = chairX + Math.cos(angle) * legLen / 2;
+      const lz = chairZ + Math.sin(angle) * legLen / 2;
+      roomBox(legLen, 1, 1.5, deskLegColor,
+        lx, floorY + 0.5, lz, 0, angle, 0);
+    }
+
+    // ─ Bookshelf — against the +Z wall ─
+    const shelfW = 36, shelfD = 12, shelfH = 60;
+    const shelfX = _offCenterX;
+    const shelfZ = _offZmax - 1 - shelfD / 2;
+    // Main bookshelf body (back + sides approximated as a single box)
+    roomBox(shelfD, shelfH, shelfW, shelfColor,
+      shelfX, floorY + shelfH / 2, shelfZ, 0, 0, 0);
+    // Shelf dividers (4 horizontal shelves)
+    for (let i = 1; i <= 4; i++) {
+      const sy = floorY + (shelfH / 5) * i;
+      roomBox(shelfD - 1, 0.8, shelfW - 1, shelfColor,
+        shelfX, sy, shelfZ, 0, 0, 0);
+    }
+    // Books on shelves (colored blocks per shelf)
+    const bookColors = [0x8b2500, 0x2e5090, 0x4a7c3f, 0x6b4226];
+    for (let i = 0; i < 4; i++) {
+      const shelfBaseY = floorY + (shelfH / 5) * i + 0.5;
+      const bookH = (shelfH / 5) - 2;
+      const booksW = 20 + Math.random() * 12;
+      roomBox(shelfD - 3, bookH, booksW, bookColors[i],
+        shelfX, shelfBaseY + bookH / 2, shelfZ + 0.5, 0, 0, 0);
+    }
+
+    // ─ Desk lamp (small) on the desk corner ─
+    {
+      const lampX = deskX - deskD / 2 + 4;
+      const lampZ = deskZ + deskW / 2 - 6;
+      const lampBaseY = deskTopY + deskH / 2;
+      // Base
+      const baseMat = new THREE.MeshStandardMaterial({
+        color: 0x222222, roughness: 0.4, metalness: 0.6 });
+      const base = new THREE.Mesh(
+        new THREE.CylinderGeometry(2.5, 3, 0.6, 12), baseMat);
+      base.position.set(lampX, lampBaseY + 0.3, lampZ);
+      base._isRoom = true; base._isOffice = true; addRoom(base);
+      // Stem
+      const stemH = 12;
+      const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.25, 0.25, stemH, 8), baseMat);
+      stem.position.set(lampX, lampBaseY + 0.6 + stemH / 2, lampZ);
+      stem._isRoom = true; stem._isOffice = true; addRoom(stem);
+      // Shade
+      const shadeMat = new THREE.MeshStandardMaterial({
+        color: 0xd0c8b8, roughness: 0.9, side: THREE.DoubleSide,
+        transparent: true, opacity: 0.85,
+        emissive: 0xffeedd, emissiveIntensity: 0.6,
+      });
+      const shade = new THREE.Mesh(
+        new THREE.CylinderGeometry(3.5, 5, 7, 16, 1, true), shadeMat);
+      shade.position.set(lampX, lampBaseY + 0.6 + stemH + 3, lampZ);
+      shade._isRoom = true; shade._isOffice = true; addRoom(shade);
+      // Warm desk lamp light
+      const deskLight = new THREE.PointLight(0xffddaa, 180, 80);
+      deskLight.position.set(lampX, lampBaseY + 0.6 + stemH + 3, lampZ);
+      deskLight.castShadow = false;
+      deskLight._isRoom = true; deskLight._isOffice = true;
+      addRoom(deskLight);
+    }
   }
 
   // Book stack — between mug and lamp

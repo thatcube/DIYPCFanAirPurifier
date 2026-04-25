@@ -49,9 +49,21 @@ const MUSIC_MUTE_KEY = 'diy_air_purifier_music_muted_v2';
 const MOUSE_SENS_KEY = 'diy_air_purifier_mouse_sens_v1';
 const SPEED_MODE_KEY = 'diy_air_purifier_speed_mode_v1';
 const SKATE_MODE_KEY = 'diy_air_purifier_skate_mode_v1';
+const SKATEBOARD_FOUND_KEY = 'diy_air_purifier_skateboard_found_v1';
 
 try { sfxMuted = localStorage.getItem(SFX_MUTE_KEY) === '1'; } catch (e) {}
 try { musicMuted = localStorage.getItem(MUSIC_MUTE_KEY) === '1'; } catch (e) {}
+
+// ── Skateboard unlock (must find the hidden skateboard first) ──────
+export let skateboardFound = false;
+try { skateboardFound = localStorage.getItem(SKATEBOARD_FOUND_KEY) === '1'; } catch (e) {}
+export function isSkateboardFound() { return skateboardFound; }
+export function markSkateboardFound() {
+  if (skateboardFound) return;
+  skateboardFound = true;
+  try { localStorage.setItem(SKATEBOARD_FOUND_KEY, '1'); } catch (e) {}
+  _syncSkateToggleUi();
+}
 
 // ── Speed mode (3x top speed, slower acceleration) ──────────────────
 // Gated behind finding every secret coin at least once (see coins.hasFoundAllSecrets).
@@ -71,10 +83,15 @@ export function setSpeedMode(enabled) {
 // ── Skate mode (sideways stance + board visual) ────────────────────
 export let skateMode = false;
 try { skateMode = localStorage.getItem(SKATE_MODE_KEY) === '1'; } catch (e) {}
-export function isSkateMode() { return skateMode; }
-export function getSkateModelLift() { return skateMode ? _skateModelLift : 0; }
+// Force-off at boot if the skateboard hasn't been found on this device yet.
+if (skateMode && !skateboardFound) {
+  skateMode = false;
+  try { localStorage.setItem(SKATE_MODE_KEY, '0'); } catch (e) {}
+}
+export function isSkateMode() { return skateMode && skateboardFound; }
+export function getSkateModelLift() { return (skateMode && skateboardFound) ? _skateModelLift : 0; }
 export function setSkateMode(enabled, opts = {}) {
-  const next = !!enabled;
+  const next = !!enabled && skateboardFound;
   const force = !!opts.force;
   const silent = !!opts.silent;
   if (!force && skateMode === next) {
@@ -90,6 +107,21 @@ export function setSkateMode(enabled, opts = {}) {
   else {
     _skateModelLift = 0;
     _silenceSkateRoll(false);
+  }
+  // Reset trick state
+  _trickManual = 0; _trickManualHeld = false;
+  _trickKickflip = 0; _trickKickflipActive = false;
+  _trickSpin = 0; _trickSpinActive = false;
+  // Toggle trick hints UI
+  const trickHints = document.getElementById('skateTrickHints');
+  if (trickHints) {
+    if (skateMode) {
+      trickHints.classList.remove('fade-out');
+      trickHints.classList.add('visible');
+    } else {
+      trickHints.classList.add('fade-out');
+      setTimeout(() => { if (!skateMode) trickHints.classList.remove('visible'); }, 350);
+    }
   }
   if (!silent && _showToast) _showToast(skateMode ? 'Skate mode on' : 'Skate mode off');
 }
@@ -160,14 +192,32 @@ export function syncAudioToggleUi() {
 function _syncSkateToggleUi() {
   const skateTog = document.getElementById('fpPauseSkateMode');
   const skateState = document.getElementById('fpPauseSkateModeState');
+  const locked = !skateboardFound;
   if (skateTog) {
-    skateTog.classList.toggle('on', skateMode);
-    skateTog.setAttribute('aria-checked', String(skateMode));
-    skateTog.setAttribute('aria-label', skateMode ? 'Skate mode enabled' : 'Skate mode disabled');
+    if (locked) {
+      skateTog.classList.remove('on');
+      skateTog.classList.add('locked');
+      skateTog.setAttribute('aria-checked', 'false');
+      skateTog.setAttribute('aria-label', 'Skate mode locked — find the skateboard!');
+      skateTog.style.pointerEvents = 'none';
+      skateTog.style.opacity = '0.45';
+    } else {
+      skateTog.classList.remove('locked');
+      skateTog.classList.toggle('on', skateMode);
+      skateTog.setAttribute('aria-checked', String(skateMode));
+      skateTog.setAttribute('aria-label', skateMode ? 'Skate mode enabled' : 'Skate mode disabled');
+      skateTog.style.pointerEvents = '';
+      skateTog.style.opacity = '';
+    }
   }
   if (skateState) {
-    skateState.textContent = skateMode ? 'On' : 'Off';
-    skateState.classList.toggle('off', !skateMode);
+    if (locked) {
+      skateState.textContent = 'Find the skateboard!';
+      skateState.classList.add('off');
+    } else {
+      skateState.textContent = skateMode ? 'On' : 'Off';
+      skateState.classList.toggle('off', !skateMode);
+    }
   }
 }
 
@@ -204,6 +254,7 @@ export function getHorizSpeed() {
 let _bobPhase = 0;
 let _lastPhysicsTs = 0;
 let _spaceHeld = 0;            // total frames space has been held (legacy: jump-hold UI)
+let _tierGateHeld = 0;         // frames held at the current tier gate (stepped charge)
 let _jumpHoldFrames = 0;       // frames of variable-height boost applied this jump
 let _isJumping = false;        // true between liftoff and apex of current jump
 let _coyoteFrames = 0;         // frames remaining where a late jump is still allowed
@@ -224,6 +275,14 @@ let _wasFootstepMoving = false;
 let _lastUiInteractTs = 0;
 let _quickControlsVisible = false;
 let _skateLean = 0;
+
+// ── Skate trick state ─────────────────────────────────────────────
+let _trickManual     = 0;      // smoothed 0..1 pitch amount
+let _trickManualHeld = false;  // E key currently down
+let _trickKickflip       = 0;      // 0..1 animation progress
+let _trickKickflipActive = false;
+let _trickSpin       = 0;      // 0..1 animation progress
+let _trickSpinActive = false;
 
 // Cached DOM elements (looked up once in init or on first use)
 let _cachedCbBar = null, _cachedCbFill = null, _cachedCbValue = null, _cachedCbLabel = null;
@@ -1390,13 +1449,78 @@ function _buildStaticBoxes() {
   // Pre-mirror hallway X = 11..51, Z = 49..289. World X = -51..-11.
   const hzStart = 49, hzEnd = 289;
   _staticBoxes.push(
-    // -X side wall of hallway (pre-mirror X=10.5..11)
-    { xMin: -11, xMax: -10.5, zMin: hzStart, zMax: hzEnd, yTop: fy + WALL_HEIGHT, room: true },
+    // -X side wall of hallway — split around office doorway (Z=64..96)
+    // Segment before doorway (Z=49..64)
+    { xMin: -11, xMax: -10.5, zMin: hzStart, zMax: 64, yTop: fy + WALL_HEIGHT, room: true },
+    // Segment after doorway (Z=96..289)
+    { xMin: -11, xMax: -10.5, zMin: 96, zMax: hzEnd, yTop: fy + WALL_HEIGHT, room: true },
+    // Header above office doorway (Y=68..ceiling, Z=64..96)
+    { xMin: -11, xMax: -10.5, zMin: 64, zMax: 96,
+      yBottom: fy + 68, yTop: fy + WALL_HEIGHT, room: true },
     // +X side wall of hallway (pre-mirror X=51..51.5)
     { xMin: -51.5, xMax: -51, zMin: hzStart, zMax: hzEnd, yTop: fy + WALL_HEIGHT, room: true },
     // End wall at Z=_hallZEnd
     { xMin: -51.5, xMax: -10.5, zMin: hzEnd, zMax: hzEnd + 0.5, yTop: fy + WALL_HEIGHT, room: true }
   );
+
+  // ── Office room walls (off the hallway's -X wall at Z=64..96) ──
+  // Pre-mirror footprint X=-60..11, Z=55..145. World X=-11..60.
+  // Shared wall is the hallway -X wall (already segmented above); only
+  // the three new walls are collided here.
+  {
+    const oXmin = -60, oXmax = 11, oZmin = 55, oZmax = 145;
+    // World X: negate pre-mirror X. Pre-mirror -60 → world 60; pre-mirror 11 → world -11.
+    const wXmin = -oXmax; // -11 (shared wall)
+    const wXmax = -oXmin; // 60  (far wall)
+    _staticBoxes.push(
+      // Far wall (world X=60..60.5)
+      { xMin: wXmax, xMax: wXmax + 0.5, zMin: oZmin - 0.5, zMax: oZmax + 0.5, yTop: fy + WALL_HEIGHT, room: true },
+      // -Z wall (world X=-11..60, Z=54.5..55)
+      { xMin: wXmin, xMax: wXmax, zMin: oZmin - 0.5, zMax: oZmin, yTop: fy + WALL_HEIGHT, room: true },
+      // +Z wall (world X=-11..60, Z=145..145.5)
+      { xMin: wXmin, xMax: wXmax, zMin: oZmax, zMax: oZmax + 0.5, yTop: fy + WALL_HEIGHT, room: true }
+    );
+  }
+
+  // ── Office furniture collision boxes ──
+  // Desk (pre-mirror X≈-48, Z≈108, 24"D × 48"W × 30"H)
+  {
+    const deskX = -60 + 6 + 12; // -42 pre-mirror
+    const deskZ = 100 + 8;       // 108
+    const deskTopY = fy + 30;
+    // Full desk body (simplified AABB)
+    _staticBoxes.push({
+      xMin: -(deskX + 12), xMax: -(deskX - 12),
+      zMin: deskZ - 24, zMax: deskZ + 24,
+      yTop: deskTopY, yBottom: fy, room: true
+    });
+    // Monitor on desk
+    _staticBoxes.push({
+      xMin: -(deskX - 12 + 4 + 0.75), xMax: -(deskX - 12 + 4 - 0.75),
+      zMin: deskZ - 10, zMax: deskZ + 10,
+      yTop: deskTopY + 4 + 20, yBottom: deskTopY, room: true
+    });
+  }
+  // Chair (pre-mirror X≈-24, Z≈108)
+  {
+    const chairX = -42 + 12 + 6; // -24 pre-mirror
+    const chairZ = 108;
+    _staticBoxes.push({
+      xMin: -(chairX + 9), xMax: -(chairX - 9),
+      zMin: chairZ - 9, zMax: chairZ + 9,
+      yTop: fy + 18 + 20, yBottom: fy, room: true
+    });
+  }
+  // Bookshelf (pre-mirror X≈-24.5, Z≈139)
+  {
+    const shelfX = (-60 + 11) / 2; // -24.5
+    const shelfZ = 145 - 1 - 6;     // 138
+    _staticBoxes.push({
+      xMin: -(shelfX + 6), xMax: -(shelfX - 6),
+      zMin: shelfZ - 18, zMax: shelfZ + 18,
+      yTop: fy + 60, yBottom: fy, room: true
+    });
+  }
 
   // ── Guest room walls (behind the hallway's +X door) ──
   // Pre-mirror footprint X=51..183, Z=-13..130. -Z wall sits just past the
@@ -1771,6 +1895,9 @@ export function toggleFirstPerson() {
     _lastFootstepTs = 0;
     _wasFootstepMoving = false;
     _skateLean = 0;
+    _trickManual = 0; _trickManualHeld = false;
+    _trickKickflip = 0; _trickKickflipActive = false;
+    _trickSpin = 0; _trickSpinActive = false;
     _silenceSkateRoll(true);
 
     // Enter FP
@@ -1822,6 +1949,9 @@ export function toggleFirstPerson() {
     _lastFootstepTs = 0;
     _wasFootstepMoving = false;
     _skateLean = 0;
+    _trickManual = 0; _trickManualHeld = false;
+    _trickKickflip = 0; _trickKickflipActive = false;
+    _trickSpin = 0; _trickSpinActive = false;
     _silenceSkateRoll(true);
 
     // Exit FP
@@ -1875,7 +2005,7 @@ function _respawn() {
   _velX = 0;
   _velZ = 0;
   _bobPhase = 0;
-  _spaceHeld = 0;
+  _spaceHeld = 0; _tierGateHeld = 0;
   _jumpHoldFrames = 0;
   _isJumping = false;
   _coyoteFrames = 0;
@@ -2152,9 +2282,15 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   // let you still jump for a moment after stepping off; the jump buffer
   // remembers a press right before landing so you don't lose presses.
   // Asymmetric gravity (snappier fall) is below in the gravity section.
-  const JUMP_BASE_VY         = 0.28;  // power on a near-zero-charge release
-  const JUMP_MAX_BONUS       = 0.52;  // extra power at full charge
-  const JUMP_CHARGE_FRAMES   = 30;    // frames to reach full charge (~0.5s)
+  const JUMP_BASE_VY         = 0.40;  // power on a near-zero-charge release
+  const JUMP_MAX_BONUS       = 0.80;  // extra power at full charge
+  const JUMP_CHARGE_FRAMES   = 90;    // frames to reach full charge (~1.5s)
+  // Stepped charge: meter pauses at each tier boundary until a hold threshold
+  // is met — like Mario Kart boost grinding. You must hold at each gate for
+  // TIER_HOLD_FRAMES before the meter advances to the next tier.
+  const TIER_HOLD_FRAMES     = 18;    // ~0.3s hold at each tier gate
+  const TIER1_GATE           = Math.round(JUMP_CHARGE_FRAMES * 0.33);  // 30
+  const TIER2_GATE           = Math.round(JUMP_CHARGE_FRAMES * 0.66);  // 59
   const COYOTE_FRAMES        = 6;     // grace frames after walking off a ledge
   const JUMP_BUFFER_FRAMES   = 8;     // grace frames for a press just before landing
   const GRAVITY_RISE         = 0.018; // gravity while ascending
@@ -2182,12 +2318,38 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   // Snapshot charge BEFORE we mutate it below — release-fire reads this.
   const chargeAtFrameStart = _spaceHeld;
 
-  // Charge while space is held AND we're on the ground (or in coyote window).
-  // Off-ground holds don't accumulate (no air-charge cheese).
+  // Stepped charge: meter advances freely within a tier, but pauses at each
+  // gate (TIER1_GATE, TIER2_GATE). You must hold at the gate for
+  // TIER_HOLD_FRAMES before the meter breaks through to the next tier.
   if (fpKeys.space && (onGround || _coyoteFrames > 0)) {
-    _spaceHeld = Math.min(JUMP_CHARGE_FRAMES, _spaceHeld + frameScale);
+    const next = Math.min(JUMP_CHARGE_FRAMES, _spaceHeld + frameScale);
+    // Which gate (if any) are we currently clamped at?
+    const atGate1 = Math.abs(_spaceHeld - TIER1_GATE) < 0.01;
+    const atGate2 = Math.abs(_spaceHeld - TIER2_GATE) < 0.01;
+    // Would the raw advance cross a gate?
+    const crossGate1 = _spaceHeld < TIER1_GATE && next >= TIER1_GATE;
+    const crossGate2 = _spaceHeld < TIER2_GATE && next >= TIER2_GATE;
+
+    if (atGate1 || atGate2) {
+      // Sitting at a gate — count hold frames
+      _tierGateHeld += frameScale;
+      if (_tierGateHeld >= TIER_HOLD_FRAMES) {
+        // Break through the gate
+        _spaceHeld = _spaceHeld + frameScale;
+        _tierGateHeld = 0;
+      }
+      // else stay clamped at gate
+    } else if (crossGate1) {
+      _spaceHeld = TIER1_GATE;
+      _tierGateHeld = 0;
+    } else if (crossGate2) {
+      _spaceHeld = TIER2_GATE;
+      _tierGateHeld = 0;
+    } else {
+      _spaceHeld = next;
+    }
   } else if (!fpKeys.space) {
-    _spaceHeld = 0;
+    _spaceHeld = 0; _tierGateHeld = 0;
   }
 
   // Fire on release while still groundable, OR if a buffered press lands while
@@ -2209,7 +2371,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   }
 
   if (firedThisFrame) {
-    _spaceHeld = 0;
+    _spaceHeld = 0; _tierGateHeld = 0;
     _jumpBufferFrames = 0;
     _coyoteFrames = 0;
     _isJumping = true;
@@ -2232,7 +2394,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     _velZ = (_wallContactNz / nLen) * wallPush;
     _wallJumpCooldown = WALL_JUMP_COOLDOWN;
     _isJumping = true;
-    _spaceHeld = 0;
+    _spaceHeld = 0; _tierGateHeld = 0;
     _jumpBufferFrames = 0;
     _playJumpCue(0.2 + spdNorm * 0.5);
     firedThisFrame = true;
@@ -2255,6 +2417,10 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   else if (chargePct > 0.33) chargeTier = 2;
   else if (chargePct > 0)    chargeTier = 1;
 
+  // Are we currently paused at a tier gate?
+  const atTierGate = _tierGateHeld > 0 && _tierGateHeld < TIER_HOLD_FRAMES;
+  const gateProgress = atTierGate ? Math.round((_tierGateHeld / TIER_HOLD_FRAMES) * 100) : 0;
+
   if (_cachedCbFill) {
     _cachedCbFill.style.width = `${Math.round(chargePct * 100)}%`;
   }
@@ -2264,13 +2430,21 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     _cachedCbBar.classList.toggle('tier-1', chargeTier === 1);
     _cachedCbBar.classList.toggle('tier-2', chargeTier === 2);
     _cachedCbBar.classList.toggle('tier-3', chargeTier === 3);
+    _cachedCbBar.classList.toggle('at-gate', atTierGate);
   }
   if (_cachedCbLabel) {
-    _cachedCbLabel.textContent =
-      chargeTier === 3 ? 'MEGA JUMP!' :
-      chargeTier === 2 ? 'Big jump' :
-      chargeTier === 1 ? 'Small jump' :
-      'Jump charge';
+    if (atTierGate) {
+      _cachedCbLabel.textContent =
+        chargeTier === 1 ? 'HOLD for Big!' :
+        chargeTier === 2 ? 'HOLD for MEGA!' :
+        'HOLD!';
+    } else {
+      _cachedCbLabel.textContent =
+        chargeTier === 3 ? 'MEGA JUMP!' :
+        chargeTier === 2 ? 'Big jump' :
+        chargeTier === 1 ? 'Small jump' :
+        'Jump charge';
+    }
   }
   if (_cachedCbValue) {
     _cachedCbValue.textContent = onGround
@@ -2324,7 +2498,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
         _ssHudFlashUntilTs = ts + SS_HUD_ENTER_FLASH_MS;
         _ssFullChargeSinceTs = 0;
         // Consume the hold so we don't immediately fire a MEGA jump on release.
-        _spaceHeld = 0;
+        _spaceHeld = 0; _tierGateHeld = 0;
         _jumpBufferFrames = 0;
         // Going Super Saiyan unlocks Bababooey. Fire a second toast the
         // first time it happens so the player knows there's a new cat
@@ -2420,7 +2594,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
           bonkIntensity = Math.max(bonkIntensity, fpVy * 1.2);
           newY = box.yBottom - 0.2 - HEAD_EXTRA;
           fpVy = -0.05;
-          _spaceHeld = 0;
+          _spaceHeld = 0; _tierGateHeld = 0;
           _isJumping = false;
         } else {
           // Push out in local space, then rotate back to world
@@ -2468,7 +2642,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
         bonkIntensity = Math.max(bonkIntensity, fpVy * 1.2);
         newY = box.yBottom - 0.2 - HEAD_EXTRA;
         fpVy = -0.05;
-        _spaceHeld = 0;
+        _spaceHeld = 0; _tierGateHeld = 0;
         _isJumping = false;
       } else {
         // XZ push-out
@@ -2498,7 +2672,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     const hitVy = fpVy;
     fpPos.y = ceilMax;
     fpVy = -0.05;
-    _spaceHeld = 0;
+    _spaceHeld = 0; _tierGateHeld = 0;
     _isJumping = false;
     if (hitVy > 0.05) {
       bonkedThisFrame = true;
@@ -2567,15 +2741,36 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
     // Camera wall clamp — include closet area so player can walk in
     const inHallway = focal.z > 49 - 1;
-    const camWallXMin = inHallway ? (-51 + 1) : (-(SIDE_WALL_X + CLOSET_DEPTH) + 1); // hallway -X wall vs. closet back wall
-    const camWallXMax = inHallway ? (-11 - 1) : (-LEFT_WALL_X - 1);                  // hallway +X wall vs. window wall
+    const inOffice = focal.x > -11 + 1 && focal.z > 55 && focal.z < 145;
+    const inGuestRoom = focal.x < -51 - 1 && focal.z > -13 && focal.z < 130;
+    let camWallXMin, camWallXMax;
+    if (inOffice) {
+      camWallXMin = -11 + 1;   // shared wall with hallway
+      camWallXMax = 60 - 1;    // office far wall
+    } else if (inGuestRoom) {
+      camWallXMin = -183 + 1;
+      camWallXMax = -51 - 1;
+    } else if (inHallway) {
+      camWallXMin = -51 + 1;
+      camWallXMax = -11 - 1;
+    } else {
+      camWallXMin = -(SIDE_WALL_X + CLOSET_DEPTH) + 1;
+      camWallXMax = -LEFT_WALL_X - 1;
+    }
     // Z bounds must include closet interior (extends to cZ - cIW/2 = -89)
     const camWallZMin = CLOSET_Z - CLOSET_INTERIOR_W / 2 + 1; // closet -Z side wall
     // Default Z clamp stops at the back-wall inner face. When the player is in
     // the hallway extension (focal X inside the hallway opening and past the
-    // back wall), extend Z so the camera can follow.
+    // back wall), extend Z so the camera can follow. Also extend for office.
     const inHallwayX = (focal.x >= -51 + 1 && focal.x <= -11 - 1);
-    const camWallZMax = (inHallwayX && focal.z > 49 - 6) ? (289 - 1) : (49 - 1);
+    let camWallZMax;
+    if (inOffice) {
+      camWallZMax = 145 - 1;
+    } else if ((inHallwayX && focal.z > 49 - 6) || inGuestRoom) {
+      camWallZMax = 289 - 1;
+    } else {
+      camWallZMax = 49 - 1;
+    }
     // Camera Y min tracks the player's current ground, not the room floor,
     // so on elevated surfaces (bed, nightstand) it doesn't clip below them.
     const cyMin = Math.max(floorY + 0.5, fpPos.y - EYE_H + 1.5);
@@ -2644,6 +2839,17 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       while (dYaw < -Math.PI) dYaw += Math.PI * 2;
       _catGroup.rotation.y += dYaw * easeAlpha(19.74, dtSec);
 
+      // ── Board spin trick (F) — full 360 of character+board ────────
+      if (_trickSpinActive) {
+        const SPIN_DUR = 0.5;
+        _trickSpin += dtSec / SPIN_DUR;
+        if (_trickSpin >= 1) { _trickSpin = 0; _trickSpinActive = false; }
+        else {
+          const t = _trickSpin;
+          _catGroup.rotation.y += t * t * (3 - 2 * t) * Math.PI * 2;
+        }
+      }
+
       const lateralInput = (fpKeys.d ? 1 : 0) - (fpKeys.a ? 1 : 0);
       const speedN = Math.max(0, Math.min(1, horizSpd / 0.5));
       const leanTarget = skateMode ? (-lateralInput * 0.18 * speedN) : 0;
@@ -2653,6 +2859,24 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
       if (_skateboardAnchor) {
         _skateboardAnchor.rotation.y = _skateboardBaseYaw + (sidewaysSkatePose ? -(Math.PI * 0.5) : 0);
+
+        // ── Manual trick (hold E) — tilt board nose-up ──────────────
+        const manualTarget = (skateMode && _trickManualHeld) ? 1 : 0;
+        _trickManual += (manualTarget - _trickManual) * easeAlpha(10, dtSec);
+        if (_trickManual < 0.001) _trickManual = 0;
+        _skateboardAnchor.rotation.x = _trickManual * 0.32;
+
+        // ── Kickflip trick (Q) — board rolls 360° ──────────────────
+        if (_trickKickflipActive) {
+          _trickKickflip += dtSec / 0.4;
+          if (_trickKickflip >= 1) { _trickKickflip = 0; _trickKickflipActive = false; }
+        }
+        if (_trickKickflipActive) {
+          const t = _trickKickflip;
+          _skateboardAnchor.rotation.z = t * t * (3 - 2 * t) * Math.PI * 2;
+        } else {
+          _skateboardAnchor.rotation.z = 0;
+        }
       }
       _syncSkateboardVisualState();
     }
@@ -2667,12 +2891,14 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       _ray.setFromCamera(_rayCenter, _camera);
       // Raycast only against known interactive objects (not entire scene)
       let aimingAt = false;
+      let aimTarget = null;
       for (let i = 0; i < _interactiveObjects.length; i++) {
         const obj = _interactiveObjects[i];
         if (!obj.parent) continue; // removed from scene
         const hits = _ray.intersectObject(obj, true);
         if (hits.length > 0 && hits[0].distance <= 220) {
           aimingAt = true;
+          aimTarget = obj;
           break;
         }
       }
@@ -2683,6 +2909,26 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       _wasAimingAtInteractable = aimingAt;
       _crosshairAimingAtInteractable = aimingAt;
       window._fpLookTarget = aimingAt;
+
+      // Tooltip — show contextual text for specific interactables
+      const tooltip = document.getElementById('fpCrosshairTooltip');
+      if (tooltip) {
+        let tooltipText = '';
+        if (aimTarget) {
+          // Walk up to find tagged parent
+          let p = aimTarget;
+          while (p) {
+            if (p._isCornerDoor || p._isCornerDoorHandle) { tooltipText = 'Office'; break; }
+            p = p.parent;
+          }
+        }
+        if (tooltipText) {
+          tooltip.textContent = tooltipText;
+          tooltip.classList.add('visible');
+        } else {
+          tooltip.classList.remove('visible');
+        }
+      }
     }
 
     const aiming = _crosshairAimingAtInteractable;
@@ -2752,7 +2998,17 @@ function _bindInputs() {
         _toggleHelp();
         break;
       case 'KeyK':
-        setSkateMode(!skateMode);
+        if (skateboardFound) setSkateMode(!skateMode);
+        else if (_showToast) _showToast('Find the hidden skateboard first!');
+        break;
+      case 'KeyQ':
+        if (skateMode && !_trickKickflipActive) { _trickKickflipActive = true; _trickKickflip = 0; }
+        break;
+      case 'KeyE':
+        _trickManualHeld = skateMode;
+        break;
+      case 'KeyF':
+        if (skateMode && !_trickSpinActive) { _trickSpinActive = true; _trickSpin = 0; }
         break;
     }
   });
@@ -2766,6 +3022,7 @@ function _bindInputs() {
       case 'KeyD': fpKeys.d = false; break;
       case 'Space': fpKeys.space = false; break;
       case 'ShiftLeft': case 'ShiftRight': fpKeys.shift = false; break;
+      case 'KeyE': _trickManualHeld = false; break;
     }
   });
 
