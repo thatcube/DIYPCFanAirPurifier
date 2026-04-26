@@ -781,9 +781,12 @@ export function createRoom(scene) {
   const doorLeft=doorCenterX-doorW/2;
   const doorRight=doorCenterX+doorW/2;
 
-  // Back-wall opening is the full hallway width so you don't see a thin
-  // sliver of back wall through the recess side gaps (which used to read
-  // like an extra door frame behind the real one).
+  // Back-wall opening spans the full hallway width so you don't see a thin
+  // sliver of back wall through the recess side gaps. The right edge of the
+  // opening is extended 1" past the back wall's outer edge (X=51 pre-mirror)
+  // to eliminate the degenerate extrude-side-face where the hole edge and
+  // the shape edge coincide — that thin strip was visible through the guest
+  // doorway in the right wall.
   const backOpenW=extrusionW;
   const backOpenLeft=extCenterX-backOpenW/2;
   const backOpenRight=extCenterX+backOpenW/2;
@@ -800,24 +803,20 @@ export function createRoom(scene) {
   const wallMeshL=(()=>{
     const mat=new THREE.MeshStandardMaterial({color:0xd8d4ce,roughness:0.7,metalness:0.05});
     const shape=new THREE.Shape();
-    // Post-mirror world X range: -51..81 (centered at +15).
-    const xMin=-51, xMax=81;
+    // Post-mirror world X range. The hallway opening spans X=-51..-11
+    // (the full right edge of the back wall to the hallway left wall).
+    // Since there's zero solid wall between the outer edge and the hole
+    // on that side, we simply start the shape at the hallway's inner
+    // edge (-backOpenLeft = -11) — no hole needed. This eliminates the
+    // degenerate extrude-side-face at X=-51 that was visible as a thin
+    // strip through the guest doorway in the right wall.
+    const xMin=-backOpenLeft, xMax=81;
     const yMin=0, yMax=80;
     shape.moveTo(xMin,yMin);
     shape.lineTo(xMax,yMin);
     shape.lineTo(xMax,yMax);
     shape.lineTo(xMin,yMax);
     shape.lineTo(xMin,yMin);
-    const hole=new THREE.Path();
-    // Hallway-width hole in the back wall, post-mirror X. Full-height so the
-    // bedroom flows into the hallway as one continuous space with no header.
-    const hxMin=-backOpenRight, hxMax=-backOpenLeft;
-    hole.moveTo(hxMin,yMin);
-    hole.lineTo(hxMax,yMin);
-    hole.lineTo(hxMax,yMax);
-    hole.lineTo(hxMin,yMax);
-    hole.lineTo(hxMin,yMin);
-    shape.holes.push(hole);
     const geo=new THREE.ExtrudeGeometry(shape, {depth:0.5, bevelEnabled:false});
     const mesh=new THREE.Mesh(geo, mat);
     mesh.position.set(0, floorY, 48.75); // front face at Z=48.75, back at 49.25
@@ -878,12 +877,13 @@ export function createRoom(scene) {
   // ceiling so the opening reads as one continuous space with the hallway.
 
   // Back-wall baseboards — split around the 40" back opening.
+  // Only the left segment exists; the right segment has zero width because the
+  // opening reaches the right wall edge, so we skip it to avoid a degenerate
+  // box that would be visible through the guest doorway.
   const bbLeftW = (backOpenLeft) - (-15 - backWallFullW/2);
-  const bbRightW = (-15 + backWallFullW/2) - backOpenRight;
   const baseboardMeshL = roomBox(bbLeftW, 3, 0.6, 0xc0bbb4,
     (-15 - backWallFullW/2 + backOpenLeft)/2, floorY+1.5, 48.5, 0,0,0);
-  const baseboardMeshR = roomBox(bbRightW, 3, 0.6, 0xc0bbb4,
-    (backOpenRight + (-15 + backWallFullW/2))/2, floorY+1.5, 48.5, 0,0,0);
+  const baseboardMeshR = null;
   const baseboardRetL=roomBox(0.6, 3, recessDepth, 0xc0bbb4, extLeft+0.5, floorY+1.5, 49-recessDepth/2, 0,0,0);
   
   // ─── Door ───
@@ -968,10 +968,10 @@ export function createRoom(scene) {
     _cornerDoorAnim=requestAnimationFrame(_stepCornerDoor);
     return _cornerDoorOpen;
   }
-  
+
   // Collect all back wall + recess meshes for fading
   const backWallParts=[wallMeshL,returnWallL,
-    baseboardMeshL,baseboardMeshR,baseboardRetL];
+    baseboardMeshL,baseboardRetL].filter(Boolean);
   if(recessWallL) backWallParts.push(recessWallL);
   if(recessWallR) backWallParts.push(recessWallR);
   if(baseboardRecessL) backWallParts.push(baseboardRecessL);
@@ -1138,49 +1138,16 @@ export function createRoom(scene) {
   // extends all the way through Z=300 so bedroom + hallway share one
   // continuous surface with no seam. See `ceiling` above.)
 
-  // Hallway side walls — the -X side is a continuous box (its "other room"
-  // door is purely decorative). The +X side has a real 32" × 68" doorway
-  // cut into it at Z=_guestDoorCenterZ so the player can walk into the
-  // guest room beyond. The -X decorative door stays where it is for visual
-  // symmetry.
+  // Hallway side walls — the -X side is a continuous box with a decorative
+  // (non-functional) door for visual symmetry. The +X side has a real 32" × 68"
+  // doorway cut into it at Z=_guestDoorCenterZ so the player can walk into the
+  // guest room (office) beyond.
   const hallWallMat = new THREE.MeshStandardMaterial({color:_hallWallColor, roughness:0.7, metalness:0.05});
-  // -X side wall (pre-mirror X=_hallXLeft=11) — split around an office
-  // doorway opening so the player can walk from the hallway into the
-  // office room. Door opening: 32" wide × 68" tall, centered at Z=80.
-  const _officeDoorCenterZ = 80;
-  const _officeDoorW = 32;
-  const _officeDoorH = 68;
-  const _officeDoorZmin = _officeDoorCenterZ - _officeDoorW / 2; // 64
-  const _officeDoorZmax = _officeDoorCenterZ + _officeDoorW / 2; // 96
-  // Segment before doorway (Z=49..64)
+  // -X side wall (pre-mirror X=_hallXLeft=11) — single continuous piece
   {
-    const segLen = _officeDoorZmin - _hallZStart; // 15
     const seg = new THREE.Mesh(
-      new THREE.BoxGeometry(0.5, _hallHeight, segLen), hallWallMat);
-    seg.position.set(_hallXLeft - 0.25, floorY + _hallHeight / 2,
-      _hallZStart + segLen / 2);
-    seg.castShadow = true; seg.receiveShadow = true;
-    seg._isRoom = true; seg._isHallway = true;
-    addRoom(seg);
-  }
-  // Segment after doorway (Z=96..289)
-  {
-    const segLen = _hallZEnd - _officeDoorZmax; // 193
-    const seg = new THREE.Mesh(
-      new THREE.BoxGeometry(0.5, _hallHeight, segLen), hallWallMat);
-    seg.position.set(_hallXLeft - 0.25, floorY + _hallHeight / 2,
-      _officeDoorZmax + segLen / 2);
-    seg.castShadow = true; seg.receiveShadow = true;
-    seg._isRoom = true; seg._isHallway = true;
-    addRoom(seg);
-  }
-  // Header above doorway (Y=doorH..ceiling, Z=64..96)
-  {
-    const headerH = _hallHeight - _officeDoorH; // 12
-    const seg = new THREE.Mesh(
-      new THREE.BoxGeometry(0.5, headerH, _officeDoorW), hallWallMat);
-    seg.position.set(_hallXLeft - 0.25, floorY + _officeDoorH + headerH / 2,
-      _officeDoorCenterZ);
+      new THREE.BoxGeometry(0.5, _hallHeight, _hallLen), hallWallMat);
+    seg.position.set(_hallXLeft - 0.25, floorY + _hallHeight / 2, _hallCenterZ);
     seg.castShadow = true; seg.receiveShadow = true;
     seg._isRoom = true; seg._isHallway = true;
     addRoom(seg);
@@ -1218,112 +1185,53 @@ export function createRoom(scene) {
       const w = zMax - zMin; if (w < 0.5) return;
       roomBox(0.6, 3, w, bbColor, x, floorY+1.5, (zMin+zMax)/2, 0,0,0);
     };
-    // -X wall — split around the office doorway AND the decorative door
-    const offDoorBBmin = _officeDoorZmin - 2.5;
-    const offDoorBBmax = _officeDoorZmax + 2.5;
-    addSeg(_hallXLeft+0.5, _hallZStart, offDoorBBmin);
-    addSeg(_hallXLeft+0.5, offDoorBBmax,  lDoorMin);
-    addSeg(_hallXLeft+0.5, lDoorMax,    _hallZEnd );
+    // -X wall — continuous (no door on this side)
+    addSeg(_hallXLeft+0.5, _hallZStart,  _hallZEnd);
     // (+X wall baseboards are handled by the unified right-wall baseboard
     // loop below, which now spans the full Z=_sbXMin.._hallZEnd range.)
     // Baseboard along the end wall
     roomBox(_hallWidth, 3, 0.6, bbColor, _hallCenterX, floorY+1.5, _hallZEnd-0.5, 0,0,0);
   }
 
-  // Decorative closed door on the hallway's -X wall (~6 ft in) — still reads
-  // as "some other room" off the hallway. The +X side is a REAL doorway
-  // (built separately below) leading into the guest room.
-  {
-    const panelThick = 1.4;
-    const side = -1;
-    const wallX = _hallXLeft;
-    const innerFaceX = wallX + side*0.25;
-    const panelCenterX = innerFaceX - side*(panelThick/2);
-    const panelY = floorY + _hallDoorH/2;
-    const panelZ = _hallDoorCenterZ;
-
-    const leaf = buildDoorLeaf({
-      width: _hallDoorW-1, height: _hallDoorH-1, thickness: panelThick,
-    });
-    leaf.position.set(panelCenterX, panelY, panelZ);
-    leaf.rotation.y = Math.PI/2;
-    tagAll(leaf, { _isRoom:true, _isHallway:true });
-    leaf.userData.doorLeaf.slab.castShadow = true;
-    addRoom(leaf);
-
-    const trimD = 1;
-    const trimX = innerFaceX - side*(trimD/2 + 0.04);
-    const frame = buildDoorFrame({
-      width: _hallDoorW, height: _hallDoorH, depth: trimD,
-    });
-    frame.position.set(trimX, panelY, panelZ);
-    frame.rotation.y = Math.PI/2;
-    tagAll(frame, { _isRoom:true, _isHallway:true });
-    addRoom(frame);
-
-    const knobZOffset = _hallDoorW/2 - 4;
-    const knob = buildDoorKnob();
-    knob.position.set(
-      panelCenterX - side*(panelThick/2),
-      panelY + leaf.userData.doorLeaf.lockRailY,
-      panelZ + knobZOffset
-    );
-    knob.rotation.y = Math.PI/2;
-    tagAll(knob, { _isRoom:true, _isHallway:true });
-    addRoom(knob);
-    doorKnobs.push(knob);
-  }
-
   // ─── Functional guest-room door (on hallway's +X wall at Z=_guestDoorCenterZ) ───
   // Frame + hinged leaf + knob, using the shared door asset so it matches
-  // every other door in the scene. Hinge is on the -Z jamb of the opening;
-  // positive rotation.y swings the free edge toward +X (into the guest room).
+  // every other door in the scene. Hinge is on the +Z jamb of the opening;
+  // negative rotation.y swings the free edge toward -X (into the hallway).
   let toggleGuestDoor = null;
+  let _guestDoorOpenState = () => false;
   let _guestDoorPanelMesh = null;
   {
     const panelThick = 1.4;
     const panelH = _guestDoorH - 0.5;
     const panelW = _guestDoorW - 1;
-    // rightWall occupies X=50.5..51 (inner face = bedroom/extrusion side at
-    // X=50.5). Place the hinge at the -Z jamb on the bedroom-side face, so
-    // the closed panel sits at X=49.1..50.5 (fully inside the bedroom;
-    // flush with the wall inner face, no poking into the hallway-wall
-    // region past X=51).
-    //
-    // The trim jambs overhang the wall opening by 0.5" on each side
-    // (buildDoorFrame inner-face inset), so the visible opening between
-    // trim pieces is 31" — exactly panelW. Shift the hinge +0.5" from the
-    // wall-opening edge so both the hinge edge and the strike edge of the
-    // closed panel sit flush with the trim inner faces (no visible gap).
-    const hingeZ = _guestDoorZmin + 0.5;
+    // Hinge on the +Z jamb. Trim jambs overhang by 0.5" so shift inward
+    // by 0.5" from the wall-opening edge for flush alignment.
+    const hingeZ = _guestDoorZmax - 0.5;
     const hingeX = sideWallX - 0.5;          // 50.5
     const pivot = new THREE.Group();
     pivot.position.set(hingeX, floorY + _guestDoorH/2, hingeZ);
     pivot._isRoom = true;
     addRoom(pivot);
 
-    // Leaf extends in +Z from the hinge; rotation.y swings the free edge
-    // from +Z toward +X (into the guest room / hallway side). Leaf
-    // position.x = -panelThick/2 offsets the panel's thickness axis so the
-    // closed panel occupies world X = [hingeX - panelThick, hingeX]
-    // = [49.1, 50.5], flush with the bedroom-side wall face.
+    // Leaf extends in -Z from the hinge; negative rotation.y swings the
+    // free edge from -Z toward -X (into the hallway). Leaf position.x =
+    // -panelThick/2 offsets the panel's thickness axis so the closed panel
+    // sits flush with the bedroom-side wall face.
     const leaf = buildDoorLeaf({
       width: panelW, height: panelH, thickness: panelThick,
     });
-    leaf.rotation.y = -Math.PI/2;            // width axis → world Z
-    leaf.position.set(-panelThick/2, 0, panelW/2);
+    leaf.rotation.y = Math.PI/2;             // width axis → world -Z
+    leaf.position.set(-panelThick/2, 0, -panelW/2);
     tagAll(leaf, { _isRoom:true, _isGuestDoor:true });
     leaf.userData.doorLeaf.slab.castShadow = true;
     pivot.add(leaf);
     _guestDoorPanelMesh = leaf.userData.doorLeaf.slab;
 
     // Knobs on both faces, on the lock rail, near the free (strike) edge.
-    // With leaf.position.x=-panelThick/2, the bedroom-side panel face is
-    // at local X=-panelThick and the wall-side face is at local X=0.
+    // Free edge is now at -Z side of the panel (handle on the right).
     const knobY = leaf.userData.doorLeaf.lockRailY;
-    const knobZ = panelW - 4;
-    // Bedroom-side knob (points -X, toward the bedroom interior). The knob
-    // group projects along its local +Z; rotation.y=-π/2 sends +Z → pivot -X.
+    const knobZ = -(panelW - 4);
+    // Bedroom-side knob (points -X, toward the bedroom interior).
     const knobBed = buildDoorKnob();
     knobBed.position.set(-panelThick, knobY, knobZ);
     knobBed.rotation.y = -Math.PI/2;
@@ -1358,9 +1266,10 @@ export function createRoom(scene) {
 
     // Hinge animation.
     let _open = false;
+    _guestDoorOpenState = () => _open;
     let _angle = 0;
     let _anim = 0;
-    const _openAngle = 82*Math.PI/180;
+    const _openAngle = 82*Math.PI/180;  // positive = swing into office (+X)
     const _step = () => {
       const target = _open ? _openAngle : 0;
       _angle += (target - _angle) * 0.22;
@@ -1382,20 +1291,15 @@ export function createRoom(scene) {
   }
 
   // ─── Guest room (behind the hallway's +X door) ────────────────────
-  // Roughly the same footprint as the main bedroom (132"×127"×80"), but a
-  // bit wider on the Z axis so the swinging guest door has room to open
-  // fully without hitting a side wall. Shared -X wall is the existing
+  // The office shares the bedroom's TV wall (oppWallZ=-78) as its -Z
+  // boundary — no separate RIGHT wall. Shared -X wall is the existing
   // bedroom/hallway right wall (at pre-mirror X=51), which already has the
-  // guest door hole cut into it, so we only build the three new walls
-  // (+X far, -Z, +Z), a hardwood floor, and a ceiling.
-  const _grXmin = 51;              // shared wall (existing sideWall/hallWallR)
-  const _grXmax = 183;             // new far wall (132" deep — matches main)
-  // The closet protrudes from the main bedroom's side wall into pre-mirror
-  // X=51..87, Z=-78..-14. Keep _grZmin >= -14 so the guest room's -Z wall
-  // doesn't clip through the closet body. -13 gives a 1" clearance and lets
-  // the closet's +Z exterior face sit flush just outside the guest room.
-  const _grZmin = -13;             // new "-Z" wall (clears closet at Z=-14)
-  const _grZmax = 130;             // new "+Z" wall (143" wide)
+  // guest door hole cut into it, so we build two new walls (+X far, +Z),
+  // extend the TV wall into the office footprint, and add floor + ceiling.
+  const _grXmin = 51;              // BACK wall — shared wall w/ hallway (has the door)
+  const _grXmax = 183;             // FRONT wall — where desk faces (132" deep)
+  const _grZmin = oppWallZ;        // TV wall serves as the -Z boundary (no separate RIGHT wall)
+  const _grZmax = 69;              // LEFT wall — 1" from door trim outer edge
   const _grCenterX = (_grXmin + _grXmax) / 2;
   const _grCenterZ = (_grZmin + _grZmax) / 2;
   const _grWidthX  = _grXmax - _grXmin; // 132
@@ -1439,13 +1343,13 @@ export function createRoom(scene) {
     addRoom(grCeil);
   }
 
-  // New walls — three simple boxes. Thickness 0.5" matches every other wall
-  // in the scene. Baseboards on the interior face, inset slightly so they
-  // don't fight with the corner where two walls meet.
+  // New walls — two boxes (FRONT + LEFT). The -Z side uses the bedroom's
+  // TV wall (oppWallZ), extended into the office footprint below.
+  // Thickness 0.5" matches every other wall in the scene.
   const grWallMat = new THREE.MeshStandardMaterial({
     color: _grWallColor, roughness: 0.7, metalness: 0.05,
   });
-  // +X far wall (pre-mirror X = _grXmax..+0.5); spans the full Z range.
+  // FRONT wall (+X far wall, pre-mirror X = _grXmax..+0.5); spans the full Z range.
   {
     const w = new THREE.Mesh(
       new THREE.BoxGeometry(0.5, _grHeight, _grWidthZ + 1),
@@ -1456,18 +1360,7 @@ export function createRoom(scene) {
     w._isRoom = true; w._isGuestRoom = true;
     addRoom(w);
   }
-  // -Z wall (behind the door, closer to the main bedroom's TV-wall side).
-  {
-    const w = new THREE.Mesh(
-      new THREE.BoxGeometry(_grWidthX, _grHeight, 0.5),
-      grWallMat
-    );
-    w.position.set(_grCenterX, floorY + _grHeight/2, _grZmin - 0.25);
-    w.castShadow = true; w.receiveShadow = true;
-    w._isRoom = true; w._isGuestRoom = true;
-    addRoom(w);
-  }
-  // +Z wall (far end of the room, past the hallway).
+  // LEFT wall (+Z, right next to the door trim when entering).
   {
     const w = new THREE.Mesh(
       new THREE.BoxGeometry(_grWidthX, _grHeight, 0.5),
@@ -1478,19 +1371,33 @@ export function createRoom(scene) {
     w._isRoom = true; w._isGuestRoom = true;
     addRoom(w);
   }
+  // TV wall extension — continues the bedroom's oppWall (Z=oppWallZ) from
+  // X=51 (shared wall) out to X=183 (front wall) so the office's -Z side
+  // is one continuous surface with the bedroom TV wall.
+  {
+    const extW = _grWidthX;   // 132
+    const w = new THREE.Mesh(
+      new THREE.BoxGeometry(extW, _grHeight, 0.5),
+      grWallMat
+    );
+    w.position.set(_grCenterX, floorY + _grHeight/2, oppWallZ - 0.25);
+    w.castShadow = true; w.receiveShadow = true;
+    w._isRoom = true; w._isGuestRoom = true;
+    addRoom(w);
+  }
 
-  // Baseboards on the three new interior wall faces.
+  // Baseboards on the new interior wall faces (FRONT, LEFT, TV wall extension).
   {
     const bbH = 3, bbT = 0.6, bbY = floorY + _hwLiftY + bbH/2;
-    // Far wall (+X) baseboard — sits just off the inner face at X=_grXmax.
+    // FRONT wall (+X) baseboard — sits just off the inner face at X=_grXmax.
     roomBox(bbT, bbH, _grWidthZ, _grBbColor,
       _grXmax - bbT/2, bbY, _grCenterZ, 0, 0, 0);
-    // -Z wall baseboard.
-    roomBox(_grWidthX, bbH, bbT, _grBbColor,
-      _grCenterX, bbY, _grZmin + bbT/2, 0, 0, 0);
-    // +Z wall baseboard.
+    // LEFT wall (+Z) baseboard.
     roomBox(_grWidthX, bbH, bbT, _grBbColor,
       _grCenterX, bbY, _grZmax - bbT/2, 0, 0, 0);
+    // TV wall extension (-Z / oppWallZ) baseboard — office side.
+    roomBox(_grWidthX, bbH, bbT, _grBbColor,
+      _grCenterX, bbY, oppWallZ + bbT/2, 0, 0, 0);
   }
 
   // Simple ceiling fixture + warm point light at the guest-room midpoint so
@@ -1527,277 +1434,259 @@ export function createRoom(scene) {
     addRoom(hallLight);
   }
 
-  // ─── Office room (behind the corner door, off the hallway's -X wall) ──
-  // Accessed through a 32"×68" doorway cut into the hallway's -X wall at
-  // Z=64..96. The office extends from pre-mirror X=-60..11 (world X=-11..60),
-  // Z=55..145 (90" deep ≈ 7.5 ft). Shared wall is the hallway's -X wall at
-  // pre-mirror X=11 (which already has the doorway hole cut above).
-  const _offXmin = -60;           // far wall (pre-mirror)
-  const _offXmax = 11;            // shared wall with hallway
-  const _offZmin = 55;            // -Z wall
-  const _offZmax = 145;           // +Z wall
-  const _offCenterX = (_offXmin + _offXmax) / 2; // -24.5
-  const _offCenterZ = (_offZmin + _offZmax) / 2; // 100
-  const _offWidthX = _offXmax - _offXmin;  // 71
-  const _offWidthZ = _offZmax - _offZmin;  // 90
-  const _offHeight = 80;
-  const _offWallColor = 0xd5d8d2; // slightly greener/cooler than bedroom
-  const _offBbColor = 0xb8b4ae;
-  const _offCeilColor = 0xdeddd8;
-
-  // Office hardwood floor
+  // ── Debug wall labels (localhost only) ──────────────────────────────
+  // Giant text on each office wall so devs can agree on "LEFT / RIGHT /
+  // FRONT / BACK". Uses Sprites so they always face the camera and are
+  // readable from any angle. Hidden by default; toggled from pause menu.
+  const _debugWallLabels = [];
   {
-    const offMat = _makeHardwoodMaterial(_offWidthX, _offWidthZ);
-    const offFloor = new THREE.Mesh(
-      new THREE.PlaneGeometry(_offWidthX, _offWidthZ), offMat);
-    offFloor.rotation.x = -Math.PI / 2;
-    offFloor.position.set(_offCenterX, floorY + _hwLiftY, _offCenterZ);
-    offFloor.receiveShadow = true;
-    offFloor._isRoom = true; offFloor._isFloor = true; offFloor._isOffice = true;
-    addRoom(offFloor);
+    const _makeLabel = (text, scale, color) => {
+      const cvs = document.createElement('canvas');
+      cvs.width = 512; cvs.height = 256;
+      const ctx = cvs.getContext('2d');
+      // Semi-transparent dark background for readability
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      const pad = 16;
+      const rr = 24;
+      ctx.beginPath();
+      ctx.roundRect(pad, pad, 512 - pad * 2, 256 - pad * 2, rr);
+      ctx.fill();
+      ctx.fillStyle = color;
+      ctx.font = 'bold 110px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 256, 108);
+      // Smaller axis note below
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.7;
+      ctx.font = '36px system-ui, sans-serif';
+      const notes = {
+        FRONT: '+X  (_grXmax)',  BACK: '-X  (_grXmin, door)',
+        LEFT: '+Z  (_grZmax)',
+      };
+      if (notes[text]) ctx.fillText(notes[text], 256, 178);
+      ctx.globalAlpha = 1;
+      const tex = new THREE.CanvasTexture(cvs);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(scale, scale / 2, 1);
+      sprite.visible = false;
+      sprite._isRoom = true;
+      sprite._isDebugLabel = true;
+      addRoom(sprite);
+      _debugWallLabels.push(sprite);
+      return sprite;
+    };
+    const midY = floorY + _grHeight / 2;
+    // Office walls (red labels) — no RIGHT label since that side is the TV wall
+    _makeLabel('FRONT', 40, '#ff4444').position.set(_grXmax - 4, midY, _grCenterZ);
+    _makeLabel('BACK',  40, '#ff4444').position.set(_grXmin + 4, midY, _grCenterZ);
+    _makeLabel('LEFT',  40, '#ff4444').position.set(_grCenterX, midY, _grZmax - 4);
   }
 
-  // Office ceiling
+  // Also label the bedroom, hallway, and closet walls for reference
   {
-    const ceilMat = new THREE.MeshStandardMaterial({
-      color: _offCeilColor, roughness: 0.9, metalness: 0.0, side: THREE.DoubleSide,
-    });
-    const offCeil = new THREE.Mesh(
-      new THREE.PlaneGeometry(_offWidthX, _offWidthZ), ceilMat);
-    offCeil.rotation.x = Math.PI / 2;
-    offCeil.position.set(_offCenterX, floorY + _offHeight + 0.05, _offCenterZ);
-    offCeil.receiveShadow = true;
-    offCeil._isRoom = true; offCeil._isOffice = true;
-    addRoom(offCeil);
+    const _makeLabel = (text, scale, color = '#44aaff') => {
+      const cvs = document.createElement('canvas');
+      cvs.width = 512; cvs.height = 256;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.beginPath();
+      ctx.roundRect(16, 16, 480, 224, 24);
+      ctx.fill();
+      ctx.fillStyle = color;
+      ctx.font = 'bold 90px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 256, 128);
+      const tex = new THREE.CanvasTexture(cvs);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(scale, scale / 2, 1);
+      sprite.visible = false;
+      sprite._isRoom = true;
+      sprite._isDebugLabel = true;
+      addRoom(sprite);
+      _debugWallLabels.push(sprite);
+      return sprite;
+    };
+    const midY = floorY + 40;
+
+    // ── Bedroom walls (blue) ──
+    _makeLabel('WINDOW', 50).position.set(leftWallX + 4, midY, -15);
+    _makeLabel('TV WALL', 50).position.set(-15, midY, oppWallZ + 4);
+    _makeLabel('SIDE WALL', 50).position.set(sideWallX - 4, midY, -15);
+    _makeLabel('DOOR WALL', 50).position.set(-15, midY, 48.5 - 4);
+
+    // ── Hallway walls (green) ──
+    const hallMidY = floorY + _hallHeight / 2;
+    const hallMidZ = _hallCenterZ;
+    _makeLabel('HALL LEFT', 28, '#44dd66').position.set(_hallXLeft + 4, hallMidY, hallMidZ);
+    _makeLabel('HALL RIGHT', 28, '#44dd66').position.set(_hallXRight - 4, hallMidY, hallMidZ);
+    _makeLabel('HALL END', 28, '#44dd66').position.set(_hallCenterX, hallMidY, _hallZEnd - 4);
   }
 
-  // Office walls — three boxes (the 4th is the shared hallway wall).
-  const offWallMat = new THREE.MeshStandardMaterial({
-    color: _offWallColor, roughness: 0.7, metalness: 0.05,
-  });
-  // Far wall (-X side, pre-mirror X=_offXmin)
-  {
-    const w = new THREE.Mesh(
-      new THREE.BoxGeometry(0.5, _offHeight, _offWidthZ + 1), offWallMat);
-    w.position.set(_offXmin - 0.25, floorY + _offHeight / 2, _offCenterZ);
-    w.castShadow = true; w.receiveShadow = true;
-    w._isRoom = true; w._isOffice = true;
-    addRoom(w);
-  }
-  // -Z wall (pre-mirror Z=_offZmin)
-  {
-    const w = new THREE.Mesh(
-      new THREE.BoxGeometry(_offWidthX, _offHeight, 0.5), offWallMat);
-    w.position.set(_offCenterX, floorY + _offHeight / 2, _offZmin - 0.25);
-    w.castShadow = true; w.receiveShadow = true;
-    w._isRoom = true; w._isOffice = true;
-    addRoom(w);
-  }
-  // +Z wall (pre-mirror Z=_offZmax)
-  {
-    const w = new THREE.Mesh(
-      new THREE.BoxGeometry(_offWidthX, _offHeight, 0.5), offWallMat);
-    w.position.set(_offCenterX, floorY + _offHeight / 2, _offZmax + 0.25);
-    w.castShadow = true; w.receiveShadow = true;
-    w._isRoom = true; w._isOffice = true;
-    addRoom(w);
-  }
 
-  // Office baseboards
-  {
-    const bbH = 3, bbT = 0.6, bbY = floorY + _hwLiftY + bbH / 2;
-    // Far wall (-X) baseboard
-    roomBox(bbT, bbH, _offWidthZ, _offBbColor,
-      _offXmin + bbT / 2, bbY, _offCenterZ, 0, 0, 0);
-    // -Z wall baseboard
-    roomBox(_offWidthX, bbH, bbT, _offBbColor,
-      _offCenterX, bbY, _offZmin + bbT / 2, 0, 0, 0);
-    // +Z wall baseboard
-    roomBox(_offWidthX, bbH, bbT, _offBbColor,
-      _offCenterX, bbY, _offZmax - bbT / 2, 0, 0, 0);
-    // Shared wall baseboard segments (around the doorway opening)
-    const bbDoorZmin = _officeDoorZmin - 2.5; // trim around door
-    const bbDoorZmax = _officeDoorZmax + 2.5;
-    const segBeforeLen = bbDoorZmin - _offZmin;
-    if (segBeforeLen > 1) {
-      roomBox(bbT, bbH, segBeforeLen, _offBbColor,
-        _offXmax - bbT / 2, bbY, _offZmin + segBeforeLen / 2, 0, 0, 0);
-    }
-    const segAfterLen = _offZmax - bbDoorZmax;
-    if (segAfterLen > 1) {
-      roomBox(bbT, bbH, segAfterLen, _offBbColor,
-        _offXmax - bbT / 2, bbY, bbDoorZmax + segAfterLen / 2, 0, 0, 0);
-    }
-  }
-
-  // Office door frame (trim around the doorway in the shared wall)
-  {
-    const trimD = 1.4;
-    const frame = buildDoorFrame({
-      width: _officeDoorW, height: _officeDoorH, depth: trimD,
-    });
-    // Frame sits at the hallway -X wall (pre-mirror X=11), rotated so depth
-    // spans along the X axis (perpendicular to the wall).
-    frame.position.set(_offXmax - 0.04 - trimD / 2,
-      floorY + _officeDoorH / 2, _officeDoorCenterZ);
-    frame.rotation.y = -Math.PI / 2;
-    tagAll(frame, { _isRoom: true, _isOffice: true });
-    addRoom(frame);
-  }
-
-  // Office ceiling light
-  {
-    const fixMat = new THREE.MeshStandardMaterial({
-      color: 0xf4ead5, emissive: 0xf4ead5, emissiveIntensity: 0.45, roughness: 0.5,
-    });
-    const fix = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 1.2, 24), fixMat);
-    fix.position.set(_offCenterX, floorY + _offHeight - 0.7, _offCenterZ);
-    fix._isRoom = true; fix._isOffice = true;
-    addRoom(fix);
-    const offLight = new THREE.PointLight(0xffe6bb, 300, 200);
-    offLight.position.set(_offCenterX, floorY + _offHeight - 6, _offCenterZ);
-    offLight.castShadow = false;
-    offLight._isRoom = true; offLight._isOffice = true;
-    addRoom(offLight);
-  }
 
   // ── Office furniture ──────────────────────────────────────────────
+  // Sit-stand desk against the -X far wall, Thor Nanoq R chair, 3 monitors.
+  // ─── Office furniture — placed inside the guest room ─────────────
   // All positions in pre-mirror coords. roomBox auto-adds _isRoom + addRoom.
+  // Guest room: X=51..183, Z=-13..130. Desk against far +X wall, facing -X.
   {
-    const deskColor = 0x8B6914;   // warm oak
-    const deskLegColor = 0x444444; // dark metal legs
-    const chairColor = 0x333333;
+    const metalColor = 0x3a3a3a;    // dark metal frame
+    const deskTopColor = 0x8B6914;  // warm oak desktop
     const monitorColor = 0x1a1a1a;
-    const shelfColor = 0x6b4226;  // dark walnut
+    const chairFrame = 0x2a2a2a;    // Thor Nanoq R dark frame
+    const chairPad = 0x1a1a1a;      // black upholstery
+    const chairAccent = 0x444444;   // armrest/accent
 
-    // ─ Desk — 48"W × 24"D × 30"H, against the far -X wall ─
-    const deskW = 48, deskD = 24, deskH = 2, deskLegH = 28;
-    const deskX = _offXmin + 6 + deskD / 2; // 6" from far wall
-    const deskZ = _offCenterZ + 8;          // slightly off-center toward +Z
-    const deskTopY = floorY + deskLegH + deskH / 2;
+    // ─ Adjustable sit-stand desk — 60"W × 30"D × 30"H (standing: ~44"H) ─
+    // Against the +X far wall, facing -X (toward the door).
+    const deskW = 60, deskD = 30, deskTopH = 1.5;
+    const deskLegH = 28; // current height (sitting position)
+    const deskX = _grXmax - 4 - deskD / 2;               // 4" from far wall → 164
+    const deskZ = _grCenterZ;                             // centered in room → 58.5
+    const deskTopY = floorY + deskLegH + deskTopH / 2;
+
     // Desktop surface
-    const deskTop = roomBox(deskD, deskH, deskW, deskColor,
+    const deskTop = roomBox(deskD, deskTopH, deskW, deskTopColor,
       deskX, deskTopY, deskZ, 0, 0, 0);
     deskTop._isOffice = true;
-    // Desk legs (4 corners)
-    for (const dx of [-1, 1]) {
-      for (const dz of [-1, 1]) {
-        const leg = roomBox(1.5, deskLegH, 1.5, deskLegColor,
-          deskX + dx * (deskD / 2 - 2), floorY + deskLegH / 2,
-          deskZ + dz * (deskW / 2 - 2), 0, 0, 0);
-        leg._isOffice = true;
-      }
+
+    // Desk frame — two T-shaped legs (left and right)
+    for (const side of [-1, 1]) {
+      const legZ = deskZ + side * (deskW / 2 - 4);
+      // Vertical post
+      roomBox(3, deskLegH, 3, metalColor,
+        deskX, floorY + deskLegH / 2, legZ, 0, 0, 0);
+      // Foot (horizontal stabilizer along desk depth)
+      roomBox(deskD - 4, 1.5, 3, metalColor,
+        deskX, floorY + 0.75, legZ, 0, 0, 0);
+    }
+    // Cross-bar between legs (under desktop)
+    roomBox(2, 2, deskW - 8, metalColor,
+      deskX, deskTopY - deskTopH / 2 - 1, deskZ, 0, 0, 0);
+
+    // ─ 3 Monitors — 27" each (24"W × 14"H × 1.5"D), on monitor arms ─
+    const monW = 24, monH = 14, monD = 1.5;
+    const monStandH = 6;  // arm height above desk
+    const monY = deskTopY + deskTopH / 2 + monStandH + monH / 2;
+    const monBaseX = deskX + deskD / 2 - 5; // near back of desk (wall side)
+
+    // Center monitor (faces -X in pre-mirror → +X in world, toward chair)
+    const monCenter = roomBox(monD, monH, monW, monitorColor,
+      monBaseX, monY, deskZ, 0, 0, 0);
+    monCenter._isOffice = true;
+    monCenter.material.roughness = 0.2; monCenter.material.metalness = 0.5;
+
+    // Left monitor (angled inward ~25°)
+    const monLeft = roomBox(monD, monH, monW, monitorColor,
+      monBaseX - 2, monY, deskZ - monW + 2, 0, -0.4, 0);
+    monLeft._isOffice = true;
+    monLeft.material.roughness = 0.2; monLeft.material.metalness = 0.5;
+
+    // Right monitor (angled inward ~25°)
+    const monRight = roomBox(monD, monH, monW, monitorColor,
+      monBaseX - 2, monY, deskZ + monW - 2, 0, 0.4, 0);
+    monRight._isOffice = true;
+    monRight.material.roughness = 0.2; monRight.material.metalness = 0.5;
+
+    // Monitor stands/arms (simplified — one post per monitor)
+    for (const mz of [deskZ, deskZ - monW + 2, deskZ + monW - 2]) {
+      roomBox(1.5, monStandH, 1.5, metalColor,
+        monBaseX, deskTopY + deskTopH / 2 + monStandH / 2, mz, 0, 0, 0);
     }
 
-    // ─ Computer monitor — 20"W × 14"H × 2"D on the desk ─
-    const monW = 14, monH = 20, monD = 1.5;
-    const monY = deskTopY + deskH / 2 + 4 + monH / 2; // 4" stand height
-    const monMesh = roomBox(monD, monH, monW, monitorColor,
-      deskX - deskD / 2 + 4, monY, deskZ, 0, 0, 0);
-    monMesh._isOffice = true;
-    monMesh.material.roughness = 0.3;
-    monMesh.material.metalness = 0.4;
-    // Monitor stand
-    const standW = 8, standH = 4, standD = 1;
-    roomBox(standD, standH, standW, monitorColor,
-      deskX - deskD / 2 + 4, deskTopY + deskH / 2 + standH / 2, deskZ, 0, 0, 0);
-    // Monitor screen (emissive blue glow)
-    const screenGeo = new THREE.PlaneGeometry(monH - 2, monW - 2);
+    // Screen glow (3 emissive planes)
     const screenMat = new THREE.MeshStandardMaterial({
       color: 0x1a3a5a, emissive: 0x2a4a6a, emissiveIntensity: 0.6,
       roughness: 0.3, metalness: 0.0,
     });
-    const screenMesh = new THREE.Mesh(screenGeo, screenMat);
-    // Screen faces -X in pre-mirror (toward the room), which becomes +X in world.
-    screenMesh.rotation.y = Math.PI / 2;
-    screenMesh.position.set(deskX - deskD / 2 + 3.2, monY, deskZ);
-    screenMesh._isRoom = true; screenMesh._isOffice = true;
-    addRoom(screenMesh);
+    // Center screen (faces -X toward chair)
+    {
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(monH - 1, monW - 1), screenMat);
+      s.rotation.y = Math.PI / 2;
+      s.position.set(monBaseX - monD / 2 - 0.1, monY, deskZ);
+      s._isRoom = true; s._isOffice = true; addRoom(s);
+    }
+    // Left screen
+    {
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(monH - 1, monW - 1), screenMat);
+      s.rotation.y = Math.PI / 2 - 0.4;
+      s.position.set(monBaseX - 2 - monD / 2 - 0.1, monY, deskZ - monW + 2);
+      s._isRoom = true; s._isOffice = true; addRoom(s);
+    }
+    // Right screen
+    {
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(monH - 1, monW - 1), screenMat);
+      s.rotation.y = Math.PI / 2 + 0.4;
+      s.position.set(monBaseX - 2 - monD / 2 - 0.1, monY, deskZ + monW - 2);
+      s._isRoom = true; s._isOffice = true; addRoom(s);
+    }
 
-    // ─ Keyboard on desk ─
-    roomBox(6, 0.5, 14, 0x2a2a2a,
-      deskX + 2, deskTopY + deskH / 2 + 0.25, deskZ, 0, 0, 0);
+    // Keyboard + mouse on desk (toward chair side, -X)
+    roomBox(6, 0.4, 16, 0x2a2a2a,
+      deskX - 4, deskTopY + deskTopH / 2 + 0.2, deskZ, 0, 0, 0);
+    roomBox(3, 0.4, 2.5, 0x2a2a2a,
+      deskX - 4, deskTopY + deskTopH / 2 + 0.2, deskZ + 12, 0, 0, 0);
 
-    // ─ Office chair — simple T-shape ─
-    const chairSeatH = 18, chairSeatW = 18, chairSeatD = 18;
-    const chairX = deskX + deskD / 2 + 6; // in front of desk
+    // ─ Thor Nanoq R chair ─
+    // Premium ergonomic gaming chair with mesh back, wide seat, prominent
+    // armrests, and 5-star aluminum base.
+    const chairX = deskX - deskD / 2 - 10; // in front of desk (toward -X/door)
     const chairZ = deskZ;
-    // Seat
-    roomBox(chairSeatD, 2, chairSeatW, chairColor,
-      chairX, floorY + chairSeatH, chairZ, 0, 0, 0);
-    // Backrest
-    roomBox(2, 20, chairSeatW, chairColor,
-      chairX + chairSeatD / 2, floorY + chairSeatH + 10, chairZ, 0, 0, 0);
-    // Pedestal (single column)
-    roomBox(3, chairSeatH - 2, 3, deskLegColor,
-      chairX, floorY + (chairSeatH - 2) / 2, chairZ, 0, 0, 0);
-    // Star base legs (5 small boxes radiating out)
+    const seatH = 18; // seat height from floor
+
+    // 5-star aluminum base
+    const baseColor = 0x777777;
     for (let i = 0; i < 5; i++) {
       const angle = (i / 5) * Math.PI * 2;
-      const legLen = 8;
+      const legLen = 10;
       const lx = chairX + Math.cos(angle) * legLen / 2;
       const lz = chairZ + Math.sin(angle) * legLen / 2;
-      roomBox(legLen, 1, 1.5, deskLegColor,
-        lx, floorY + 0.5, lz, 0, angle, 0);
+      roomBox(legLen, 1.2, 2, baseColor, lx, floorY + 0.6, lz, 0, angle, 0);
+      // Caster at end of each leg
+      const cx = chairX + Math.cos(angle) * legLen;
+      const cz = chairZ + Math.sin(angle) * legLen;
+      roomBox(1.5, 1.5, 1.5, chairFrame, cx, floorY + 0.75, cz, 0, 0, 0);
     }
 
-    // ─ Bookshelf — against the +Z wall ─
-    const shelfW = 36, shelfD = 12, shelfH = 60;
-    const shelfX = _offCenterX;
-    const shelfZ = _offZmax - 1 - shelfD / 2;
-    // Main bookshelf body (back + sides approximated as a single box)
-    roomBox(shelfD, shelfH, shelfW, shelfColor,
-      shelfX, floorY + shelfH / 2, shelfZ, 0, 0, 0);
-    // Shelf dividers (4 horizontal shelves)
-    for (let i = 1; i <= 4; i++) {
-      const sy = floorY + (shelfH / 5) * i;
-      roomBox(shelfD - 1, 0.8, shelfW - 1, shelfColor,
-        shelfX, sy, shelfZ, 0, 0, 0);
-    }
-    // Books on shelves (colored blocks per shelf)
-    const bookColors = [0x8b2500, 0x2e5090, 0x4a7c3f, 0x6b4226];
-    for (let i = 0; i < 4; i++) {
-      const shelfBaseY = floorY + (shelfH / 5) * i + 0.5;
-      const bookH = (shelfH / 5) - 2;
-      const booksW = 20 + Math.random() * 12;
-      roomBox(shelfD - 3, bookH, booksW, bookColors[i],
-        shelfX, shelfBaseY + bookH / 2, shelfZ + 0.5, 0, 0, 0);
-    }
+    // Gas cylinder
+    roomBox(3, seatH - 3, 3, chairFrame,
+      chairX, floorY + (seatH - 3) / 2 + 1.5, chairZ, 0, 0, 0);
 
-    // ─ Desk lamp (small) on the desk corner ─
-    {
-      const lampX = deskX - deskD / 2 + 4;
-      const lampZ = deskZ + deskW / 2 - 6;
-      const lampBaseY = deskTopY + deskH / 2;
-      // Base
-      const baseMat = new THREE.MeshStandardMaterial({
-        color: 0x222222, roughness: 0.4, metalness: 0.6 });
-      const base = new THREE.Mesh(
-        new THREE.CylinderGeometry(2.5, 3, 0.6, 12), baseMat);
-      base.position.set(lampX, lampBaseY + 0.3, lampZ);
-      base._isRoom = true; base._isOffice = true; addRoom(base);
-      // Stem
-      const stemH = 12;
-      const stem = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.25, 0.25, stemH, 8), baseMat);
-      stem.position.set(lampX, lampBaseY + 0.6 + stemH / 2, lampZ);
-      stem._isRoom = true; stem._isOffice = true; addRoom(stem);
-      // Shade
-      const shadeMat = new THREE.MeshStandardMaterial({
-        color: 0xd0c8b8, roughness: 0.9, side: THREE.DoubleSide,
-        transparent: true, opacity: 0.85,
-        emissive: 0xffeedd, emissiveIntensity: 0.6,
-      });
-      const shade = new THREE.Mesh(
-        new THREE.CylinderGeometry(3.5, 5, 7, 16, 1, true), shadeMat);
-      shade.position.set(lampX, lampBaseY + 0.6 + stemH + 3, lampZ);
-      shade._isRoom = true; shade._isOffice = true; addRoom(shade);
-      // Warm desk lamp light
-      const deskLight = new THREE.PointLight(0xffddaa, 180, 80);
-      deskLight.position.set(lampX, lampBaseY + 0.6 + stemH + 3, lampZ);
-      deskLight.castShadow = false;
-      deskLight._isRoom = true; deskLight._isOffice = true;
-      addRoom(deskLight);
+    // Seat pan (wide, contoured)
+    const seatW = 22, seatD = 22;
+    roomBox(seatD, 3, seatW, chairPad,
+      chairX, floorY + seatH, chairZ, 0, 0, 0);
+
+    // Mesh backrest (tall, slight recline — faces +X toward wall)
+    const backH = 28, backW = 20;
+    const backMat = new THREE.MeshStandardMaterial({
+      color: chairFrame, roughness: 0.6, metalness: 0.3,
+      transparent: true, opacity: 0.85, // mesh-look
+    });
+    const backMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(2, backH, backW), backMat);
+    backMesh.position.set(chairX - seatD / 2 - 1, floorY + seatH + backH / 2, chairZ);
+    backMesh.rotation.z = 0.1; // slight recline (tilts toward +X/wall)
+    backMesh._isRoom = true; backMesh._isOffice = true;
+    addRoom(backMesh);
+
+    // Headrest
+    roomBox(2, 5, 14, chairPad,
+      chairX - seatD / 2 - 2, floorY + seatH + backH + 2, chairZ, 0, 0, 0);
+
+    // Armrests (two wide pads on metal supports)
+    for (const side of [-1, 1]) {
+      const az = chairZ + side * (seatW / 2 + 1);
+      // Support post
+      roomBox(2, 8, 2, chairFrame,
+        chairX, floorY + seatH + 4, az, 0, 0, 0);
+      // Pad
+      roomBox(10, 1.5, 4, chairAccent,
+        chairX, floorY + seatH + 8.5, az, 0, 0, 0);
     }
   }
 
@@ -2690,7 +2579,40 @@ export function createRoom(scene) {
     const section1Z = shelfZMin + (shelfLen/4)/2; // = shelfZMin + shelfLen/8
     window._closetShelf1Z = section1Z;
   }
-  
+
+  // ── Closet debug wall labels (yellow) — must come after closet vars ──
+  {
+    const _makeLabel = (text, scale, color) => {
+      const cvs = document.createElement('canvas');
+      cvs.width = 512; cvs.height = 256;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.beginPath();
+      ctx.roundRect(16, 16, 480, 224, 24);
+      ctx.fill();
+      ctx.fillStyle = color;
+      ctx.font = 'bold 90px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 256, 128);
+      const tex = new THREE.CanvasTexture(cvs);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(scale, scale / 2, 1);
+      sprite.visible = false;
+      sprite._isRoom = true;
+      sprite._isDebugLabel = true;
+      addRoom(sprite);
+      _debugWallLabels.push(sprite);
+      return sprite;
+    };
+    const closetCX = sideWallX + 0.5 + _closetDepth / 2;
+    const closetMidY = floorY + _closetInteriorH / 2;
+    _makeLabel('CLOSET BACK', 22, '#ddcc44').position.set(sideWallX + _closetDepth - 4, closetMidY, _closetZ);
+    _makeLabel('CLOSET +Z', 22, '#ddcc44').position.set(closetCX, closetMidY, _closetZ + _closetInteriorW / 2 - 4);
+    _makeLabel('CLOSET -Z', 22, '#ddcc44').position.set(closetCX, closetMidY, _closetZ - _closetInteriorW / 2 + 4);
+  }
+
   // ─── Left side wall with window (near the bed) ───
   // leftWallX declared in header
   // winW, winH declared in header
@@ -3581,9 +3503,11 @@ export function createRoom(scene) {
     windowIsNight: _windowIsNight,
     leftWallX,
     toggleCornerDoor,
+    isCornerDoorOpen: () => _cornerDoorOpen,
     getCornerDoorPanelMesh: () => doorPanel,
     getCornerDoorAngle: () => _cornerDoorAngle,
     toggleGuestDoor: toggleGuestDoor || (() => false),
+    isGuestDoorOpen: _guestDoorOpenState,
     getGuestDoorPanelMesh: () => _guestDoorPanelMesh,
     doorKnobs,
     toggleTV,
@@ -3600,6 +3524,12 @@ export function createRoom(scene) {
       return show;
     },
     isFoodVisible: () => _foodGroup && _foodGroup.length ? _foodGroup[0].visible : false,
-    getFoodBowlMesh: () => _foodBowlMesh
+    getFoodBowlMesh: () => _foodBowlMesh,
+    toggleDebugWallLabels: (show) => {
+      const vis = typeof show === 'boolean' ? show : !_debugWallLabels[0]?.visible;
+      for (const l of _debugWallLabels) l.visible = vis;
+      return vis;
+    },
+    areDebugWallLabelsVisible: () => _debugWallLabels[0]?.visible ?? false
   };
 }

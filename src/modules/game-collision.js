@@ -4,8 +4,8 @@
 // large and referenced by both physics and debug display.
 
 import {
-  SIDE_WALL_X, LEFT_WALL_X, OPP_WALL_Z,
-  CLOSET_DEPTH, CLOSET_INTERIOR_W,
+  LEFT_WALL_X, OPP_WALL_Z,
+  CLOSET_INTERIOR_W,
   PLAYER_BODY_R, PLAYER_EYE_H, PLAYER_HEAD_EXTRA
 } from './spatial.js';
 
@@ -29,7 +29,8 @@ export function resetBoxPool() {
 // ── Bounds ──────────────────────────────────────────────────────────
 
 export const boundsBase = {
-  xMin: -(SIDE_WALL_X + CLOSET_DEPTH) + 0.25,  // closet back wall
+  // Guest room (office) far wall at pre-mirror X=183 → world X=-183.5
+  xMin: -183.5 + 0.25,
   xMax: -(LEFT_WALL_X) - 0.25,                   // window wall
   zMin: OPP_WALL_Z - CLOSET_INTERIOR_W / 2,
   // Back wall is at Z=49. Hallway extension runs Z=49..289. Use the hallway

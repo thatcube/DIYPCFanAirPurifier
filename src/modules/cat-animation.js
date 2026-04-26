@@ -94,6 +94,18 @@ const babaBase  = { left: null, right: null, up: null, down: null, mid: null };
 const toonLegBones = {};
 const toonLegBase  = {};
 
+// Korra bone refs (procedural quadruped cat)
+const korraBones = {
+  hips: null, spine: null, chest: null, neck: null, head: null,
+  tail1: null, tail2: null, tail3: null,
+  lfLeg: null, rfLeg: null, lbLeg: null, rbLeg: null,
+  lfFoot: null, rfFoot: null, lbFoot: null, rbFoot: null
+};
+const korraBase = {};
+for (const k in korraBones) korraBase[k] = null;
+let _korraRunPhase = 0;
+let _korraRunLastTs = -1;
+
 // Totodile bone refs (humanoid biped rig from the Pokémon FBX import).
 // Bone names like "LThigh_05", "RForeArm_033", "Tail1_017", "Jaw_029".
 const totoBones = {
@@ -141,6 +153,19 @@ export function loadGameplayCat(refs = {}) {
   console.log('[cat-anim] loadGameplayCat called, GLTFLoader=', typeof GLTFLoader);
   const nonce = ++gameLoadNonce;
   clearGameplayCat();
+
+  const preset = getSelectedModelPreset();
+
+  // Procedural models (like Korra) are built in code, not loaded from GLB.
+  if (preset.procedural) {
+    import('./korra-model.js').then(({ buildKorraModel }) => {
+      if (nonce !== gameLoadNonce) return;
+      const result = buildKorraModel();
+      _initGameplayCatFromScene(result.scene, result.animations, '', refs, nonce);
+    }).catch(err => console.warn('Procedural cat build failed', err));
+    return;
+  }
+
   const loader = new GLTFLoader();
   const sources = getSourcesForModelKey(catModelKey);
   console.log('[cat-anim] loading sources:', sources);
@@ -148,7 +173,16 @@ export function loadGameplayCat(refs = {}) {
   _loadWithFallback(loader, (gltf, src) => {
     if (nonce !== gameLoadNonce) return;
     console.log('[cat-anim] loaded:', src);
-    catModel = gltf.scene;
+    _initGameplayCatFromScene(gltf.scene, gltf.animations, src, refs, nonce);
+  }, (err) => { console.warn('Cat load failed', err); }, sources);
+}
+
+/**
+ * Shared post-load setup for both GLB and procedural models.
+ */
+function _initGameplayCatFromScene(scene, animations, src, refs, nonce) {
+    if (nonce !== gameLoadNonce) return;
+    catModel = scene;
     _collectIdleBones(catModel);
     _stripBackdrop(catModel, src);
 
@@ -172,9 +206,6 @@ export function loadGameplayCat(refs = {}) {
     // Shadows + material cleanup
     catModel.traverse(o => {
       if (o.isMesh) {
-        // Cat does NOT cast shadows — at throttled shadow refresh rates
-        // the cat's shadow trails behind during movement, creating a
-        // visible ghost/jitter effect. The cat still receives shadows.
         o.castShadow = false; o.receiveShadow = true;
         if (o.isSkinnedMesh) o.frustumCulled = false;
         if (o.material && o.material.map) o.material.map.colorSpace = THREE.SRGBColorSpace;
@@ -201,36 +232,27 @@ export function loadGameplayCat(refs = {}) {
     catMixer = new THREE.AnimationMixer(catModel);
 
     // Animations
-    if (gltf.animations && gltf.animations.length) {
-      // Strip position (translation) tracks from all animation clips.
-      // Many GLB cat models bake root motion into bone position tracks
-      // (e.g. the "All" root bone translates forward during walk/run).
-      // In Three.js 0.184+ these bone positions are applied faithfully,
-      // causing the mesh to slide forward then snap back every cycle.
-      // We handle all movement via catGroup.position, so bone position
-      // tracks are unwanted — only rotation/scale tracks are kept.
-      for (const clip of gltf.animations) {
+    if (animations && animations.length) {
+      for (const clip of animations) {
         clip.tracks = clip.tracks.filter(t => !t.name.endsWith('.position'));
       }
-      // Reset duration since we removed tracks
-      for (const clip of gltf.animations) {
+      for (const clip of animations) {
         clip.resetDuration();
       }
 
       const byName = (names) => {
         for (const n of names) {
-          const c = gltf.animations.find(a => a.name.toLowerCase().includes(n));
+          const c = animations.find(a => a.name.toLowerCase().includes(n));
           if (c) return c;
         }
         return null;
       };
-      const walkClip = byName(['walk', 'run', 'gallop']) || gltf.animations[0];
-      const idleClip = byName(['idle', 'sit', 'rest']) || gltf.animations[0];
+      const walkClip = byName(['walk', 'run', 'gallop']) || animations[0];
+      const idleClip = byName(['idle', 'sit', 'rest']) || animations[0];
       if (walkClip) { catWalkAction = catMixer.clipAction(walkClip); catWalkAction.play(); catWalkAction.weight = 0; }
       if (idleClip && idleClip !== walkClip) { catIdleAction = catMixer.clipAction(idleClip); catIdleAction.play(); catIdleAction.weight = 1; }
       else if (catWalkAction) catWalkAction.weight = 1;
     }
-  }, (err) => { console.warn('Cat load failed', err); }, sources);
 }
 
 export function clearGameplayCat() {
@@ -242,6 +264,8 @@ export function clearGameplayCat() {
   _babaRunLastTs = -1;
   _totoRunPhase = 0;
   _totoRunLastTs = -1;
+  _korraRunPhase = 0;
+  _korraRunLastTs = -1;
   _resetBababooeyRollAnchor();
   _resetIdleBones();
 }
@@ -418,6 +442,8 @@ function _collectIdleBones(model) {
   for (const k in babaBones) { babaBones[k] = null; babaBase[k] = null; }
   for (const k in toonLegBones) { toonLegBones[k] = null; toonLegBase[k] = null; }
   for (const k in totoBones) { totoBones[k] = null; totoBase[k] = null; }
+  for (const k in korraBones) { korraBones[k] = null; korraBase[k] = null; }
+  _korraRunPhase = 0; _korraRunLastTs = -1;
 
   // Totodile bone-name → key. Match against the leading semantic
   // segment so trailing FBX node-id suffixes (e.g. "_05", "_011") are
@@ -480,6 +506,21 @@ function _collectIdleBones(model) {
     for (const k in totoMap) {
       if (totoBones[k] == null && totoMap[k].test(n)) {
         totoBones[k] = o; totoBase[k] = o.quaternion.clone();
+      }
+    }
+    // Korra bones (procedural quadruped)
+    const korraMap = {
+      hips:   /^Hips$/i,   spine: /^Spine$/i,  chest: /^Chest$/i,
+      neck:   /^Neck$/i,   head:  /^Head$/i,
+      tail1:  /^Tail1$/i,  tail2: /^Tail2$/i,  tail3: /^Tail3$/i,
+      lfLeg:  /^LFrontLeg$/i,  rfLeg:  /^RFrontLeg$/i,
+      lbLeg:  /^LBackLeg$/i,   rbLeg:  /^RBackLeg$/i,
+      lfFoot: /^LFrontFoot$/i, rfFoot: /^RFrontFoot$/i,
+      lbFoot: /^LBackFoot$/i,  rbFoot: /^RBackFoot$/i
+    };
+    for (const k in korraMap) {
+      if (korraBones[k] == null && korraMap[k].test(n)) {
+        korraBones[k] = o; korraBase[k] = o.quaternion.clone();
       }
     }
   });
@@ -1379,6 +1420,121 @@ export function applyTotodileIdleSquish(ts, intensity) {
     baseScale.y * (1 - squish),
     baseScale.z * (1 + squish * 0.5)
   );
+}
+
+// ── Korra procedural animations ────────────────────────────────────
+
+function _korraApply(bone, base, pitch, yaw, roll, slerp) {
+  if (!bone || !base) return;
+  tmpEuler.set(pitch, yaw, roll);
+  tmpQuat.setFromEuler(tmpEuler);
+  tmpQuatB.copy(base).multiply(tmpQuat);
+  bone.quaternion.slerp(tmpQuatB, slerp);
+}
+
+/**
+ * Korra idle — the generic applyGameplayProceduralIdle() handles tail,
+ * head, and spine sway via the auto-detected idle bone arrays.
+ * This function adds cat-specific touches: a slow, natural tail sway
+ * and gentle weight shifts between legs.
+ */
+export function applyKorraProceduralIdle(ts, intensity) {
+  if (!catModel || intensity <= 0.001) return;
+  if (!korraBones.lfLeg && !korraBones.spine) return;
+  const t = ts * 0.001;
+  const k = Math.min(1, intensity);
+
+  // Slow, expressive tail sway — only yaw (side-to-side) so the base
+  // stays anchored to the body. Layered incommensurate frequencies
+  // so the motion never repeats and feels alive.
+  const tailYaw  = (Math.sin(t * 0.55) * 0.30
+                  + Math.sin(t * 0.93 + 1.0) * 0.18
+                  + Math.sin(t * 1.71 + 2.3) * 0.08) * k;
+  _korraApply(korraBones.tail1, korraBase.tail1, 0, tailYaw, 0, 0.5);
+
+  // Subtle weight shift — legs rock very slightly
+  const shift = Math.sin(t * 0.45) * 0.02 * k;
+  _korraApply(korraBones.lfLeg, korraBase.lfLeg, shift, 0, 0, 0.3);
+  _korraApply(korraBones.rbLeg, korraBase.rbLeg, shift, 0, 0, 0.3);
+  _korraApply(korraBones.rfLeg, korraBase.rfLeg, -shift, 0, 0, 0.3);
+  _korraApply(korraBones.lbLeg, korraBase.lbLeg, -shift, 0, 0, 0.3);
+}
+
+/** Korra breathing squish — gentle chest expansion. */
+export function applyKorraIdleSquish(ts, intensity) {
+  if (!catModel || intensity <= 0.001) return;
+  const t = ts * 0.001;
+  const wave = Math.sin(t * 1.4) * 0.65 + Math.sin(t * 2.3 + 0.4) * 0.35;
+  const squish = wave * 0.020 * intensity;
+  catModel.scale.set(
+    baseScale.x * (1 + squish * 0.45),
+    baseScale.y * (1 - squish),
+    baseScale.z * (1 + squish * 0.45)
+  );
+}
+
+/**
+ * Korra quadruped run cycle: diagonal gait (LF+RB, RF+LB),
+ * spine undulation, tail counter-sway.
+ *
+ * @param {number} ts   - timestamp in ms
+ * @param {number} moveSpeed - inches/sec
+ * @param {number} moveBlend - 0..1
+ */
+export function applyKorraProceduralRun(ts, moveSpeed, moveBlend) {
+  if (!catModel) return;
+  if (!korraBones.lfLeg && !korraBones.rfLeg) return;
+  const sp = Math.max(0, moveSpeed);
+  const spN = Math.min(1, sp / 27);
+  const blend = Math.max(0, Math.min(1, moveBlend)) * Math.max(0.45, spN);
+  if (blend < 0.001) return;
+
+  if (!Number.isFinite(_korraRunLastTs) || _korraRunLastTs < 0) _korraRunLastTs = ts;
+  const phaseDt = Math.max(0, Math.min(0.05, (ts - _korraRunLastTs) * 0.001));
+  _korraRunLastTs = ts;
+
+  // Phase advances with speed — faster run = faster cycle.
+  const baseRate = 6.0;
+  const speedRate = baseRate + spN * 6.0;
+  _korraRunPhase += phaseDt * speedRate;
+
+  const p = _korraRunPhase;
+  const sL = Math.sin(p);       // left-pair phase
+  const cL = Math.cos(p);
+  const sR = Math.sin(p + Math.PI); // right-pair (opposite)
+  const cR = Math.cos(p + Math.PI);
+
+  // ── Legs ──
+  // Diagonal gait: LF+RB swing together, RF+LB swing together.
+  const legSwing = 0.45 * blend;   // forward/back swing amplitude
+  const liftAngle = 0.15 * blend;  // knee lift
+
+  // Left-front + Right-back pair
+  _korraApply(korraBones.lfLeg,  korraBase.lfLeg,  sL * legSwing, 0, 0, 0.65);
+  _korraApply(korraBones.lfFoot, korraBase.lfFoot, Math.max(0, -cL) * liftAngle, 0, 0, 0.5);
+  _korraApply(korraBones.rbLeg,  korraBase.rbLeg,  sL * legSwing * 0.85, 0, 0, 0.65);
+  _korraApply(korraBones.rbFoot, korraBase.rbFoot, Math.max(0, -cL) * liftAngle, 0, 0, 0.5);
+
+  // Right-front + Left-back pair
+  _korraApply(korraBones.rfLeg,  korraBase.rfLeg,  sR * legSwing, 0, 0, 0.65);
+  _korraApply(korraBones.rfFoot, korraBase.rfFoot, Math.max(0, -cR) * liftAngle, 0, 0, 0.5);
+  _korraApply(korraBones.lbLeg,  korraBase.lbLeg,  sR * legSwing * 0.85, 0, 0, 0.65);
+  _korraApply(korraBones.lbFoot, korraBase.lbFoot, Math.max(0, -cR) * liftAngle, 0, 0, 0.5);
+
+  // ── Spine undulation ──
+  const spineWave = Math.sin(p * 2) * 0.04 * blend;
+  _korraApply(korraBones.spine, korraBase.spine, spineWave, Math.sin(p) * 0.03 * blend, 0, 0.5);
+  _korraApply(korraBones.chest, korraBase.chest, -spineWave * 0.6, Math.sin(p + 0.4) * 0.02 * blend, 0, 0.45);
+
+  // ── Hip counter-twist ──
+  const hipTwist = Math.sin(p) * 0.06 * blend;
+  _korraApply(korraBones.hips, korraBase.hips, 0, hipTwist, 0, 0.45);
+
+  // ── Head stabilization (counter spine bob) ──
+  _korraApply(korraBones.neck, korraBase.neck, -spineWave * 0.5, 0, 0, 0.4);
+  _korraApply(korraBones.head, korraBase.head, -spineWave * 0.3, 0, 0, 0.35);
+
+  // ── Tail (no run override — idle sway handles it) ──
 }
 
 /**
