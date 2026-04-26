@@ -81,7 +81,7 @@ function _setFadeOpacity(mesh, alpha) {
   mat.opacity = alpha;
 }
 
-export function update(camera, orbitTarget) {
+export function update(camera, orbitTarget, flyMode) {
   if (!_fadingMeshes.length) return;
 
   if (orbitTarget) _target.copy(orbitTarget);
@@ -89,6 +89,14 @@ export function update(camera, orbitTarget) {
   const cx = camera.position.x;
   const cy = camera.position.y;
   const cz = camera.position.z;
+
+  // In fly mode only fade ceilings — keep walls & interiors opaque
+  if (flyMode) {
+    for (const m of _fadingMeshes) {
+      _setFadeOpacity(m, m._fadeTag === 'ceiling' ? 0.08 : 1);
+    }
+    return;
+  }
 
   // Camera → target direction
   _camDir.set(_target.x - cx, _target.y - cy, _target.z - cz);

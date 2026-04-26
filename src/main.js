@@ -1499,7 +1499,7 @@ function animate(ts) {
 
   // Wall auto-fade (only in orbit mode — FP resets to opaque)
   if (!gameFp.fpMode) {
-    wallFade.update(camera, controls.target);
+    wallFade.update(camera, controls.target, _flyMode);
   }
 
   // Shadow throttle — update on dirty flag OR periodically.
