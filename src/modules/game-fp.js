@@ -990,6 +990,7 @@ function _useForwardSkatePoseForModel() {
   return key === 'classic' || key === 'toon' || key === 'korra';
 }
 
+// How high each model is lifted above the skateboard (Y-axis).
 function _getSkateLiftTrimForModel() {
   const key = String(catAppearance.catModelKey || '').toLowerCase();
   switch (key) {
@@ -1001,6 +1002,7 @@ function _getSkateLiftTrimForModel() {
   }
 }
 
+// How far forward/back the board is shifted under the model (Z-axis).
 function _getSkateBoardZTrimForModel() {
   const key = String(catAppearance.catModelKey || '').toLowerCase();
   if (key === 'bababooey') return 1.08;
@@ -1986,6 +1988,25 @@ function _getBoxes() {
     }
   }
 
+  // Bypass sliding closet doors — dynamic AABB collision (translation only).
+  if (window._bypassDoorsRef) {
+    const fy = getFloorY();
+    for (const panel of window._bypassDoorsRef) {
+      if (!panel) continue;
+      panel.updateWorldMatrix(true, false);
+      const wx = panel.matrixWorld.elements[12];
+      const wz = panel.matrixWorld.elements[14];
+      const pH = 65.5;
+      const pW = 25;   // _bypassPanelW
+      const pT = 1.0;  // _bypassPanelThick
+      result.push({
+        xMin: wx - pT / 2 - 0.3, xMax: wx + pT / 2 + 0.3,
+        zMin: wz - pW / 2, zMax: wz + pW / 2,
+        yTop: fy + pH, yBottom: fy, room: true
+      });
+    }
+  }
+
   // Corner door (by nightstand) — dynamic collision from animated panel.
   if (_roomRefs && _roomRefs.getCornerDoorPanelMesh) {
     const doorPanel = _roomRefs.getCornerDoorPanelMesh();
@@ -2366,10 +2387,11 @@ export function setPaused(paused) {
     if (overlay && !finishOpen) {
       overlay.style.display = 'flex';
       leaderboard.renderLeaderboardPanel();
+      void leaderboard.refreshSharedLeaderboard();
       // Focus trap
       _pauseSavedFocus = saveFocus();
       _pauseFocusTrap = trapFocus(overlay);
-      const resumeBtn = overlay.querySelector('.pause-btn.primary');
+      const resumeBtn = overlay.querySelector('#fpPauseResume');
       if (resumeBtn) resumeBtn.focus();
     }
     if (crosshair) crosshair.style.opacity = '0.25';
@@ -2575,6 +2597,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   const JUMP_MEGA_BONUS      = 0.40;  // extra on top when holding past full (~150%)
   const JUMP_CHARGE_FRAMES   = 36;    // frames to reach full charge (~0.6s)
   const MEGA_HOLD_FRAMES     = 30;    // ~0.5s hold at full before MEGA bonus kicks in
+  const SS_JUMP_MUL          = isSuperSaiyanActive() ? 1.5 : 1.0; // SS mode: 1.5x jump height
   const COYOTE_FRAMES        = 6;     // grace frames after walking off a ledge
   const JUMP_BUFFER_FRAMES   = 8;     // grace frames for a press just before landing
   const GRAVITY_RISE         = 0.018; // gravity while ascending
@@ -2629,12 +2652,12 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     const chargeN = Math.min(1, chargeAtFrameStart / JUMP_CHARGE_FRAMES);
     // MEGA bonus: if held past full, ramp up to 150% jump height
     const megaN = Math.min(1, tierGateAtFrameStart / MEGA_HOLD_FRAMES);
-    fpVy = JUMP_BASE_VY + JUMP_MAX_BONUS * chargeN + JUMP_MEGA_BONUS * megaN;
+    fpVy = (JUMP_BASE_VY + JUMP_MAX_BONUS * chargeN + JUMP_MEGA_BONUS * megaN) * SS_JUMP_MUL;
     _playJumpCue(chargeN + megaN * 0.5);
     firedThisFrame = true;
   } else if (canJump && _jumpBufferFrames > 0 && !fpKeys.space) {
     // Buffered press from before landing — fire a base jump on touchdown.
-    fpVy = JUMP_BASE_VY;
+    fpVy = JUMP_BASE_VY * SS_JUMP_MUL;
     _playJumpCue(0);
     firedThisFrame = true;
   }

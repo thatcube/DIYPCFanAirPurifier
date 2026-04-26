@@ -877,38 +877,6 @@ function _applyWeightedBoneModelYaw(yaw, targets) {
   return applied;
 }
 
-function _applyWeightedBoneModelRoll(roll, targets) {
-  if (!catModel) return 0;
-  let total = 0;
-  for (const t of targets) {
-    if (!t || !t.bone || !t.bone.isBone || !t.bone.parent) continue;
-    const w = Number(t.weight) || 0;
-    if (w <= 0) continue;
-    total += w;
-  }
-  if (total <= 0) return 0;
-
-  catModel.updateMatrixWorld(true);
-  const modelForwardWorld = tmpVecA
-    .set(0, 0, 1)
-    .applyQuaternion(catModel.getWorldQuaternion(tmpQuatC))
-    .normalize();
-
-  let applied = 0;
-  for (const t of targets) {
-    if (!t || !t.bone || !t.bone.isBone || !t.bone.parent) continue;
-    const w = Number(t.weight) || 0;
-    if (w <= 0) continue;
-
-    const parentWorld = t.bone.parent.getWorldQuaternion(tmpQuatD);
-    const axisLocal = tmpVecB.copy(modelForwardWorld).applyQuaternion(parentWorld.invert()).normalize();
-    tmpQuat.setFromAxisAngle(axisLocal, roll * (w / total));
-    t.bone.quaternion.multiply(tmpQuat);
-    applied++;
-  }
-  return applied;
-}
-
 /**
  * Skate pose helper for sideways-stance models.
  * Turns only upper body bones toward movement so the board can stay
@@ -954,18 +922,9 @@ export function applyGameplaySkateUpperBodyForwardYaw(modelKey, amount = 1, ts =
     if (!Number.isFinite(animState._totoSkateMoveBlend)) animState._totoSkateMoveBlend = move;
     animState._totoSkateMoveBlend += (move - animState._totoSkateMoveBlend) * 0.18;
     const moveK = animState._totoSkateMoveBlend;
-    const rideKRaw = Math.max(0, Math.min(1, (moveK - 0.06) / 0.94));
-    const rideK = rideKRaw * rideKRaw * (3 - 2 * rideKRaw); // smoothstep
-    const rideCadence = 0.52 + rideK * 0.48;
-    const rideSway = Math.sin(t * rideCadence + 0.35);
-    const rideSwayFine = Math.sin(t * (rideCadence * 1.15) + 1.05);
-    const rideBob = Math.sin(t * (rideCadence * 1.25) + 0.55);
     // Keep feet planted by avoiding hip rotation in skate pose.
     // Drive turn/lean from waist upward so mid/upper torso carries motion.
-    const swayYaw =
-      (Math.sin(t * 0.62 + 0.35) * 0.018) +
-      (Math.sin(t * 1.05 + 1.1) * 0.010) +
-      ((rideSway * 0.050) + (rideSwayFine * 0.020)) * rideK;
+    const swayYaw = (Math.sin(t * 1.0 + 0.35) * 0.02) + (Math.sin(t * 1.7 + 1.1) * 0.012);
     const bodyYaw = (-0.94 + swayYaw) * k;
 
     let applied = _applyWeightedBoneModelYaw(bodyYaw, [
@@ -975,75 +934,40 @@ export function applyGameplaySkateUpperBodyForwardYaw(modelKey, amount = 1, ts =
       { bone: totoBones.head, weight: 0.14 }
     ]);
 
-    const torsoLean = (-0.24 + Math.sin(t * 0.6 + 0.2) * 0.030 + rideBob * 0.058 * rideK) * k;
+    const torsoLean = (-0.24 + Math.sin(t * 0.9 + 0.2) * 0.025) * k;
     applied += _applyWeightedBoneModelPitch(torsoLean, [
-      { bone: totoBones.waist, weight: 0.36 },
-      { bone: totoBones.spine, weight: 0.48 },
-      { bone: totoBones.neck, weight: 0.11 },
-      { bone: totoBones.head, weight: 0.05 }
+      { bone: totoBones.waist, weight: 0.33 },
+      { bone: totoBones.spine, weight: 0.42 },
+      { bone: totoBones.neck, weight: 0.15 },
+      { bone: totoBones.head, weight: 0.10 }
     ]);
 
-    const torsoPulse = (Math.sin(t * (rideCadence * 1.15) + 0.12) * 0.020 + rideSway * 0.010) * rideK * k;
-    applied += _applyWeightedBoneModelPitch(torsoPulse, [
-      { bone: totoBones.waist, weight: 0.40 },
-      { bone: totoBones.spine, weight: 0.46 },
-      { bone: totoBones.neck, weight: 0.09 },
-      { bone: totoBones.head, weight: 0.05 }
-    ]);
-
-    const headLeadYaw = (0.30 + Math.sin(t * 0.34 + 0.4) * 0.026 + rideSway * 0.062 * rideK) * k;
+    const headLeadYaw = (0.30 + Math.sin(t * 0.95 + 0.4) * 0.012) * k;
     applied += _applyWeightedBoneModelYaw(-headLeadYaw, [
-      { bone: totoBones.neck, weight: 0.50 },
-      { bone: totoBones.head, weight: 0.50 }
+      { bone: totoBones.neck, weight: 0.45 },
+      { bone: totoBones.head, weight: 0.55 }
     ]);
 
-    // Clear, slower head scan while riding so the look-around reads.
-    const lookRate = 0.34 + rideK * 0.12;
-    const lookSweepRaw = Math.sin(t * lookRate + 2.1);
-    const lookSweep = lookSweepRaw * (0.55 + 0.45 * Math.abs(lookSweepRaw));
-    const lookYaw = lookSweep * (0.140 + rideK * 0.175) * rideK * k;
-    applied += _applyWeightedBoneModelYaw(lookYaw, [
-      { bone: totoBones.neck, weight: 0.44 },
-      { bone: totoBones.head, weight: 0.56 }
-    ]);
-
-    const headNod = (Math.sin(t * 0.26 + 0.9) * (0.038 + rideK * 0.022) + rideBob * 0.012 * rideK) * k;
+    const headNod = Math.sin(t * 0.72 + 0.9) * 0.038 * k;
     applied += _applyWeightedBoneModelPitch(headNod, [
-      { bone: totoBones.neck, weight: 0.46 },
-      { bone: totoBones.head, weight: 0.54 }
-    ]);
-
-    // Keep Totodile's skate gaze naturally lifted so he reads as looking ahead,
-    // not down at the board.
-    const headUpBias = (-0.105 - rideK * 0.045) * k;
-    applied += _applyWeightedBoneModelPitch(headUpBias, [
-      { bone: totoBones.neck, weight: 0.54 },
-      { bone: totoBones.head, weight: 0.46 }
-    ]);
-
-    // Flip the lateral head cant to the opposite side while keeping the
-    // forward-facing look and up-bias intact.
-    const headCantFlip = -(0.082 + rideK * 0.046) * k;
-    applied += _applyWeightedBoneModelRoll(headCantFlip, [
-      { bone: totoBones.neck, weight: 0.62 },
-      { bone: totoBones.head, weight: 0.38 }
+      { bone: totoBones.neck, weight: 0.38 },
+      { bone: totoBones.head, weight: 0.62 }
     ]);
 
     // Balance-arms layer: keep the riding pose as-is while moving, then add
     // an extra downward shoulder/arm drop only when nearly stationary.
-    const armPoseK = 0 + moveK * 0.42;
+    const armPoseK = 0 + moveK * 0.34;
     const idleDropRaw = Math.max(0, Math.min(1, (0.22 - moveK) / 0.22));
     const idleDrop = idleDropRaw * idleDropRaw * (3 - 2 * idleDropRaw); // smoothstep
     const steerLift = turn * (0.06 + moveK * 0.18);
-    const shoulderRideSway = ((rideSway * 0.038) + (rideSwayFine * 0.015)) * rideK;
-    const armWave = Math.sin(t * 0.55 + 0.5) * (0.006 + moveK * 0.018);
+    const armWave = Math.sin(t * 0.9 + 0.5) * (0.004 + moveK * 0.014);
     const applyBalanceArm = (shoulder, shoulderBase, arm, armBase, foreArm, foreArmBase, hand, handBase, sideSign) => {
       const lift = steerLift * sideSign;
       const spreadSign = -sideSign;
       _totoApply(
         shoulder,
         shoulderBase,
-        (0.10 + lift * 0.8 + armWave * sideSign + shoulderRideSway * sideSign) * armPoseK - 0.34 * idleDrop,
+        (0.10 + lift * 0.8 + armWave * sideSign) * armPoseK - 0.34 * idleDrop,
         0,
         (0.92 * spreadSign) * armPoseK,
         0.78
@@ -1145,8 +1069,8 @@ export function applyClickNod(ts, modelKey) {
     applied = _applyWeightedBoneModelPitch(pitch, [
       { bone: totoBones.waist, weight: 0.12 },
       { bone: totoBones.spine, weight: 0.24 },
-      { bone: totoBones.neck, weight: 0.28 },
-      { bone: totoBones.head, weight: 0.36 }
+      { bone: totoBones.neck, weight: 0.30 },
+      { bone: totoBones.head, weight: 0.34 }
     ]);
   } else {
     const spineTargets = [];
