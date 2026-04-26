@@ -393,30 +393,28 @@
       <div>Crosshair turns blue on hover</div>
     </div>
   </div>
-  <div id="fpQuickControls" role="group" aria-label="Quick controls">
-    <button type="button" class="fpQuickBtn" id="fpQuickHelpBtn" onclick="window._toggleHelp&&window._toggleHelp()"><kbd>H</kbd> Help</button>
-    <button type="button" class="fpQuickBtn" id="fpQuickCamBtn" onclick="window._switchCamFP&&window._switchCamFP()"><kbd>V</kbd> <span id="fpQuickCamLabel">Third person</span></button>
-    <button type="button" class="fpQuickBtn" onclick="window._pauseFP&&window._pauseFP()"><kbd>Esc</kbd> Pause</button>
-    <button type="button" class="fpQuickBtn" onclick="window._resetFP&&window._resetFP()"><kbd>R</kbd> Reset</button>
-  </div>
-  <div id="skateUnlockHint" aria-label="Skateboard unlocked">
-    <span class="skate-icon">🛹</span> <kbd>K</kbd> Skateboard
-  </div>
-  <div id="skateTrickHints" aria-label="Skate trick controls">
-    <span><kbd>Q</kbd> Kickflip</span>
-    <span><kbd>E</kbd> Manual</span>
-    <span><kbd>F</kbd> Spin</span>
-  </div>
   <div id="fpChargeBar" aria-label="Jump charge">
+    <div id="fpBarTopRow">
+      <div id="skateUnlockHint" aria-label="Skateboard unlocked">
+        <span class="skate-icon">🛹</span> <kbd>K</kbd> Skateboard
+      </div>
+      <div id="pauseHint" onclick="window._pauseFP&&window._pauseFP()">
+        <kbd>Esc</kbd> Pause
+      </div>
+    </div>
+    <div id="skateTrickHints" aria-label="Skate trick controls">
+      <span><kbd>Q</kbd> Kickflip</span>
+      <span><kbd>E</kbd> Manual</span>
+      <span><kbd>F</kbd> Spin</span>
+    </div>
+    <div id="fpBarDivider"></div>
     <div class="fp-charge-head">
       <span class="fp-charge-label"><i class="ph ph-arrow-fat-up"></i> <span id="fpChargeLabel">Jump charge</span></span>
-      <span id="fpChargeSkateTag" class="fp-charge-skate-tag" style="display:none"><i class="ph-fill ph-sneaker-move"></i> Skating</span>
       <span id="fpChargeValue">Ready</span>
     </div>
     <div class="fp-charge-track">
       <div id="fpChargeFill"></div>
     </div>
-    <div id="fpChargeHint"><kbd>Hold Space</kbd> then release for a higher jump</div>
   </div>
 
   <!-- Pause overlay -->
@@ -511,7 +509,7 @@
               <div><kbd>K</kbd> Skate mode</div>
               <div><kbd>Q</kbd> Kickflip (skate)</div>
               <div><kbd>E</kbd> Manual (skate)</div>
-              <div><kbd>F</kbd> Spin (skate)</div>
+              <div><kbd>F</kbd> Helicopter (skate)</div>
               <div><kbd>R</kbd> Reset run</div>
               <div><kbd>Esc</kbd> Resume</div>
             </div>

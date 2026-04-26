@@ -1024,82 +1024,31 @@ input[type=range]::-moz-range-thumb {
   padding: 2px 6px; font-size: 10px; font-weight: 600;
   border: 1px solid rgba(255,255,255,0.06);
 }
-#fpQuickControls {
-  display: none;
-  position: fixed;
-  left: 50%;
-  bottom: 80px;
-  transform: translateX(-50%);
-  z-index: 325;
-  pointer-events: auto;
-  gap: 8px;
-  opacity: 1;
-  transition: opacity 0.22s ease, transform 0.22s ease;
-}
-#fpQuickControls.is-hidden {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateX(-50%) translateY(8px);
-}
-.fpQuickBtn {
-  appearance: none;
-  border: 1px solid rgba(170, 220, 255, 0.28);
-  background: rgba(8, 20, 34, 0.62);
-  color: #d9f6ff;
-  border-radius: 10px;
-  padding: 8px 10px;
-  font-size: 11px;
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.01em;
-  display: inline-flex;
+/* ── Top row (skate hint + pause, inline) ───────────────────────────── */
+#fpBarTopRow {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  backdrop-filter: blur(10px);
-  transition: transform var(--dur-med) var(--spring), background 0.2s, border-color 0.2s;
+  justify-content: space-between;
+  gap: 10px;
 }
-.fpQuickBtn:hover {
-  background: rgba(25, 52, 76, 0.75);
-  border-color: rgba(170, 220, 255, 0.45);
-  transform: translateY(-1px);
-}
-.fpQuickBtn:active { transform: translateY(0) scale(0.97); }
-.fpQuickBtn.on {
-  background: rgba(35, 72, 102, 0.82);
-  border-color: rgba(170, 220, 255, 0.6);
-}
-.fpQuickBtn kbd {
-  background: rgba(255,255,255,0.13);
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 9px;
-  line-height: 1;
-}
-/* ── Skate unlock hint ──────────────────────────────────────────── */
 #skateUnlockHint {
   display: none;
-  position: fixed;
-  right: 18px;
-  bottom: 80px;
-  z-index: 325;
-  pointer-events: none;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
   font-weight: 600;
-  color: #d9f6ff;
+  color: #7af5c2;
   letter-spacing: 0.02em;
-  background: rgba(8, 20, 34, 0.55);
-  border: 1px solid rgba(170, 220, 255, 0.22);
-  border-radius: 8px;
-  padding: 6px 12px;
-  backdrop-filter: blur(8px);
-  gap: 6px;
-  align-items: center;
-  opacity: 0;
-  transition: opacity 0.35s ease;
+  pointer-events: none;
 }
 #skateUnlockHint.visible {
   display: inline-flex;
-  opacity: 1;
+}
+#skateUnlockHint.active {
+  color: #7af5c2;
+}
+#skateUnlockHint:not(.active) {
+  color: rgba(207, 236, 255, 0.7);
 }
 #skateUnlockHint .skate-icon {
   font-size: 15px;
@@ -1113,40 +1062,30 @@ input[type=range]::-moz-range-thumb {
   line-height: 1;
   margin: 0 2px;
 }
-/* ── Skate trick hints strip ─────────────────────────────────────── */
+/* ── Skate trick hints (inside charge bar) ──────────────────────────── */
 #skateTrickHints {
   display: none;
-  position: fixed;
-  left: 50%;
-  bottom: 24px;
-  transform: translateX(-50%);
-  z-index: 324;
-  pointer-events: none;
-  gap: 12px;
+  gap: 8px;
   font-size: 11px;
   font-weight: 600;
   color: #d9f6ff;
   letter-spacing: 0.02em;
-  opacity: 0;
-  transition: opacity 0.35s ease, transform 0.35s ease;
+  pointer-events: none;
 }
 #skateTrickHints.visible {
   display: flex;
-  opacity: 1;
 }
 #skateTrickHints.fade-out {
   opacity: 0;
-  transform: translateX(-50%) translateY(6px);
 }
 #skateTrickHints span {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: rgba(8, 20, 34, 0.55);
-  border: 1px solid rgba(170, 220, 255, 0.22);
-  border-radius: 8px;
-  padding: 5px 10px;
-  backdrop-filter: blur(8px);
+  background: rgba(122, 245, 194, 0.08);
+  border: 1px solid rgba(122, 245, 194, 0.2);
+  border-radius: 6px;
+  padding: 4px 8px;
 }
 #skateTrickHints kbd {
   background: rgba(255,255,255,0.13);
@@ -1155,6 +1094,45 @@ input[type=range]::-moz-range-thumb {
   padding: 1px 5px;
   font-size: 9px;
   line-height: 1;
+}
+/* ── Pause hint (right side of top row) ─────────────────────────────── */
+#pauseHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(207, 236, 255, 0.55);
+  letter-spacing: 0.02em;
+  pointer-events: auto;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+#skateUnlockHint.visible ~ #pauseHint::before {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 14px;
+  background: rgba(170, 220, 255, 0.22);
+  margin-right: 2px;
+}
+#pauseHint:hover {
+  color: #d9f6ff;
+}
+#pauseHint kbd {
+  background: rgba(255,255,255,0.13);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 9px;
+  line-height: 1;
+}
+/* ── Divider between top row and charge bar ─────────────────────────── */
+#fpBarDivider {
+  height: 1px;
+  background: rgba(170, 220, 255, 0.18);
+  margin: 6px 0 4px;
 }
 #fpChargeBar {
   display: none;
@@ -1188,21 +1166,6 @@ input[type=range]::-moz-range-thumb {
   font-weight: var(--weight-medium);
 }
 .fp-charge-label i { color: #9fe3ff; }
-.fp-charge-skate-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  font-weight: 700;
-  color: #7af5c2;
-  background: rgba(122, 245, 194, 0.12);
-  border: 1px solid rgba(122, 245, 194, 0.25);
-  border-radius: 6px;
-  padding: 1px 7px 1px 5px;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-.fp-charge-skate-tag i { font-size: 13px; }
 #fpChargeValue {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -1236,6 +1199,8 @@ input[type=range]::-moz-range-thumb {
   border-radius: 4px;
   padding: 1px 5px;
   font-size: 9px;
+}
+  line-height: 1;
 }
 #fpChargeBar.charging #fpChargeFill {
   background: linear-gradient(90deg, rgba(110,200,255,0.75), rgba(170,235,255,0.98));
@@ -2293,7 +2258,6 @@ body.play-mode #fps {
 }
 body.play-mode #fpControls { display: block; }
 body.play-mode #fpControlsHint { display: none; }
-body.play-mode #fpQuickControls { display: flex; }
 body.play-mode #fpChargeBar { display: block; }
 
 /* Mobile — show touch controls in play mode */
@@ -2303,9 +2267,8 @@ body.play-mode #fpChargeBar { display: block; }
   body.play-mode #mobileExitBtn { display: flex !important; align-items: center; justify-content: center; }
   body.play-mode #fpControls { display: none !important; }
   body.play-mode #fpControlsHint { display: none !important; }
-  body.play-mode #fpQuickControls { display: none !important; }
-  body.play-mode #skateTrickHints { display: none !important; }
-  body.play-mode #skateUnlockHint { display: none !important; }
+  body.play-mode #fpBarTopRow { display: none !important; }
+  body.play-mode #fpBarDivider { display: none !important; }
   body.play-mode .run-hud-center { top: 10px; }
   body.play-mode .run-pill { padding: 6px 12px; gap: 8px; }
   body.play-mode .run-pill--combo > #runTimerHud,
