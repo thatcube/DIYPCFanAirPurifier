@@ -113,17 +113,6 @@ export function setSkateMode(enabled, opts = {}) {
   _trickManual = 0; _trickManualHeld = false;
   _trickKickflip = 0; _trickKickflipActive = false;
   _trickSpin = 0; _trickSpinActive = false;
-  // Toggle trick hints UI
-  const trickHints = document.getElementById('skateTrickHints');
-  if (trickHints) {
-    if (skateMode) {
-      trickHints.classList.remove('fade-out');
-      trickHints.classList.add('visible');
-    } else {
-      trickHints.classList.add('fade-out');
-      setTimeout(() => { if (!skateMode) trickHints.classList.remove('visible'); }, 350);
-    }
-  }
   if (!silent && _showToast) _showToast(skateMode ? 'Skate mode on' : 'Skate mode off');
 }
 
@@ -248,18 +237,27 @@ function _syncSkateToggleUi() {
       skateState.classList.toggle('off', !skateMode);
     }
   }
-  // Show/hide the skateboard unlock hint in the HUD
+  // Show/hide skate hint + trick hints in the charge bar
   const skateHint = document.getElementById('skateUnlockHint');
-  if (skateHint) {
-    if (!locked && fpMode) {
+  const trickHints = document.getElementById('skateTrickHints');
+  if (!locked && fpMode) {
+    if (skateHint) {
       skateHint.classList.add('visible');
-    } else {
-      skateHint.classList.remove('visible');
+      skateHint.classList.toggle('active', skateMode);
     }
+    if (trickHints) {
+      if (skateMode) {
+        trickHints.classList.remove('fade-out');
+        trickHints.classList.add('visible');
+      } else {
+        trickHints.classList.add('fade-out');
+        trickHints.classList.remove('visible');
+      }
+    }
+  } else {
+    if (skateHint) skateHint.classList.remove('visible');
+    if (trickHints) { trickHints.classList.remove('visible'); trickHints.classList.remove('fade-out'); }
   }
-  // Show/hide the skateboard tag in the charge bar
-  const skateTag = document.getElementById('fpChargeSkateTag');
-  if (skateTag) skateTag.style.display = (skateMode && skateboardFound) ? '' : 'none';
   _syncMphHud();
 }
 
@@ -316,9 +314,8 @@ let _lastCrosshairRaycastTs = 0;
 let _crosshairAimingAtInteractable = false;
 let _lastFootstepTs = 0;
 let _wasFootstepMoving = false;
-let _lastUiInteractTs = 0;
-let _quickControlsVisible = false;
 let _skateLean = 0;
+let _catGroupYaw = 0;
 
 // ── Skate trick state ─────────────────────────────────────────────
 let _trickManual     = 0;      // smoothed 0..1 pitch amount
@@ -609,8 +606,6 @@ function _sampleSuperSaiyanChargeShake(ts, strength, out = _ssShakeOffset) {
   return out;
 }
 
-const HUD_IDLE_CONTROLS_MS = 1400;
-
 const PITCH_MIN = -1.45;
 const PITCH_MAX = 1.55;
 
@@ -655,6 +650,13 @@ const _skateboardCenter = new THREE.Vector3();
 const _skateboardSize = new THREE.Vector3();
 const _skateboardFloorPoint = new THREE.Vector3();
 const _skateFootAnchor = new THREE.Vector3();
+// Reusable quaternions/vectors for gimbal-free catGroup orientation
+const _quatA = new THREE.Quaternion();
+const _quatB = new THREE.Quaternion();
+const _quatC = new THREE.Quaternion();
+const _vecUp = new THREE.Vector3(0, 1, 0);
+const _vecRight = new THREE.Vector3(1, 0, 0);
+const _vecFwd = new THREE.Vector3(0, 0, 1);
 const _skateFootTmp = new THREE.Vector3();
 const _skateFootPoints = [];
 
@@ -1404,14 +1406,6 @@ export function init(refs) {
   _initSkateboard();
   _spawnPickupSkateboard();
   _syncSkateboardVisualState();
-}
-
-function _setQuickControlsVisible(visible) {
-  const next = !!visible;
-  if (_quickControlsVisible === next) return;
-  _quickControlsVisible = next;
-  const dock = document.getElementById('fpQuickControls');
-  if (dock) dock.classList.toggle('is-hidden', !next);
 }
 
 function _clearPointerLockRetry() {
@@ -2434,8 +2428,6 @@ export function toggleFirstPerson() {
   if (fpMode) {
     // Reset help panel state on new run for a cleaner HUD start.
     _toggleHelp(false);
-    _lastUiInteractTs = performance.now() - HUD_IDLE_CONTROLS_MS;
-    _setQuickControlsVisible(true);
     _wasAimingAtInteractable = false;
     _wasGroundedLast = true;
     _lastFootstepTs = 0;
@@ -2490,7 +2482,6 @@ export function toggleFirstPerson() {
     if (_showToast) _showToast('Game mode! WASD to move, Space to jump (wall jump too!)');
   } else {
     _toggleHelp(false);
-    _setQuickControlsVisible(false);
     _wasAimingAtInteractable = false;
     _wasGroundedLast = true;
     _lastFootstepTs = 0;
@@ -2650,7 +2641,6 @@ export function setPaused(paused) {
     }
     if (crosshair) crosshair.style.opacity = '0.25';
 
-    _setQuickControlsVisible(true);
     _syncAudioToggleUi();
     _syncMouseSensUi();
 
@@ -2666,8 +2656,6 @@ export function setPaused(paused) {
     // Release focus trap
     if (_pauseFocusTrap) { _pauseFocusTrap.release(); _pauseFocusTrap = null; }
     if (_pauseSavedFocus) { _pauseSavedFocus.restore(); _pauseSavedFocus = null; }
-    _lastUiInteractTs = performance.now();
-    _setQuickControlsVisible(false);
 
     // Re-lock pointer (desktop only) — delay to avoid SecurityError
     if (_canvas && !state.isMobile) {
@@ -2693,7 +2681,6 @@ function _toggleHelp(open) {
   if (panel) panel.style.display = _helpOpen ? 'block' : 'none';
   if (hint) hint.style.display = _helpOpen ? 'none' : '';
   if (quickHelp) quickHelp.classList.toggle('on', _helpOpen);
-  if (_helpOpen) _setQuickControlsVisible(true);
 }
 // Expose for HTML onclick
 window._toggleHelp = _toggleHelp;
@@ -2828,15 +2815,6 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     if (!inputActive && Math.hypot(_velX, _velZ) < 0.002) { _velX = 0; _velZ = 0; }
   }
 
-  const isInteracting = inputActive
-    || fpKeys.space
-    || fpKeys.shift
-    || Math.abs(stepX) > 0
-    || Math.abs(stepY) > 0
-    || _spaceHeld > 0;
-  if (isInteracting) _lastUiInteractTs = ts;
-  const showQuickControls = _helpOpen || (ts - _lastUiInteractTs >= HUD_IDLE_CONTROLS_MS);
-  _setQuickControlsVisible(showQuickControls);
 
   const moveX = _velX * frameScale;
   const moveZ = _velZ * frameScale;
@@ -3385,19 +3363,23 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       const sidewaysSkatePose = skateMode && !_useForwardSkatePoseForModel();
       const skateYawOffset = sidewaysSkatePose ? (Math.PI * 0.5) : 0;
       const targetYaw = lastCatFacingYaw + skateYawOffset;
-      let dYaw = targetYaw - _catGroup.rotation.y;
+      let dYaw = targetYaw - _catGroupYaw;
       while (dYaw > Math.PI) dYaw -= Math.PI * 2;
       while (dYaw < -Math.PI) dYaw += Math.PI * 2;
-      _catGroup.rotation.y += dYaw * easeAlpha(19.74, dtSec);
+      _catGroupYaw += dYaw * easeAlpha(19.74, dtSec);
 
       // ── Board spin trick (F) — full 360 of character+board ────────
+      let spinExtra = 0;
       if (_trickSpinActive) {
         const SPIN_DUR = 0.5;
         _trickSpin += dtSec / SPIN_DUR;
         if (_trickSpin >= 1) { _trickSpin = 0; _trickSpinActive = false; }
         else {
           const t = _trickSpin;
-          _catGroup.rotation.y += t * t * (3 - 2 * t) * Math.PI * 2;
+          spinExtra = t * t * (3 - 2 * t) * Math.PI * 2;
+          // Helicopter lift — strongest at start, fades out
+          const lift = (1 - t) * 0.35;
+          fpVy = Math.max(fpVy, lift);
         }
       }
 
@@ -3405,17 +3387,26 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       const speedN = Math.max(0, Math.min(1, horizSpd / 0.5));
       const leanTarget = skateMode ? (-lateralInput * 0.26 * speedN) : 0;
       _skateLean += (leanTarget - _skateLean) * easeAlpha(12.5, dtSec);
-      _catGroup.rotation.x = 0;
-      _catGroup.rotation.z = _skateLean;
+      // ── Manual trick (hold E) — tilt nose up, lean cat back ─────
+      const manualTarget = (skateMode && _trickManualHeld) ? 1 : 0;
+      _trickManual += (manualTarget - _trickManual) * easeAlpha(10, dtSec);
+      if (_trickManual < 0.001) _trickManual = 0;
+      const manualAngle = _trickManual * 0.32;
+
+      // Compose catGroup orientation via quaternion to avoid Euler gimbal
+      // issues when combining yaw + lean + manual pitch.
+      {
+        const qYaw = _quatA.setFromAxisAngle(_vecUp, _catGroupYaw + spinExtra);
+        const qLean = _quatB.setFromAxisAngle(_vecFwd, _skateLean);
+        const qManual = _quatC.setFromAxisAngle(_vecRight, -manualAngle);
+        // Yaw first, then local lean (roll), then local pitch (manual)
+        _catGroup.quaternion.copy(qYaw).multiply(qLean).multiply(qManual);
+      }
 
       if (_skateboardAnchor) {
         _skateboardAnchor.rotation.y = _skateboardBaseYaw + (sidewaysSkatePose ? -(Math.PI * 0.5) : 0);
-
-        // ── Manual trick (hold E) — tilt board nose-up ──────────────
-        const manualTarget = (skateMode && _trickManualHeld) ? 1 : 0;
-        _trickManual += (manualTarget - _trickManual) * easeAlpha(10, dtSec);
-        if (_trickManual < 0.001) _trickManual = 0;
-        _skateboardAnchor.rotation.x = _trickManual * 0.32;
+        // Don't add extra manual pitch here — the anchor inherits it from catGroup
+        _skateboardAnchor.rotation.x = 0;
 
         // ── Kickflip trick (Q) — board rolls 360° ──────────────────
         if (_trickKickflipActive) {
@@ -3426,9 +3417,13 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
           const t = _trickKickflip;
           _skateboardAnchor.rotation.z = t * t * (3 - 2 * t) * Math.PI * 2;
         } else {
-          // ── Turn lean — tilt board on Z when steering ────────────
-          _skateboardAnchor.rotation.z = _skateLean;
+          _skateboardAnchor.rotation.z = 0;
         }
+      }
+
+      // Lift catGroup during manual so the board tail doesn't clip ground
+      if (manualAngle > 0) {
+        _catGroup.position.y += Math.sin(manualAngle) * 1.5;
       }
       _syncSkateboardVisualState();
     }

@@ -1240,7 +1240,7 @@ export function createRoom(scene) {
   // step that reads as a proper threshold instead of a paper-thin decal.
   // The guest room floor below uses the same Y so the two planes line up
   // through the guest door opening.
-  const _hwLiftY = 0.25;
+  const _hwLiftY = 0.01;
   const _hwStartZ = recessZ + 0.25;
   {
     const hwW = 40;
