@@ -160,6 +160,140 @@ function buildDoorKnob() {
   return group;
 }
 
+// Bypass sliding closet panel. Flat shaker-style slab with recessed
+// circular finger pull on each face. width/height in the door plane;
+// thickness along the track axis (X for the office closet).
+function buildBypassPanel({ width, height, thickness = 1.0,
+                            color = 0xe0d8cc, pullColor = 0xb0aca4,
+                            pullZOffset = 0 }) {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.72, metalness: 0.0 });
+  // Main slab
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(thickness, height, width), mat);
+  slab.castShadow = true; slab.receiveShadow = true;
+  group.add(slab);
+  // Shaker-style raised border on each face
+  const bord = 2.0;              // border width
+  const proud = 0.12;            // how far it sticks out
+  const innerW = width - bord * 2 - 0.4;
+  const innerH = height - bord * 2 - 0.4;
+  const frameMat = new THREE.MeshStandardMaterial({ color: color + 0x060606, roughness: 0.65, metalness: 0.0 });
+  for (const face of [-1, 1]) {
+    const fz = face * (thickness / 2 + proud / 2);
+    // top
+    const t = new THREE.Mesh(new THREE.BoxGeometry(proud, bord, innerW + bord * 2), frameMat);
+    t.position.set(fz, height / 2 - bord / 2, 0); t.receiveShadow = true; group.add(t);
+    // bottom
+    const b = new THREE.Mesh(new THREE.BoxGeometry(proud, bord, innerW + bord * 2), frameMat);
+    b.position.set(fz, -height / 2 + bord / 2, 0); b.receiveShadow = true; group.add(b);
+    // left
+    const l = new THREE.Mesh(new THREE.BoxGeometry(proud, innerH, bord), frameMat);
+    l.position.set(fz, 0, -width / 2 + bord / 2); l.receiveShadow = true; group.add(l);
+    // right
+    const r = new THREE.Mesh(new THREE.BoxGeometry(proud, innerH, bord), frameMat);
+    r.position.set(fz, 0, width / 2 - bord / 2); r.receiveShadow = true; group.add(r);
+  }
+  // Recessed circular finger pull on each face (flush disc)
+  const pullMat = new THREE.MeshStandardMaterial({ color: pullColor, roughness: 0.3, metalness: 0.6 });
+  for (const face of [-1, 1]) {
+    const pull = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.15, 16), pullMat);
+    pull.rotation.z = Math.PI / 2;
+    pull.position.set(face * (thickness / 2 + 0.08), 0, -pullZOffset);
+    pull.receiveShadow = true;
+    group.add(pull);
+  }
+  return group;
+}
+
+// ─── Shared window model ───────────────────────────────────────────
+// Double-hung style: upper pane (fixed) + lower pane (slides up to open).
+// Origin at the center of the opening. X = depth, Y = up, Z = width.
+function buildWindowModel({ width, height, frameThickness = 0.8, frameDepth = 0.6 }) {
+  // Double-hung window: two sash units at different depths.
+  // The lower sash (closer to room interior) slides up in front of the upper sash.
+  const group = new THREE.Group();
+  const fT = frameThickness, fD = frameDepth;
+  const sashRail = fT * 1.2;        // sash frame rail/stile thickness
+  const sashDepth = fD * 0.5;       // each sash's depth (X)
+  const sashGap = sashDepth + 0.15;  // full sash thickness + small air gap between planes
+  const frameMat = stdMat({ color: 0xf5f5f0, shininess: 10 });
+  const sashMat = stdMat({ color: 0xf0efe8, shininess: 8 });
+  const glassMat = new THREE.MeshStandardMaterial({
+    color: 0xd4e8f0, transparent: true, opacity: 0.15,
+    roughness: 0.05, metalness: 0.1, side: THREE.DoubleSide
+  });
+
+  // ── Outer frame (jambs, head, apron) — stationary ──
+  const frameTop = new THREE.Mesh(new THREE.BoxGeometry(fD, fT, width + fT * 2), frameMat);
+  frameTop.position.set(0, height / 2 + fT / 2, 0);
+  frameTop.castShadow = true; frameTop.receiveShadow = true;
+  group.add(frameTop);
+  const frameBottom = new THREE.Mesh(new THREE.BoxGeometry(fD, fT, width + fT * 2), frameMat);
+  frameBottom.position.set(0, -height / 2 - 0.5 - fT / 2, 0);
+  frameBottom.castShadow = true; frameBottom.receiveShadow = true;
+  group.add(frameBottom);
+  const frameLeft = new THREE.Mesh(new THREE.BoxGeometry(fD, height + 0.5, fT), frameMat);
+  frameLeft.position.set(0, -0.25, -width / 2 - fT / 2);
+  frameLeft.castShadow = true; frameLeft.receiveShadow = true;
+  group.add(frameLeft);
+  const frameRight = new THREE.Mesh(new THREE.BoxGeometry(fD, height + 0.5, fT), frameMat);
+  frameRight.position.set(0, -0.25, width / 2 + fT / 2);
+  frameRight.castShadow = true; frameRight.receiveShadow = true;
+  group.add(frameRight);
+
+  // Helper: build a sash (sub-frame + glass as a single group)
+  const sashH = height / 2;
+  const glassH = sashH - sashRail * 2;
+  const glassW = width - sashRail * 2;
+  function buildSash() {
+    const sash = new THREE.Group();
+    // Top rail
+    const top = new THREE.Mesh(new THREE.BoxGeometry(sashDepth, sashRail, width), sashMat);
+    top.position.set(0, sashH / 2 - sashRail / 2, 0);
+    top.castShadow = true; top.receiveShadow = true;
+    sash.add(top);
+    // Bottom rail
+    const bot = new THREE.Mesh(new THREE.BoxGeometry(sashDepth, sashRail, width), sashMat);
+    bot.position.set(0, -sashH / 2 + sashRail / 2, 0);
+    bot.castShadow = true; bot.receiveShadow = true;
+    sash.add(bot);
+    // Left stile
+    const left = new THREE.Mesh(new THREE.BoxGeometry(sashDepth, sashH - sashRail * 2, sashRail), sashMat);
+    left.position.set(0, 0, -width / 2 + sashRail / 2);
+    left.castShadow = true; left.receiveShadow = true;
+    sash.add(left);
+    // Right stile
+    const right = new THREE.Mesh(new THREE.BoxGeometry(sashDepth, sashH - sashRail * 2, sashRail), sashMat);
+    right.position.set(0, 0, width / 2 - sashRail / 2);
+    right.castShadow = true; right.receiveShadow = true;
+    sash.add(right);
+    // Glass
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(0.12, glassH, glassW), glassMat);
+    glass.renderOrder = 1;
+    sash.add(glass);
+    return sash;
+  }
+
+  // ── Upper sash (fixed, sits further from room interior) ──
+  const upperSash = buildSash();
+  upperSash.position.set(-sashGap / 2, height / 4, 0);
+  group.add(upperSash);
+
+  // ── Lower sash (slides, sits closer to room interior) ──
+  const lowerSash = buildSash();
+  lowerSash.position.set(sashGap / 2, -height / 4, 0);
+  lowerSash._baseY = -height / 4;
+  group.add(lowerSash);
+
+  group.userData.windowModel = {
+    lowerPane: lowerSash, upperPane: upperSash,
+    // Keep refs for tagging — collect all meshes in each sash
+    frameTop, frameBottom, frameLeft, frameRight,
+    height, width, _slideTarget: undefined
+  };
+  return group;
+}
+
 function tagAll(obj, flags) {
   obj.traverse(o => { for (const k in flags) o[k] = flags[k]; });
 }
@@ -1296,6 +1430,10 @@ export function createRoom(scene) {
   // bedroom/hallway right wall (at pre-mirror X=51), which already has the
   // guest door hole cut into it, so we build two new walls (+X far, +Z),
   // extend the TV wall into the office footprint, and add floor + ceiling.
+  let outdoorMat; // forward-declared; assigned later when outdoor textures are ready
+  let _grOutdoorMesh; // guest-room outdoor backdrop — material swapped after outdoorMat init
+  let _officeWindowModel = null;
+  let _officeWindowOpen = false;
   const _grXmin = 51;              // BACK wall — shared wall w/ hallway (has the door)
   const _grXmax = 183;             // FRONT wall — where desk faces (132" deep)
   const _grZmin = oppWallZ;        // TV wall serves as the -Z boundary (no separate RIGHT wall)
@@ -1309,20 +1447,55 @@ export function createRoom(scene) {
   const _grBbColor   = 0xc0bbb4;
   const _grCeilColor = 0xe0ddd6;
 
-  // Hardwood floor — same material factory as the hallway, sized to the
-  // guest-room footprint. Uses the same lift (_hwLiftY) as the hallway so
-  // the two planes meet flush through the guest door opening.
+  // Hardwood floor — split into two rectangles so the bedroom closet
+  // interior (X=[51,87], Z=[-78,-14]) shows the bedroom carpet instead
+  // of hardwood.  The closet opens from the bedroom via bifold doors,
+  // so its floor should match the bedroom.
+  //
+  // Rect 1: everything above the closet's +Z wall (Z >= -14)
+  //   X=[51,183], Z=[-14, 69]  →  132 × 83
+  // Rect 2: the strip to the right of the closet back wall (X >= 87)
+  //   X=[87,183], Z=[-78,-14]  →  96 × 64
+  //
+  // The seams sit behind the closet +Z side wall and back wall, so
+  // mismatched plank patterns are hidden by geometry.
   {
-    const grMat = _makeHardwoodMaterial(_grWidthX, _grWidthZ);
-    const grFloor = new THREE.Mesh(
-      new THREE.PlaneGeometry(_grWidthX, _grWidthZ),
-      grMat
+    // Bedroom closet interior: X=[51,87], Z=[-78,-14]
+    // Pre-computed from closet constants declared later in the file:
+    //   _closetZ=-46, _closetInteriorW=64, _closetDepth=36
+    const _clZmax = -14;   // _closetZ + _closetInteriorW/2
+    const _clZmin = -78;   // _closetZ + -_closetInteriorW/2  (= oppWallZ)
+    const _clXmax = 87;    // sideWallX + _closetDepth
+
+    // Rect 1 — upper portion (above closet +Z wall)
+    const r1W = _grWidthX;                          // 132
+    const r1Z = _grZmax - _clZmax;                   // 69 - (-14) = 83
+    const r1Cx = _grCenterX;                         // 117
+    const r1Cz = (_clZmax + _grZmax) / 2;            // (-14+69)/2 = 27.5
+    const r1 = new THREE.Mesh(
+      new THREE.PlaneGeometry(r1W, r1Z),
+      _makeHardwoodMaterial(r1W, r1Z)
     );
-    grFloor.rotation.x = -Math.PI/2;
-    grFloor.position.set(_grCenterX, floorY + _hwLiftY, _grCenterZ);
-    grFloor.receiveShadow = true;
-    grFloor._isRoom = true; grFloor._isFloor = true; grFloor._isGuestRoom = true;
-    addRoom(grFloor);
+    r1.rotation.x = -Math.PI/2;
+    r1.position.set(r1Cx, floorY + _hwLiftY, r1Cz);
+    r1.receiveShadow = true;
+    r1._isRoom = true; r1._isFloor = true; r1._isGuestRoom = true;
+    addRoom(r1);
+
+    // Rect 2 — lower-right strip (beside closet, X >= closet back wall)
+    const r2W = _grXmax - _clXmax;                   // 183 - 87 = 96
+    const r2Z = _clZmax - _clZmin;                    // -14 - (-78) = 64
+    const r2Cx = (_clXmax + _grXmax) / 2;             // (87+183)/2 = 135
+    const r2Cz = (_clZmin + _clZmax) / 2;             // (-78+-14)/2 = -46
+    const r2 = new THREE.Mesh(
+      new THREE.PlaneGeometry(r2W, r2Z),
+      _makeHardwoodMaterial(r2W, r2Z)
+    );
+    r2.rotation.x = -Math.PI/2;
+    r2.position.set(r2Cx, floorY + _hwLiftY, r2Cz);
+    r2.receiveShadow = true;
+    r2._isRoom = true; r2._isFloor = true; r2._isGuestRoom = true;
+    addRoom(r2);
   }
 
   // Ceiling — separate plane covering just the guest-room footprint, at the
@@ -1349,16 +1522,47 @@ export function createRoom(scene) {
   const grWallMat = new THREE.MeshStandardMaterial({
     color: _grWallColor, roughness: 0.7, metalness: 0.05,
   });
-  // FRONT wall (+X far wall, pre-mirror X = _grXmax..+0.5); spans the full Z range.
+  // FRONT wall (+X far wall, pre-mirror X = _grXmax..+0.5) with window opening.
+  // Window uses the same dimensions as the bedroom window (winW × winH) and is
+  // centered on the Z span of the office.
+  const grWinCenterZ = _grCenterZ;
+  const grWinCenterY = winCenterY;       // same sill height as bedroom
+  const grWinBottom = grWinCenterY - winH/2;
+  const grWinTop    = grWinCenterY + winH/2;
+  const grWinLeft   = grWinCenterZ - winW/2;   // toward -Z (TV wall side)
+  const grWinRight  = grWinCenterZ + winW/2;   // toward +Z (left wall side)
+  const grFrontWallX = _grXmax + 0.25;
+  const grWallZmin  = _grZmin - 0.5;           // full Z range of wall
+  const grWallZmax  = _grZmax + 0.5;
   {
+    // Below window
+    const bH = grWinBottom - floorY;
     const w = new THREE.Mesh(
-      new THREE.BoxGeometry(0.5, _grHeight, _grWidthZ + 1),
-      grWallMat
-    );
-    w.position.set(_grXmax + 0.25, floorY + _grHeight/2, _grCenterZ);
+      new THREE.BoxGeometry(0.5, bH, _grWidthZ + 1), grWallMat);
+    w.position.set(grFrontWallX, floorY + bH/2, _grCenterZ);
     w.castShadow = true; w.receiveShadow = true;
-    w._isRoom = true; w._isGuestRoom = true;
-    addRoom(w);
+    w._isRoom = true; w._isGuestRoom = true; addRoom(w);
+    // Above window
+    const aH = floorY + _grHeight - grWinTop;
+    const wa = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, aH, _grWidthZ + 1), grWallMat);
+    wa.position.set(grFrontWallX, grWinTop + aH/2, _grCenterZ);
+    wa.castShadow = true; wa.receiveShadow = true;
+    wa._isRoom = true; wa._isGuestRoom = true; addRoom(wa);
+    // Left of window (toward -Z / TV wall)
+    const lW = grWinLeft - grWallZmin;
+    const wl = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, winH, lW), grWallMat);
+    wl.position.set(grFrontWallX, grWinCenterY, grWallZmin + lW/2);
+    wl.castShadow = true; wl.receiveShadow = true;
+    wl._isRoom = true; wl._isGuestRoom = true; addRoom(wl);
+    // Right of window (toward +Z / left wall)
+    const rW = grWallZmax - grWinRight;
+    const wr = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, winH, rW), grWallMat);
+    wr.position.set(grFrontWallX, grWinCenterY, grWinRight + rW/2);
+    wr.castShadow = true; wr.receiveShadow = true;
+    wr._isRoom = true; wr._isGuestRoom = true; addRoom(wr);
   }
   // LEFT wall (+Z, right next to the door trim when entering).
   {
@@ -1389,15 +1593,190 @@ export function createRoom(scene) {
   // Baseboards on the new interior wall faces (FRONT, LEFT, TV wall extension).
   {
     const bbH = 3, bbT = 0.6, bbY = floorY + _hwLiftY + bbH/2;
-    // FRONT wall (+X) baseboard — sits just off the inner face at X=_grXmax.
-    roomBox(bbT, bbH, _grWidthZ, _grBbColor,
-      _grXmax - bbT/2, bbY, _grCenterZ, 0, 0, 0);
+    // FRONT wall (+X) baseboard — split into two segments around the window.
+    // Left segment (toward -Z / TV wall)
+    const grBbLeftW = grWinLeft - grWallZmin;
+    roomBox(bbT, bbH, grBbLeftW, _grBbColor,
+      _grXmax - bbT/2, bbY, grWallZmin + grBbLeftW/2, 0, 0, 0);
+    // Right segment (toward +Z / left wall)
+    const grBbRightW = grWallZmax - grWinRight;
+    roomBox(bbT, bbH, grBbRightW, _grBbColor,
+      _grXmax - bbT/2, bbY, grWinRight + grBbRightW/2, 0, 0, 0);
     // LEFT wall (+Z) baseboard.
     roomBox(_grWidthX, bbH, bbT, _grBbColor,
       _grCenterX, bbY, _grZmax - bbT/2, 0, 0, 0);
     // TV wall extension (-Z / oppWallZ) baseboard — office side.
     roomBox(_grWidthX, bbH, bbT, _grBbColor,
       _grCenterX, bbY, oppWallZ + bbT/2, 0, 0, 0);
+  }
+
+  // ─── Office front-wall window (frame, sill, outdoor backdrop) ───
+  // Uses the same outdoor material as the bedroom window so clicking either
+  // one toggles day/night for both.
+  {
+    // Window sill
+    roomBox(0.8, 0.5, winW + 2, 0xc8c4be,
+      _grXmax - 0.4, grWinBottom - 0.25, grWinCenterZ, 0, 0, 0);
+    // Window frame + glass — shared model (office window IS openable).
+    const grFrameD = 0.6;
+    const grWallInnerX = _grXmax;       // inner face of front wall
+    const grTrimX = grWallInnerX - grFrameD/2 - 0.04;  // proud toward room interior
+    _officeWindowModel = buildWindowModel({ width: winW, height: winH });
+    _officeWindowModel.position.set(grTrimX, grWinCenterY, grWinCenterZ);
+    tagAll(_officeWindowModel, { _isRoom: true, _isGuestRoom: true });
+    // Mark ALL meshes in the window as interactive for open/close
+    _officeWindowModel.traverse(o => { if (o.isMesh) o._isWindowPane = true; });
+    addRoom(_officeWindowModel);
+
+    // Outdoor backdrop — shares the bedroom window's material (outdoorMat) so
+    // clicking either window toggles the same texture/color.
+    // outdoorMat is assigned later when textures are ready; use placeholder now.
+    const grOutdoorGeo = new THREE.PlaneGeometry(600, 300);
+    const _grOutdoorPlaceholder = new THREE.MeshBasicMaterial({color:0x88aacc});
+    const grOutdoor = new THREE.Mesh(grOutdoorGeo, _grOutdoorPlaceholder);
+    _grOutdoorMesh = grOutdoor; // store ref so we can swap material later
+    grOutdoor.rotation.y = -Math.PI/2;  // face inward (-X direction in pre-mirror)
+    grOutdoor.position.set(_grXmax + 300, grWinCenterY + 80, grWinCenterZ);
+    grOutdoor._isRoom = true; grOutdoor._isGuestRoom = true;
+    grOutdoor._isWindow = true;  // clickable for day/night toggle
+    addRoom(grOutdoor);
+  }
+
+  // ─── Outdoor terrain (beyond office front wall) ──────────────────
+  // Accessible when the office window is open. Pre-mirror +X extends
+  // beyond the front wall at X=183.
+  //   Drop slope:  183.5 → 255  (6 ft down ~48")
+  //   Flat grass:  255   → 375  (10 ft flat)
+  //   Incline:     375   → 411  (3 ft up ~36")
+  //   Road:        411   → 543  (11 ft flat)
+  // Z extent: 200" centered on grWinCenterZ.
+  {
+    const terrainZhalf = 100;
+    const terrainZmin = grWinCenterZ - terrainZhalf;
+    const terrainZmax = grWinCenterZ + terrainZhalf;
+    const terrainZw = terrainZmax - terrainZmin;
+    const terrainZcenter = grWinCenterZ;
+
+    // Y reference: window sill = grWinBottom = floorY + 23
+    // Outdoor ground starts at sill level, drops 48" over 72"
+    const sillY = grWinBottom;         // floorY + 23
+    const dropStartX = _grXmax + 0.5;  // 183.5
+    const dropEndX   = 255;
+    const dropStartY = sillY;
+    const dropEndY   = sillY - 48;     // floorY - 25
+    const flatStartX = dropEndX;
+    const flatEndX   = 375;
+    const flatY      = dropEndY;
+    const incStartX  = flatEndX;
+    const incEndX    = 411;
+    const incStartY  = flatY;
+    const incEndY    = flatY + 36;     // floorY + 11
+    const roadStartX = incEndX;
+    const roadEndX   = 543;
+    const roadY      = incEndY;
+
+    const grassMat = new THREE.MeshStandardMaterial({ color: 0x4a8a3a, roughness: 0.9, metalness: 0 });
+    const roadMat  = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.85, metalness: 0 });
+    const curbMat  = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.7, metalness: 0 });
+
+    // ── Drop slope (rotated slab) ─────────────────────────────────
+    {
+      const dx = dropEndX - dropStartX;                    // 71.5
+      const dy = dropEndY - dropStartY;                    // -48
+      const len = Math.sqrt(dx * dx + dy * dy);            // ~86
+      const angle = Math.atan2(dy, dx);                    // negative (downhill)
+      const cx = (dropStartX + dropEndX) / 2;
+      const cy = (dropStartY + dropEndY) / 2;
+      const slab = new THREE.Mesh(
+        new THREE.BoxGeometry(len, 2, terrainZw), grassMat);
+      slab.position.set(cx, cy, terrainZcenter);
+      slab.rotation.z = -angle; // negate: X-mirror flips position but not rotation.z
+      slab.castShadow = true; slab.receiveShadow = true;
+      slab._isRoom = true; slab._isGuestRoom = true;
+      addRoom(slab);
+    }
+
+    // ── Flat grass ────────────────────────────────────────────────
+    {
+      const w = flatEndX - flatStartX;
+      const slab = new THREE.Mesh(
+        new THREE.BoxGeometry(w, 2, terrainZw), grassMat);
+      slab.position.set((flatStartX + flatEndX) / 2, flatY, terrainZcenter);
+      slab.castShadow = true; slab.receiveShadow = true;
+      slab._isRoom = true; slab._isGuestRoom = true;
+      addRoom(slab);
+    }
+
+    // ── Incline to road (rotated slab) ────────────────────────────
+    {
+      const dx = incEndX - incStartX;                      // 36
+      const dy = incEndY - incStartY;                      // 36
+      const len = Math.sqrt(dx * dx + dy * dy);            // ~50.9
+      const angle = Math.atan2(dy, dx);                    // ~45°
+      const cx = (incStartX + incEndX) / 2;
+      const cy = (incStartY + incEndY) / 2;
+      const slab = new THREE.Mesh(
+        new THREE.BoxGeometry(len, 2, terrainZw), grassMat);
+      slab.position.set(cx, cy, terrainZcenter);
+      slab.rotation.z = -angle; // negate: X-mirror flips position but not rotation.z
+      slab.castShadow = true; slab.receiveShadow = true;
+      slab._isRoom = true; slab._isGuestRoom = true;
+      addRoom(slab);
+    }
+
+    // ── Road surface ──────────────────────────────────────────────
+    {
+      const w = roadEndX - roadStartX;
+      const slab = new THREE.Mesh(
+        new THREE.BoxGeometry(w, 1.5, terrainZw), roadMat);
+      slab.position.set((roadStartX + roadEndX) / 2, roadY, terrainZcenter);
+      slab.castShadow = true; slab.receiveShadow = true;
+      slab._isRoom = true; slab._isGuestRoom = true;
+      addRoom(slab);
+      // Road curb (raised edge between grass incline and road)
+      const curb = new THREE.Mesh(
+        new THREE.BoxGeometry(2, 4, terrainZw), curbMat);
+      curb.position.set(roadStartX, roadY + 2, terrainZcenter);
+      curb.castShadow = true; curb.receiveShadow = true;
+      curb._isRoom = true; curb._isGuestRoom = true;
+      addRoom(curb);
+    }
+
+    // ── Dashed center line on road ────────────────────────────────
+    {
+      const lineY = roadY + 0.8;
+      const lineMat = new THREE.MeshStandardMaterial({ color: 0xdddd44, roughness: 0.6 });
+      const roadMidX = (roadStartX + roadEndX) / 2;
+      const dashLen = 12, gapLen = 8, dashW = 1.5;
+      for (let z = terrainZmin + 5; z < terrainZmax - 5; z += dashLen + gapLen) {
+        const dash = new THREE.Mesh(
+          new THREE.BoxGeometry(dashW, 0.3, dashLen), lineMat);
+        dash.position.set(roadMidX, lineY, z + dashLen / 2);
+        dash._isRoom = true; dash._isGuestRoom = true;
+        addRoom(dash);
+      }
+    }
+
+    // ── Fill terrain underneath slopes to prevent seeing underside ──
+    // Large box filling the volume below the terrain surface
+    {
+      const fillW = roadEndX - dropStartX;
+      const fillH = 60; // deep enough to cover all gaps
+      const fillY = Math.min(dropEndY, flatY) - fillH / 2 - 1;
+      const fill = new THREE.Mesh(
+        new THREE.BoxGeometry(fillW, fillH, terrainZw),
+        new THREE.MeshStandardMaterial({ color: 0x3a6a2a, roughness: 1.0 }));
+      fill.position.set((dropStartX + roadEndX) / 2, fillY, terrainZcenter);
+      fill.receiveShadow = true;
+      fill._isRoom = true; fill._isGuestRoom = true;
+      addRoom(fill);
+    }
+
+    // ── Outdoor hemisphere light ──────────────────────────────────
+    const outdoorHemi = new THREE.HemisphereLight(0x87ceeb, 0x4a8a3a, 0.6);
+    outdoorHemi.position.set(_grXmax + 100, floorY + 80, grWinCenterZ);
+    outdoorHemi._isRoom = true; outdoorHemi._isGuestRoom = true;
+    addRoom(outdoorHemi);
   }
 
   // Simple ceiling fixture + warm point light at the guest-room midpoint so
@@ -1452,7 +1831,12 @@ export function createRoom(scene) {
       ctx.roundRect(pad, pad, 512 - pad * 2, 256 - pad * 2, rr);
       ctx.fill();
       ctx.fillStyle = color;
-      ctx.font = 'bold 110px system-ui, sans-serif';
+      let fontSize = 110;
+      ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
+      while (ctx.measureText(text).width > 460 && fontSize > 20) {
+        fontSize -= 4;
+        ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
+      }
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(text, 256, 108);
@@ -1486,7 +1870,8 @@ export function createRoom(scene) {
 
   // Also label the bedroom, hallway, and closet walls for reference
   {
-    const _makeLabel = (text, scale, color = '#44aaff') => {
+    const _makeLabel = (lines, scale, color = '#44aaff') => {
+      if (typeof lines === 'string') lines = [{ text: lines, color }];
       const cvs = document.createElement('canvas');
       cvs.width = 512; cvs.height = 256;
       const ctx = cvs.getContext('2d');
@@ -1494,11 +1879,21 @@ export function createRoom(scene) {
       ctx.beginPath();
       ctx.roundRect(16, 16, 480, 224, 24);
       ctx.fill();
-      ctx.fillStyle = color;
-      ctx.font = 'bold 90px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(text, 256, 128);
+      const n = lines.length;
+      const lineH = 220 / n;
+      for (let i = 0; i < n; i++) {
+        const { text, color: c } = lines[i];
+        ctx.fillStyle = c;
+        let fs = Math.min(lineH - 4, 90);
+        ctx.font = `bold ${fs}px system-ui, sans-serif`;
+        while (ctx.measureText(text).width > 460 && fs > 20) {
+          fs -= 4;
+          ctx.font = `bold ${fs}px system-ui, sans-serif`;
+        }
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 256, 24 + lineH * i + lineH / 2);
+      }
       const tex = new THREE.CanvasTexture(cvs);
       const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
       const sprite = new THREE.Sprite(mat);
@@ -1515,7 +1910,11 @@ export function createRoom(scene) {
     // ── Bedroom walls (blue) ──
     _makeLabel('WINDOW', 50).position.set(leftWallX + 4, midY, -15);
     _makeLabel('TV WALL', 50).position.set(-15, midY, oppWallZ + 4);
-    _makeLabel('SIDE WALL', 50).position.set(sideWallX - 4, midY, -15);
+    // Shared wall: bedroom side wall / office closet back
+    _makeLabel([
+      { text: 'SIDE WALL', color: '#44aaff' },
+      { text: 'OFFICE CLOSET BACK', color: '#dd8844' },
+    ], 50).position.set(sideWallX - 4, midY, -15);
     _makeLabel('DOOR WALL', 50).position.set(-15, midY, 48.5 - 4);
 
     // ── Hallway walls (green) ──
@@ -1529,24 +1928,22 @@ export function createRoom(scene) {
 
 
   // ── Office furniture ──────────────────────────────────────────────
-  // Sit-stand desk against the -X far wall, Thor Nanoq R chair, 3 monitors.
+  // Sit-stand desk against the -X far wall, Thorzone Nanoq R PC case, 3 OLED monitors.
   // ─── Office furniture — placed inside the guest room ─────────────
   // All positions in pre-mirror coords. roomBox auto-adds _isRoom + addRoom.
   // Guest room: X=51..183, Z=-13..130. Desk against far +X wall, facing -X.
   {
     const metalColor = 0x3a3a3a;    // dark metal frame
-    const deskTopColor = 0x8B6914;  // warm oak desktop
+    const legColor = 0xf0f0f0;     // white desk legs
+    const deskTopColor = 0xd4b070;  // natural bamboo desktop
     const monitorColor = 0x1a1a1a;
-    const chairFrame = 0x2a2a2a;    // Thor Nanoq R dark frame
-    const chairPad = 0x1a1a1a;      // black upholstery
-    const chairAccent = 0x444444;   // armrest/accent
 
-    // ─ Adjustable sit-stand desk — 60"W × 30"D × 30"H (standing: ~44"H) ─
-    // Against the +X far wall, facing -X (toward the door).
-    const deskW = 60, deskD = 30, deskTopH = 1.5;
+    // ─ Adjustable sit-stand desk — 84"W × 30"D × 30"H (standing: ~44"H) ─
+    // Against the +X far wall, facing -X (toward the door). Flush with LEFT wall.
+    const deskW = 84, deskD = 30, deskTopH = 1.5;
     const deskLegH = 28; // current height (sitting position)
     const deskX = _grXmax - 4 - deskD / 2;               // 4" from far wall → 164
-    const deskZ = _grCenterZ;                             // centered in room → 58.5
+    const deskZ = _grZmax - deskW / 2;                    // flush against LEFT wall
     const deskTopY = floorY + deskLegH + deskTopH / 2;
 
     // Desktop surface
@@ -1558,18 +1955,18 @@ export function createRoom(scene) {
     for (const side of [-1, 1]) {
       const legZ = deskZ + side * (deskW / 2 - 4);
       // Vertical post
-      roomBox(3, deskLegH, 3, metalColor,
+      roomBox(3, deskLegH, 3, legColor,
         deskX, floorY + deskLegH / 2, legZ, 0, 0, 0);
       // Foot (horizontal stabilizer along desk depth)
-      roomBox(deskD - 4, 1.5, 3, metalColor,
+      roomBox(deskD - 4, 1.5, 3, legColor,
         deskX, floorY + 0.75, legZ, 0, 0, 0);
     }
     // Cross-bar between legs (under desktop)
-    roomBox(2, 2, deskW - 8, metalColor,
+    roomBox(2, 2, deskW - 8, legColor,
       deskX, deskTopY - deskTopH / 2 - 1, deskZ, 0, 0, 0);
 
-    // ─ 3 Monitors — 27" each (24"W × 14"H × 1.5"D), on monitor arms ─
-    const monW = 24, monH = 14, monD = 1.5;
+    // ─ 3 OLED Monitors — 27" each (24"W × 14"H × 0.5"D), on monitor arms ─
+    const monW = 24, monH = 14, monD = 0.5;
     const monStandH = 6;  // arm height above desk
     const monY = deskTopY + deskTopH / 2 + monStandH + monH / 2;
     const monBaseX = deskX + deskD / 2 - 5; // near back of desk (wall side)
@@ -1580,48 +1977,65 @@ export function createRoom(scene) {
     monCenter._isOffice = true;
     monCenter.material.roughness = 0.2; monCenter.material.metalness = 0.5;
 
-    // Left monitor (angled inward ~25°)
+    // Left monitor (angled inward ~34°, pulled forward toward chair)
+    const monSideX = monBaseX - 8;
+    const monSideAngle = 0.6;
+    const monSideOff = monW - 2; // Z offset from center
     const monLeft = roomBox(monD, monH, monW, monitorColor,
-      monBaseX - 2, monY, deskZ - monW + 2, 0, -0.4, 0);
+      monSideX, monY, deskZ - monSideOff, 0, monSideAngle, 0);
     monLeft._isOffice = true;
     monLeft.material.roughness = 0.2; monLeft.material.metalness = 0.5;
 
-    // Right monitor (angled inward ~25°)
+    // Right monitor (angled inward ~34°, pulled forward toward chair)
     const monRight = roomBox(monD, monH, monW, monitorColor,
-      monBaseX - 2, monY, deskZ + monW - 2, 0, 0.4, 0);
+      monSideX, monY, deskZ + monSideOff, 0, -monSideAngle, 0);
     monRight._isOffice = true;
     monRight.material.roughness = 0.2; monRight.material.metalness = 0.5;
 
-    // Monitor stands/arms (simplified — one post per monitor)
-    for (const mz of [deskZ, deskZ - monW + 2, deskZ + monW - 2]) {
-      roomBox(1.5, monStandH, 1.5, metalColor,
-        monBaseX, deskTopY + deskTopH / 2 + monStandH / 2, mz, 0, 0, 0);
+    // Monitor arm — single center post with horizontal arms branching to outer monitors
+    const armPostY = deskTopY + deskTopH / 2 + monStandH / 2;
+    const armX = monBaseX + 1.5; // just behind center monitor
+    // Center vertical post (single mount point)
+    roomBox(2, monStandH, 2, metalColor,
+      armX, armPostY, deskZ, 0, 0, 0);
+    // Horizontal arm spanning left to right monitor
+    const armSpan = monSideOff * 2; // distance between outer monitors
+    roomBox(1.5, 1.5, armSpan, metalColor,
+      armX, deskTopY + deskTopH / 2 + monStandH, deskZ, 0, 0, 0);
+    // Short forward arms to outer monitors (reach from post to monSideX)
+    const armReach = armX - monSideX; // from post to side monitors
+    for (const side of [-1, 1]) {
+      roomBox(armReach, 1.5, 1.5, metalColor,
+        monSideX + armReach / 2, deskTopY + deskTopH / 2 + monStandH, deskZ + side * monSideOff, 0, 0, 0);
     }
 
-    // Screen glow (3 emissive planes)
+    // Screen glow (3 emissive planes, offset from monitor face toward chair)
     const screenMat = new THREE.MeshStandardMaterial({
       color: 0x1a3a5a, emissive: 0x2a4a6a, emissiveIntensity: 0.6,
       roughness: 0.3, metalness: 0.0,
     });
+    const scrOff = monD / 2 + 0.1; // offset from monitor center to face
     // Center screen (faces -X toward chair)
     {
-      const s = new THREE.Mesh(new THREE.PlaneGeometry(monH - 1, monW - 1), screenMat);
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(monW - 1, monH - 1), screenMat);
       s.rotation.y = Math.PI / 2;
-      s.position.set(monBaseX - monD / 2 - 0.1, monY, deskZ);
+      s.position.set(monBaseX - scrOff, monY, deskZ);
       s._isRoom = true; s._isOffice = true; addRoom(s);
     }
-    // Left screen
+    // Left screen (rotated, offset along rotated normal)
     {
-      const s = new THREE.Mesh(new THREE.PlaneGeometry(monH - 1, monW - 1), screenMat);
-      s.rotation.y = Math.PI / 2 - 0.4;
-      s.position.set(monBaseX - 2 - monD / 2 - 0.1, monY, deskZ - monW + 2);
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(monW - 1, monH - 1), screenMat);
+      s.rotation.y = Math.PI / 2 + monSideAngle;
+      const nx = -Math.cos(monSideAngle), nz = Math.sin(monSideAngle);
+      s.position.set(monSideX + nx * scrOff, monY, deskZ - monSideOff + nz * scrOff);
       s._isRoom = true; s._isOffice = true; addRoom(s);
     }
-    // Right screen
+    // Right screen (rotated, offset along rotated normal)
     {
-      const s = new THREE.Mesh(new THREE.PlaneGeometry(monH - 1, monW - 1), screenMat);
-      s.rotation.y = Math.PI / 2 + 0.4;
-      s.position.set(monBaseX - 2 - monD / 2 - 0.1, monY, deskZ + monW - 2);
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(monW - 1, monH - 1), screenMat);
+      s.rotation.y = Math.PI / 2 - monSideAngle;
+      const nx = -Math.cos(monSideAngle), nz = -Math.sin(monSideAngle);
+      s.position.set(monSideX + nx * scrOff, monY, deskZ + monSideOff + nz * scrOff);
       s._isRoom = true; s._isOffice = true; addRoom(s);
     }
 
@@ -1631,62 +2045,75 @@ export function createRoom(scene) {
     roomBox(3, 0.4, 2.5, 0x2a2a2a,
       deskX - 4, deskTopY + deskTopH / 2 + 0.2, deskZ + 12, 0, 0, 0);
 
-    // ─ Thor Nanoq R chair ─
-    // Premium ergonomic gaming chair with mesh back, wide seat, prominent
-    // armrests, and 5-star aluminum base.
-    const chairX = deskX - deskD / 2 - 10; // in front of desk (toward -X/door)
-    const chairZ = deskZ;
-    const seatH = 18; // seat height from floor
+    // ─ Thorzone Nanoq R — SFF PC case on left side of desk ─
+    // ~13.4"L × 6.7"W × 9.8"H — long side is depth (X), short side is width (Z)
+    const pcD = 13.4, pcW = 6.7, pcH = 9.8;
+    const pcSilver = 0xd4d6d9;   // light silver aluminum
+    const pcDark   = 0x333333;   // dark vent insets
+    const pcWood   = 0x6b4226;   // walnut wood slats
+    const pcX = deskX + deskD / 2 - pcD / 2 - 1;  // pushed near wall edge of desk
+    const pcZ = deskZ + monW + 6;
+    const pcBaseY = deskTopY + deskTopH / 2;
+    const pcCenterY = pcBaseY + pcH / 2;
 
-    // 5-star aluminum base
-    const baseColor = 0x777777;
-    for (let i = 0; i < 5; i++) {
-      const angle = (i / 5) * Math.PI * 2;
-      const legLen = 10;
-      const lx = chairX + Math.cos(angle) * legLen / 2;
-      const lz = chairZ + Math.sin(angle) * legLen / 2;
-      roomBox(legLen, 1.2, 2, baseColor, lx, floorY + 0.6, lz, 0, angle, 0);
-      // Caster at end of each leg
-      const cx = chairX + Math.cos(angle) * legLen;
-      const cz = chairZ + Math.sin(angle) * legLen;
-      roomBox(1.5, 1.5, 1.5, chairFrame, cx, floorY + 0.75, cz, 0, 0, 0);
+    // Main body — light silver aluminum shell
+    const pcBody = roomBox(pcD, pcH, pcW, pcSilver,
+      pcX, pcCenterY, pcZ, 0, 0, 0);
+    pcBody._isOffice = true;
+    pcBody.material.roughness = 0.28;
+    pcBody.material.metalness = 0.75;
+
+    // Top panel — dark perforation inset
+    roomBox(pcD - 1, 0.12, pcW - 0.6, pcDark,
+      pcX, pcBaseY + pcH - 0.08, pcZ, 0, 0, 0);
+
+    // Long side panels — dark vent insets (±Z faces)
+    for (const side of [-1, 1]) {
+      const panel = new THREE.Mesh(
+        new THREE.PlaneGeometry(pcD - 2, pcH - 2),
+        new THREE.MeshStandardMaterial({
+          color: pcDark, roughness: 0.7, metalness: 0.15,
+        })
+      );
+      panel.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+      panel.position.set(pcX, pcCenterY, pcZ + side * (pcW / 2 - 0.05));
+      panel._isRoom = true; panel._isOffice = true; addRoom(panel);
     }
 
-    // Gas cylinder
-    roomBox(3, seatH - 3, 3, chairFrame,
-      chairX, floorY + (seatH - 3) / 2 + 1.5, chairZ, 0, 0, 0);
+    // Front face — walnut wood vertical slats (faces -X toward chair)
+    {
+      const slatCount = 4;
+      const slatW = 0.5, slatGap = (pcW - 0.8) / slatCount;
+      const frontX = pcX - pcD / 2 + 0.05;
+      for (let i = 0; i < slatCount; i++) {
+        const sz = pcZ - (pcW - 0.8) / 2 + slatGap * (i + 0.5);
+        roomBox(0.25, pcH - 2, slatW, pcWood,
+          frontX, pcCenterY, sz, 0, 0, 0);
+      }
+      // Center accent strip
+      roomBox(0.12, pcH - 2.5, 0.35, 0xf0f0f0,
+        frontX - 0.08, pcCenterY, pcZ, 0, 0, 0);
+    }
 
-    // Seat pan (wide, contoured)
-    const seatW = 22, seatD = 22;
-    roomBox(seatD, 3, seatW, chairPad,
-      chairX, floorY + seatH, chairZ, 0, 0, 0);
+    // Back face — dark vent panel (exhaust, faces +X)
+    {
+      const backPanel = new THREE.Mesh(
+        new THREE.PlaneGeometry(pcW - 0.8, pcH - 1.5),
+        new THREE.MeshStandardMaterial({
+          color: pcDark, roughness: 0.7, metalness: 0.15,
+        })
+      );
+      backPanel.position.set(pcX + pcD / 2 - 0.05, pcCenterY, pcZ);
+      backPanel._isRoom = true; backPanel._isOffice = true; addRoom(backPanel);
+    }
 
-    // Mesh backrest (tall, slight recline — faces +X toward wall)
-    const backH = 28, backW = 20;
-    const backMat = new THREE.MeshStandardMaterial({
-      color: chairFrame, roughness: 0.6, metalness: 0.3,
-      transparent: true, opacity: 0.85, // mesh-look
-    });
-    const backMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(2, backH, backW), backMat);
-    backMesh.position.set(chairX - seatD / 2 - 1, floorY + seatH + backH / 2, chairZ);
-    backMesh.rotation.z = 0.1; // slight recline (tilts toward +X/wall)
-    backMesh._isRoom = true; backMesh._isOffice = true;
-    addRoom(backMesh);
-
-    // Headrest
-    roomBox(2, 5, 14, chairPad,
-      chairX - seatD / 2 - 2, floorY + seatH + backH + 2, chairZ, 0, 0, 0);
-
-    // Armrests (two wide pads on metal supports)
-    for (const side of [-1, 1]) {
-      const az = chairZ + side * (seatW / 2 + 1);
-      // Support post
-      roomBox(2, 8, 2, chairFrame,
-        chairX, floorY + seatH + 4, az, 0, 0, 0);
-      // Pad
-      roomBox(10, 1.5, 4, chairAccent,
-        chairX, floorY + seatH + 8.5, az, 0, 0, 0);
+    // Small feet
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        roomBox(1.2, 0.35, 1, 0x999999,
+          pcX + sx * (pcD / 2 - 1.2), pcBaseY + 0.18, pcZ + sz * (pcW / 2 - 0.8),
+          0, 0, 0);
+      }
     }
   }
 
@@ -2306,6 +2733,22 @@ export function createRoom(scene) {
   // so _closetInteriorH is kept separate.
   const _closetW=48, _closetH=66, _closetInteriorH=wallHeight, _closetDepth=36, _closetInteriorW=64;
   const _closetZ=oppWallZ+_closetW/2+8; // = -46 (5.5" trim-to-TV-wall gap)
+
+  // ─── Bypass sliding closet door constants ───
+  // The gap between the bedroom closet's +Z side wall (Z=-14) and the guest
+  // door frame trim (-Z edge ≈ Z=33). Doors sit on the closet back-wall plane
+  // at X = sideWallX + _closetDepth = 87.
+  const _bypassZmin = _closetZ + _closetInteriorW / 2;           // -14 (closet +Z side wall)
+  const _bypassZmax = 32;                                         // 1" gap from guest door trim
+  const _bypassOpenW = _bypassZmax - _bypassZmin;                 // 46
+  const _bypassCenterZ = (_bypassZmin + _bypassZmax) / 2;         // 9
+  const _bypassH = _closetH;                                      // 66 (matches bifold door height)
+  const _bypassBackX = sideWallX + _closetDepth;                   // 87 (closet back wall plane)
+  const _bypassPanelW = Math.round(_bypassOpenW * 0.55);          // 25 (~4" overlap when closed)
+  const _bypassPanelH = _bypassH - 0.5;                           // 65.5 (floor clearance)
+  const _bypassPanelThick = 1.0;
+  const _bypassTrackGap = 0.6;                                    // offset between parallel tracks
+
   const rightWall=(()=>{
     // Unified right-side wall: spans the full Z range from the TV wall
     // (Z=_sbXMin) all the way through the hallway to its end cap
@@ -2580,9 +3023,11 @@ export function createRoom(scene) {
     window._closetShelf1Z = section1Z;
   }
 
-  // ── Closet debug wall labels (yellow) — must come after closet vars ──
+  // ── Closet debug wall labels — must come after closet vars ──
   {
-    const _makeLabel = (text, scale, color) => {
+    const _makeLabel = (lines, scale, color) => {
+      // lines: array of {text, color} or a single string
+      if (typeof lines === 'string') lines = [{ text: lines, color }];
       const cvs = document.createElement('canvas');
       cvs.width = 512; cvs.height = 256;
       const ctx = cvs.getContext('2d');
@@ -2590,11 +3035,21 @@ export function createRoom(scene) {
       ctx.beginPath();
       ctx.roundRect(16, 16, 480, 224, 24);
       ctx.fill();
-      ctx.fillStyle = color;
-      ctx.font = 'bold 90px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(text, 256, 128);
+      const n = lines.length;
+      const lineH = 220 / n;
+      for (let i = 0; i < n; i++) {
+        const { text, color: c } = lines[i];
+        ctx.fillStyle = c;
+        let fs = Math.min(lineH - 4, 90);
+        ctx.font = `bold ${fs}px system-ui, sans-serif`;
+        while (ctx.measureText(text).width > 460 && fs > 20) {
+          fs -= 4;
+          ctx.font = `bold ${fs}px system-ui, sans-serif`;
+        }
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 256, 24 + lineH * i + lineH / 2);
+      }
       const tex = new THREE.CanvasTexture(cvs);
       const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
       const sprite = new THREE.Sprite(mat);
@@ -2608,9 +3063,219 @@ export function createRoom(scene) {
     };
     const closetCX = sideWallX + 0.5 + _closetDepth / 2;
     const closetMidY = floorY + _closetInteriorH / 2;
-    _makeLabel('CLOSET BACK', 22, '#ddcc44').position.set(sideWallX + _closetDepth - 4, closetMidY, _closetZ);
-    _makeLabel('CLOSET +Z', 22, '#ddcc44').position.set(closetCX, closetMidY, _closetZ + _closetInteriorW / 2 - 4);
-    _makeLabel('CLOSET -Z', 22, '#ddcc44').position.set(closetCX, closetMidY, _closetZ - _closetInteriorW / 2 + 4);
+    // Shared back wall (X=87) — bedroom closet back / office closet front
+    _makeLabel([
+      { text: 'BEDROOM CLOSET BACK', color: '#ddcc44' },
+      { text: 'OFFICE CLOSET FRONT', color: '#dd8844' },
+    ], 22).position.set(sideWallX + _closetDepth - 4, closetMidY, _closetZ);
+    // Shared divider wall (Z=-14) — bedroom closet +Z / office closet -Z
+    _makeLabel([
+      { text: 'BEDROOM CLOSET +Z', color: '#ddcc44' },
+      { text: 'OFFICE CLOSET -Z', color: '#dd8844' },
+    ], 22).position.set(closetCX, closetMidY, _closetZ + _closetInteriorW / 2 - 4);
+    // Bedroom-only -Z wall (against TV wall)
+    _makeLabel('BEDROOM CLOSET -Z', 22, '#ddcc44').position.set(closetCX, closetMidY, _closetZ - _closetInteriorW / 2 + 4);
+  }
+
+  // ─── Bypass sliding closet doors (office side, on closet back-wall plane) ──
+  // Two panels slide along Z on parallel tracks at X = _bypassBackX (87).
+  // The closet interior behind these doors spans X=51..87, Z=-14..32.
+  {
+    const insideMat = new THREE.MeshStandardMaterial({ color: 0xe4dcce, roughness: 0.85, metalness: 0.0 });
+    const trimColor = 0xe4ddd1;
+    const trimMat = new THREE.MeshStandardMaterial({ color: trimColor, roughness: 0.35, metalness: 0.05 });
+    const headerH = wallHeight - _bypassH; // 14" (wall above door opening)
+    const innerDepth = _closetDepth;        // 36"
+    const innerCx = sideWallX + 0.5 + innerDepth / 2;
+
+    // ── Back wall extension: header above the bypass opening ──
+    const extHeader = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, headerH, _bypassOpenW),
+      insideMat
+    );
+    extHeader.position.set(_bypassBackX, floorY + _bypassH + headerH / 2, _bypassCenterZ);
+    extHeader.receiveShadow = true; extHeader._isRoom = true; addRoom(extHeader);
+
+    // ── New closet interior walls ──
+    // +Z side wall at Z=_bypassZmax (32): separates closet from guest door area
+    const sideWallPZ = new THREE.Mesh(
+      new THREE.BoxGeometry(innerDepth, wallHeight, 0.5),
+      insideMat
+    );
+    sideWallPZ.position.set(innerCx, floorY + wallHeight / 2, _bypassZmax + 0.25);
+    sideWallPZ.receiveShadow = true; sideWallPZ._isRoom = true; addRoom(sideWallPZ);
+
+    // -Z side: reuse the existing closet +Z side wall (closetSideP at Z=-14).
+    // No new wall needed there — just extend the back wall downward.
+    // Back wall extension below header (fills from floor to door-top height)
+    // is NOT built — that's where the door opening is. The panels close it.
+
+    // Ceiling of the new closet section
+    const bpCeil = new THREE.Mesh(
+      new THREE.BoxGeometry(innerDepth, 0.5, _bypassOpenW),
+      insideMat
+    );
+    bpCeil.position.set(innerCx, floorY + wallHeight, _bypassCenterZ);
+    bpCeil.receiveShadow = true; bpCeil._isRoom = true; addRoom(bpCeil);
+
+    // Clothes rod across the new closet, ~30" below ceiling
+    const rodMat = new THREE.MeshStandardMaterial({ color: 0xb8b8b8, roughness: 0.35, metalness: 0.6 });
+    const bpRod = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.4, 0.4, _bypassOpenW - 2, 14),
+      rodMat
+    );
+    bpRod.rotation.x = Math.PI / 2;
+    bpRod.position.set(innerCx, floorY + wallHeight - 30, _bypassCenterZ);
+    bpRod.castShadow = true; bpRod._isRoom = true; addRoom(bpRod);
+
+    // Shelf above the rod (matching bedroom closet pattern)
+    const bpShelfDrop = 24;
+    const bpShelfDepth = 14;
+    const bpShelfCX = sideWallX + 0.5 + 0.1 + bpShelfDepth / 2;
+    const bpShelfY = floorY + wallHeight - bpShelfDrop;
+    const shelfMat = new THREE.MeshStandardMaterial({ color: 0xdcd2c0, roughness: 0.75, metalness: 0.0 });
+    const bpShelfLen = _bypassOpenW - 1;
+    const bpShelf = new THREE.Mesh(
+      new THREE.BoxGeometry(bpShelfDepth, 0.8, bpShelfLen),
+      shelfMat
+    );
+    bpShelf.position.set(bpShelfCX, bpShelfY, _bypassCenterZ);
+    bpShelf.castShadow = true; bpShelf.receiveShadow = true; bpShelf._isRoom = true; addRoom(bpShelf);
+
+    // Shelf dividers (3 dividers → 4 sections)
+    const divThick = 0.6;
+    const divTopY = floorY + wallHeight - 0.5;
+    const divBotY = bpShelfY + 0.4;
+    const divH = divTopY - divBotY;
+    const divCY = (divTopY + divBotY) / 2;
+    const bpShelfZmin = _bypassCenterZ - bpShelfLen / 2;
+    for (let i = 1; i <= 3; i++) {
+      const zC = bpShelfZmin + (bpShelfLen * i / 4);
+      const div = new THREE.Mesh(
+        new THREE.BoxGeometry(bpShelfDepth, divH, divThick),
+        shelfMat
+      );
+      div.position.set(bpShelfCX, divCY, zC);
+      div.castShadow = true; div.receiveShadow = true; div._isRoom = true;
+      addRoom(div);
+    }
+
+    // ── Door frame / trim (on the office-facing side, X < 87) ──
+    const frameW = 2.5;
+    // Left jamb (at Z = _bypassZmin)
+    const jambL = new THREE.Mesh(new THREE.BoxGeometry(frameW, _bypassH, frameW), trimMat);
+    jambL.position.set(_bypassBackX - frameW / 2, floorY + _bypassH / 2, _bypassZmin - frameW / 2 + 0.5);
+    jambL.receiveShadow = true; jambL._isRoom = true; addRoom(jambL);
+    // Right jamb (at Z = _bypassZmax) — flush against +Z wall
+    const jambR = new THREE.Mesh(new THREE.BoxGeometry(frameW, _bypassH, frameW), trimMat);
+    jambR.position.set(_bypassBackX - frameW / 2, floorY + _bypassH / 2, _bypassZmax - frameW / 2 + 0.25);
+    jambR.receiveShadow = true; jambR._isRoom = true; addRoom(jambR);
+    // Header — spans from left jamb to +Z wall
+    const headerSpanZ = _bypassZmax - (_bypassZmin - frameW / 2 + 0.5) + 0.25;
+    const headerCenterZ = (_bypassZmin - frameW / 2 + 0.5 + _bypassZmax + 0.25) / 2;
+    const headerTrim = new THREE.Mesh(
+      new THREE.BoxGeometry(frameW, frameW, headerSpanZ),
+      trimMat
+    );
+    headerTrim.position.set(_bypassBackX - frameW / 2, floorY + _bypassH + frameW / 2 - 0.5, headerCenterZ);
+    headerTrim.receiveShadow = true; headerTrim._isRoom = true; addRoom(headerTrim);
+
+    // ── Top track (aluminum rail) ──
+    const trackMat = new THREE.MeshStandardMaterial({ color: 0xc0c0c0, roughness: 0.3, metalness: 0.5 });
+    const topTrack = new THREE.Mesh(
+      new THREE.BoxGeometry(1.5, 0.5, _bypassOpenW - 2),
+      trackMat
+    );
+    topTrack.position.set(_bypassBackX, floorY + _bypassH - 0.25, _bypassCenterZ);
+    topTrack.receiveShadow = true; topTrack._isRoom = true; addRoom(topTrack);
+
+    // ── Floor guide (thin rail) ──
+    const floorGuide = new THREE.Mesh(
+      new THREE.BoxGeometry(1.0, 0.3, _bypassOpenW),
+      trackMat
+    );
+    floorGuide.position.set(_bypassBackX, floorY + 0.15, _bypassCenterZ);
+    floorGuide.receiveShadow = true; floorGuide._isRoom = true; addRoom(floorGuide);
+
+    // ── Two bypass sliding panels ──
+    const bypassPanels = [];
+    window._bypassDoorsRef = bypassPanels;
+
+    for (let i = 0; i < 2; i++) {
+      // Panel 0 = front track (office side, -X) covers -Z half
+      // Panel 1 = back track (closet side, +X) covers +Z half
+      // Real bypass: each panel slides TOWARD the other to stack behind it,
+      // exposing its own side of the opening. Only one side open at a time.
+      const trackOffset = (i === 0 ? -1 : 1) * (_bypassTrackGap / 2);
+      const zOffset = (i === 0 ? -1 : 1) * (_bypassOpenW - _bypassPanelW) / 2;
+      const panelZ = _bypassCenterZ + zOffset;
+      // Pull offset toward the outside edge (center of the opening)
+      const pullZ = (i === 0 ? 1 : -1) * (_bypassPanelW / 2 - 3);
+      const panel = buildBypassPanel({
+        width: _bypassPanelW,
+        height: _bypassPanelH,
+        thickness: _bypassPanelThick,
+        pullZOffset: pullZ,
+      });
+      const panelGroup = new THREE.Group();
+      panelGroup.add(panel);
+      panelGroup.position.set(
+        _bypassBackX + trackOffset,
+        floorY + _bypassPanelH / 2 + 0.25,
+        panelZ
+      );
+      panelGroup._isBypassPanel = true;
+      panelGroup._isRoom = true;
+      panelGroup._panelIndex = i;
+      panelGroup._slideOpen = false;
+      panelGroup._slideTarget = panelZ;
+      panelGroup._baseZ = panelZ;
+      // Slide distance: move toward the other panel's position (stack behind it)
+      // Panel 0 (-Z side) slides +Z, panel 1 (+Z side) slides -Z
+      panelGroup._slideDir = (i === 0 ? 1 : -1);
+      panelGroup._slideMax = _bypassOpenW - _bypassPanelW; // distance between panel centers
+      addRoom(panelGroup);
+      bypassPanels.push(panelGroup);
+
+      // Tag all children for raycasting
+      tagAll(panel, { _isBypassPanel: true, _isRoom: true });
+    }
+
+    // ── Debug wall labels for the office closet (orange) ──
+    {
+      const _makeLabel2 = (text, scale, color) => {
+        const cvs = document.createElement('canvas');
+        cvs.width = 512; cvs.height = 256;
+        const ctx = cvs.getContext('2d');
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.beginPath();
+        ctx.roundRect(16, 16, 480, 224, 24);
+        ctx.fill();
+        ctx.fillStyle = color;
+        let fontSize = 78;
+        ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
+        while (ctx.measureText(text).width > 460 && fontSize > 20) {
+          fontSize -= 4;
+          ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
+        }
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 256, 128);
+        const tex = new THREE.CanvasTexture(cvs);
+        const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+        const sprite = new THREE.Sprite(mat);
+        sprite.scale.set(scale, scale / 2, 1);
+        sprite.visible = false;
+        sprite._isRoom = true;
+        sprite._isDebugLabel = true;
+        addRoom(sprite);
+        _debugWallLabels.push(sprite);
+        return sprite;
+      };
+      const ocMidY = floorY + wallHeight / 2;
+      // +Z side wall (Z=32, separates from guest door area) — unique to office closet
+      _makeLabel2('OFFICE CLOSET +Z', 18, '#dd8844').position.set(innerCx, ocMidY, _bypassZmax - 4);
+    }
   }
 
   // ─── Left side wall with window (near the bed) ───
@@ -2654,34 +3319,19 @@ export function createRoom(scene) {
   // Window sill
   roomBox(0.8, 0.5, winW+2, 0xc8c4be, leftWallX+0.4, winBottom-0.25, winCenterZ, 0,0,0);
   
-  // Window frame (thin white trim) — sit fully proud of the wall surface.
-  // The wall sections around the opening (above/below/front/back) are 0.5" thick
-  // centered at leftWallX, so their inner face is at leftWallX+0.25. The trim
-  // back face must clear that plane or its edges become coplanar with the wall
-  // (along the winTop/winBottom/winFront/winBack boundaries) and z-fight.
-  const frameMat=stdMat({color:0xf5f5f0,shininess:10});
-  const frameT=0.8, frameD=0.6;
+  // Window frame + glass — shared model (bedroom window is NOT openable).
+  const frameD=0.6;
   const wallInnerX = leftWallX + 0.25;
   const trimX = wallInnerX + frameD / 2 + 0.04; // back face ~0.04" proud of wall
-  // NOTE: trim pieces intentionally do NOT get _isWindow — only the outdoor
-  // backdrop (the actual glass area visible through the opening) should be
-  // clickable for the day/night toggle.
-  // Top
-  const wft=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT, winW+frameT*2), frameMat);
-  wft.position.set(trimX, winTop+frameT/2, winCenterZ); wft._isRoom=true; addRoom(wft);
-  // Bottom (apron) — sits BELOW the sill so it doesn't z-fight with it.
-  // Sill spans Y=[winBottom-0.5, winBottom]; place apron top flush with sill bottom.
-  const wfb=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT, winW+frameT*2), frameMat);
-  wfb.position.set(trimX, winBottom-0.5-frameT/2, winCenterZ); wfb._isRoom=true; addRoom(wfb);
-  // Left (toward outside)
-  const wfl=new THREE.Mesh(new THREE.BoxGeometry(frameD, winH, frameT), frameMat);
-  wfl.position.set(trimX, winCenterY, winFront-frameT/2); wfl._isRoom=true; addRoom(wfl);
-  // Right (toward inside)
-  const wfr=new THREE.Mesh(new THREE.BoxGeometry(frameD, winH, frameT), frameMat);
-  wfr.position.set(trimX, winCenterY, winBack+frameT/2); wfr._isRoom=true; addRoom(wfr);
-  // Horizontal mullion (center bar)
-  const wfm=new THREE.Mesh(new THREE.BoxGeometry(frameD, frameT*0.6, winW), frameMat);
-  wfm.position.set(trimX, winCenterY, winCenterZ); wfm._isRoom=true; addRoom(wfm);
+  const bedroomWindow = buildWindowModel({ width: winW, height: winH });
+  bedroomWindow.position.set(trimX, winCenterY, winCenterZ);
+  tagAll(bedroomWindow, { _isRoom: true });
+  // Mark ALL bedroom window meshes as click-passthrough so raycasts reach the
+  // outdoor backdrop behind them for day/night toggle.
+  bedroomWindow.traverse(o => {
+    if (o.isMesh) o.userData.clickPassthrough = true;
+  });
+  addRoom(bedroomWindow);
   
   // Outdoor scene visible through window — same composition for day + night.
   const _clouds = [[80,90,60,25],[200,70,80,30],[350,100,55,20],[430,60,70,28]];
@@ -2761,8 +3411,10 @@ export function createRoom(scene) {
   const _outdoorDayTex=outdoorTex;
   const _outdoorNightTex=nightOutdoorTex;
   
-  const outdoorMat=new THREE.MeshBasicMaterial({map:_windowIsNight?nightOutdoorTex:outdoorTex, color:_windowIsNight?0x445566:0xfff0d4});
+  outdoorMat=new THREE.MeshBasicMaterial({map:_windowIsNight?nightOutdoorTex:outdoorTex, color:_windowIsNight?0x445566:0xfff0d4});
   outdoorMat.toneMapped=false;
+  // Swap placeholder on guest-room outdoor backdrop now that outdoorMat exists
+  if (_grOutdoorMesh) { _grOutdoorMesh.material.dispose(); _grOutdoorMesh.material = outdoorMat; }
   const outdoorGeo=new THREE.PlaneGeometry(winW*2.5, winH*2);
   const outdoor=new THREE.Mesh(outdoorGeo, outdoorMat);
   outdoor.rotation.y=Math.PI/2;
@@ -3530,6 +4182,16 @@ export function createRoom(scene) {
       for (const l of _debugWallLabels) l.visible = vis;
       return vis;
     },
-    areDebugWallLabelsVisible: () => _debugWallLabels[0]?.visible ?? false
+    areDebugWallLabelsVisible: () => _debugWallLabels[0]?.visible ?? false,
+    // Office window open/close state
+    getOfficeWindowModel: () => _officeWindowModel,
+    isOfficeWindowOpen: () => _officeWindowOpen,
+    setOfficeWindowOpen: (v) => { _officeWindowOpen = v; },
+    // Office window opening coords (pre-mirror, for collision)
+    grWinCenterZ: typeof grWinCenterZ !== 'undefined' ? grWinCenterZ : 0,
+    grWinBottom: typeof grWinBottom !== 'undefined' ? grWinBottom : 0,
+    grWinTop: typeof grWinTop !== 'undefined' ? grWinTop : 0,
+    grWinLeft: typeof grWinLeft !== 'undefined' ? grWinLeft : 0,
+    grWinRight: typeof grWinRight !== 'undefined' ? grWinRight : 0
   };
 }

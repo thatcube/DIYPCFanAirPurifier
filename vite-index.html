@@ -363,6 +363,10 @@
           <span id="secretCoinCount">0</span>
         </span>
       </div>
+      <span id="mphDivider" class="run-pill__divider" aria-hidden="true" style="display:none"></span>
+      <div id="mphHud" class="run-pill--mph" aria-label="Speed" style="display:none">
+        <span id="mphValue">0</span><span class="mph-unit">MPH</span>
+      </div>
     </div>
     <span id="runTimerState" class="run-timer-state" hidden></span>
     <div id="fpShareRow" style="display:none"><button id="fpShareBtn" type="button"><i class="ph ph-copy"></i> Copy result</button></div>
@@ -406,6 +410,7 @@
   <div id="fpChargeBar" aria-label="Jump charge">
     <div class="fp-charge-head">
       <span class="fp-charge-label"><i class="ph ph-arrow-fat-up"></i> <span id="fpChargeLabel">Jump charge</span></span>
+      <span id="fpChargeSkateTag" class="fp-charge-skate-tag" style="display:none"><i class="ph-fill ph-sneaker-move"></i> Skating</span>
       <span id="fpChargeValue">Ready</span>
     </div>
     <div class="fp-charge-track">
@@ -464,6 +469,11 @@
                 <span class="pause-toggle-label"><i class="ph ph-gauge"></i> Show FPS</span>
                 <div class="toggle-sw" id="fpPauseShowFps" role="switch" aria-checked="false" onclick="window._toggleFps&&window._toggleFps()"></div>
                 <span class="pause-toggle-state off" id="fpPauseShowFpsState">Off</span>
+              </div>
+              <div class="pause-toggle-row" id="fpPauseShowMphRow" style="display:none">
+                <span class="pause-toggle-label"><i class="ph ph-speedometer"></i> Show MPH</span>
+                <div class="toggle-sw on" id="fpPauseShowMph" role="switch" aria-checked="true" onclick="window._toggleMph&&window._toggleMph()"></div>
+                <span class="pause-toggle-state" id="fpPauseShowMphState">On</span>
               </div>
               <div class="pause-toggle-row" id="fpPauseDebugWallsRow" style="display:none">
                 <span class="pause-toggle-label"><i class="ph ph-walls"></i> Wall labels</span>

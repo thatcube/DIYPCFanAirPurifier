@@ -105,10 +105,10 @@ export function createLights(isMobile) {
   key.shadow.radius = isMobile ? 5 : 8;
   key.shadow.blurSamples = isMobile ? 8 : 16;
   key.shadow.camera.near = 1;
-  key.shadow.camera.far = 280;
+  key.shadow.camera.far = 350;
   key.shadow.camera.left = -120;
   key.shadow.camera.right = 120;
-  key.shadow.camera.top = 95;
+  key.shadow.camera.top = 130;
   key.shadow.camera.bottom = -95;
   key.shadow.camera.updateProjectionMatrix();
   scene.add(key);

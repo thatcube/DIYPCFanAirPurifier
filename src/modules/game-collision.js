@@ -29,8 +29,8 @@ export function resetBoxPool() {
 // ── Bounds ──────────────────────────────────────────────────────────
 
 export const boundsBase = {
-  // Guest room (office) far wall at pre-mirror X=183 → world X=-183.5
-  xMin: -183.5 + 0.25,
+  // Outdoor terrain extends to pre-mirror X=543 → world X=-543
+  xMin: -544 + 0.25,
   xMax: -(LEFT_WALL_X) - 0.25,                   // window wall
   zMin: OPP_WALL_Z - CLOSET_INTERIOR_W / 2,
   // Back wall is at Z=49. Hallway extension runs Z=49..289. Use the hallway
