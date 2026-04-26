@@ -417,20 +417,23 @@
   <!-- Pause overlay -->
   <div id="fpPauseOverlay" role="dialog" aria-modal="true" aria-label="Pause menu">
     <div class="pause-card">
-      <div class="pause-layout">
-        <!-- Left: controls -->
-        <div class="pause-left">
-          <header class="pause-header">
-            <h2>Paused</h2>
-            <p class="pause-sub">Timer keeps running...</p>
-          </header>
 
-          <!-- Primary actions -->
-          <div class="pause-primary">
-            <button class="pause-btn glass-btn glass-btn--primary" onclick="window._resumeFP&&window._resumeFP()"><i class="ph-fill ph-play"></i> Resume <kbd class="pause-btn-key">Esc</kbd></button>
-            <button class="pause-btn glass-btn" onclick="window._resetFP&&window._resetFP()"><i class="ph ph-arrow-counter-clockwise"></i> Reset run <kbd class="pause-btn-key">R</kbd></button>
-            <button class="pause-btn glass-btn glass-btn--danger" onclick="window._exitFP&&window._exitFP()"><i class="ph ph-sign-out"></i> Exit</button>
-          </div>
+      <!-- Action zone: Resume / Reset / Exit — prominent top band -->
+      <div class="pause-action-zone">
+        <div class="pause-action-header">
+          <h2>Paused</h2>
+        </div>
+        <div class="pause-action-btns">
+          <button class="pause-btn pause-btn--hero glass-btn glass-btn--primary" id="fpPauseResume" onclick="window._resumeFP&&window._resumeFP()"><i class="ph-fill ph-play"></i> Resume <kbd class="pause-btn-key">Esc</kbd></button>
+          <button class="pause-btn pause-btn--secondary glass-btn" onclick="window._resetFP&&window._resetFP()"><i class="ph ph-arrow-counter-clockwise"></i> Reset run <kbd class="pause-btn-key">R</kbd></button>
+          <button class="pause-btn pause-btn--secondary glass-btn glass-btn--danger" onclick="window._exitFP&&window._exitFP()"><i class="ph ph-sign-out"></i> Exit</button>
+        </div>
+      </div>
+
+      <!-- Body: settings + leaderboard -->
+      <div class="pause-layout">
+        <!-- Left: settings -->
+        <div class="pause-left">
 
           <!-- Audio -->
           <section class="pause-section">
@@ -504,6 +507,7 @@
             </div>
           </section>
         </div>
+
         <!-- Right: leaderboard -->
         <div class="pause-right">
           <h4 class="pause-lb-title"><i class="ph-fill ph-trophy"></i> Leaderboard</h4>

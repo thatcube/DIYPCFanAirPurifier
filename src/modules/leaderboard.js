@@ -603,8 +603,8 @@ export function renderLeaderboardPanel() {
     return;
   }
   if (emptyEl) emptyEl.style.display = 'none';
-  // Show top 5 in the pause card
-  const top = _leaderboard.slice(0, 5);
+  // Show top 10 in the pause card
+  const top = _leaderboard.slice(0, 10);
   const latestEntryId = String(((_lastRunData && _lastRunData.entryId) || (_finishDialogData && _finishDialogData.entryId) || '')).trim();
   list.innerHTML = top.map((r, i) => {
     const isHistory = r.playerId ? (r.playerId === _playerId) : (r.name === _playerName);
