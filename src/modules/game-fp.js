@@ -112,7 +112,7 @@ export function setSkateMode(enabled, opts = {}) {
   // Reset trick state
   _trickManual = 0; _trickManualHeld = false;
   _trickKickflip = 0; _trickKickflipActive = false;
-  _trickSpin = 0; _trickSpinActive = false;
+  _trickSpinAngle = 0; _trickSpinSpeed = 0; _trickSpinBoost = false;
   if (!silent && _showToast) _showToast(skateMode ? 'Skate mode on' : 'Skate mode off');
 }
 
@@ -322,8 +322,9 @@ let _trickManual     = 0;      // smoothed 0..1 pitch amount
 let _trickManualHeld = false;  // E key currently down
 let _trickKickflip       = 0;      // 0..1 animation progress
 let _trickKickflipActive = false;
-let _trickSpin       = 0;      // 0..1 animation progress
-let _trickSpinActive = false;
+let _trickSpinAngle  = 0;      // cumulative spin angle (radians)
+let _trickSpinSpeed  = 0;      // current spin speed (radians/sec)
+let _trickSpinBoost  = false;  // flag: apply upward kick next frame
 
 // Cached DOM elements (looked up once in init or on first use)
 let _cachedCbBar = null, _cachedCbFill = null, _cachedCbValue = null, _cachedCbLabel = null;
@@ -2435,7 +2436,7 @@ export function toggleFirstPerson() {
     _skateLean = 0;
     _trickManual = 0; _trickManualHeld = false;
     _trickKickflip = 0; _trickKickflipActive = false;
-    _trickSpin = 0; _trickSpinActive = false;
+    _trickSpinAngle = 0; _trickSpinSpeed = 0; _trickSpinBoost = false;
     _silenceSkateRoll(true);
 
     // Enter FP
@@ -2489,7 +2490,7 @@ export function toggleFirstPerson() {
     _skateLean = 0;
     _trickManual = 0; _trickManualHeld = false;
     _trickKickflip = 0; _trickKickflipActive = false;
-    _trickSpin = 0; _trickSpinActive = false;
+    _trickSpinAngle = 0; _trickSpinSpeed = 0; _trickSpinBoost = false;
     _silenceSkateRoll(true);
 
     // Exit FP
@@ -2560,7 +2561,7 @@ function _respawn() {
   _skateLean = 0;
   _trickManual = 0; _trickManualHeld = false;
   _trickKickflip = 0; _trickKickflipActive = false;
-  _trickSpin = 0; _trickSpinActive = false;
+  _trickSpinAngle = 0; _trickSpinSpeed = 0; _trickSpinBoost = false;
   _silenceSkateRoll(true);
   _ssShakeOffset.set(0, 0, 0);
   _setSuperSaiyanEnvLightOff();
@@ -3368,19 +3369,31 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       while (dYaw < -Math.PI) dYaw += Math.PI * 2;
       _catGroupYaw += dYaw * easeAlpha(19.74, dtSec);
 
-      // ── Board spin trick (F) — full 360 of character+board ────────
+      // ── Board spin trick (F) — accumulating aerial spin ───────────
+      // Each press gives a brief upward impulse; you must keep mashing
+      // to stay airborne. No continuous lift — gravity always wins.
       let spinExtra = 0;
-      if (_trickSpinActive) {
-        const SPIN_DUR = 0.5;
-        _trickSpin += dtSec / SPIN_DUR;
-        if (_trickSpin >= 1) { _trickSpin = 0; _trickSpinActive = false; }
-        else {
-          const t = _trickSpin;
-          spinExtra = t * t * (3 - 2 * t) * Math.PI * 2;
-          // Helicopter lift — strongest at start, fades out
-          const lift = (1 - t) * 0.35;
-          fpVy = Math.max(fpVy, lift);
+      if (_trickSpinSpeed !== 0) {
+        if (grounded) {
+          _trickSpinAngle = 0;
+          _trickSpinSpeed = 0;
+          _trickSpinBoost = false;
+        } else {
+          _trickSpinAngle += _trickSpinSpeed * dtSec;
+          spinExtra = _trickSpinAngle;
         }
+      }
+      // Apply per-press upward impulse (deferred from keydown)
+      // Dampened near ceiling so you can't get stuck up there
+      if (_trickSpinBoost) {
+        const _flY = getFloorY();
+        const _ceilY = outdoorZone ? (_flY + 200) : (_flY + 80) - 0.5;
+        const headroom = _ceilY - fpPos.y;
+        const HOVER_MARGIN = 10;
+        const ceilDamp = headroom < HOVER_MARGIN ? Math.max(0, headroom / HOVER_MARGIN) : 1;
+        const kick = 0.22 * ceilDamp;
+        fpVy = Math.max(fpVy, kick);
+        _trickSpinBoost = false;
       }
 
       const lateralInput = (fpKeys.d ? 1 : 0) - (fpKeys.a ? 1 : 0);
@@ -3561,7 +3574,13 @@ function _bindInputs() {
         _trickManualHeld = skateMode;
         break;
       case 'KeyF':
-        if (skateMode && !_trickSpinActive) { _trickSpinActive = true; _trickSpin = 0; }
+        // Each press adds spin speed while airborne; cap at ~30 rev/s
+        if (skateMode && !_wasGroundedLast) {
+          const SPIN_ADD = Math.PI * 2;   // ~1 rev/s per press
+          const SPIN_CAP = Math.PI * 15;  // ~30 rev/s
+          _trickSpinSpeed = Math.min(_trickSpinSpeed + SPIN_ADD, SPIN_CAP);
+          _trickSpinBoost = true;
+        }
         break;
     }
   });
