@@ -3395,12 +3395,20 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
       // Compose catGroup orientation via quaternion to avoid Euler gimbal
       // issues when combining yaw + lean + manual pitch.
+      // Lean & manual are relative to movement direction, not the visual
+      // pose yaw — so we apply them around the movement yaw, then add the
+      // pose offset on top. This keeps them correct for sideways-stance
+      // models (totodile, bababooey) without affecting forward-stance ones.
       {
-        const qYaw = _quatA.setFromAxisAngle(_vecUp, _catGroupYaw + spinExtra);
+        const moveYaw = _catGroupYaw - skateYawOffset + spinExtra;
+        const qMoveYaw = _quatA.setFromAxisAngle(_vecUp, moveYaw);
         const qLean = _quatB.setFromAxisAngle(_vecFwd, _skateLean);
         const qManual = _quatC.setFromAxisAngle(_vecRight, -manualAngle);
-        // Yaw first, then local lean (roll), then local pitch (manual)
-        _catGroup.quaternion.copy(qYaw).multiply(qLean).multiply(qManual);
+        // Movement yaw → lean → manual → then pose offset on top
+        _catGroup.quaternion.copy(qMoveYaw).multiply(qLean).multiply(qManual);
+        if (skateYawOffset !== 0) {
+          _catGroup.quaternion.multiply(_quatA.setFromAxisAngle(_vecUp, skateYawOffset));
+        }
       }
 
       if (_skateboardAnchor) {
