@@ -1813,7 +1813,7 @@ export function createPurifier(scene) {
   function getInteractiveTarget(obj){
     let p=obj;
     while(p){
-      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isCornerDoorHandle||p._isCornerDoor||p._isGuestDoor||p._isGuestDoorHandle||p._isMacbook||p._isWindow||p._isTV||p._isFoodBowl||p._isPickupSkateboard) return p;
+      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isBypassPanel||p._isCornerDoorHandle||p._isCornerDoor||p._isGuestDoor||p._isGuestDoorHandle||p._isMacbook||p._isWindow||p._isWindowPane||p._isTV||p._isFoodBowl||p._isPickupSkateboard) return p;
       p=p.parent;
     }
     return null;
@@ -2098,6 +2098,24 @@ export function createPurifier(scene) {
       if(_fpMode) spawnSecretCeilingLightCoins();
       return;
     }
+    // Clicked window pane → slide open/close
+    if(obj._isWindowPane){
+      let winGroup = obj;
+      while (winGroup && !winGroup.userData?.windowModel) winGroup = winGroup.parent;
+      if (!winGroup) return;
+      if (_windowLerps.some(wl => wl.group === winGroup)) return; // already animating
+      const wm = winGroup.userData.windowModel;
+      // Toggle open state (stored on userData so it persists with the group)
+      wm._isOpen = !wm._isOpen;
+      const open = wm._isOpen;
+      wm._slideTarget = open ? wm.lowerPane._baseY + wm.height / 2 : wm.lowerPane._baseY;
+      _windowLerps.push({ group: winGroup });
+      // Sync room-level state for collision gating in game-fp
+      if (typeof window !== 'undefined' && window._roomRefs && window._roomRefs.setOfficeWindowOpen) {
+        window._roomRefs.setOfficeWindowOpen(open);
+      }
+      return;
+    }
     // Clicked window → toggle day/night
     if(obj._isWindow){
       if(!_roomOutdoorMat || !_applyTimeOfDay) return;
@@ -2174,6 +2192,19 @@ export function createPurifier(scene) {
       const openAng=80*Math.PI/180;
       leaf._leafTarget=leaf._leafOpen ? openAng : 0;
       _bifoldLerps.push({leaf});
+      return;
+    }
+    // Clicked a bypass sliding closet panel → toggle slide
+    if(obj._isBypassPanel){
+      let panel=obj;
+      while(panel && !(panel._isBypassPanel && panel.isGroup && panel._slideMax!==undefined)) panel=panel.parent;
+      if(!panel) return;
+      if(_bypassLerps.some(bl=>bl.panel===panel)) return;
+      panel._slideOpen=!panel._slideOpen;
+      _playDoorCue(panel._slideOpen, 0.65);
+      // Each panel slides toward the other (stacks behind it on parallel track)
+      panel._slideTarget=panel._slideOpen ? panel._baseZ+panel._slideDir*panel._slideMax : panel._baseZ;
+      _bypassLerps.push({panel});
       return;
     }
     // Clicked the MacBook → toggle screen + spawn secret coin on first click.
@@ -2288,6 +2319,8 @@ export function createPurifier(scene) {
   const _filterLerps=[];
   const _drawerLerps=[];
   const _bifoldLerps=[];
+  const _bypassLerps=[];
+  const _windowLerps=[];
   
   // macOS trackpad pinch-to-zoom → model zoom (Safari gesture events)
   let gestureStartRadius;
@@ -3539,6 +3572,36 @@ export function createPurifier(scene) {
         }
       }
     }
+
+    // Bypass sliding door lerp
+    if (_bypassLerps.length > 0) {
+      const aBypass = 1 - Math.exp(-7.0 * dtSec);
+      for (let i = _bypassLerps.length - 1; i >= 0; i--) {
+        const bl = _bypassLerps[i];
+        const panel = bl.panel;
+        panel.matrixAutoUpdate = true;
+        panel.position.z += (panel._slideTarget - panel.position.z) * aBypass;
+        if (Math.abs(panel.position.z - panel._slideTarget) < 0.01) {
+          panel.position.z = panel._slideTarget;
+          _bypassLerps.splice(i, 1);
+        }
+      }
+    }
+
+    // Window pane slide lerp
+    if (_windowLerps.length > 0) {
+      const aWin = 1 - Math.exp(-8.0 * dtSec);
+      for (let i = _windowLerps.length - 1; i >= 0; i--) {
+        const wl = _windowLerps[i];
+        const wm = wl.group.userData.windowModel;
+        const pane = wm.lowerPane;
+        pane.position.y += (wm._slideTarget - pane.position.y) * aWin;
+        if (Math.abs(pane.position.y - wm._slideTarget) < 0.02) {
+          pane.position.y = wm._slideTarget;
+          _windowLerps.splice(i, 1);
+        }
+      }
+    }
   }
 
   // ─── Fan color & RGB functions ──────────────────────────────────
@@ -3673,6 +3736,33 @@ export function createPurifier(scene) {
           leaf._leafOpen = false;
           leaf.rotation.y = 0;
           if (leaf._innerGroup) leaf._innerGroup.rotation.y = 0;
+        }
+      }
+
+      // Bypass sliding doors: snap fully closed.
+      _bypassLerps.length = 0;
+      const bypassDoors = (typeof window !== 'undefined') ? window._bypassDoorsRef : null;
+      if (bypassDoors && bypassDoors.length) {
+        for (const panel of bypassDoors) {
+          if (!panel) continue;
+          panel.position.z = panel._baseZ;
+          panel._slideTarget = panel._baseZ;
+          panel._slideOpen = false;
+          panel.matrixAutoUpdate = true;
+          panel.updateMatrixWorld(true);
+        }
+      }
+
+      // Office window: snap closed.
+      _windowLerps.length = 0;
+      if (roomRefs && roomRefs.setOfficeWindowOpen) {
+        roomRefs.setOfficeWindowOpen(false);
+        const wm = roomRefs.getOfficeWindowModel && roomRefs.getOfficeWindowModel();
+        if (wm && wm.userData && wm.userData.windowModel) {
+          const wd = wm.userData.windowModel;
+          wd._isOpen = false;
+          wd.lowerPane.position.y = wd.lowerPane._baseY;
+          wd._slideTarget = wd.lowerPane._baseY;
         }
       }
     },

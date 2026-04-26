@@ -17,7 +17,7 @@ import * as THREE from 'three';
 
 const GREY      = new THREE.Color(0x6b7b8d);
 const WHITE     = new THREE.Color(0xf0ede8);
-const PINK      = 0xe8a0a0;
+const PINK      = 0xd4b0ab;
 const EYE_GREEN = 0x8fad5a;
 const PUPIL     = 0x111111;
 const EYE_WHITE = 0xf5f5f0;
@@ -209,11 +209,27 @@ function _sculptBody() {
 function _paintVCBody(geo) {
   const pp = geo.attributes.position;
   const colors = new Float32Array(pp.count * 3);
+  const W = 0.20, H = 0.18, L = 0.44;
   for (let i = 0; i < pp.count; i++) {
-    const y = pp.getY(i);
-    // Hard cutoff: below -0.01 is white, above is grey
-    // This puts the boundary just below the midline — white belly, grey back
-    const c = y < -0.01 ? WHITE : GREY;
+    const x = pp.getX(i), y = pp.getY(i), z = pp.getZ(i);
+    const nx = x / (W / 2);   // -1..1 left-right
+    const ny = y / (H / 2);   // -1..1 bottom-top
+    const nz = z / (L / 2);   // -1..1 (-Z = chest/front, +Z = hips/back)
+
+    // Saddle / cape pattern shaped by position along the torso:
+    // - Mid-body: grey extends down the sides
+    // - Front (chest, +Z): all white, wraps fully around including top
+    // - Back (hips, -Z): grey on top, white on sides
+    const absNz = Math.abs(nz);
+    // How much grey is allowed to extend down — peaks in the middle of torso
+    const midBody = 1 - absNz * absNz;            // 1 at center, 0 at ends
+    const sideWhiten  = nx * nx * (0.3 + 0.4 * (1 - midBody)); // sides whiten more at ends
+    const frontWhiten = Math.pow(Math.max(0, nz), 1.2) * 3.0;  // very strong whiten at chest end
+    const backWhiten  = Math.max(0, -nz) * 0.15;  // mild whiten toward hips
+    const threshold   = sideWhiten + frontWhiten + backWhiten - 0.55;
+
+    const isGrey = ny > threshold;
+    const c = isGrey ? GREY : WHITE;
     colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -233,7 +249,7 @@ function _sculptHead() {
     const nx = x / (W / 2), ny = y / (H / 2), nz = z / (D / 2);
 
     // Round into an overall sphere-ish shape
-    const edgeR = 0.045;
+    const edgeR = 0.065;
     const ex = Math.max(0, Math.abs(x) - W / 2 + edgeR);
     const ey = Math.max(0, Math.abs(y) - H / 2 + edgeR);
     const ez = Math.max(0, Math.abs(z) - D / 2 + edgeR);
@@ -289,12 +305,27 @@ function _sculptHead() {
 function _paintVCHead(geo) {
   const pp = geo.attributes.position;
   const colors = new Float32Array(pp.count * 3);
+  const W = 0.24, H = 0.19, D = 0.20;
   for (let i = 0; i < pp.count; i++) {
-    const y = pp.getY(i);
-    const z = pp.getZ(i);
-    // Grey is default (top of head, back). White on lower front face.
-    // White if: below the midline AND in the front half
-    const isWhite = y < -0.01 && z > -0.02;
+    const x = pp.getX(i), y = pp.getY(i), z = pp.getZ(i);
+    const nx = Math.abs(x) / (W / 2); // 0 center, 1 edge
+    const nz = z / (D / 2);
+
+    // White forms an inverted V on the front face:
+    // - Wide at the bottom (connects to white chin/chest)
+    // - Tapers to a narrow point between the eyes
+    const onFront = Math.max(0, nz);
+    // V shape: white boundary depends on how far from center.
+    // At center (nx=0) white reaches highest; at sides it stays low.
+    // The boundary is a linear V slope from center outward.
+    const vHeight = Math.max(0, 0.05 - nx * 0.08) * onFront;
+    const threshold = -0.02 + vHeight;
+
+    // Small white patch on top of head between the ears
+    const topDist = nx * nx / (0.2 * 0.2) + Math.pow((nz + 0.15) / 0.35, 2);
+    const topPatch = y > H * 0.38 && topDist < 1.0;
+
+    const isWhite = (y < threshold && z > -0.02) || topPatch;
     const c = isWhite ? WHITE : GREY;
     colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
   }
@@ -305,7 +336,7 @@ function _paintVCHead(geo) {
 // Tall, slightly concave, organic triangle shape — not a simple cone.
 
 function _sculptEar() {
-  const W = 0.065, H = 0.11, D = 0.04;
+  const W = 0.08, H = 0.14, D = 0.05;
   const geo = new THREE.BoxGeometry(W, H, D, 6, 10, 4);
   const pp = geo.attributes.position;
 
@@ -346,8 +377,9 @@ function _sculptEar() {
     const z = pp.getZ(i);
     const y = pp.getY(i);
     const ny = y / (H / 2);
-    // Inner pink if facing forward and not at the very base
-    const isPink = z > 0.005 && ny > -0.4;
+    // Inner pink if facing forward, not at the very base, and not near edges
+    const nx = pp.getX(i) / (W / 2);
+    const isPink = z > 0.012 && ny > -0.3 && Math.abs(nx) < 0.55;
     const c = isPink ? pink : GREY;
     colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
   }
@@ -405,12 +437,10 @@ function _sculptLeg(isBack) {
     pp.setX(i, x); pp.setY(i, y); pp.setZ(i, z);
   }
 
-  // Paint: grey at very top, white rest
+  // Paint: all white — Korra's legs are fully white
   const colors = new Float32Array(pp.count * 3);
   for (let i = 0; i < pp.count; i++) {
-    const y = pp.getY(i);
-    const c = y > H / 2 * 0.7 ? GREY : WHITE;
-    colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+    colors[i * 3] = WHITE.r; colors[i * 3 + 1] = WHITE.g; colors[i * 3 + 2] = WHITE.b;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geo.computeVertexNormals();
@@ -491,8 +521,8 @@ export function buildKorraModel() {
   const earMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0 });
   for (const side of [-1, 1]) {
     const earMesh = new THREE.Mesh(_sculptEar(), earMat);
-    earMesh.position.set(side * 0.065, 0.10, -0.01);
-    earMesh.rotation.set(-0.1, 0, side * 0.2);
+    earMesh.position.set(side * 0.085, 0.10, -0.01);
+    earMesh.rotation.set(-0.1, 0, side * -0.25);
     bones.head.add(earMesh);
   }
 
@@ -625,16 +655,16 @@ function _buildSkeleton() {
   chest.position.set(0, 0.04, 0.14);
   neck.position.set(0, 0.05, 0.10);
   head.position.set(0, 0.06, 0.06);
-  tail1.position.set(0, 0.08, -0.14);
+  tail1.position.set(0, 0.14, -0.14);
   tail2.position.set(0, 0.04, -0.10);
   tail3.position.set(0, 0.04, -0.08);
 
   // Front legs attach via chest (hips→spine→chest adds +0.08 Y),
   // so front leg bones sit lower to compensate. All foot bones equal.
-  lfLeg.position.set(0.08, -0.14, 0.02);
-  rfLeg.position.set(-0.08, -0.14, 0.02);
-  lbLeg.position.set(0.07, -0.06, 0.02);
-  rbLeg.position.set(-0.07, -0.06, 0.02);
+  lfLeg.position.set(0.08, -0.10, 0.02);
+  rfLeg.position.set(-0.08, -0.10, 0.02);
+  lbLeg.position.set(0.07, -0.02, 0.02);
+  rbLeg.position.set(-0.07, -0.02, 0.02);
   // Foot bones = knee joints, at bottom of upper leg (H=0.20)
   lfFoot.position.set(0, -0.20, 0);
   rfFoot.position.set(0, -0.20, 0);

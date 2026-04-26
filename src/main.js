@@ -207,6 +207,7 @@ ensureGlassBlurCompat();
 // ── Build scene ─────────────────────────────────────────────────────
 
 const roomRefs = createRoom(scene);
+window._roomRefs = roomRefs;  // expose for purifier.js window-open click handler
 console.log('[main] Room created');
 
 const purifierRefs = createPurifier(scene);
@@ -920,6 +921,11 @@ window._toggleFps = () => {
 };
 _applyFpsVisibility();
 
+// MPH HUD toggle
+window._toggleMph = () => {
+  gameFp.setMphVisible(!gameFp.mphVisible);
+};
+
 // Debug wall labels (localhost only)
 window._toggleDebugWallLabels = () => {
   if (!roomRefs || typeof roomRefs.toggleDebugWallLabels !== 'function') return;
@@ -1148,6 +1154,8 @@ const _flyMove = new THREE.Vector3();
 
 // Cached DOM refs for per-frame updates
 const _elRunTimer = document.getElementById('runTimerText');
+const _elMphValue = document.getElementById('mphValue');
+let _lastMphText = '';
 const _elFps = document.getElementById('fpsInline');
 const _elPauseOv = document.getElementById('fpPauseOverlay');
 
@@ -1219,6 +1227,20 @@ function animate(ts) {
     // Timer tick
     leaderboard.tickTimer(ts);
     if (_elRunTimer) _elRunTimer.textContent = leaderboard.formatRunTime(leaderboard.getElapsed());
+    // MPH speedometer — update every frame (cheap: one hypot + DOM write)
+    if (_elMphValue && gameFp.mphVisible && gameFp.skateboardFound) {
+      // getHorizSpeed() returns inches/second; scale so base skate sprint ≈ 25 MPH
+      const rawSpd = gameFp.getHorizSpeed();
+      const mph = Math.round(rawSpd * 0.44);
+      const txt = String(mph);
+      if (txt !== _lastMphText) {
+        _elMphValue.textContent = txt;
+        _lastMphText = txt;
+        // Heat glow tiers
+        const heat = mph >= 120 ? '3' : mph >= 60 ? '2' : mph >= 30 ? '1' : '';
+        if (_elMphValue.dataset.heat !== heat) _elMphValue.dataset.heat = heat;
+      }
+    }
     // Check for run completion (all regular coins collected)
     if (coins.coinScore >= coins.coinTotal && coins.coinTotal > 0 && !leaderboard.isFinished()) {
       leaderboard.stopTimer();

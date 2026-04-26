@@ -19,6 +19,8 @@ const PICK_RADIUS_SQ = PICK_RADIUS * PICK_RADIUS;
 let _geo = null;
 let _mat = null;
 let _secretMat = null;
+let _sparkleMat = null;
+let _secretSparkleMat = null;
 
 // Audio context — shared with music module
 export let audioCtx = null;
@@ -102,25 +104,54 @@ export function setQuickCoinMode(enabled) {
 
 export function makeCoin(opts) {
   if (!_geo) {
-    _geo = new THREE.CylinderGeometry(1.2, 1.2, 0.28, 12);
+    // Coin profile: beveled rim with a slight dish on the face.
+    // LatheGeometry revolves these points around Y to form the coin.
+    const r = 1.2, h = 0.14, bevel = 0.06;
+    const pts = [
+      new THREE.Vector2(0,        h),          // center-top
+      new THREE.Vector2(r - bevel, h),          // face edge
+      new THREE.Vector2(r,         h - bevel),  // rim top bevel
+      new THREE.Vector2(r,        -h + bevel),  // rim bottom bevel
+      new THREE.Vector2(r - bevel,-h),          // face edge bottom
+      new THREE.Vector2(0,       -h),           // center-bottom
+    ];
+    _geo = new THREE.LatheGeometry(pts, 24);
     _geo.rotateX(Math.PI / 2);
   }
   if (!_mat) {
     _mat = new THREE.MeshStandardMaterial({
       color: 0xffd24a,
       emissive: 0xffb300,
-      emissiveIntensity: 1.2,
+      emissiveIntensity: 1.4,
       roughness: 0.25,
       metalness: 0.85
+    });
+  }
+  if (!_sparkleMat) {
+    _sparkleMat = new THREE.SpriteMaterial({
+      color: 0xffd54f,
+      transparent: true,
+      opacity: 0.6,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
     });
   }
   if (opts && opts.secret && !_secretMat) {
     _secretMat = new THREE.MeshStandardMaterial({
       color: 0x4ab8ff,
       emissive: 0x1e88e5,
-      emissiveIntensity: 1.4,
+      emissiveIntensity: 1.5,
       roughness: 0.25,
       metalness: 0.85
+    });
+  }
+  if (opts && opts.secret && !_secretSparkleMat) {
+    _secretSparkleMat = new THREE.SpriteMaterial({
+      color: 0x80d0ff,
+      transparent: true,
+      opacity: 0.6,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
     });
   }
   const mat = (opts && opts.secret) ? _secretMat : _mat;
@@ -141,6 +172,24 @@ export function addCoin(parent, localPos, opts) {
     : `coin_${coinTotal + 1}`);
   coin.position.copy(localPos);
   coin.visible = false;
+
+  // Attach subtle glint sprites to the coin mesh
+  const sMat = secret ? _secretSparkleMat : _sparkleMat;
+  const sparkles = [];
+  if (sMat) {
+    for (let i = 0; i < 2; i++) {
+      const s = new THREE.Sprite(sMat);
+      s._baseScale = 0.2 + Math.random() * 0.15;
+      s.scale.setScalar(s._baseScale);
+      s._phase = (i / 2) * Math.PI * 2 + Math.random() * 0.5;
+      s._radius = 1.4 + Math.random() * 0.4;
+      s._yOff = (Math.random() - 0.5) * 0.6;
+      s._speed = 0.4 + Math.random() * 0.3;
+      coin.add(s);
+      sparkles.push(s);
+    }
+  }
+
   parent.add(coin);
   coins.push({
     id: coinId,
@@ -154,6 +203,7 @@ export function addCoin(parent, localPos, opts) {
     inDrawer: !!(opts && opts.inDrawer),
     consoleProp: !!(opts && opts.consoleProp),
     secret,
+    sparkles,
     isDynamic: !!(opts && opts.isDynamic),
     highJump: !!(opts && opts.highJump),
     speedModeOnly: !!(opts && opts.speedModeOnly)
@@ -401,6 +451,21 @@ export function spawnRoomCoins(roomRefs) {
     const dwz = drw.position.z + (drw._drawerTrayD || 10) / 2 + 0.4; // center of tray
     coinInDrawer.position.set(dwx, dwy, dwz);
     coinInDrawer.visible = false;
+    // Add glint sprites to drawer coin
+    const drawerSparkles = [];
+    if (_sparkleMat) {
+      for (let i = 0; i < 2; i++) {
+        const s = new THREE.Sprite(_sparkleMat);
+        s._baseScale = 0.2 + Math.random() * 0.15;
+        s.scale.setScalar(s._baseScale);
+        s._phase = (i / 2) * Math.PI * 2 + Math.random() * 0.5;
+        s._radius = 1.4 + Math.random() * 0.4;
+        s._yOff = (Math.random() - 0.5) * 0.6;
+        s._speed = 0.4 + Math.random() * 0.3;
+        coinInDrawer.add(s);
+        drawerSparkles.push(s);
+      }
+    }
     _coinGroup.add(coinInDrawer);
     const drawerCoinEntry = {
       id: 'coin_' + (coinTotal + 1),
@@ -414,6 +479,7 @@ export function spawnRoomCoins(roomRefs) {
       inDrawer: true,
       consoleProp: false,
       secret: false,
+      sparkles: drawerSparkles,
       isDynamic: false,
       _drawerRef: drw,
       _allDrawers: roomRefs.drawers,
@@ -598,6 +664,24 @@ export function updateCoins(ts, playerPos) {
     // Spin + bob
     c.mesh.rotation.y = t * c.spinSpeed * 60;
     c.mesh.position.y = c.basePos.y + Math.sin(t * 2 + c.bobPhase) * 0.8;
+
+    // Animate glint sprites — slow orbit, intermittent flash
+    if (c.sparkles) {
+      const coinRot = c.mesh.rotation.y;
+      for (const s of c.sparkles) {
+        const angle = s._phase + t * s._speed;
+        const localAngle = angle - coinRot;
+        s.position.set(
+          Math.cos(localAngle) * s._radius,
+          s._yOff + Math.sin(t * 1.5 + s._phase) * 0.3,
+          Math.sin(localAngle) * s._radius
+        );
+        // Glint: mostly invisible, brief flash peaks
+        const wave = Math.sin(t * 2.5 + s._phase * 3);
+        const flash = Math.max(0, wave * wave * wave); // sharp peaks
+        s.scale.setScalar(s._baseScale * flash);
+      }
+    }
 
     // Drawer coins: track the drawer's slide position
     if (c.inDrawer && c._drawerRef) {

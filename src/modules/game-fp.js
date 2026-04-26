@@ -50,6 +50,7 @@ const MOUSE_SENS_KEY = 'diy_air_purifier_mouse_sens_v1';
 const SPEED_MODE_KEY = 'diy_air_purifier_speed_mode_v1';
 const SKATE_MODE_KEY = 'diy_air_purifier_skate_mode_v1';
 const SKATEBOARD_FOUND_KEY = 'diy_air_purifier_skateboard_found_v1';
+const MPH_VIS_KEY = 'diy_air_purifier_mph_visible_v1';
 
 try { sfxMuted = localStorage.getItem(SFX_MUTE_KEY) === '1'; } catch (e) {}
 try { musicMuted = localStorage.getItem(MUSIC_MUTE_KEY) === '1'; } catch (e) {}
@@ -155,6 +156,34 @@ export function syncMouseSensUi() {
   _syncMouseSensUi();
 }
 
+// ── MPH HUD visibility ─────────────────────────────────────────────
+export let mphVisible = true;
+try { mphVisible = localStorage.getItem(MPH_VIS_KEY) !== '0'; } catch (e) {}
+
+export function isMphVisible() { return mphVisible; }
+export function setMphVisible(v) {
+  mphVisible = !!v;
+  try { localStorage.setItem(MPH_VIS_KEY, mphVisible ? '1' : '0'); } catch (e) {}
+  _syncMphHud();
+}
+
+function _syncMphHud() {
+  const show = mphVisible && skateboardFound && fpMode;
+  const el = document.getElementById('mphHud');
+  const div = document.getElementById('mphDivider');
+  if (el) el.style.display = show ? '' : 'none';
+  if (div) div.style.display = show ? '' : 'none';
+  // Pause menu toggle
+  const row = document.getElementById('fpPauseShowMphRow');
+  if (row) row.style.display = skateboardFound ? '' : 'none';
+  const sw = document.getElementById('fpPauseShowMph');
+  const st = document.getElementById('fpPauseShowMphState');
+  if (sw) { sw.classList.toggle('on', mphVisible); sw.setAttribute('aria-checked', String(mphVisible)); }
+  if (st) { st.textContent = mphVisible ? 'On' : 'Off'; st.classList.toggle('off', !mphVisible); }
+}
+
+export function syncMphHud() { _syncMphHud(); }
+
 function _syncAudioToggleUi() {
   const sfxTog = document.getElementById('fpPauseMuteSfx');
   const musicTog = document.getElementById('fpPauseMuteMusic');
@@ -228,6 +257,10 @@ function _syncSkateToggleUi() {
       skateHint.classList.remove('visible');
     }
   }
+  // Show/hide the skateboard tag in the charge bar
+  const skateTag = document.getElementById('fpChargeSkateTag');
+  if (skateTag) skateTag.style.display = (skateMode && skateboardFound) ? '' : 'none';
+  _syncMphHud();
 }
 
 export function syncSkateToggleUi() {
@@ -661,10 +694,10 @@ function _findInteractiveAncestor(obj) {
   for (let p = obj; p; p = p.parent) {
     if (p._isLamp || p._isCeilLight || p._isFan ||
         p._isFilterL || p._isFilterR ||
-        p._isDrawer || p._isBifoldLeaf ||
+        p._isDrawer || p._isBifoldLeaf || p._isBypassPanel ||
         p._isCornerDoorHandle || p._isCornerDoor ||
         p._isGuestDoor || p._isGuestDoorHandle ||
-        p._isMacbook || p._isWindow || p._isTV || p._isFoodBowl ||
+        p._isMacbook || p._isWindow || p._isWindowPane || p._isTV || p._isFoodBowl ||
         p._isPickupSkateboard) return p;
   }
   return null;
@@ -701,6 +734,12 @@ function _labelForInteractable(target) {
       if (leaf && leaf._leafOpen) return { verb: 'Close', noun: 'Closet' };
       return { verb: 'Open', noun: 'Closet' };
     }
+    if (p._isBypassPanel) {
+      let panel = p;
+      while (panel && !(panel._isBypassPanel && panel.isGroup && panel._slideMax !== undefined)) panel = panel.parent;
+      if (panel && panel._slideOpen) return { verb: 'Close', noun: 'Closet' };
+      return { verb: 'Open', noun: 'Closet' };
+    }
     if (p._isDrawer) {
       // Walk up to the drawer group that has _drawerOpen state.
       let grp = p;
@@ -712,7 +751,8 @@ function _labelForInteractable(target) {
     if (p._isCeilLight) return { verb: 'Toggle', noun: 'Ceiling Light' };
     if (p._isFan) return { verb: 'Toggle', noun: 'Fan' };
     if (p._isFilterL || p._isFilterR) return { verb: 'Slide', noun: 'Filter' };
-    if (p._isWindow) return { verb: 'Toggle', noun: 'Window' };
+    if (p._isWindowPane) return { verb: _roomRefs && _roomRefs.isOfficeWindowOpen() ? 'Close' : 'Open', noun: 'Window' };
+    if (p._isWindow) return { verb: 'Toggle', noun: 'Day/Night' };
     if (p._isMacbook) return { verb: 'Toggle', noun: 'MacBook' };
     if (p._isTV) return { verb: 'Toggle', noun: 'TV' };
     if (p._isFoodBowl) return { verb: 'Fill', noun: 'Food Bowl' };
@@ -1146,13 +1186,12 @@ function _spawnPickupSkateboard() {
 
     root.scale.setScalar(1.1);
 
-    // Place in the office room. Post-mirror coords:
-    // office X=-183..-51, Z=-78..69. Put it on the floor roughly
-    // center-room so the player spots it when entering.
+    // Place inside the office closet (bypass sliding door closet).
+    // World coords (room is mirrored on X): X≈-87..-51, Z≈-14..32.
     const fy = getFloorY();
-    const placeX = -100;   // mid-office
+    const placeX = -69;    // mid-closet depth (world X)
     const placeY = fy + 5;
-    const placeZ = 10;     // slightly toward the door side
+    const placeZ = 9;      // office closet center Z
 
     root.position.set(placeX, placeY, placeZ);
     root.rotation.set(0, Math.PI * 0.3, Math.PI * 0.12);
@@ -1351,7 +1390,7 @@ export function init(refs) {
   _interactiveObjects = [];
   _scene.traverse(obj => {
     if (obj._isLamp || obj._isCeilLight || obj._isFan || obj._isFilterL || obj._isFilterR ||
-        obj._isDrawer || obj._isBifoldLeaf || obj._isCornerDoorHandle || obj._isCornerDoor || obj._isWindow ||
+        obj._isDrawer || obj._isBifoldLeaf || obj._isBypassPanel || obj._isCornerDoorHandle || obj._isCornerDoor || obj._isWindow || obj._isWindowPane ||
         obj._isMacbook || obj._isTV || obj._isFoodBowl ||
         obj._isGuestDoor || obj._isGuestDoorHandle || obj._isPickupSkateboard) {
       _interactiveObjects.push(obj);
@@ -1634,6 +1673,59 @@ function _buildStaticBoxes() {
     });
   }
 
+  // Office closet +Z side wall (Z=32 pre-mirror, separates closet from guest door area)
+  _staticBoxes.push({
+    xMin: -(SIDE_WALL_X + CLOSET_DEPTH), xMax: -(SIDE_WALL_X + 0.5),
+    zMin: 32 - 0.25, zMax: 32 + 0.25,
+    yTop: fy + WALL_HEIGHT, room: true
+  });
+
+  // Office closet front wall header (above bypass door opening, X=87)
+  // extHeader: 0.5 thick, headerH=14 tall, _bypassOpenW=46 wide
+  // Position: X=87, Y=floorY+66+7, Z=9
+  {
+    const bpZmin = -14, bpZmax = 32, bpCenterZ = 9;
+    const bpH = 66; // bypass door height
+    _staticBoxes.push({
+      xMin: -(SIDE_WALL_X + CLOSET_DEPTH + 0.25), xMax: -(SIDE_WALL_X + CLOSET_DEPTH - 0.25),
+      zMin: bpZmin, zMax: bpZmax,
+      yTop: fy + WALL_HEIGHT, yBottom: fy + bpH, room: true
+    });
+
+    // Office closet shelf (against back wall at X≈58.6)
+    const bpShelfDepth = 14;
+    const bpShelfCX = SIDE_WALL_X + 0.5 + 0.1 + bpShelfDepth / 2; // 58.6
+    const bpShelfLen = (bpZmax - bpZmin) - 1; // 45
+    const bpShelfY = fy + WALL_HEIGHT - 24; // fy + 56
+    _staticBoxes.push({
+      xMin: -(bpShelfCX + bpShelfDepth / 2), xMax: -(bpShelfCX - bpShelfDepth / 2),
+      zMin: bpCenterZ - bpShelfLen / 2, zMax: bpCenterZ + bpShelfLen / 2,
+      yTop: bpShelfY + 0.4, yBottom: bpShelfY - 0.4, room: true
+    });
+
+    // Office closet shelf dividers (3 dividers)
+    const divThick = 0.6;
+    const divBotY = bpShelfY + 0.4;
+    const divTopY = fy + WALL_HEIGHT - 0.5;
+    const shelfZmin = bpCenterZ - bpShelfLen / 2;
+    for (let i = 1; i <= 3; i++) {
+      const zC = shelfZmin + (bpShelfLen * i / 4);
+      _staticBoxes.push({
+        xMin: -(bpShelfCX + bpShelfDepth / 2), xMax: -(bpShelfCX - bpShelfDepth / 2),
+        zMin: zC - divThick / 2, zMax: zC + divThick / 2,
+        yTop: divTopY, yBottom: divBotY, room: true
+      });
+    }
+
+    // Office closet clothes rod (at innerCx=69.5, Y=fy+50)
+    const rodCx = SIDE_WALL_X + 0.5 + CLOSET_DEPTH / 2; // 69.5 (approx)
+    _staticBoxes.push({
+      xMin: -(rodCx + 0.4), xMax: -(rodCx - 0.4),
+      zMin: bpCenterZ - (bpShelfLen - 1) / 2, zMax: bpCenterZ + (bpShelfLen - 1) / 2,
+      yTop: fy + WALL_HEIGHT - 30 + 0.4, yBottom: fy + WALL_HEIGHT - 30 - 0.4, room: true
+    });
+  }
+
   // Opposite wall (TV wall)
   _staticBoxes.push({
     xMin: -SIDE_WALL_X, xMax: -LEFT_WALL_X,
@@ -1771,47 +1863,195 @@ function _buildStaticBoxes() {
     { xMin: -51.5, xMax: -10.5, zMin: hzEnd, zMax: hzEnd + 0.5, yTop: fy + WALL_HEIGHT, room: true }
   );
 
-  // ── Guest room walls (behind the hallway's +X door) ──
-  // Desk against the +X far wall (pre-mirror X≈164, Z≈58.5)
-  // World: X = -164, Z = 58.5
+  // ── Guest room furniture collision ──
+  // Desk against the +X far wall (pre-mirror X≈164, Z≈27)
+  // 84"W × 30"D × 30"H, flush against LEFT (+Z) wall
   {
-    const deskX = 183 - 4 - 15; // 164 pre-mirror
-    const deskZ = 58.5;
-    const deskTopY = fy + 30;
+    const deskW = 84, deskD = 30;
+    const deskX = 183 - 4 - deskD / 2; // 164 pre-mirror
+    const deskZ = 69 - deskW / 2;       // 27, flush against LEFT wall
+    const deskSurface = fy + 30;         // leg height (28) + top slab (1.5) ≈ 30
+    // Desk body — standable surface
     _staticBoxes.push({
-      xMin: -(deskX + 15), xMax: -(deskX - 15),
-      zMin: deskZ - 30, zMax: deskZ + 30,
-      yTop: deskTopY + 22, yBottom: fy, room: true
+      xMin: -(deskX + deskD / 2), xMax: -(deskX - deskD / 2),
+      zMin: deskZ - deskW / 2, zMax: deskZ + deskW / 2,
+      yTop: deskSurface, yBottom: fy, room: true
     });
-  }
-  // Chair (pre-mirror X≈139, Z≈58.5)
-  {
-    const chairX = 164 - 15 - 10; // 139
-    const chairZ = 58.5;
+    // ── Monitor collision — 3 OLED monitors with angled side hitboxes ──
+    // Dimensions match room.js: 24"W × 14"H × 0.5"D each, on 6" arms
+    const monW = 24, monD = 0.5, monH = 14, monStandH = 6;
+    const monBaseX = deskX + deskD / 2 - 5; // 174 pre-mirror (near wall)
+    const monYBot = deskSurface + monStandH; // bottom of screen
+    const monYTop = monYBot + monH;          // top of screen
+    const monPad = 1; // collision padding
+
+    // Center monitor — axis-aligned, tight AABB
     _staticBoxes.push({
-      xMin: -(chairX + 12), xMax: -(chairX - 12),
-      zMin: chairZ - 12, zMax: chairZ + 12,
-      yTop: fy + 48, yBottom: fy, room: true
+      xMin: -(monBaseX + monD / 2 + monPad), xMax: -(monBaseX - monD / 2 - monPad),
+      zMin: deskZ - monW / 2, zMax: deskZ + monW / 2,
+      yTop: monYTop, yBottom: monYBot, room: true
+    });
+
+    // Angled side monitors — 3 AABB strips each to approximate rotation
+    const monAngle = 0.6; // radians (~34°), matches room.js monSideAngle
+    const cosA = Math.cos(monAngle), sinA = Math.sin(monAngle);
+    const stripW = monW / 3; // 8" per strip
+    const stripHalfD = (monD * cosA + stripW * sinA) / 2 + monPad;
+    const stripHalfW = (monD * sinA + stripW * cosA) / 2;
+
+    // Left monitor: pre-mirror center (monBaseX-8, _, deskZ - monW + 2)
+    const lMonX = monBaseX - 8, lMonZ = deskZ - monW + 2;
+    // Right monitor: pre-mirror center (monBaseX-8, _, deskZ + monW - 2)
+    const rMonX = monBaseX - 8, rMonZ = deskZ + monW - 2;
+
+    for (const localZ of [-stripW, 0, stripW]) {
+      // Left monitor strips (rotY = +0.4)
+      const lx = lMonX + localZ * sinA;
+      const lz = lMonZ + localZ * cosA;
+      _staticBoxes.push({
+        xMin: -(lx + stripHalfD), xMax: -(lx - stripHalfD),
+        zMin: lz - stripHalfW, zMax: lz + stripHalfW,
+        yTop: monYTop, yBottom: monYBot, room: true
+      });
+      // Right monitor strips (rotY = -0.4, sinA negated)
+      const rx = rMonX - localZ * sinA;
+      const rz = rMonZ + localZ * cosA;
+      _staticBoxes.push({
+        xMin: -(rx + stripHalfD), xMax: -(rx - stripHalfD),
+        zMin: rz - stripHalfW, zMax: rz + stripHalfW,
+        yTop: monYTop, yBottom: monYBot, room: true
+      });
+    }
+
+    // Monitor arm posts (thin 1.5" collision pillars between desk and screens)
+    for (const mz of [deskZ, lMonZ, rMonZ]) {
+      _staticBoxes.push({
+        xMin: -(monBaseX + 1), xMax: -(monBaseX - 1),
+        zMin: mz - 1, zMax: mz + 1,
+        yTop: monYBot, yBottom: deskSurface, room: true
+      });
+    }
+  }
+  // Thorzone Nanoq R PC case on desk (left side, pre-mirror Z≈57, on desk surface)
+  {
+    const pcD = 13.4, pcW = 6.7, pcH = 9.8;
+    const pcX = 164 + 30 / 2 - 13.4 / 2 - 1; // pushed near wall edge (deskD=30)
+    const pcZ = 27 + 24 + 6;
+    const pcBot = fy + 30;
+    _staticBoxes.push({
+      xMin: -(pcX + pcD / 2), xMax: -(pcX - pcD / 2),
+      zMin: pcZ - pcW / 2, zMax: pcZ + pcW / 2,
+      yTop: pcBot + pcH, yBottom: pcBot, room: true
     });
   }
 
   // ── Guest room walls (behind the hallway's +X door) ──
-  // Pre-mirror footprint X=51..183, Z=-13..130. -Z wall sits just past the
-  // closet's +Z exterior face (closet occupies Z=-78..-14) so it doesn't
-  // clip through the closet body. Shared -X wall is the existing
-  // bedroom/hallway right wall (already in _staticBoxes via the
-  // sideWall + hallWallR blocks); we only collide the three new walls here.
+  // Pre-mirror footprint X=51..183, Z=-78..69. Shares the bedroom's TV wall
+  // (oppWallZ=-78) as its -Z boundary and the hallway right wall as its -X
+  // wall (already in _staticBoxes). We only collide the three new walls here.
   // World X = -183..-51 after mirror.
   {
-    const gXmin = 51, gXmax = 183, gZmin = -13, gZmax = 130;
+    const gXmin = 51, gXmax = 183, gZmin = -78, gZmax = 69;
+    const wh = WALL_HEIGHT;
+
+    // Far wall — split into 4 pieces around the window opening so the player
+    // can jump through when the office window is open.
+    const gwB = _roomRefs ? _roomRefs.grWinBottom : fy + 23;
+    const gwT = _roomRefs ? _roomRefs.grWinTop : fy + 73;
+    const gwL = _roomRefs ? _roomRefs.grWinLeft : -22;   // -Z edge of window
+    const gwR = _roomRefs ? _roomRefs.grWinRight : 14;    // +Z edge of window
+
     _staticBoxes.push(
-      // Far wall (pre-mirror X=183..183.5)
-      { xMin: -gXmax - 0.5, xMax: -gXmax, zMin: gZmin - 0.5, zMax: gZmax + 0.5, yTop: fy + WALL_HEIGHT, room: true },
-      // -Z wall (pre-mirror Z=-30.5..-30) spans full interior X range.
-      { xMin: -gXmax, xMax: -gXmin, zMin: gZmin - 0.5, zMax: gZmin, yTop: fy + WALL_HEIGHT, room: true },
-      // +Z wall (pre-mirror Z=130..130.5) spans full interior X range.
-      { xMin: -gXmax, xMax: -gXmin, zMin: gZmax, zMax: gZmax + 0.5, yTop: fy + WALL_HEIGHT, room: true }
+      // Below window: full Z, floor → window bottom
+      { xMin: -gXmax - 0.5, xMax: -gXmax, zMin: gZmin - 0.5, zMax: gZmax + 0.5, yTop: gwB, yBottom: fy, room: true },
+      // Above window: full Z, window top → ceiling
+      { xMin: -gXmax - 0.5, xMax: -gXmax, zMin: gZmin - 0.5, zMax: gZmax + 0.5, yTop: fy + wh, yBottom: gwT, room: true },
+      // Left of window (toward -Z / TV wall side)
+      { xMin: -gXmax - 0.5, xMax: -gXmax, zMin: gZmin - 0.5, zMax: gwL, yTop: gwT, yBottom: gwB, room: true },
+      // Right of window (toward +Z / left wall side)
+      { xMin: -gXmax - 0.5, xMax: -gXmax, zMin: gwR, zMax: gZmax + 0.5, yTop: gwT, yBottom: gwB, room: true },
+      // -Z wall (TV wall extension, pre-mirror Z=-78)
+      { xMin: -gXmax, xMax: -gXmin, zMin: gZmin - 0.5, zMax: gZmin, yTop: fy + wh, room: true },
+      // +Z wall (LEFT wall, pre-mirror Z=69)
+      { xMin: -gXmax, xMax: -gXmin, zMin: gZmax, zMax: gZmax + 0.5, yTop: fy + wh, room: true }
     );
+
+    // ── Outdoor terrain collision (beyond office front wall) ──
+    // Stair-step AABBs approximate the slopes since the system is axis-aligned.
+    // Pre-mirror +X extends beyond 183; all coords are already in world space (negated X).
+    const sillY = gwB;                        // window sill Y
+    const dropStartX = gXmax + 0.5;           // 183.5
+    const dropEndX   = 255;
+    const dropDY     = -48;                   // drops 48" over the slope
+    const flatY      = sillY + dropDY;        // floorY - 25
+    const flatEndX   = 375;
+    const incEndX    = 411;
+    const incDY      = 36;                    // rises 36"
+    const roadY      = flatY + incDY;         // floorY + 11
+    const roadEndX   = 543;
+
+    // Terrain Z extent: 200" centered on window
+    const tZmin = (gwL + gwR) / 2 - 100;
+    const tZmax = (gwL + gwR) / 2 + 100;
+
+    // Drop slope — 6 stair steps, each 12" wide, dropping 8"
+    const dropStepW = (dropEndX - dropStartX) / 6;
+    const dropStepH = Math.abs(dropDY) / 6;
+    for (let i = 0; i < 6; i++) {
+      const sx = dropStartX + i * dropStepW;
+      const sy = sillY - i * dropStepH;
+      _staticBoxes.push({
+        xMin: -(sx + dropStepW), xMax: -sx, zMin: tZmin, zMax: tZmax,
+        yTop: sy, yBottom: sy - dropStepH - 2, room: true
+      });
+    }
+
+    // Flat grass
+    _staticBoxes.push({
+      xMin: -flatEndX, xMax: -dropEndX, zMin: tZmin, zMax: tZmax,
+      yTop: flatY, yBottom: flatY - 2, room: true
+    });
+
+    // Incline — 4 stair steps, each 9" wide, rising 9"
+    const incStepW = (incEndX - flatEndX) / 4;
+    const incStepH = incDY / 4;
+    for (let i = 0; i < 4; i++) {
+      const sx = flatEndX + i * incStepW;
+      const sy = flatY + i * incStepH;
+      _staticBoxes.push({
+        xMin: -(sx + incStepW), xMax: -sx, zMin: tZmin, zMax: tZmax,
+        yTop: sy, yBottom: sy - incStepH - 2, room: true
+      });
+    }
+
+    // Road surface
+    _staticBoxes.push({
+      xMin: -roadEndX, xMax: -incEndX, zMin: tZmin, zMax: tZmax,
+      yTop: roadY, yBottom: roadY - 2, room: true
+    });
+
+    // Boundary walls — invisible tall boxes at terrain edges
+    const terrainCeil = fy + wh + 20;
+    _staticBoxes.push(
+      // Far edge (pre-mirror X=543)
+      { xMin: -roadEndX - 1, xMax: -roadEndX, zMin: tZmin, zMax: tZmax, yTop: terrainCeil, yBottom: flatY - 40, room: true },
+      // Left Z edge
+      { xMin: -roadEndX, xMax: -dropStartX, zMin: tZmin - 1, zMax: tZmin, yTop: terrainCeil, yBottom: flatY - 40, room: true },
+      // Right Z edge
+      { xMin: -roadEndX, xMax: -dropStartX, zMin: tZmax, zMax: tZmax + 1, yTop: terrainCeil, yBottom: flatY - 40, room: true }
+    );
+
+    // Catch floor — safety net well below terrain
+    _staticBoxes.push({
+      xMin: -roadEndX, xMax: -dropStartX, zMin: tZmin, zMax: tZmax,
+      yTop: flatY - 35, yBottom: flatY - 40, room: true
+    });
+
+    // Exterior sill ledge — small standable box outside the window for re-entry
+    _staticBoxes.push({
+      xMin: -dropStartX - 2, xMax: -(gXmax), zMin: gwL, zMax: gwR,
+      yTop: gwB, yBottom: gwB - 1, room: true
+    });
   }
 }
 
@@ -2059,6 +2299,20 @@ function _getBoxes() {
         room: true
       });
     }
+  }
+
+  // Office window — when closed, block the window opening so the player can't pass through.
+  if (_roomRefs && !_roomRefs.isOfficeWindowOpen()) {
+    const gwB = _roomRefs.grWinBottom;
+    const gwT = _roomRefs.grWinTop;
+    const gwL = _roomRefs.grWinLeft;
+    const gwR = _roomRefs.grWinRight;
+    result.push({
+      xMin: -183.5, xMax: -183,
+      zMin: gwL, zMax: gwR,
+      yTop: gwT, yBottom: gwB,
+      room: true
+    });
   }
 
   // MacBook open lid — thin wall matching the screen overlay mesh exactly
@@ -2602,12 +2856,12 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   const JUMP_BUFFER_FRAMES   = 8;     // grace frames for a press just before landing
   const GRAVITY_RISE         = 0.018; // gravity while ascending
   const GRAVITY_FALL         = 0.028; // stronger gravity while falling — snappier feel
-  const WALL_JUMP_VY_MIN     = 0.70;  // vertical boost at zero speed
-  const WALL_JUMP_VY_MAX     = 1.15;  // vertical boost at full sprint into wall
+  const WALL_JUMP_VY_MIN     = 0.85;  // vertical boost at zero speed
+  const WALL_JUMP_VY_MAX     = 1.35;  // vertical boost at full sprint into wall
   const WALL_JUMP_PUSH_MIN   = 0.30;  // horizontal push at zero speed
   const WALL_JUMP_PUSH_MAX   = 0.75;  // horizontal push at full sprint
   const WALL_JUMP_COOLDOWN   = 18;    // frames between wall jumps (anti-spam)
-  const WALL_JUMP_GRAV_EXTRA = 0.35;  // extra gravity multiplier per consecutive wall jump
+  const WALL_JUMP_GRAV_EXTRA = 0.55;  // extra gravity multiplier per consecutive wall jump
 
   // Grounded gate matches the old vy≈0 check; _wasGroundedLast is set at the
   // end of the previous frame and is the most reliable "on something" signal.
@@ -2824,8 +3078,9 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
   // ── Gravity (asymmetric: fall faster than rise) ───────────────────
   // Consecutive wall jumps make gravity heavier to prevent infinite climbing
+  const SS_GRAV_MUL = isSuperSaiyanActive() ? 0.55 : 1.0; // SS mode: floatier jumps
   const gravScale = 1 + _consecutiveWallJumps * WALL_JUMP_GRAV_EXTRA;
-  const g = (fpVy > 0 ? GRAVITY_RISE : GRAVITY_FALL) * gravScale;
+  const g = (fpVy > 0 ? GRAVITY_RISE : GRAVITY_FALL) * gravScale * SS_GRAV_MUL;
   fpVy -= g * frameScale;
   let newY = fpPos.y + fpVy * frameScale;
 
@@ -2849,6 +3104,9 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   let bonkedThisFrame = false;
   let bonkIntensity = 0;
   let groundY = getPlayerFloorY(); // eye-height floor (floorY + EYE_H)
+  // When outdoors (past office far wall), don't override groundY —
+  // the stair-step collision boxes handle floor height naturally.
+  const outdoorZone = nx < -183;
   const boxes = _getBoxes();
 
   for (const box of boxes) {
@@ -2955,7 +3213,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
   // Ceiling — push down immediately to avoid oscillation jitter
   const floorY = getFloorY();
-  const ceilMax = (floorY + 80) - 0.5;
+  const ceilMax = outdoorZone ? (floorY + 200) : (floorY + 80) - 0.5;
   if (fpPos.y > ceilMax) {
     const hitVy = fpVy;
     fpPos.y = ceilMax;
@@ -3033,10 +3291,14 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     // allow the camera to follow into the office room smoothly.
     const inGuestDoorway = focal.x < -51 + 4 && focal.x > -51 - 8
       && focal.z > 34 - 2 && focal.z < 66 + 2;
-    const inGuestRoom = focal.x < -51 - 1 && focal.z > -13 && focal.z < 130;
+    const inGuestRoom = focal.x < -51 - 1 && focal.z > -78 && focal.z < 69;
+    const inOutdoor = focal.x < -183;
     const inHallway = focal.z > 49 - 1 && !inGuestDoorway && !inGuestRoom;
     let camWallXMin, camWallXMax;
-    if (inGuestRoom || inGuestDoorway) {
+    if (inOutdoor) {
+      camWallXMin = -544 + 1;
+      camWallXMax = -LEFT_WALL_X - 1;
+    } else if (inGuestRoom || inGuestDoorway) {
       camWallXMin = -183 + 1;
       camWallXMax = -LEFT_WALL_X - 1;
     } else if (inHallway) {
@@ -3141,7 +3403,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
       const lateralInput = (fpKeys.d ? 1 : 0) - (fpKeys.a ? 1 : 0);
       const speedN = Math.max(0, Math.min(1, horizSpd / 0.5));
-      const leanTarget = skateMode ? (-lateralInput * 0.18 * speedN) : 0;
+      const leanTarget = skateMode ? (-lateralInput * 0.26 * speedN) : 0;
       _skateLean += (leanTarget - _skateLean) * easeAlpha(12.5, dtSec);
       _catGroup.rotation.x = 0;
       _catGroup.rotation.z = _skateLean;
@@ -3164,7 +3426,8 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
           const t = _trickKickflip;
           _skateboardAnchor.rotation.z = t * t * (3 - 2 * t) * Math.PI * 2;
         } else {
-          _skateboardAnchor.rotation.z = 0;
+          // ── Turn lean — tilt board on Z when steering ────────────
+          _skateboardAnchor.rotation.z = _skateLean;
         }
       }
       _syncSkateboardVisualState();

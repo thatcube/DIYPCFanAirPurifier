@@ -1072,6 +1072,16 @@ export function applyClickNod(ts, modelKey) {
       { bone: totoBones.neck, weight: 0.30 },
       { bone: totoBones.head, weight: 0.34 }
     ]);
+  } else if (modelKey === 'korra') {
+    // Korra is a quadruped — front legs are children of chest/spine,
+    // so only nod using neck + head to avoid moving the front feet.
+    const targets = [];
+    for (const b of idleHeadBones) {
+      if (!b || !b.isBone) continue;
+      if (/neck/i.test(String(b.name || ''))) targets.push({ bone: b, weight: 0.35 });
+      else targets.push({ bone: b, weight: 0.65 });
+    }
+    applied = _applyWeightedBonePitch(pitch, targets);
   } else {
     const spineTargets = [];
     const headTargets = [];

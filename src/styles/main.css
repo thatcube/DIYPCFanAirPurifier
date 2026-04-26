@@ -616,6 +616,45 @@ input[type=range]::-moz-range-thumb {
   100% { transform: scale(1) translateY(0); color: var(--gold); text-shadow: none; }
 }
 
+/* MPH speedometer (skateboard section of the HUD pill) */
+.run-pill--combo > #mphHud {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.run-pill--mph {
+  color: #f4fbff;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+#mphValue {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+  color: #f4fbff;
+  text-shadow: 0 1px 10px rgba(159,227,255,0.22);
+  transition: color 0.2s ease;
+  min-width: 2.2ch;
+  text-align: right;
+  display: inline-block;
+}
+/* Glow hotter as speed increases — driven by data-heat attribute */
+#mphValue[data-heat="1"] { color: #ffe066; text-shadow: 0 0 12px rgba(255,220,80,0.5); }
+#mphValue[data-heat="2"] { color: #ffb347; text-shadow: 0 0 16px rgba(255,160,60,0.65); }
+#mphValue[data-heat="3"] { color: #ff6b6b; text-shadow: 0 0 20px rgba(255,80,80,0.7); }
+.mph-unit {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(207,236,255,0.6);
+  margin-left: -2px;
+  align-self: flex-end;
+  padding-bottom: 2px;
+}
+
 /* Yellow-coin sparkle burst (see ui-interactions.js coinBump). Lives on
  * a fixed-position overlay anchored to the gold icon's viewport center
  * so it isn't constrained by the run-pill clipping/overflow. */
@@ -1149,6 +1188,21 @@ input[type=range]::-moz-range-thumb {
   font-weight: var(--weight-medium);
 }
 .fp-charge-label i { color: #9fe3ff; }
+.fp-charge-skate-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #7af5c2;
+  background: rgba(122, 245, 194, 0.12);
+  border: 1px solid rgba(122, 245, 194, 0.25);
+  border-radius: 6px;
+  padding: 1px 7px 1px 5px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.fp-charge-skate-tag i { font-size: 13px; }
 #fpChargeValue {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -2258,6 +2312,8 @@ body.play-mode #fpChargeBar { display: block; }
   body.play-mode .run-pill--combo > #coinHud { gap: 6px; }
   body.play-mode .run-pill--coins { font-size: 15px; }
   body.play-mode .run-pill--timer #runTimerText { font-size: 22px; }
+  body.play-mode #mphValue { font-size: 20px; }
+  body.play-mode .mph-unit { font-size: 9px; }
   body.play-mode #fps { top: 56px; right: 12px; font-size: 10px; padding: 3px 6px; }
   body.play-mode #fpShareRow { top: 56px; left: 12px; right: auto; }
   body.play-mode #fpChargeBar { width: min(94vw, 360px); bottom: 10px; padding: 9px 10px 8px; }
