@@ -383,6 +383,7 @@ purifierRefs.setRoomRefs({
   toggleMacbook: roomRefs.toggleMacbook,
   toggleTV: roomRefs.toggleTV,
   toggleCornerDoor: roomRefs.toggleCornerDoor,
+  toggleGuestDoor: roomRefs.toggleGuestDoor,
   toggleFoodBowl: roomRefs.toggleFoodBowl,
   getFoodBowlMesh: roomRefs.getFoodBowlMesh
 });
@@ -919,6 +920,16 @@ window._toggleFps = () => {
 };
 _applyFpsVisibility();
 
+// Debug wall labels (localhost only)
+window._toggleDebugWallLabels = () => {
+  if (!roomRefs || typeof roomRefs.toggleDebugWallLabels !== 'function') return;
+  const vis = roomRefs.toggleDebugWallLabels();
+  const sw = document.getElementById('fpPauseDebugWalls');
+  const st = document.getElementById('fpPauseDebugWallsState');
+  if (sw) { sw.classList.toggle('on', vis); sw.setAttribute('aria-checked', String(vis)); }
+  if (st) { st.textContent = vis ? 'On' : 'Off'; st.classList.toggle('off', !vis); }
+};
+
 window._toggleQuickCoin = () => {
   const next = !coins.isQuickCoinMode();
   coins.setQuickCoinMode(next);
@@ -1207,11 +1218,7 @@ function animate(ts) {
     }
     // Timer tick
     leaderboard.tickTimer(ts);
-    // Throttle DOM updates to ~10 Hz to reduce layout thrashing
-    if (ts - _lastCoinDomUpdate >= 100) {
-      _lastCoinDomUpdate = ts;
-      if (_elRunTimer) _elRunTimer.textContent = leaderboard.formatRunTime(leaderboard.getElapsed());
-    }
+    if (_elRunTimer) _elRunTimer.textContent = leaderboard.formatRunTime(leaderboard.getElapsed());
     // Check for run completion (all regular coins collected)
     if (coins.coinScore >= coins.coinTotal && coins.coinTotal > 0 && !leaderboard.isFinished()) {
       leaderboard.stopTimer();
@@ -1237,6 +1244,7 @@ function animate(ts) {
     const catAnimSpeed = Math.max(0.12, Number(preset.animSpeed) || 1);
     const isBababooey = catAppearance.catModelKey === 'bababooey';
     const isTotodile = catAppearance.catModelKey === 'totodile';
+    const isKorra = catAppearance.catModelKey === 'korra';
     const hasWalkClip = !!catAnimation.catWalkAction;
     const hasIdleClip = !!catAnimation.catIdleAction;
 
@@ -1398,6 +1406,29 @@ function animate(ts) {
         catAnimation.applyTotodileIdleSquish(ts, idleBlend);
       }
       catAnimation.applyTotodileProceduralRun(ts, svel, totoRunBlend);
+    }
+
+    // Korra — procedural quadruped. Generic idle handles tail/head/spine;
+    // Korra-specific functions add leg weight shift and quadruped walk.
+    if (isKorra) {
+      if (!Number.isFinite(st._korraRunBlend)) st._korraRunBlend = 0;
+      let korraRunBlend = 0;
+      if (!skateIdleOnly) {
+        const korraRunTarget = Math.min(1, svel / 15) * moveBlend;
+        const korraRunEaseUp = 1 - Math.exp(-dtSec * 4.0);
+        const korraRunEaseDown = 1 - Math.exp(-dtSec * 8.0);
+        const korraRunEase = korraRunTarget > st._korraRunBlend ? korraRunEaseUp : korraRunEaseDown;
+        st._korraRunBlend += (korraRunTarget - st._korraRunBlend) * korraRunEase;
+        korraRunBlend = Math.max(0, Math.min(1, st._korraRunBlend));
+      } else {
+        st._korraRunBlend = 0;
+      }
+
+      if (idleBlend > 0.001) {
+        catAnimation.applyKorraProceduralIdle(ts, idleBlend);
+        catAnimation.applyKorraIdleSquish(ts, idleBlend);
+      }
+      catAnimation.applyKorraProceduralRun(ts, svel, korraRunBlend);
     }
 
     // Reset position/rotation to base each frame

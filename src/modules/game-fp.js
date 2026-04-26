@@ -219,6 +219,15 @@ function _syncSkateToggleUi() {
       skateState.classList.toggle('off', !skateMode);
     }
   }
+  // Show/hide the skateboard unlock hint in the HUD
+  const skateHint = document.getElementById('skateUnlockHint');
+  if (skateHint) {
+    if (!locked && fpMode) {
+      skateHint.classList.add('visible');
+    } else {
+      skateHint.classList.remove('visible');
+    }
+  }
 }
 
 export function syncSkateToggleUi() {
@@ -264,7 +273,9 @@ let _wasBonking = false;
 let _wasGroundedLast = true;
 let _wallContactNx = 0;       // wall-push normal X from last frame (0 = no wall)
 let _wallContactNz = 0;       // wall-push normal Z from last frame
+let _skateBoostAccum = 0;     // progressive speed boost — grows while skating, resets on wall hit
 let _wallJumpCooldown = 0;     // frames remaining before next wall jump allowed
+let _consecutiveWallJumps = 0; // wall jumps since last grounded — increases gravity
 let _preCollisionSpd = 0;     // horizontal speed snapshot before collision kills it
 let _wasAimingAtInteractable = false;
 let _lastAimToneTs = 0;
@@ -318,6 +329,7 @@ function _ensureChargeLight() {
 // sphere/halo around the cat.
 let _ssAura = null;          // additive yellow sphere child of _catGroup
 let _ssHalo = null;          // additive yellow ring/sprite child of _catGroup
+let _ssSparkles = null;      // array of orbiting gold diamond meshes during SS
 let _ssMatCache = null;      // Map<material, {emissive:Color, intensity:number}>
 let _ssAuraStrength = 0;     // smoothed 0..1 drive value
 let _ssEnvLight = null;      // moving point light that affects room surfaces
@@ -361,6 +373,7 @@ function _ensureSuperSaiyanAura() {
   _ssAura.position.set(0, 4, 0);
   _ssAura.renderOrder = 999;
   _ssAura.frustumCulled = false;
+  _ssAura.userData.clickPassthrough = true;
   _catGroup.add(_ssAura);
 
   // Outer flickery halo — slightly bigger, front side, lower opacity.
@@ -375,7 +388,35 @@ function _ensureSuperSaiyanAura() {
   _ssHalo.position.set(0, 4, 0);
   _ssHalo.renderOrder = 999;
   _ssHalo.frustumCulled = false;
+  _ssHalo.userData.clickPassthrough = true;
   _catGroup.add(_ssHalo);
+
+  // Gold diamond sparkles — small OctahedronGeometry, distinct from the round
+  // blue Sprites used on the skateboard pickup. Orbit the cat during SS.
+  const diamondGeo = new THREE.OctahedronGeometry(0.28, 0);
+  const diamondMat = new THREE.MeshBasicMaterial({
+    color: 0xffd54f,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  _ssSparkles = [];
+  for (let i = 0; i < 12; i++) {
+    const m = new THREE.Mesh(diamondGeo, diamondMat.clone());
+    m.renderOrder = 1000;
+    m.frustumCulled = false;
+    m.userData.clickPassthrough = true;
+    m._phase = (i / 12) * Math.PI * 2;
+    m._radius = 3.5 + Math.random() * 3.5;
+    m._yBase = 1.5 + Math.random() * 6;
+    m._speed = 1.2 + Math.random() * 1.0;
+    m._rotSpeed = 3 + Math.random() * 4;
+    m._baseScale = 0.6 + Math.random() * 0.6;
+    m.visible = false;
+    _catGroup.add(m);
+    _ssSparkles.push(m);
+  }
 }
 
 function _ensureSuperSaiyanEnvLight() {
@@ -429,7 +470,7 @@ function _applySuperSaiyan(strength /* 0..1 sustained */, burst /* 0..1 transien
   const wantOverride = total > 0.005;
   _catGroup.traverse((obj) => {
     if (!obj.isMesh || !obj.material) return;
-    if (obj === _ssAura || obj === _ssHalo) return;
+    if (obj === _ssAura || obj === _ssHalo || (_ssSparkles && _ssSparkles.includes(obj))) return;
     const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
     for (const m of mats) {
       if (!m || !('emissive' in m)) continue;
@@ -452,6 +493,35 @@ function _applySuperSaiyan(strength /* 0..1 sustained */, burst /* 0..1 transien
       }
     }
   });
+
+  // Animate gold diamond sparkles — orbit + tumble + pulse, only when active
+  if (_ssSparkles) {
+    const tSec = ts * 0.001;
+    for (const sp of _ssSparkles) {
+      if (total < 0.01) {
+        sp.visible = false;
+        sp.material.opacity = 0;
+        continue;
+      }
+      sp.visible = true;
+      const angle = sp._phase + tSec * sp._speed;
+      const r = sp._radius * (0.85 + 0.15 * Math.sin(tSec * 1.7 + sp._phase));
+      sp.position.set(
+        Math.cos(angle) * r,
+        sp._yBase + Math.sin(tSec * 2.3 + sp._phase * 1.4) * 1.8,
+        Math.sin(angle) * r
+      );
+      // Tumble rotation for diamond facets catching light
+      sp.rotation.x = tSec * sp._rotSpeed;
+      sp.rotation.y = tSec * sp._rotSpeed * 0.7 + sp._phase;
+      // Opacity fades in/out with twinkle
+      const twinkle = 0.4 + 0.6 * Math.abs(Math.sin(tSec * 4.5 + sp._phase * 3));
+      sp.material.opacity = Math.min(1, (s * 0.7 + b * 0.9)) * twinkle * flicker;
+      // Scale pulses slightly
+      const sc = sp._baseScale * (0.7 + 0.3 * Math.sin(tSec * 3 + sp._phase * 2));
+      sp.scale.setScalar(sc * (1 + b * 0.5));
+    }
+  }
 }
 
 function _applySuperSaiyanEnvLight(anchor, strength /* 0..1 */, burst /* 0..1 */, ts, dtSec) {
@@ -583,6 +653,72 @@ function _isObjectVisibleInWorld(obj) {
     if (n.visible === false) return false;
   }
   return true;
+}
+
+// Walk up to find the nearest ancestor tagged as a clickable interactable.
+// Keep this in sync with getInteractiveTarget() in purifier.js.
+function _findInteractiveAncestor(obj) {
+  for (let p = obj; p; p = p.parent) {
+    if (p._isLamp || p._isCeilLight || p._isFan ||
+        p._isFilterL || p._isFilterR ||
+        p._isDrawer || p._isBifoldLeaf ||
+        p._isCornerDoorHandle || p._isCornerDoor ||
+        p._isGuestDoor || p._isGuestDoorHandle ||
+        p._isMacbook || p._isWindow || p._isTV || p._isFoodBowl ||
+        p._isPickupSkateboard) return p;
+  }
+  return null;
+}
+
+// True if a hit mesh should block the crosshair / click ray. Skips
+// invisible hitboxes, fully-transparent particles, and non-mesh nodes.
+function _isOccluder(obj) {
+  if (!obj || !obj.isMesh) return false;
+  if (obj.userData && obj.userData.clickPassthrough) return false;
+  const m = obj.material;
+  if (!m) return false;
+  if (Array.isArray(m)) return true;
+  if (m.transparent && (m.opacity == null || m.opacity < 0.05)) return false;
+  return true;
+}
+
+// Friendly label shown under the crosshair when aiming at an interactable.
+// Returns { verb, noun } for the glass-pill tooltip, e.g. { verb:'Open', noun:'Bedroom' }.
+function _labelForInteractable(target) {
+  for (let p = target; p; p = p.parent) {
+    if (p._isCornerDoor || p._isCornerDoorHandle) {
+      if (_roomRefs && _roomRefs.isCornerDoorOpen && _roomRefs.isCornerDoorOpen()) return { verb: 'Close', noun: 'Door' };
+      return { verb: 'Open', noun: fpPos.z > 49 ? 'Bedroom' : 'Hallway' };
+    }
+    if (p._isGuestDoor || p._isGuestDoorHandle) {
+      if (_roomRefs && _roomRefs.isGuestDoorOpen && _roomRefs.isGuestDoorOpen()) return { verb: 'Close', noun: 'Door' };
+      return { verb: 'Open', noun: fpPos.x > -51 ? 'Office' : 'Hallway' };
+    }
+    if (p._isBifoldLeaf) {
+      // Walk up to the leaf pivot group to check its open state.
+      let leaf = p;
+      while (leaf && !(leaf._isBifoldLeaf && leaf.isGroup && leaf._innerGroup)) leaf = leaf.parent;
+      if (leaf && leaf._leafOpen) return { verb: 'Close', noun: 'Closet' };
+      return { verb: 'Open', noun: 'Closet' };
+    }
+    if (p._isDrawer) {
+      // Walk up to the drawer group that has _drawerOpen state.
+      let grp = p;
+      while (grp && !(grp.isGroup && grp._drawerSlideMax !== undefined)) grp = grp.parent;
+      if (grp && grp._drawerOpen) return { verb: 'Close', noun: 'Drawer' };
+      return { verb: 'Open', noun: 'Drawer' };
+    }
+    if (p._isLamp) return { verb: 'Toggle', noun: 'Lamp' };
+    if (p._isCeilLight) return { verb: 'Toggle', noun: 'Ceiling Light' };
+    if (p._isFan) return { verb: 'Toggle', noun: 'Fan' };
+    if (p._isFilterL || p._isFilterR) return { verb: 'Slide', noun: 'Filter' };
+    if (p._isWindow) return { verb: 'Toggle', noun: 'Window' };
+    if (p._isMacbook) return { verb: 'Toggle', noun: 'MacBook' };
+    if (p._isTV) return { verb: 'Toggle', noun: 'TV' };
+    if (p._isFoodBowl) return { verb: 'Fill', noun: 'Food Bowl' };
+    if (p._isPickupSkateboard) return { verb: 'Pick up', noun: 'Skateboard' };
+  }
+  return null;
 }
 
 function _pushWorldAabbBox(result, obj, padXZ = 0) {
@@ -851,7 +987,7 @@ function _syncSkateboardVisualState() {
 
 function _useForwardSkatePoseForModel() {
   const key = String(catAppearance.catModelKey || '').toLowerCase();
-  return key === 'classic' || key === 'toon';
+  return key === 'classic' || key === 'toon' || key === 'korra';
 }
 
 function _getSkateLiftTrimForModel() {
@@ -983,6 +1119,166 @@ function _fitSkateboardToCat(force = false) {
   _skateboardFitCatModel = catAnimation.catModel;
 }
 
+// ── Pickup skateboard (collectible in the office) ───────────────────
+let _pickupSkateboardMesh = null;
+let _pickupSkateboardLoaded = false;
+let _pickupBobPhase = 0;
+
+function _spawnPickupSkateboard() {
+  if (_pickupSkateboardLoaded || skateboardFound || !_scene) return;
+  _pickupSkateboardLoaded = true;
+
+  const loader = new GLTFLoader();
+  loader.load('assets/skateboard.glb', (gltf) => {
+    if (skateboardFound) return;
+    const root = gltf?.scene;
+    if (!root) return;
+
+    root.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = true;
+      o.receiveShadow = true;
+      o._isPickupSkateboard = true;
+      if (o.material && o.material.map) o.material.map.colorSpace = THREE.SRGBColorSpace;
+    });
+
+    root.scale.setScalar(1.1);
+
+    // Place in the office room. Post-mirror coords:
+    // office X=-183..-51, Z=-78..69. Put it on the floor roughly
+    // center-room so the player spots it when entering.
+    const fy = getFloorY();
+    const placeX = -100;   // mid-office
+    const placeY = fy + 5;
+    const placeZ = 10;     // slightly toward the door side
+
+    root.position.set(placeX, placeY, placeZ);
+    root.rotation.set(0, Math.PI * 0.3, Math.PI * 0.12);
+
+    root._isPickupSkateboard = true;
+    _pickupSkateboardMesh = root;
+    _scene.add(root);
+
+    // Sparkle glow — soft point light + orbiting sprite particles
+    const glowGroup = new THREE.Group();
+    glowGroup.position.copy(root.position);
+    glowGroup.position.y += 3;
+    _scene.add(glowGroup);
+    root._glowGroup = glowGroup;
+
+    // Soft blue point light
+    const glow = new THREE.PointLight(0x60aaff, 120, 40, 2);
+    glow.position.set(0, 1, 0);
+    glowGroup.add(glow);
+
+    // Sparkle sprites
+    const sparkleMat = new THREE.SpriteMaterial({
+      color: 0xaaddff,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const sparkles = [];
+    for (let i = 0; i < 8; i++) {
+      const s = new THREE.Sprite(sparkleMat);
+      s.scale.setScalar(0.5 + Math.random() * 0.4);
+      s._phase = (i / 8) * Math.PI * 2;
+      s._radius = 3 + Math.random() * 2;
+      s._yOff = Math.random() * 3 - 0.5;
+      s._speed = 0.8 + Math.random() * 0.6;
+      glowGroup.add(s);
+      sparkles.push(s);
+    }
+    root._sparkles = sparkles;
+
+    // Add to interactive objects so crosshair highlights it
+    root.traverse((o) => {
+      if (o.isMesh) _interactiveObjects.push(o);
+    });
+  }, undefined, (err) => {
+    console.warn('[game-fp] Pickup skateboard failed to load', err);
+  });
+}
+
+export function collectPickupSkateboard() {
+  _collectPickupSkateboard();
+}
+window._collectPickupSkateboard = collectPickupSkateboard;
+
+function _collectPickupSkateboard() {
+  if (skateboardFound || !_pickupSkateboardMesh) return;
+
+  // Remove sparkle glow
+  if (_pickupSkateboardMesh._glowGroup) {
+    _scene.remove(_pickupSkateboardMesh._glowGroup);
+  }
+
+  // Remove from interactive objects
+  _pickupSkateboardMesh.traverse((o) => {
+    if (o.isMesh) {
+      const idx = _interactiveObjects.indexOf(o);
+      if (idx >= 0) _interactiveObjects.splice(idx, 1);
+    }
+  });
+  _scene.remove(_pickupSkateboardMesh);
+  _pickupSkateboardMesh = null;
+
+  markSkateboardFound();
+  _playPickupSfx();
+
+  if (_showToast) _showToast('Skateboard found! Skate mode unlocked! Press K or toggle in pause menu.');
+}
+
+function _playPickupSfx() {
+  const ac = _ensureSfxAudioCtx();
+  if (!ac || sfxMuted) return;
+  const notes = [523, 659, 784]; // C5, E5, G5
+  notes.forEach((freq, i) => {
+    const delay = i * 0.1;
+    const now = ac.currentTime + delay;
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now);
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.linearRampToValueAtTime(0.04, now + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+    osc.connect(g).connect(ac.destination);
+    osc.start(now);
+    osc.stop(now + 0.3);
+  });
+}
+
+function _updatePickupSkateboardBob(dtSec) {
+  if (!_pickupSkateboardMesh || skateboardFound) return;
+  _pickupBobPhase += dtSec * 2.5;
+  const fy = getFloorY();
+  _pickupSkateboardMesh.position.y = fy + 5 + Math.sin(_pickupBobPhase) * 0.5;
+
+  // Glow stays at ground level
+  const g = _pickupSkateboardMesh._glowGroup;
+  if (g) {
+    g.position.x = _pickupSkateboardMesh.position.x;
+    g.position.y = fy + 5;
+    g.position.z = _pickupSkateboardMesh.position.z;
+  }
+  const sparkles = _pickupSkateboardMesh._sparkles;
+  if (sparkles) {
+    const t = _pickupBobPhase;
+    for (const s of sparkles) {
+      const angle = s._phase + t * s._speed;
+      s.position.set(
+        Math.cos(angle) * s._radius,
+        s._yOff + Math.sin(t * 1.5 + s._phase) * 1.2,
+        Math.sin(angle) * s._radius
+      );
+      s.material.opacity = 0.45 + 0.4 * Math.sin(t * 3 + s._phase);
+      s.scale.setScalar(0.3 + 0.35 * Math.sin(t * 2.5 + s._phase * 2));
+    }
+  }
+}
+
 function _initSkateboard() {
   if (_skateboardLoadStarted) return;
   _skateboardLoadStarted = true;
@@ -1054,7 +1350,8 @@ export function init(refs) {
   _scene.traverse(obj => {
     if (obj._isLamp || obj._isCeilLight || obj._isFan || obj._isFilterL || obj._isFilterR ||
         obj._isDrawer || obj._isBifoldLeaf || obj._isCornerDoorHandle || obj._isCornerDoor || obj._isWindow ||
-        obj._isMacbook || obj._isTV || obj._isFoodBowl) {
+        obj._isMacbook || obj._isTV || obj._isFoodBowl ||
+        obj._isGuestDoor || obj._isGuestDoorHandle || obj._isPickupSkateboard) {
       _interactiveObjects.push(obj);
     }
   });
@@ -1064,6 +1361,7 @@ export function init(refs) {
   _syncAudioToggleUi();
   _syncSkateToggleUi();
   _initSkateboard();
+  _spawnPickupSkateboard();
   _syncSkateboardVisualState();
 }
 
@@ -1232,10 +1530,18 @@ function _buildStaticBoxes() {
     });
   }
 
-  // Right wall solid portions (flanking closet opening)
+  // Right wall solid portions (flanking closet opening and guest door)
+  // Guest door opening spans Z=34..66 (pre-mirror). The wall segment after
+  // the closet must stop at the guest door, with only a header above it.
+  const _guestDoorZmin = 34, _guestDoorZmax = 66, _guestDoorH = 68;
   _staticBoxes.push(
+    // Before closet opening
     { xMin: -(SIDE_WALL_X + 0.5), xMax: -SIDE_WALL_X, zMin: OPP_WALL_Z, zMax: CLOSET_Z - CLOSET_W / 2, yTop: fy + WALL_HEIGHT, room: true },
-    { xMin: -(SIDE_WALL_X + 0.5), xMax: -SIDE_WALL_X, zMin: CLOSET_Z + CLOSET_W / 2, zMax: 49, yTop: fy + WALL_HEIGHT, room: true }
+    // After closet opening, before guest door
+    { xMin: -(SIDE_WALL_X + 0.5), xMax: -SIDE_WALL_X, zMin: CLOSET_Z + CLOSET_W / 2, zMax: _guestDoorZmin, yTop: fy + WALL_HEIGHT, room: true },
+    // Header above guest door (bedroom side, Z=34..49)
+    { xMin: -(SIDE_WALL_X + 0.5), xMax: -SIDE_WALL_X, zMin: _guestDoorZmin, zMax: 49,
+      yBottom: fy + _guestDoorH, yTop: fy + WALL_HEIGHT, room: true }
   );
 
   // ── Closet collision (exact match to monolith _fpBoxesBase) ──
@@ -1449,76 +1755,41 @@ function _buildStaticBoxes() {
   // Pre-mirror hallway X = 11..51, Z = 49..289. World X = -51..-11.
   const hzStart = 49, hzEnd = 289;
   _staticBoxes.push(
-    // -X side wall of hallway — split around office doorway (Z=64..96)
-    // Segment before doorway (Z=49..64)
-    { xMin: -11, xMax: -10.5, zMin: hzStart, zMax: 64, yTop: fy + WALL_HEIGHT, room: true },
-    // Segment after doorway (Z=96..289)
-    { xMin: -11, xMax: -10.5, zMin: 96, zMax: hzEnd, yTop: fy + WALL_HEIGHT, room: true },
-    // Header above office doorway (Y=68..ceiling, Z=64..96)
-    { xMin: -11, xMax: -10.5, zMin: 64, zMax: 96,
+    // -X side wall of hallway (continuous — no office door split)
+    { xMin: -11, xMax: -10.5, zMin: hzStart, zMax: hzEnd, yTop: fy + WALL_HEIGHT, room: true },
+    // +X side wall of hallway — split around guest doorway (Z=34..66)
+    // Guest door opening starts before hallway (Z=34), hallway starts at Z=49,
+    // so the gap in the hallway wall is Z=49..66. No "before" segment needed.
+    // Segment after doorway (Z=66..289)
+    { xMin: -51.5, xMax: -51, zMin: 66, zMax: hzEnd, yTop: fy + WALL_HEIGHT, room: true },
+    // Header above guest doorway (Y=68..ceiling, Z=49..66)
+    { xMin: -51.5, xMax: -51, zMin: hzStart, zMax: 66,
       yBottom: fy + 68, yTop: fy + WALL_HEIGHT, room: true },
-    // +X side wall of hallway (pre-mirror X=51..51.5)
-    { xMin: -51.5, xMax: -51, zMin: hzStart, zMax: hzEnd, yTop: fy + WALL_HEIGHT, room: true },
     // End wall at Z=_hallZEnd
     { xMin: -51.5, xMax: -10.5, zMin: hzEnd, zMax: hzEnd + 0.5, yTop: fy + WALL_HEIGHT, room: true }
   );
 
-  // ── Office room walls (off the hallway's -X wall at Z=64..96) ──
-  // Pre-mirror footprint X=-60..11, Z=55..145. World X=-11..60.
-  // Shared wall is the hallway -X wall (already segmented above); only
-  // the three new walls are collided here.
+  // ── Guest room walls (behind the hallway's +X door) ──
+  // Desk against the +X far wall (pre-mirror X≈164, Z≈58.5)
+  // World: X = -164, Z = 58.5
   {
-    const oXmin = -60, oXmax = 11, oZmin = 55, oZmax = 145;
-    // World X: negate pre-mirror X. Pre-mirror -60 → world 60; pre-mirror 11 → world -11.
-    const wXmin = -oXmax; // -11 (shared wall)
-    const wXmax = -oXmin; // 60  (far wall)
-    _staticBoxes.push(
-      // Far wall (world X=60..60.5)
-      { xMin: wXmax, xMax: wXmax + 0.5, zMin: oZmin - 0.5, zMax: oZmax + 0.5, yTop: fy + WALL_HEIGHT, room: true },
-      // -Z wall (world X=-11..60, Z=54.5..55)
-      { xMin: wXmin, xMax: wXmax, zMin: oZmin - 0.5, zMax: oZmin, yTop: fy + WALL_HEIGHT, room: true },
-      // +Z wall (world X=-11..60, Z=145..145.5)
-      { xMin: wXmin, xMax: wXmax, zMin: oZmax, zMax: oZmax + 0.5, yTop: fy + WALL_HEIGHT, room: true }
-    );
-  }
-
-  // ── Office furniture collision boxes ──
-  // Desk (pre-mirror X≈-48, Z≈108, 24"D × 48"W × 30"H)
-  {
-    const deskX = -60 + 6 + 12; // -42 pre-mirror
-    const deskZ = 100 + 8;       // 108
+    const deskX = 183 - 4 - 15; // 164 pre-mirror
+    const deskZ = 58.5;
     const deskTopY = fy + 30;
-    // Full desk body (simplified AABB)
     _staticBoxes.push({
-      xMin: -(deskX + 12), xMax: -(deskX - 12),
-      zMin: deskZ - 24, zMax: deskZ + 24,
-      yTop: deskTopY, yBottom: fy, room: true
-    });
-    // Monitor on desk
-    _staticBoxes.push({
-      xMin: -(deskX - 12 + 4 + 0.75), xMax: -(deskX - 12 + 4 - 0.75),
-      zMin: deskZ - 10, zMax: deskZ + 10,
-      yTop: deskTopY + 4 + 20, yBottom: deskTopY, room: true
+      xMin: -(deskX + 15), xMax: -(deskX - 15),
+      zMin: deskZ - 30, zMax: deskZ + 30,
+      yTop: deskTopY + 22, yBottom: fy, room: true
     });
   }
-  // Chair (pre-mirror X≈-24, Z≈108)
+  // Chair (pre-mirror X≈139, Z≈58.5)
   {
-    const chairX = -42 + 12 + 6; // -24 pre-mirror
-    const chairZ = 108;
+    const chairX = 164 - 15 - 10; // 139
+    const chairZ = 58.5;
     _staticBoxes.push({
-      xMin: -(chairX + 9), xMax: -(chairX - 9),
-      zMin: chairZ - 9, zMax: chairZ + 9,
-      yTop: fy + 18 + 20, yBottom: fy, room: true
-    });
-  }
-  // Bookshelf (pre-mirror X≈-24.5, Z≈139)
-  {
-    const shelfX = (-60 + 11) / 2; // -24.5
-    const shelfZ = 145 - 1 - 6;     // 138
-    _staticBoxes.push({
-      xMin: -(shelfX + 6), xMax: -(shelfX - 6),
-      zMin: shelfZ - 18, zMax: shelfZ + 18,
-      yTop: fy + 60, yBottom: fy, room: true
+      xMin: -(chairX + 12), xMax: -(chairX - 12),
+      zMin: chairZ - 12, zMax: chairZ + 12,
+      yTop: fy + 48, yBottom: fy, room: true
     });
   }
 
@@ -1939,6 +2210,7 @@ export function toggleFirstPerson() {
 
     if (_markShadowsDirty) _markShadowsDirty();
     document.body.classList.add('play-mode');
+    _syncSkateToggleUi();
     _playModeCue(true);
     if (_showToast) _showToast('Game mode! WASD to move, Space to jump (wall jump too!)');
   } else {
@@ -1993,6 +2265,7 @@ export function toggleFirstPerson() {
     // Restore cat shadow casting for orbit mode
     catAnimation.setCatShadows(true);
     document.body.classList.remove('play-mode');
+    _syncSkateToggleUi();
     _playModeCue(false);
   }
 }
@@ -2011,7 +2284,7 @@ function _respawn() {
   _coyoteFrames = 0;
   _jumpBufferFrames = 0;
   _spaceWasDown = false;  _lastPhysicsTs = 0;
-  _wallContactNx = 0; _wallContactNz = 0; _wallJumpCooldown = 0; _preCollisionSpd = 0;
+  _wallContactNx = 0; _wallContactNz = 0; _wallJumpCooldown = 0; _preCollisionSpd = 0; _consecutiveWallJumps = 0; _skateBoostAccum = 0;
   fpPaused = false;
   _ssFullChargeSinceTs = 0;
   _ssActiveUntilTs = 0;
@@ -2019,6 +2292,9 @@ function _respawn() {
   _ssHudFlashUntilTs = 0;
   _ssChargeShake = 0;
   _skateLean = 0;
+  _trickManual = 0; _trickManualHeld = false;
+  _trickKickflip = 0; _trickKickflipActive = false;
+  _trickSpin = 0; _trickSpinActive = false;
   _silenceSkateRoll(true);
   _ssShakeOffset.set(0, 0, 0);
   _setSuperSaiyanEnvLightOff();
@@ -2032,6 +2308,7 @@ function _resetWorldState() {
   }
   if (_roomRefs) {
     if (typeof _roomRefs.toggleCornerDoor === 'function') _roomRefs.toggleCornerDoor(false);
+    if (typeof _roomRefs.toggleGuestDoor === 'function') _roomRefs.toggleGuestDoor(false);
     if (typeof _roomRefs.toggleGuestDoor  === 'function') _roomRefs.toggleGuestDoor(false);
   }
   // Filter / drawer collision boxes are cached; force a rebuild.
@@ -2193,7 +2470,17 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   const inputActive = fpKeys.w || fpKeys.a || fpKeys.s || fpKeys.d;
 
   if (skateMode) {
-    const skateSpd = (fpKeys.shift ? 0.62 : 0.42) * speedMul;
+    // Reset progressive boost on wall collision
+    if (_wallContactNx !== 0 || _wallContactNz !== 0) _skateBoostAccum = 0;
+
+    const skateBase = (fpKeys.shift ? 0.95 : 0.60) * speedMul;
+    // Progressive boost: grows while holding input, uncapped
+    if (inputActive) {
+      const boostRate = (fpKeys.shift ? 0.012 : 0.007) * speedMul;
+      _skateBoostAccum += boostRate * frameScale;
+    }
+    const skateSpd = skateBase + _skateBoostAccum;
+
     let tgtX = 0, tgtZ = 0;
     if (fpKeys.w) { tgtX += fwd.x * skateSpd; tgtZ += fwd.z * skateSpd; }
     if (fpKeys.s) { tgtX -= fwd.x * skateSpd; tgtZ -= fwd.z * skateSpd; }
@@ -2227,12 +2514,13 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       _velX = dirX * along + latX;
       _velZ = dirZ * along + latZ;
     } else {
-      const glideDrag = Math.pow(0.988, accelScale);
+      const glideDrag = Math.pow(0.994, accelScale);
       _velX *= glideDrag;
       _velZ *= glideDrag;
     }
 
-    const maxVel = skateSpd * 1.08;
+    // No hard velocity clamp — progressive boost is the cap
+    const maxVel = skateSpd * 1.18;
     const velMag = Math.hypot(_velX, _velZ);
     if (velMag > maxVel && velMag > 1e-6) {
       const clamp = maxVel / velMag;
@@ -2283,30 +2571,27 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   // remembers a press right before landing so you don't lose presses.
   // Asymmetric gravity (snappier fall) is below in the gravity section.
   const JUMP_BASE_VY         = 0.40;  // power on a near-zero-charge release
-  const JUMP_MAX_BONUS       = 0.80;  // extra power at full charge
-  const JUMP_CHARGE_FRAMES   = 90;    // frames to reach full charge (~1.5s)
-  // Stepped charge: meter pauses at each tier boundary until a hold threshold
-  // is met — like Mario Kart boost grinding. You must hold at each gate for
-  // TIER_HOLD_FRAMES before the meter advances to the next tier.
-  const TIER_HOLD_FRAMES     = 18;    // ~0.3s hold at each tier gate
-  const TIER1_GATE           = Math.round(JUMP_CHARGE_FRAMES * 0.33);  // 30
-  const TIER2_GATE           = Math.round(JUMP_CHARGE_FRAMES * 0.66);  // 59
+  const JUMP_MAX_BONUS       = 0.80;  // extra power at full charge (100%)
+  const JUMP_MEGA_BONUS      = 0.40;  // extra on top when holding past full (~150%)
+  const JUMP_CHARGE_FRAMES   = 36;    // frames to reach full charge (~0.6s)
+  const MEGA_HOLD_FRAMES     = 30;    // ~0.5s hold at full before MEGA bonus kicks in
   const COYOTE_FRAMES        = 6;     // grace frames after walking off a ledge
   const JUMP_BUFFER_FRAMES   = 8;     // grace frames for a press just before landing
   const GRAVITY_RISE         = 0.018; // gravity while ascending
   const GRAVITY_FALL         = 0.028; // stronger gravity while falling — snappier feel
-  const WALL_JUMP_VY_MIN     = 0.55;  // vertical boost at zero speed
-  const WALL_JUMP_VY_MAX     = 1.00;  // vertical boost at full sprint into wall
+  const WALL_JUMP_VY_MIN     = 0.70;  // vertical boost at zero speed
+  const WALL_JUMP_VY_MAX     = 1.15;  // vertical boost at full sprint into wall
   const WALL_JUMP_PUSH_MIN   = 0.30;  // horizontal push at zero speed
   const WALL_JUMP_PUSH_MAX   = 0.75;  // horizontal push at full sprint
   const WALL_JUMP_COOLDOWN   = 18;    // frames between wall jumps (anti-spam)
+  const WALL_JUMP_GRAV_EXTRA = 0.35;  // extra gravity multiplier per consecutive wall jump
 
   // Grounded gate matches the old vy≈0 check; _wasGroundedLast is set at the
   // end of the previous frame and is the most reliable "on something" signal.
   const onGround = _wasGroundedLast && Math.abs(fpVy) < 0.01;
 
   // Coyote: full window while grounded, decays once we leave.
-  if (onGround) _coyoteFrames = COYOTE_FRAMES;
+  if (onGround) { _coyoteFrames = COYOTE_FRAMES; _consecutiveWallJumps = 0; }
   else _coyoteFrames = Math.max(0, _coyoteFrames - frameScale);
 
   // Edge-detect space press; refresh the buffer on the press only.
@@ -2317,36 +2602,18 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
   // Snapshot charge BEFORE we mutate it below — release-fire reads this.
   const chargeAtFrameStart = _spaceHeld;
+  const tierGateAtFrameStart = _tierGateHeld;
 
-  // Stepped charge: meter advances freely within a tier, but pauses at each
-  // gate (TIER1_GATE, TIER2_GATE). You must hold at the gate for
-  // TIER_HOLD_FRAMES before the meter breaks through to the next tier.
+  // Charge while space is held AND we're on the ground (or in coyote window).
+  // Off-ground holds don't accumulate (no air-charge cheese).
+  // Once at full charge, _tierGateHeld counts how long you've been holding
+  // past full — used for the MEGA bonus and super saiyan activation.
   if (fpKeys.space && (onGround || _coyoteFrames > 0)) {
-    const next = Math.min(JUMP_CHARGE_FRAMES, _spaceHeld + frameScale);
-    // Which gate (if any) are we currently clamped at?
-    const atGate1 = Math.abs(_spaceHeld - TIER1_GATE) < 0.01;
-    const atGate2 = Math.abs(_spaceHeld - TIER2_GATE) < 0.01;
-    // Would the raw advance cross a gate?
-    const crossGate1 = _spaceHeld < TIER1_GATE && next >= TIER1_GATE;
-    const crossGate2 = _spaceHeld < TIER2_GATE && next >= TIER2_GATE;
-
-    if (atGate1 || atGate2) {
-      // Sitting at a gate — count hold frames
+    if (_spaceHeld >= JUMP_CHARGE_FRAMES) {
+      // Already at full — count hold-past-full frames
       _tierGateHeld += frameScale;
-      if (_tierGateHeld >= TIER_HOLD_FRAMES) {
-        // Break through the gate
-        _spaceHeld = _spaceHeld + frameScale;
-        _tierGateHeld = 0;
-      }
-      // else stay clamped at gate
-    } else if (crossGate1) {
-      _spaceHeld = TIER1_GATE;
-      _tierGateHeld = 0;
-    } else if (crossGate2) {
-      _spaceHeld = TIER2_GATE;
-      _tierGateHeld = 0;
     } else {
-      _spaceHeld = next;
+      _spaceHeld = Math.min(JUMP_CHARGE_FRAMES, _spaceHeld + frameScale);
     }
   } else if (!fpKeys.space) {
     _spaceHeld = 0; _tierGateHeld = 0;
@@ -2360,8 +2627,10 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   if (canJump && releasedThisFrame) {
     // Released — fire with whatever charge had built up (min = base jump).
     const chargeN = Math.min(1, chargeAtFrameStart / JUMP_CHARGE_FRAMES);
-    fpVy = JUMP_BASE_VY + JUMP_MAX_BONUS * chargeN;
-    _playJumpCue(chargeN);
+    // MEGA bonus: if held past full, ramp up to 150% jump height
+    const megaN = Math.min(1, tierGateAtFrameStart / MEGA_HOLD_FRAMES);
+    fpVy = JUMP_BASE_VY + JUMP_MAX_BONUS * chargeN + JUMP_MEGA_BONUS * megaN;
+    _playJumpCue(chargeN + megaN * 0.5);
     firedThisFrame = true;
   } else if (canJump && _jumpBufferFrames > 0 && !fpKeys.space) {
     // Buffered press from before landing — fire a base jump on touchdown.
@@ -2393,6 +2662,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     _velX = (_wallContactNx / nLen) * wallPush;
     _velZ = (_wallContactNz / nLen) * wallPush;
     _wallJumpCooldown = WALL_JUMP_COOLDOWN;
+    _consecutiveWallJumps++;
     _isJumping = true;
     _spaceHeld = 0; _tierGateHeld = 0;
     _jumpBufferFrames = 0;
@@ -2411,39 +2681,34 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   const chargePct = (onGround && _spaceHeld > 0)
     ? Math.min(_spaceHeld / JUMP_CHARGE_FRAMES, 1)
     : 0;
-  // Tier 0 = no charge, 1 = small (>0–33%), 2 = big (33–66%), 3 = MEGA (66–100%)
-  let chargeTier = 0;
-  if (chargePct > 0.66)      chargeTier = 3;
-  else if (chargePct > 0.33) chargeTier = 2;
-  else if (chargePct > 0)    chargeTier = 1;
-
-  // Are we currently paused at a tier gate?
-  const atTierGate = _tierGateHeld > 0 && _tierGateHeld < TIER_HOLD_FRAMES;
-  const gateProgress = atTierGate ? Math.round((_tierGateHeld / TIER_HOLD_FRAMES) * 100) : 0;
+  // MEGA hold: how far past full charge we've been holding (0–1)
+  const megaPct = (onGround && _tierGateHeld > 0)
+    ? Math.min(_tierGateHeld / MEGA_HOLD_FRAMES, 1)
+    : 0;
+  const isMega = megaPct >= 1;
 
   if (_cachedCbFill) {
-    _cachedCbFill.style.width = `${Math.round(chargePct * 100)}%`;
+    // Show charge % normally, or overfill to represent MEGA
+    const displayPct = isMega ? 100 : Math.round(chargePct * 100);
+    _cachedCbFill.style.width = `${displayPct}%`;
   }
   if (_cachedCbBar) {
     _cachedCbBar.classList.toggle('charging', chargePct > 0);
     _cachedCbBar.classList.toggle('charged', chargePct >= 0.95);
-    _cachedCbBar.classList.toggle('tier-1', chargeTier === 1);
-    _cachedCbBar.classList.toggle('tier-2', chargeTier === 2);
-    _cachedCbBar.classList.toggle('tier-3', chargeTier === 3);
-    _cachedCbBar.classList.toggle('at-gate', atTierGate);
+    _cachedCbBar.classList.toggle('tier-1', chargePct > 0 && chargePct <= 0.99 && !isMega);
+    _cachedCbBar.classList.toggle('tier-2', chargePct >= 0.99 && !isMega);
+    _cachedCbBar.classList.toggle('tier-3', isMega);
+    _cachedCbBar.classList.toggle('at-gate', chargePct >= 0.99 && !isMega);
   }
   if (_cachedCbLabel) {
-    if (atTierGate) {
-      _cachedCbLabel.textContent =
-        chargeTier === 1 ? 'HOLD for Big!' :
-        chargeTier === 2 ? 'HOLD for MEGA!' :
-        'HOLD!';
+    if (isMega) {
+      _cachedCbLabel.textContent = 'MEGA JUMP!';
+    } else if (chargePct >= 0.99) {
+      _cachedCbLabel.textContent = 'HOLD for MEGA!';
+    } else if (chargePct > 0) {
+      _cachedCbLabel.textContent = 'Jump charge';
     } else {
-      _cachedCbLabel.textContent =
-        chargeTier === 3 ? 'MEGA JUMP!' :
-        chargeTier === 2 ? 'Big jump' :
-        chargeTier === 1 ? 'Small jump' :
-        'Jump charge';
+      _cachedCbLabel.textContent = 'Jump charge';
     }
   }
   if (_cachedCbValue) {
@@ -2452,22 +2717,20 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       : 'Air';
   }
 
-  // Cat charge glow — color blends cyan → teal → gold as tier rises.
+  // Cat charge glow — ramps with charge, shifts gold when MEGA.
   if (_chargeLight) {
-    // Smoothed target intensity per tier (0, ~6, ~14, ~28). Scales with
-    // chargePct within the tier so it ramps in instead of stepping.
     let targetI = 0;
-    if (chargeTier === 1)      targetI = 4 + chargePct * 4;
-    else if (chargeTier === 2) targetI = 10 + (chargePct - 0.33) * 12;
-    else if (chargeTier === 3) targetI = 22 + (chargePct - 0.66) * 22;
-    // Add a subtle MEGA flicker so it feels alive, not static.
-    if (chargeTier === 3) targetI *= 0.85 + 0.15 * Math.sin(ts * 0.05);
+    if (isMega) {
+      targetI = 28 + megaPct * 16;
+      targetI *= 0.85 + 0.15 * Math.sin(ts * 0.05); // MEGA flicker
+    } else if (chargePct > 0) {
+      targetI = 4 + chargePct * 20;
+    }
     _chargeLightTarget = targetI;
     const lerpK = 1 - Math.exp(-Math.max(0, dtSec) * 18);
     _chargeLight.intensity += (_chargeLightTarget - _chargeLight.intensity) * lerpK;
-    // Hue: cyan(0x88ddff) → teal(0x88ffe0) → gold(0xffc870)
-    if (chargeTier === 3) _chargeLight.color.setHex(0xffc870);
-    else if (chargeTier === 2) _chargeLight.color.setHex(0x88ffe0);
+    if (isMega) _chargeLight.color.setHex(0xffc870);
+    else if (chargePct >= 0.99) _chargeLight.color.setHex(0x88ffe0);
     else _chargeLight.color.setHex(0x88ddff);
   }
 
@@ -2537,7 +2800,9 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   }
 
   // ── Gravity (asymmetric: fall faster than rise) ───────────────────
-  const g = fpVy > 0 ? GRAVITY_RISE : GRAVITY_FALL;
+  // Consecutive wall jumps make gravity heavier to prevent infinite climbing
+  const gravScale = 1 + _consecutiveWallJumps * WALL_JUMP_GRAV_EXTRA;
+  const g = (fpVy > 0 ? GRAVITY_RISE : GRAVITY_FALL) * gravScale;
   fpVy -= g * frameScale;
   let newY = fpPos.y + fpVy * frameScale;
 
@@ -2740,16 +3005,17 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     let dzC = -lookDir.z * camDist + right.z * camShoulder;
 
     // Camera wall clamp — include closet area so player can walk in
-    const inHallway = focal.z > 49 - 1;
-    const inOffice = focal.x > -11 + 1 && focal.z > 55 && focal.z < 145;
+    // Guest doorway transition zone: when the focal point is near the
+    // right wall (X≈-51) and within the guest door Z range (34..66),
+    // allow the camera to follow into the office room smoothly.
+    const inGuestDoorway = focal.x < -51 + 4 && focal.x > -51 - 8
+      && focal.z > 34 - 2 && focal.z < 66 + 2;
     const inGuestRoom = focal.x < -51 - 1 && focal.z > -13 && focal.z < 130;
+    const inHallway = focal.z > 49 - 1 && !inGuestDoorway && !inGuestRoom;
     let camWallXMin, camWallXMax;
-    if (inOffice) {
-      camWallXMin = -11 + 1;   // shared wall with hallway
-      camWallXMax = 60 - 1;    // office far wall
-    } else if (inGuestRoom) {
+    if (inGuestRoom || inGuestDoorway) {
       camWallXMin = -183 + 1;
-      camWallXMax = -51 - 1;
+      camWallXMax = -LEFT_WALL_X - 1;
     } else if (inHallway) {
       camWallXMin = -51 + 1;
       camWallXMax = -11 - 1;
@@ -2761,12 +3027,11 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     const camWallZMin = CLOSET_Z - CLOSET_INTERIOR_W / 2 + 1; // closet -Z side wall
     // Default Z clamp stops at the back-wall inner face. When the player is in
     // the hallway extension (focal X inside the hallway opening and past the
-    // back wall), extend Z so the camera can follow. Also extend for office.
+    // back wall), extend Z so the camera can follow. Also extend for office
+    // and the guest doorway transition.
     const inHallwayX = (focal.x >= -51 + 1 && focal.x <= -11 - 1);
     let camWallZMax;
-    if (inOffice) {
-      camWallZMax = 145 - 1;
-    } else if ((inHallwayX && focal.z > 49 - 6) || inGuestRoom) {
+    if ((inHallwayX && focal.z > 49 - 6) || inGuestRoom || inGuestDoorway) {
       camWallZMax = 289 - 1;
     } else {
       camWallZMax = 49 - 1;
@@ -2820,6 +3085,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       if (_catGroup.parent !== _scene) _scene.add(_catGroup);
       _catGroup.visible = true;
       _fitSkateboardToCat();
+      _updatePickupSkateboardBob(dtSec);
       _catGroup.position.set(fpPos.x, fpPos.y - 4.0, fpPos.z);
       if (_ssChargeShake > 0.0001) {
         const shake = _sampleSuperSaiyanChargeShake(ts, _ssChargeShake);
@@ -2889,18 +3155,18 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     if (ts - _lastCrosshairRaycastTs >= RAYCAST_INTERVAL_MS) {
       _lastCrosshairRaycastTs = ts;
       _ray.setFromCamera(_rayCenter, _camera);
-      // Raycast only against known interactive objects (not entire scene)
+      // Scene-wide raycast so opaque geometry (walls/furniture) occludes
+      // interactables behind them — no clicking through walls.
+      const hits = _ray.intersectObjects(_scene.children, true);
       let aimingAt = false;
       let aimTarget = null;
-      for (let i = 0; i < _interactiveObjects.length; i++) {
-        const obj = _interactiveObjects[i];
-        if (!obj.parent) continue; // removed from scene
-        const hits = _ray.intersectObject(obj, true);
-        if (hits.length > 0 && hits[0].distance <= 220) {
-          aimingAt = true;
-          aimTarget = obj;
-          break;
-        }
+      for (let i = 0; i < hits.length; i++) {
+        const h = hits[i];
+        if (h.distance > 220) break;
+        if (!_isObjectVisibleInWorld(h.object)) continue;
+        const t = _findInteractiveAncestor(h.object);
+        if (t) { aimingAt = true; aimTarget = t; break; }
+        if (_isOccluder(h.object)) break; // blocked by opaque geometry
       }
       if (aimingAt && !_wasAimingAtInteractable && ts - _lastAimToneTs > 220) {
         _playAimCue();
@@ -2910,23 +3176,21 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       _crosshairAimingAtInteractable = aimingAt;
       window._fpLookTarget = aimingAt;
 
-      // Tooltip — show contextual text for specific interactables
+      // Tooltip — show a friendly label for the targeted interactable.
+      // Door labels flip based on which side of the door the player is on.
       const tooltip = document.getElementById('fpCrosshairTooltip');
       if (tooltip) {
-        let tooltipText = '';
-        if (aimTarget) {
-          // Walk up to find tagged parent
-          let p = aimTarget;
-          while (p) {
-            if (p._isCornerDoor || p._isCornerDoorHandle) { tooltipText = 'Office'; break; }
-            p = p.parent;
+        const label = aimTarget ? _labelForInteractable(aimTarget) : null;
+        if (label) {
+          const html = '<span class="tt-verb">' + label.verb + '</span><span class="tt-sep">\u00b7</span>' + label.noun;
+          if (tooltip._lastHtml !== html) {
+            tooltip.innerHTML = html;
+            tooltip._lastHtml = html;
           }
-        }
-        if (tooltipText) {
-          tooltip.textContent = tooltipText;
           tooltip.classList.add('visible');
         } else {
           tooltip.classList.remove('visible');
+          tooltip._lastHtml = '';
         }
       }
     }

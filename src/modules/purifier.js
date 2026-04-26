@@ -42,6 +42,7 @@ export function createPurifier(scene) {
   let _toggleMacbook = null;
   let _toggleTV = null;
   let _toggleCornerDoor = null;
+  let _toggleGuestDoor = null;
   let _toggleFoodBowl = null;
   let _getFoodBowlMesh = null;
   let _uiSfxAC = null;
@@ -1751,6 +1752,12 @@ export function createPurifier(scene) {
         if (h.distance > 220) break; // interaction range
         fpTarget = getInteractiveTarget(h.object);
         if (fpTarget) break;
+        // Opaque non-interactive geometry blocks the click — no clicking
+        // through walls, furniture, etc.
+        const m = h.object && h.object.isMesh ? h.object.material : null;
+        const passthrough = h.object && h.object.userData && h.object.userData.clickPassthrough;
+        const transparent = m && !Array.isArray(m) && m.transparent && (m.opacity == null || m.opacity < 0.05);
+        if (m && !passthrough && !transparent) break;
       }
       if (fpTarget) {
         handleClickObject(fpTarget);
@@ -1806,7 +1813,7 @@ export function createPurifier(scene) {
   function getInteractiveTarget(obj){
     let p=obj;
     while(p){
-      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isCornerDoorHandle||p._isCornerDoor||p._isMacbook||p._isWindow||p._isTV||p._isFoodBowl) return p;
+      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isCornerDoorHandle||p._isCornerDoor||p._isGuestDoor||p._isGuestDoorHandle||p._isMacbook||p._isWindow||p._isTV||p._isFoodBowl||p._isPickupSkateboard) return p;
       p=p.parent;
     }
     return null;
@@ -2034,6 +2041,11 @@ export function createPurifier(scene) {
   
   function handleClickObject(obj){
     if(!obj) return;
+    // Clicked pickup skateboard
+    if(obj._isPickupSkateboard){
+      if(window._collectPickupSkateboard) window._collectPickupSkateboard();
+      return;
+    }
     // Clicked corner door (handle or panel — the whole leaf opens/closes)
     if(obj._isCornerDoorHandle||obj._isCornerDoor){
       if(_toggleCornerDoor){
@@ -2041,6 +2053,14 @@ export function createPurifier(scene) {
         _playDoorCue(!!isOpen, 1);
       }
       if(_fpMode) spawnSecretCornerDoorCoin();
+      return;
+    }
+    // Clicked guest door (handle or panel) — leads to office
+    if(obj._isGuestDoor||obj._isGuestDoorHandle){
+      if(_toggleGuestDoor){
+        const isOpen = _toggleGuestDoor();
+        _playDoorCue(!!isOpen, 1);
+      }
       return;
     }
     // Clicked lamp → toggle light
@@ -3586,6 +3606,8 @@ export function createPurifier(scene) {
     if (refs.toggleMacbook) _toggleMacbook = refs.toggleMacbook;
     if (refs.toggleTV) _toggleTV = refs.toggleTV;
     if (refs.toggleCornerDoor) _toggleCornerDoor = refs.toggleCornerDoor;
+    if (refs.toggleGuestDoor) _toggleGuestDoor = refs.toggleGuestDoor;
+    if (refs.toggleGuestDoor) _toggleGuestDoor = refs.toggleGuestDoor;
     if (refs.toggleFoodBowl) _toggleFoodBowl = refs.toggleFoodBowl;
     if (refs.getFoodBowlMesh) _getFoodBowlMesh = refs.getFoodBowlMesh;
   }

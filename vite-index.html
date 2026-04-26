@@ -317,6 +317,11 @@
           <div class="char-name">Totodile</div>
           <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
         </div>
+        <div class="char-card" data-model="korra" role="button" tabindex="0" aria-label="Korra" onclick="window._selectCat&&window._selectCat('korra',this)">
+          <canvas class="char-preview" id="previewKorra"></canvas>
+          <div class="char-name">Cursed Korra</div>
+          <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
+        </div>
       </div>
       <div class="mode-select" role="group" aria-label="Movement mode">
         <button type="button" class="mode-pill on" data-mode="normal" onclick="window._selectMode&&window._selectMode('normal',this)">
@@ -373,6 +378,9 @@
       <div><kbd>Shift</kbd> Sprint</div>
       <div><kbd>V</kbd> Toggle first/third person</div>
       <div><kbd>K</kbd> Toggle skate mode</div>
+      <div><kbd>Q</kbd> Kickflip (skate)</div>
+      <div><kbd>E</kbd> Manual / wheelie (skate)</div>
+      <div><kbd>F</kbd> Board spin (skate)</div>
       <div><kbd>R</kbd> Reset run</div>
       <div><kbd>H</kbd> Toggle this panel</div>
       <div><kbd>G</kbd> Exit game</div>
@@ -387,6 +395,14 @@
     <button type="button" class="fpQuickBtn" onclick="window._pauseFP&&window._pauseFP()"><kbd>Esc</kbd> Pause</button>
     <button type="button" class="fpQuickBtn" onclick="window._resetFP&&window._resetFP()"><kbd>R</kbd> Reset</button>
   </div>
+  <div id="skateUnlockHint" aria-label="Skateboard unlocked">
+    <span class="skate-icon">🛹</span> <kbd>K</kbd> Skateboard
+  </div>
+  <div id="skateTrickHints" aria-label="Skate trick controls">
+    <span><kbd>Q</kbd> Kickflip</span>
+    <span><kbd>E</kbd> Manual</span>
+    <span><kbd>F</kbd> Spin</span>
+  </div>
   <div id="fpChargeBar" aria-label="Jump charge">
     <div class="fp-charge-head">
       <span class="fp-charge-label"><i class="ph ph-arrow-fat-up"></i> <span id="fpChargeLabel">Jump charge</span></span>
@@ -394,10 +410,6 @@
     </div>
     <div class="fp-charge-track">
       <div id="fpChargeFill"></div>
-      <div class="fp-charge-ticks" aria-hidden="true">
-        <span class="fp-charge-tick" style="left: 33.3%"></span>
-        <span class="fp-charge-tick" style="left: 66.6%"></span>
-      </div>
     </div>
     <div id="fpChargeHint"><kbd>Hold Space</kbd> then release for a higher jump</div>
   </div>
@@ -450,6 +462,11 @@
                 <div class="toggle-sw" id="fpPauseShowFps" role="switch" aria-checked="false" onclick="window._toggleFps&&window._toggleFps()"></div>
                 <span class="pause-toggle-state off" id="fpPauseShowFpsState">Off</span>
               </div>
+              <div class="pause-toggle-row" id="fpPauseDebugWallsRow" style="display:none">
+                <span class="pause-toggle-label"><i class="ph ph-walls"></i> Wall labels</span>
+                <div class="toggle-sw" id="fpPauseDebugWalls" role="switch" aria-checked="false" onclick="window._toggleDebugWallLabels&&window._toggleDebugWallLabels()"></div>
+                <span class="pause-toggle-state off" id="fpPauseDebugWallsState">Off</span>
+              </div>
             </div>
           </section>
 
@@ -479,6 +496,9 @@
               <div><kbd>Shift</kbd> Sprint</div>
               <div><kbd>V</kbd> Camera</div>
               <div><kbd>K</kbd> Skate mode</div>
+              <div><kbd>Q</kbd> Kickflip (skate)</div>
+              <div><kbd>E</kbd> Manual (skate)</div>
+              <div><kbd>F</kbd> Spin (skate)</div>
               <div><kbd>R</kbd> Reset run</div>
               <div><kbd>Esc</kbd> Resume</div>
             </div>
@@ -504,6 +524,13 @@
   <button id="mobileExitBtn" aria-label="Exit game" onclick="window._exitFP&&window._exitFP()"><i class="ph ph-x" aria-hidden="true"></i></button>
   </main>
 
+  <script>
+    // Show debug wall-label toggle only on localhost
+    if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+      var r = document.getElementById('fpPauseDebugWallsRow');
+      if (r) r.style.display = '';
+    }
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

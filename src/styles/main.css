@@ -847,20 +847,36 @@ input[type=range]::-moz-range-thumb {
 @media (prefers-reduced-motion: reduce) {
   #fpCrosshair.click-pulse { animation: none; }
 }
-/* Crosshair tooltip — shows contextual label below the crosshair */
+/* Crosshair tooltip — frosted glass pill below the crosshair.
+ * Shows "Verb · Noun" (e.g. "Open · Bedroom", "Toggle · Lamp").
+ */
 #fpCrosshairTooltip {
   display: none; position: fixed;
-  top: calc(50% + 18px); left: 50%;
-  transform: translateX(-50%);
+  top: calc(50% + 22px); left: 50%;
+  transform: translateX(-50%) translateY(0);
   z-index: 301; pointer-events: none;
-  font-size: 12px; font-weight: 600;
-  color: rgba(255,255,255,0.92);
-  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+  font-size: 11.5px; font-weight: 600; letter-spacing: 0.015em;
+  color: rgba(225,245,255,0.92);
   white-space: nowrap;
-  transition: opacity 0.15s ease;
+  background: rgba(8, 16, 28, 0.58);
+  border: 1px solid rgba(146, 210, 255, 0.18);
+  border-radius: 10px;
+  padding: 4px 12px;
+  backdrop-filter: blur(10px);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  opacity: 0;
 }
 #fpCrosshairTooltip.visible {
   display: block;
+  opacity: 1;
+}
+#fpCrosshairTooltip .tt-verb {
+  color: rgba(145, 222, 255, 0.88);
+}
+#fpCrosshairTooltip .tt-sep {
+  color: rgba(255,255,255,0.3);
+  margin: 0 5px;
 }
 #fpControls {
   display: none; position: fixed; bottom: 16px; left: 16px;
@@ -1013,6 +1029,87 @@ input[type=range]::-moz-range-thumb {
   border-color: rgba(170, 220, 255, 0.6);
 }
 .fpQuickBtn kbd {
+  background: rgba(255,255,255,0.13);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 9px;
+  line-height: 1;
+}
+/* ── Skate unlock hint ──────────────────────────────────────────── */
+#skateUnlockHint {
+  display: none;
+  position: fixed;
+  right: 18px;
+  bottom: 80px;
+  z-index: 325;
+  pointer-events: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: #d9f6ff;
+  letter-spacing: 0.02em;
+  background: rgba(8, 20, 34, 0.55);
+  border: 1px solid rgba(170, 220, 255, 0.22);
+  border-radius: 8px;
+  padding: 6px 12px;
+  backdrop-filter: blur(8px);
+  gap: 6px;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+#skateUnlockHint.visible {
+  display: inline-flex;
+  opacity: 1;
+}
+#skateUnlockHint .skate-icon {
+  font-size: 15px;
+}
+#skateUnlockHint kbd {
+  background: rgba(255,255,255,0.13);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 9px;
+  line-height: 1;
+  margin: 0 2px;
+}
+/* ── Skate trick hints strip ─────────────────────────────────────── */
+#skateTrickHints {
+  display: none;
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 324;
+  pointer-events: none;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #d9f6ff;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+#skateTrickHints.visible {
+  display: flex;
+  opacity: 1;
+}
+#skateTrickHints.fade-out {
+  opacity: 0;
+  transform: translateX(-50%) translateY(6px);
+}
+#skateTrickHints span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(8, 20, 34, 0.55);
+  border: 1px solid rgba(170, 220, 255, 0.22);
+  border-radius: 8px;
+  padding: 5px 10px;
+  backdrop-filter: blur(8px);
+}
+#skateTrickHints kbd {
   background: rgba(255,255,255,0.13);
   border: 1px solid rgba(255,255,255,0.2);
   border-radius: 4px;
@@ -1904,16 +2001,16 @@ body.play-mode #fps {
   transform: translateY(-50%) scale(1.1);
 }
 .char-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr);
-  gap: 18px; margin-bottom: 24px;
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 14px; margin-bottom: 24px;
 }
 @media (max-width: 720px) {
-  .char-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .char-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
 }
 .char-card {
   background-color: var(--glass);
   border: 2px solid rgba(255,255,255,0.12);
-  border-radius: var(--r-lg); padding: 18px 16px 20px;
+  border-radius: var(--r-lg); padding: 14px 12px 16px;
   cursor: pointer; position: relative;
   transition: all var(--dur-med) var(--spring);
   backdrop-filter: var(--glass-blur);
@@ -1985,7 +2082,7 @@ body.play-mode #fps {
 }
 /* 3D preview canvas */
 .char-preview {
-  width: 100%; height: clamp(200px, 32vh, 340px); display: block;
+  width: 100%; height: clamp(160px, 26vh, 280px); display: block;
   border-radius: var(--r-md);
   margin-bottom: 8px; background: transparent;
   flex-shrink: 0;
@@ -2140,6 +2237,8 @@ body.play-mode #fpChargeBar { display: block; }
   body.play-mode #fpControls { display: none !important; }
   body.play-mode #fpControlsHint { display: none !important; }
   body.play-mode #fpQuickControls { display: none !important; }
+  body.play-mode #skateTrickHints { display: none !important; }
+  body.play-mode #skateUnlockHint { display: none !important; }
   body.play-mode .run-hud-center { top: 10px; }
   body.play-mode .run-pill { padding: 6px 12px; gap: 8px; }
   body.play-mode .run-pill--combo > #runTimerHud,

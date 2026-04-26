@@ -36,6 +36,7 @@ const MODEL_MAP = {
   toon:      { src: 'assets/tooncat.glb' },
   bababooey: { src: 'assets/bababooey_cat.glb' },
   totodile:  { src: 'assets/totodile.glb' },
+  korra:     { src: null, procedural: true },
 };
 
 /**
@@ -258,6 +259,7 @@ export function initPreviews() {
     { key: 'toon',      canvasId: 'previewToon' },
     { key: 'bababooey', canvasId: 'previewBababooey' },
     { key: 'totodile',  canvasId: 'previewTotodile' },
+    { key: 'korra',     canvasId: 'previewKorra' },
   ];
 
   for (const entry of entries) {
@@ -295,22 +297,30 @@ export function initPreviews() {
     const preview = { renderer, scene, camera, model: null, mixer: null, key: entry.key, cfg, animSpeed, src: cfg.src };
     previews.push(preview);
 
-    // Load model (with fallback for alt filenames)
-    const loadModel = (src) => {
-      loader.load(src, (gltf) => {
-        _processLoadedModel(preview, entry, gltf, preset);
-        // Render one frame immediately so the cat is visible the moment the
-        // user opens the character-select screen (even if the _animate loop
-        // is still early-returning because the modal isn't .open yet).
+    if (cfg.procedural) {
+      // Procedural model (Korra) — build in code, no GLB needed.
+      import('./korra-model.js').then(({ buildKorraModel }) => {
+        const result = buildKorraModel();
+        // Wrap in a fake gltf-like structure for _processLoadedModel.
+        const fakeGltf = { scene: result.scene, animations: result.animations || [] };
+        _processLoadedModel(preview, entry, fakeGltf, preset);
         _renderPreviewOnce(preview);
-      }, undefined, (err) => {
-        const altSources = { 'assets/tooncat.glb': 'assets/toon-cat.glb', 'assets/toon-cat.glb': 'assets/tooncat.glb' };
-        const alt = altSources[src];
-        if (alt) { loadModel(alt); }
-        else { console.warn('[cat-preview] failed to load', src, err); }
-      });
-    };
-    loadModel(cfg.src);
+      }).catch(err => console.warn('[cat-preview] procedural build failed', err));
+    } else {
+      // Load model (with fallback for alt filenames)
+      const loadModel = (src) => {
+        loader.load(src, (gltf) => {
+          _processLoadedModel(preview, entry, gltf, preset);
+          _renderPreviewOnce(preview);
+        }, undefined, (err) => {
+          const altSources = { 'assets/tooncat.glb': 'assets/toon-cat.glb', 'assets/toon-cat.glb': 'assets/tooncat.glb' };
+          const alt = altSources[src];
+          if (alt) { loadModel(alt); }
+          else { console.warn('[cat-preview] failed to load', src, err); }
+        });
+      };
+      loadModel(cfg.src);
+    }
   }
 
   if (!_animId) _animate();

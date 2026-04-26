@@ -123,12 +123,13 @@ export function resetTimer() {
 
 // ── Formatting ──────────────────────────────────────────────────────
 
-export function formatRunTime(ms) {
+export function formatRunTime(ms, full) {
   const total = Math.max(0, Math.floor(Number(ms) || 0));
   const m = Math.floor(total / 60000);
   const s = Math.floor((total % 60000) / 1000);
   const z = total % 1000;
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(z).padStart(3, '0')}`;
+  if (full) return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(z).padStart(3, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${Math.floor(z / 100)}`;
 }
 
 // ── Player identity ─────────────────────────────────────────────────
@@ -613,7 +614,7 @@ export function renderLeaderboardPanel() {
       <span class="rk">#${i + 1}</span>
       <span class="nm">${_escapeHtml(r.name)}</span>
       ${_catBadgeHtml(r)}
-      <span class="tm">${formatRunTime(r.timeMs)}</span>
+      <span class="tm">${formatRunTime(r.timeMs, true)}</span>
     </li>`;
   }).join('');
 }
@@ -643,7 +644,7 @@ function _buildShareText(data) {
   const secretCount = Math.floor(Number(row.secretCoins) || 0);
   const secretChip = secretCount > 0 ? ` · 🔵 ${secretCount} secret${secretCount > 1 ? 's' : ''}` : '';
   return [
-    `${who} · DIY Air Purifier · ${formatRunTime(row.timeMs || 0)} · ${rankTxt} · ${modelEmoji} ${modelLabel}${colorChip}${secretChip}`,
+    `${who} · DIY Air Purifier · ${formatRunTime(row.timeMs || 0, true)} · ${rankTxt} · ${modelEmoji} ${modelLabel}${colorChip}${secretChip}`,
     url
   ].join('\n');
 }
@@ -1243,7 +1244,7 @@ function _renderFinishDialog() {
   const rank = Math.floor(Number(data.rank) || 0);
   const secretCount = Math.max(0, Math.floor(Number(data.secretCoins) || Number(_finishPendingRun?.secretCoins) || 0));
 
-  if (summaryTime) summaryTime.textContent = formatRunTime(runTimeMs);
+  if (summaryTime) summaryTime.textContent = formatRunTime(runTimeMs, true);
   if (summaryRank) {
     if (pending) {
       summaryRank.innerHTML = '<span class="finishRankSkel" aria-hidden="true"></span>';
@@ -1322,7 +1323,7 @@ function _renderFinishDialog() {
             <input type="text" class="finishDialogRowNameInput" maxlength="24" value="${_escapeHtml(pendingName)}" autocomplete="off" spellcheck="false" disabled aria-label="Your name (saving)" />
           </span>
           ${_catBadgeHtml(pendingEntry)}
-          <span class="tm">${formatRunTime(pendingTimeMs)}</span>
+          <span class="tm">${formatRunTime(pendingTimeMs, true)}</span>
         </li>`;
       }
 
@@ -1340,9 +1341,8 @@ function _renderFinishDialog() {
             : _escapeHtml(r.name)
           }</span>
           ${_catBadgeHtml(r)}
-          <span class="tm">${formatRunTime(r.timeMs)}</span>
-        </li>`);
-      }
+          <span class="tm">${formatRunTime(r.timeMs, true)}</span>
+        </li>`);      }
       if (pending && pendingInsertAt >= _leaderboard.length) rows.push(pendingHtml);
     } else {
       rows.push('<li style="opacity:0.62;padding:8px 10px">No runs yet.</li>');
