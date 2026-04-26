@@ -591,6 +591,21 @@ async function _renameLatestEntry(entryId, nextName, baseData) {
   return _renameLatestEntryLocal(entryId, nextName, baseData);
 }
 
+// ── Filter: keep only top N entries per player ────────────────────
+// List must already be sorted by time. Returns indices to show.
+const MAX_PER_PLAYER = 5;
+function _visibleIndices(board) {
+  const counts = {};
+  const vis = [];
+  for (let i = 0; i < board.length; i++) {
+    const r = board[i];
+    const key = r.playerId ? `id:${r.playerId}` : `name:${r.name}`;
+    counts[key] = (counts[key] || 0) + 1;
+    if (counts[key] <= MAX_PER_PLAYER) vis.push(i);
+  }
+  return vis;
+}
+
 // ── Render leaderboard panel (in-game, shown on pause) ──────────────
 
 export function renderLeaderboardPanel() {
@@ -603,15 +618,17 @@ export function renderLeaderboardPanel() {
     return;
   }
   if (emptyEl) emptyEl.style.display = 'none';
-  // Show top 10 in the pause card
-  const top = _leaderboard.slice(0, 10);
+  // Show top 10 visible entries (after per-player cap) in the pause card
+  const vis = _visibleIndices(_leaderboard);
+  const top = vis.slice(0, 10);
   const latestEntryId = String(((_lastRunData && _lastRunData.entryId) || (_finishDialogData && _finishDialogData.entryId) || '')).trim();
-  list.innerHTML = top.map((r, i) => {
+  list.innerHTML = top.map((idx, rank) => {
+    const r = _leaderboard[idx];
     const isHistory = r.playerId ? (r.playerId === _playerId) : (r.name === _playerName);
     const isCurrent = !!latestEntryId && String(r.id || '') === latestEntryId;
     const rowClass = `${isHistory ? 'own-history ' : ''}${isCurrent ? 'own-current' : ''}`.trim();
     return `<li class="${rowClass}">
-      <span class="rk">#${i + 1}</span>
+      <span class="rk">#${rank + 1}</span>
       <span class="nm">${_escapeHtml(r.name)}</span>
       ${_catBadgeHtml(r)}
       <span class="tm">${formatRunTime(r.timeMs, true)}</span>
@@ -1327,15 +1344,20 @@ function _renderFinishDialog() {
         </li>`;
       }
 
+      const visSet = new Set(_visibleIndices(_leaderboard));
+      let displayRank = 0;
+
       for (let i = 0; i < _leaderboard.length; i++) {
-        if (pending && i === pendingInsertAt) rows.push(pendingHtml);
+        if (pending && i === pendingInsertAt) { displayRank++; rows.push(pendingHtml); }
+        if (!visSet.has(i)) continue;
+        displayRank++;
         const r = _leaderboard[i];
         const isHistory = !!r.playerId && r.playerId === _playerId;
         const isCurrent = !!ownId && r.id === ownId;
         const rowClass = `${isHistory ? 'own-history ' : ''}${isCurrent ? 'own-current' : ''}`.trim();
         const editable = !pending && !!editableEntryId && r.id === editableEntryId;
         rows.push(`<li class="${rowClass}" data-entry-id="${_escapeHtml(r.id)}">
-          <span class="rk">#${i + 1}</span>
+          <span class="rk">#${displayRank}</span>
           <span class="nm ${editable ? 'nm-edit' : ''}">${editable
             ? `<input type="text" class="finishDialogRowNameInput" maxlength="24" value="${_escapeHtml(r.name)}" autocomplete="off" spellcheck="false" />`
             : _escapeHtml(r.name)
