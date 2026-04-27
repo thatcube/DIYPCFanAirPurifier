@@ -1395,11 +1395,44 @@ export function createPurifier(scene) {
   
   let currentFeetH=bunFootH;
   let feetStyle='bun';
-  
+  let feetSplay=0; // 0 = straight, ~35° when angled
+  const SPLAY_ANGLE=35*Math.PI/180;
+  const legSigns=[]; // store {x,z} sign per leg for re-tilting
+
+  function applyFootTilt(leg, xSgn, zSgn, h){
+    leg.rotation.set(0,0,0);
+    const yBase=-(H/2+ply+h/2);
+    if(feetSplay>0.01){
+      const ax=new THREE.Vector3(-zSgn, 0, xSgn).normalize();
+      leg.rotateOnAxis(ax, feetSplay);
+    }
+    leg.position.y=yBase;
+  }
+
+  function reapplyAllFeetTilt(){
+    const h=currentFeetH;
+    const ins=feetStyle==='bun'?Math.max(bunInset,(currentFootDiameter/2)+0.1):legInset;
+    for(let i=0;i<allLegMeshes.length;i++){
+      const leg=allLegMeshes[i], s=legSigns[i];
+      leg.position.x=s.x*(panelW/2-ins);
+      leg.position.z=s.z*(D/2+ply-ins);
+      applyFootTilt(leg, s.x, s.z, h);
+      leg.matrixAutoUpdate=true;
+      leg.updateMatrixWorld(true);
+      leg.matrixAutoUpdate=false;
+    }
+  }
+
+  function setFeetAngled(angled){
+    feetSplay=angled?SPLAY_ANGLE:0;
+    if(feetStyle!=='none') reapplyAllFeetTilt();
+  }
+
   for(let xSgn of[-1,1]){
     for(let zSgn of[-1,1]){
       const leg=new THREE.Mesh(bunGeo, woodLegMat);
       leg.position.set(xSgn*(panelW/2-bunInset), -(H/2+ply+bunFootH/2), zSgn*(D/2+ply-bunInset));
+      legSigns.push({x:xSgn, z:zSgn});
       legGroup.add(leg);
       allLegMeshes.push(leg);
     }
@@ -2732,11 +2765,12 @@ export function createPurifier(scene) {
       // Adjust inset so larger feet don't poke outside panel edges
       const r = d / 2;
       const ins = Math.max(bunInset, r + 0.1);
-      for(const leg of allLegMeshes){
+      for(let i=0;i<allLegMeshes.length;i++){
+        const leg=allLegMeshes[i], s=legSigns[i];
         leg.geometry=bunGeo;
-        const sx=Math.sign(leg.position.x), sz=Math.sign(leg.position.z);
-        leg.position.x=sx*(panelW/2-ins);
-        leg.position.z=sz*(D/2+ply-ins);
+        leg.position.x=s.x*(panelW/2-ins);
+        leg.position.z=s.z*(D/2+ply-ins);
+        applyFootTilt(leg, s.x, s.z, currentBunH);
         leg.matrixAutoUpdate=true;
         leg.updateMatrixWorld(true);
         leg.matrixAutoUpdate=false;
@@ -2756,10 +2790,10 @@ export function createPurifier(scene) {
       legGroup.visible = h > 0.05;
       if(h > 0.05){
         bunGeo=makeBunGeo(currentFootDiameter/2, h);
-        const newLegY=-(H/2+ply+h/2);
-        for(const leg of allLegMeshes){
+        for(let i=0;i<allLegMeshes.length;i++){
+          const leg=allLegMeshes[i], s=legSigns[i];
           leg.geometry=bunGeo;
-          leg.position.y=newLegY;
+          applyFootTilt(leg, s.x, s.z, h);
           leg.matrixAutoUpdate=true;
           leg.updateMatrixWorld(true);
           leg.matrixAutoUpdate=false;
@@ -2772,8 +2806,10 @@ export function createPurifier(scene) {
     const show=(feetStyle==='bun');
     const dia=_el('footDiameterRow');
     const hgt=_el('footHeightRow');
+    const ang=_el('footAngleRow');
     if(dia) dia.style.display=show?'':'none';
     if(hgt) hgt.style.display=show?'':'none';
+    if(ang) ang.style.display=(feetStyle!=='none')?'':'none';
   }
   function setFeetStyle(style){
     if(style===feetStyle){
@@ -2797,14 +2833,13 @@ export function createPurifier(scene) {
     const geo=style==='bun'?bunGeo:pegGeo;
     const mat=style==='rubber'?rubberMat:woodLegMat;
     const ins=style==='bun'?bunInset:legInset;
-    const newLegY=-(H/2+ply+newH/2);
-    for(const leg of allLegMeshes){
+    for(let i=0;i<allLegMeshes.length;i++){
+      const leg=allLegMeshes[i], s=legSigns[i];
       leg.geometry=geo;
       leg.material=mat;
-      leg.position.y=newLegY;
-      const sx=Math.sign(leg.position.x), sz=Math.sign(leg.position.z);
-      leg.position.x=sx*(panelW/2-ins);
-      leg.position.z=sz*(D/2+ply-ins);
+      leg.position.x=s.x*(panelW/2-ins);
+      leg.position.z=s.z*(D/2+ply-ins);
+      applyFootTilt(leg, s.x, s.z, newH);
       leg.matrixAutoUpdate=true;
       leg.updateMatrixWorld(true);
       leg.matrixAutoUpdate=false;
@@ -3775,6 +3810,7 @@ export function createPurifier(scene) {
     setFeetStyle,
     setFootDiameter,
     setFootHeight,
+    setFeetAngled,
     toggleDimensions,
     toggleXray,
     isXrayOn,

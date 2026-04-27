@@ -1025,6 +1025,13 @@ window._setFootHt = (val) => {
   markShadowsDirty();
 };
 
+window._setFeetAngled = (angled) => {
+  purifierRefs.setFeetAngled(angled);
+  document.querySelectorAll('#btnFeetStraight,#btnFeetAngled').forEach(b => b.classList.remove('on'));
+  document.getElementById(angled ? 'btnFeetAngled' : 'btnFeetStraight')?.classList.add('on');
+  markShadowsDirty();
+};
+
 window._setFanColor = (mode) => {
   purifierRefs.setFanColor(mode);
   document.querySelectorAll('#btnFanWhite,#btnFanBlack').forEach(b => b.classList.remove('on'));
