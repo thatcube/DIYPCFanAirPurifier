@@ -4200,6 +4200,19 @@ export function createRoom(scene) {
         return { opened: binderState.open, coinPos };
       }
       window._togglePokemonBinder = togglePokemonBinder;
+
+      // Run reset hook: snap closed and clear coin-spawn flag so the
+      // secret can re-spawn on the next open.
+      window._resetPokemonBinder = function () {
+        binderState.open = false;
+        binderState.progress = 0;
+        binderState.coinSpawned = false;
+        if (binderState.animTimer) {
+          cancelAnimationFrame(binderState.animTimer);
+          binderState.animTimer = 0;
+        }
+        _applyHinge();
+      };
     }
   }
 

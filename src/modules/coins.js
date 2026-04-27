@@ -31,20 +31,20 @@ export function getAudioCtx() { return audioCtx; }
 let _bonkBuffer = null;
 
 // Toast callback
-let _showToast = () => {};
+let _showToast = () => { };
 export function setToastFn(fn) { _showToast = fn; }
 
 const SFX_MUTE_KEY = 'diy_air_purifier_muted_v2';
 let _sfxMuted = false;
-try { _sfxMuted = localStorage.getItem(SFX_MUTE_KEY) === '1'; } catch (e) {}
+try { _sfxMuted = localStorage.getItem(SFX_MUTE_KEY) === '1'; } catch (e) { }
 
 const QUICK_COIN_MODE_KEY = 'diy_air_purifier_quick_coin_mode';
 let _quickCoinMode = false;
-try { _quickCoinMode = localStorage.getItem(QUICK_COIN_MODE_KEY) === '1'; } catch (e) {}
+try { _quickCoinMode = localStorage.getItem(QUICK_COIN_MODE_KEY) === '1'; } catch (e) { }
 
 const SPEED_MODE_KEY = 'diy_air_purifier_speed_mode_v1';
 let _speedMode = false;
-try { _speedMode = localStorage.getItem(SPEED_MODE_KEY) === '1'; } catch (e) {}
+try { _speedMode = localStorage.getItem(SPEED_MODE_KEY) === '1'; } catch (e) { }
 
 // ── Secret-coin "ever found" persistence (unlock gate for Speed Mode) ──
 const SECRET_FOUND_KEY = 'diy_air_purifier_secrets_found_v1';
@@ -55,7 +55,7 @@ try {
     const arr = JSON.parse(raw);
     if (Array.isArray(arr)) for (const id of arr) if (typeof id === 'string') _secretFoundIds.add(id);
   }
-} catch (e) {}
+} catch (e) { }
 
 function _getFoundRequiredSecretCount() {
   let found = 0;
@@ -71,7 +71,7 @@ export function hasFoundAllSecrets() { return _getFoundRequiredSecretCount() >= 
 function _markSecretFound(id) {
   if (!id || _secretFoundIds.has(id)) return;
   _secretFoundIds.add(id);
-  try { localStorage.setItem(SECRET_FOUND_KEY, JSON.stringify([..._secretFoundIds])); } catch (e) {}
+  try { localStorage.setItem(SECRET_FOUND_KEY, JSON.stringify([..._secretFoundIds])); } catch (e) { }
 }
 
 export function isSpeedMode() {
@@ -81,13 +81,13 @@ export function isSpeedMode() {
 export function setSpeedMode(enabled) {
   // Refuse to enable speed mode until all secrets have been found.
   _speedMode = !!enabled && hasFoundAllSecrets();
-  try { localStorage.setItem(SPEED_MODE_KEY, _speedMode ? '1' : '0'); } catch (e) {}
+  try { localStorage.setItem(SPEED_MODE_KEY, _speedMode ? '1' : '0'); } catch (e) { }
   _applyQuickCoinMode();
 }
 
 export function setSfxMuted(muted) {
   _sfxMuted = !!muted;
-  try { localStorage.setItem(SFX_MUTE_KEY, _sfxMuted ? '1' : '0'); } catch (e) {}
+  try { localStorage.setItem(SFX_MUTE_KEY, _sfxMuted ? '1' : '0'); } catch (e) { }
 }
 
 export function isQuickCoinMode() {
@@ -96,7 +96,7 @@ export function isQuickCoinMode() {
 
 export function setQuickCoinMode(enabled) {
   _quickCoinMode = !!enabled;
-  try { localStorage.setItem(QUICK_COIN_MODE_KEY, _quickCoinMode ? '1' : '0'); } catch (e) {}
+  try { localStorage.setItem(QUICK_COIN_MODE_KEY, _quickCoinMode ? '1' : '0'); } catch (e) { }
   _applyQuickCoinMode();
 }
 
@@ -108,12 +108,12 @@ export function makeCoin(opts) {
     // LatheGeometry revolves these points around Y to form the coin.
     const r = 1.2, h = 0.14, bevel = 0.06;
     const pts = [
-      new THREE.Vector2(0,        h),          // center-top
+      new THREE.Vector2(0, h),          // center-top
       new THREE.Vector2(r - bevel, h),          // face edge
-      new THREE.Vector2(r,         h - bevel),  // rim top bevel
-      new THREE.Vector2(r,        -h + bevel),  // rim bottom bevel
-      new THREE.Vector2(r - bevel,-h),          // face edge bottom
-      new THREE.Vector2(0,       -h),           // center-bottom
+      new THREE.Vector2(r, h - bevel),  // rim top bevel
+      new THREE.Vector2(r, -h + bevel),  // rim bottom bevel
+      new THREE.Vector2(r - bevel, -h),          // face edge bottom
+      new THREE.Vector2(0, -h),           // center-bottom
     ];
     _geo = new THREE.LatheGeometry(pts, 24);
     _geo.rotateX(Math.PI / 2);
@@ -504,23 +504,23 @@ function _spawnSpeedModeCoins() {
   // staying mid-air or above known walkable spots.
   const positions = [
     // ── Main room — air coins along a meandering trail ──
-    new THREE.Vector3(  10, fy + 22,  30),  // 1. above center, near back wall
-    new THREE.Vector3(  35, fy + 38,  20),  // 2. high over middle-window side
-    new THREE.Vector3(  60, fy + 28, -10),  // 3. window side, mid-room
-    new THREE.Vector3(  55, fy + 14, -45),  // 4. low near window/TV corner
-    new THREE.Vector3(  20, fy + 32, -55),  // 5. high mid-room, TV side
-    new THREE.Vector3( -10, fy + 18, -30),  // 6. mid-air, TV-wall side
-    new THREE.Vector3( -25, fy + 44,  15),  // 7. very high near closet-wall edge
-    new THREE.Vector3(  -5, fy + 10,  35),  // 8. low between bed & nightstand area
-    new THREE.Vector3(  40, fy + 50,   5),  // 9. ceiling-light height, mid-room
+    new THREE.Vector3(10, fy + 22, 30),  // 1. above center, near back wall
+    new THREE.Vector3(35, fy + 38, 20),  // 2. high over middle-window side
+    new THREE.Vector3(60, fy + 28, -10),  // 3. window side, mid-room
+    new THREE.Vector3(55, fy + 14, -45),  // 4. low near window/TV corner
+    new THREE.Vector3(20, fy + 32, -55),  // 5. high mid-room, TV side
+    new THREE.Vector3(-10, fy + 18, -30),  // 6. mid-air, TV-wall side
+    new THREE.Vector3(-25, fy + 44, 15),  // 7. very high near closet-wall edge
+    new THREE.Vector3(-5, fy + 10, 35),  // 8. low between bed & nightstand area
+    new THREE.Vector3(40, fy + 50, 5),  // 9. ceiling-light height, mid-room
     // ── Closet — three coins sitting on the upper shelf, in 3 of the 4 sections ──
     // Shelf top Y ≈ fy + 56.4 (interiorH 80 - drop 24 + 0.4 half-thickness).
     // Shelf X spans world -86.4 .. -72.4 (centered at -79.4).
     // Section centers along Z (shelfZMin=-77.5, sectionW=15.75):
     //   sec1=-69.625, sec2=-53.875, sec3=-38.125, sec4=-22.375.
-    new THREE.Vector3( -79.4, fy + 58.9, -69.6),  // 10. shelf section 1 (back-left)
-    new THREE.Vector3( -79.4, fy + 58.9, -53.9),  // 11. shelf section 2
-    new THREE.Vector3( -79.4, fy + 58.9, -22.4),  // 12. shelf section 4 (front-right)
+    new THREE.Vector3(-79.4, fy + 58.9, -69.6),  // 10. shelf section 1 (back-left)
+    new THREE.Vector3(-79.4, fy + 58.9, -53.9),  // 11. shelf section 2
+    new THREE.Vector3(-79.4, fy + 58.9, -22.4),  // 12. shelf section 4 (front-right)
   ];
   // Apply a small per-session jitter so positions feel "random" but stay
   // inside their hand-picked safe pockets.
@@ -569,9 +569,9 @@ export function spawnSecretCeilingLightCoins() {
   // look naturally scattered. Positions are near CEIL_LIGHT_X/Z, varying
   // in XZ spread and Y height below the ceiling.
   const positions = [
-    new THREE.Vector3(CEIL_LIGHT_X - 8,  ceilY - 4,  CEIL_LIGHT_Z + 10),
+    new THREE.Vector3(CEIL_LIGHT_X - 8, ceilY - 4, CEIL_LIGHT_Z + 10),
     new THREE.Vector3(CEIL_LIGHT_X + 12, ceilY - 16, CEIL_LIGHT_Z - 7),
-    new THREE.Vector3(CEIL_LIGHT_X - 3,  ceilY - 28, CEIL_LIGHT_Z - 14),
+    new THREE.Vector3(CEIL_LIGHT_X - 3, ceilY - 28, CEIL_LIGHT_Z - 14),
   ];
   for (let i = 0; i < positions.length; i++) {
     addCoin(_coinGroup, positions[i], { secret: true, isDynamic: true, id: 'secret_pb' + (i + 1) });

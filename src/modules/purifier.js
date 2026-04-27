@@ -21,6 +21,10 @@ import {
   setAudioCtx as _setAudioCtx
 } from './coins.js';
 import { triggerNod as _triggerCatNod } from './cat-animation.js';
+import { isTotodileUnlocked, setTotodileUnlocked } from './cat-appearance.js';
+
+let _showToast = null;
+export function setToastFn(fn) { _showToast = fn; }
 
 export function createPurifier(scene) {
   const canvas = document.getElementById('c');
@@ -2094,6 +2098,10 @@ export function createPurifier(scene) {
         const result = window._togglePokemonBinder();
         if(_fpMode && result && result.opened && result.coinPos){
           spawnSecretBinderCoin(result.coinPos);
+        }
+        if(result && result.opened && !isTotodileUnlocked()){
+          setTotodileUnlocked(true);
+          if(_showToast) _showToast('🐊 Totodile unlocked! Pick him in Choose Your Cat.');
         }
       }
       return;

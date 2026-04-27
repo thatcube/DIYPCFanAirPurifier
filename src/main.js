@@ -24,6 +24,7 @@ import * as spatial from './modules/spatial.js';
 import * as gameFp from './modules/game-fp.js';
 import * as wallFade from './modules/wall-fade.js';
 import { createRoom } from './modules/room.js';
+import * as purifier from './modules/purifier.js';
 import { createPurifier } from './modules/purifier.js';
 import { initInteractions, coinBump, secretCoinBump } from './modules/ui-interactions.js';
 import { initGlassShine } from './modules/glass-shine.js';
@@ -187,7 +188,7 @@ const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.minDistance = 8;
-controls.maxDistance = 200;
+controls.maxDistance = 3000;
 controls.maxPolarAngle = Math.PI * 0.48;
 
 // Lights
@@ -393,6 +394,7 @@ purifierRefs.setRoomRefs({
 
 music.setToastFn(showToast);
 coins.setToastFn(showToast);
+purifier.setToastFn(showToast);
 
 // Create coin group + spawn room coins
 const coinGroup = coins.createCoinGroup(scene);
@@ -434,7 +436,7 @@ catAnimation.loadGameplayCat({
   onModelReady: () => {
     // Cat materials just arrived. Pre-build their shader programs now so
     // first render in game mode doesn't stutter compiling them mid-frame.
-    try { renderer.compile(scene, camera); } catch (e) {}
+    try { renderer.compile(scene, camera); } catch (e) { }
   }
 });
 
@@ -762,7 +764,7 @@ window._startGame = () => {
   catAnimation.loadGameplayCat({
     applyCatColorToModel: catAnimation.applyColorToAll,
     onModelReady: () => {
-      try { renderer.compile(scene, camera); } catch (e) {}
+      try { renderer.compile(scene, camera); } catch (e) { }
     }
   });
   // Enter game mode

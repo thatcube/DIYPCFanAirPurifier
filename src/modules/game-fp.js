@@ -1995,8 +1995,9 @@ function _buildStaticBoxes() {
     const gwR = _roomRefs ? _roomRefs.grWinRight : 14;    // +Z edge of window
 
     _staticBoxes.push(
-      // Below window: full Z, floor → window bottom
-      { xMin: -gXmax - 0.5, xMax: -gXmax, zMin: gZmin - 0.5, zMax: gZmax + 0.5, yTop: gwB, yBottom: fy, room: true },
+      // Below window: full Z, yard level → window bottom (extended below
+      // floor so the player can't crawl underneath from the outdoor lawn).
+      { xMin: -gXmax - 0.5, xMax: -gXmax, zMin: gZmin - 0.5, zMax: gZmax + 0.5, yTop: gwB, yBottom: fy - 60, room: true },
       // Above window: full Z, window top → ceiling
       { xMin: -gXmax - 0.5, xMax: -gXmax, zMin: gZmin - 0.5, zMax: gZmax + 0.5, yTop: fy + wh, yBottom: gwT, room: true },
       // Left of window (toward -Z / TV wall side)
@@ -2009,57 +2010,49 @@ function _buildStaticBoxes() {
       { xMin: -gXmax, xMax: -gXmin, zMin: gZmax, zMax: gZmax + 0.5, yTop: fy + wh, room: true }
     );
 
-    // ── Outdoor terrain collision (beyond office front wall) ──
-    // The visible yard uses smooth slopes; we don't add stair-step AABBs for
-    // the slopes. Instead, when the player is in the outdoor zone, physics
-    // calls _sampleOutdoorGroundY() to get the exact terrain height for
-    // their current X. We still add boundary walls + a catch floor + a sill
-    // ledge as plain AABBs.
-    const sillY = gwB - 36;                   // yard sits 3 ft below window sill
-    const dropStartX = gXmax + 0.5;           // 183.5
-    const dropEndX = 255;
-    const dropDY = -18;                   // gentle 14° drop
+    // ── Outdoor terrain (around the entire house) ──
+    // Lawn sits ~3' below the office window sill. There is no outer fence;
+    // the player can roam to the bounds defined by boundsBase. Slopes are
+    // sampled by _sampleOutdoorGroundY(), not stair-stepped here.
+    const sillY = gwB - 36;
+    const dropDY = -18;
     const flatY = sillY + dropDY;
-    const flatEndX = 375;
-    const incEndX = 411;
-    const incDY = 12;                    // gentle 18° incline
-    const roadY = flatY + incDY;
-    const roadEndX = 543;
+    const yardBottom = flatY - 50;
 
-    // Wide terrain Z extent — matches the visual lawn (±300" centered on the
-    // window) so the boundary walls line up with the grass edges.
-    const tZmin = (gwL + gwR) / 2 - 300;
-    const tZmax = (gwL + gwR) / 2 + 300;
-
-    // Boundary walls — invisible tall boxes at terrain edges
-    const terrainCeil = fy + wh + 20;
+    // Bedroom window-wall (post-mirror world X = +81). Splits around the
+    // bedroom window so the player can see through but not walk through.
+    // Extended below floorY so it blocks at the lower lawn level too.
+    const bedWinB = fy + 23;
+    const bedWinT = fy + 73;
+    const bedWinCZ = 7.35;          // BED_Z from spatial.js
+    const bedWinHalfW = 18;         // WIN_W=36 / 2
+    const bedWinFront = bedWinCZ - bedWinHalfW;
+    const bedWinBack = bedWinCZ + bedWinHalfW;
+    const bedZmin = -78, bedZmax = 49;
+    const bedWallX = 81;
     _staticBoxes.push(
-      // Far edge (pre-mirror X=543)
-      { xMin: -roadEndX - 1, xMax: -roadEndX, zMin: tZmin, zMax: tZmax, yTop: terrainCeil, yBottom: flatY - 40, room: true },
-      // -Z (left) edge
-      { xMin: -roadEndX, xMax: -dropStartX, zMin: tZmin - 1, zMax: tZmin, yTop: terrainCeil, yBottom: flatY - 40, room: true },
-      // +Z (right) edge
-      { xMin: -roadEndX, xMax: -dropStartX, zMin: tZmax, zMax: tZmax + 1, yTop: terrainCeil, yBottom: flatY - 40, room: true }
+      {
+        xMin: bedWallX, xMax: bedWallX + 0.5, zMin: bedZmin - 0.5, zMax: bedZmax + 0.5,
+        yTop: bedWinB, yBottom: yardBottom, room: true
+      },
+      {
+        xMin: bedWallX, xMax: bedWallX + 0.5, zMin: bedZmin - 0.5, zMax: bedZmax + 0.5,
+        yTop: fy + wh, yBottom: bedWinT, room: true
+      },
+      {
+        xMin: bedWallX, xMax: bedWallX + 0.5, zMin: bedZmin - 0.5, zMax: bedWinFront,
+        yTop: bedWinT, yBottom: bedWinB, room: true
+      },
+      {
+        xMin: bedWallX, xMax: bedWallX + 0.5, zMin: bedWinBack, zMax: bedZmax + 0.5,
+        yTop: bedWinT, yBottom: bedWinB, room: true
+      }
     );
 
-    // Front-of-house extension wall — solid wall along +Z from the office
-    // front wall to the hallway end, blocking the player from walking around
-    // the side of the house when on the lawn.
+    // Exterior sill ledge — small standable box outside the office window
+    // for re-entry from the lawn.
     _staticBoxes.push({
-      xMin: -dropStartX, xMax: -dropStartX + 0.5,
-      zMin: gZmax + 0.5, zMax: 289.5,
-      yTop: fy + wh, yBottom: flatY - 40, room: true
-    });
-
-    // Catch floor — safety net well below terrain
-    _staticBoxes.push({
-      xMin: -roadEndX, xMax: -dropStartX, zMin: tZmin, zMax: tZmax,
-      yTop: flatY - 35, yBottom: flatY - 40, room: true
-    });
-
-    // Exterior sill ledge — small standable box outside the window for re-entry
-    _staticBoxes.push({
-      xMin: -dropStartX - 2, xMax: -(gXmax), zMin: gwL, zMax: gwR,
+      xMin: -(gXmax + 2), xMax: -(gXmax), zMin: gwL, zMax: gwR,
       yTop: gwB, yBottom: gwB - 1, room: true
     });
   }
@@ -2134,19 +2127,29 @@ function _buildPurifierBoxes() {
 }
 
 // ── Smooth outdoor terrain ground sampling ─────────────────────────
-// Returns the world-space Y of the lawn/road surface at the given world X.
-// Mirrors the slope segments used by the visual terrain in room.js so the
-// player walks up/down a continuous curve instead of stepped AABBs.
-function _sampleOutdoorGroundY(worldX) {
+// Returns the world-space Y of the lawn/road surface at the given world X/Z.
+// The slope/incline/road shaping only exists in front of the office window
+// (negative world X, within the front-yard Z extent). Everywhere else
+// around the house the lawn is flat at flatY so the player can walk freely
+// in any direction.
+function _sampleOutdoorGroundY(worldX, worldZ) {
   const px = -worldX; // pre-mirror X (positive)
   const fy = getFloorY();
   const gwB = (_roomRefs && typeof _roomRefs.grWinBottom === 'number') ? _roomRefs.grWinBottom : (fy + 23);
+  const gwL = (_roomRefs && typeof _roomRefs.grWinLeft === 'number') ? _roomRefs.grWinLeft : -22;
+  const gwR = (_roomRefs && typeof _roomRefs.grWinRight === 'number') ? _roomRefs.grWinRight : 14;
   const sillY = gwB - 36;
   const dropStartX = 183.5, dropEndX = 255, flatEndX = 375, incEndX = 411;
   const dropDY = -18, incDY = 12;
   const flatY = sillY + dropDY;
   const roadY = flatY + incDY;
-  if (px <= dropStartX) return sillY;
+  // If we're not in front of the office window (negative world X past the
+  // front wall) OR not within the front-yard Z extent, the ground is just
+  // the flat lawn at flatY.
+  const frontYardZmin = (gwL + gwR) / 2 - 300;
+  const frontYardZmax = (gwL + gwR) / 2 + 300;
+  const inFrontYardZ = (worldZ === undefined) ? true : (worldZ >= frontYardZmin && worldZ <= frontYardZmax);
+  if (px <= dropStartX || !inFrontYardZ) return flatY;
   if (px <= dropEndX) {
     const t = (px - dropStartX) / (dropEndX - dropStartX);
     return sillY + t * dropDY;
@@ -2619,6 +2622,7 @@ function _resetWorldState() {
     if (typeof _roomRefs.toggleGuestDoor === 'function') _roomRefs.toggleGuestDoor(false);
     if (typeof _roomRefs.toggleGuestDoor === 'function') _roomRefs.toggleGuestDoor(false);
   }
+  if (typeof window._resetPokemonBinder === 'function') window._resetPokemonBinder();
   // Filter / drawer collision boxes are cached; force a rebuild.
   _purifierBoxesDirtyFlag = true;
 }
@@ -3124,11 +3128,17 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   let bonkedThisFrame = false;
   let bonkIntensity = 0;
   let groundY = getPlayerFloorY(); // eye-height floor (floorY + EYE_H)
-  const outdoorZone = nx < -183;
-  // When outdoors, sample the smooth terrain height at the player's X so
+  // Outdoor when player is outside all three house volumes (bedroom,
+  // office, hallway). World coords; bounding boxes are slightly inflated
+  // so doorway transitions don't flicker between in/out.
+  const inBedroom = (nx >= -51 && nx <= 81 && nz >= -78 && nz <= 49);
+  const inOffice = (nx >= -183 && nx <= -51 && nz >= -78 && nz <= 69);
+  const inHallway = (nx >= -51 && nx <= -11 && nz >= 49 && nz <= 289);
+  const outdoorZone = !(inBedroom || inOffice || inHallway);
+  // When outdoors, sample the smooth terrain height at the player's X/Z so
   // the ground curves with the visible grass slopes instead of stepping.
   if (outdoorZone) {
-    groundY = Math.max(groundY, _sampleOutdoorGroundY(nx) + EYE_H);
+    groundY = Math.max(groundY, _sampleOutdoorGroundY(nx, nz) + EYE_H);
   }
   const boxes = _getBoxes();
 
@@ -3630,7 +3640,7 @@ function _bindInputs() {
         // Cap at ~30 rev/s.
         if (skateMode && !_wasGroundedLast) {
           const SPIN_BASE = Math.PI * 2.66; // ~1.33 rev/s base add
-          const SPIN_CAP  = Math.PI * 15;   // ~30 rev/s
+          const SPIN_CAP = Math.PI * 15;   // ~30 rev/s
           // Falloff: 1.0 at rest → ~0.2 near cap. Quadratic feels better
           // than linear here — early presses ramp quickly, later presses
           // gently top off.

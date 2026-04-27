@@ -4,8 +4,6 @@
 // large and referenced by both physics and debug display.
 
 import {
-  LEFT_WALL_X, OPP_WALL_Z,
-  CLOSET_INTERIOR_W,
   PLAYER_BODY_R, PLAYER_EYE_H, PLAYER_HEAD_EXTRA
 } from './spatial.js';
 
@@ -29,15 +27,14 @@ export function resetBoxPool() {
 // ── Bounds ──────────────────────────────────────────────────────────
 
 export const boundsBase = {
-  // Outdoor terrain extends to pre-mirror X=543 → world X=-543
-  xMin: -544 + 0.25,
-  xMax: -(LEFT_WALL_X) - 0.25,                   // window wall
-  zMin: OPP_WALL_Z - CLOSET_INTERIOR_W / 2,
-  // Back wall is at Z=49. Hallway extension runs Z=49..289. Use the hallway
-  // end as zMax; static collision boxes on the back-wall flanks and hallway
-  // side walls keep the player inside the bedroom X range outside the
-  // doorway opening, and inside the hallway X range past Z=49.
-  zMax: 289 - 0.25
+  // Massive outdoor lawn surrounds the entire house; bounds extend far in
+  // every direction. Wall AABBs (bedroom window-wall, office front wall,
+  // back wall, hallway walls, etc.) keep the player from clipping into
+  // the house structure.
+  xMin: -3000,
+  xMax: 3000,
+  zMin: -3000,
+  zMax: 3000
 };
 
 export function getBounds(placementOffset) {
@@ -52,8 +49,8 @@ export function getBounds(placementOffset) {
 
 // ── Physics constants (re-exported for convenience) ─────────────────
 
-export const BODY_R    = PLAYER_BODY_R;
-export const EYE_H     = PLAYER_EYE_H;
+export const BODY_R = PLAYER_BODY_R;
+export const EYE_H = PLAYER_EYE_H;
 export const HEAD_EXTRA = PLAYER_HEAD_EXTRA;
 
 // ── Ease helper ─────────────────────────────────────────────────────
