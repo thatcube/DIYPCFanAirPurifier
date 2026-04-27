@@ -544,7 +544,7 @@ function _refreshTotodileCardLockState() {
     if (!nameEl.dataset.origName) nameEl.dataset.origName = nameEl.textContent || 'Totodile';
     nameEl.textContent = unlocked
       ? nameEl.dataset.origName
-      : 'Beat the game in under 2:00';
+      : 'Find a hidden item';
   }
   // Lock badge — gold padlock chip in the corner. Created lazily.
   let badge = card.querySelector('.char-card__lock');
@@ -560,8 +560,42 @@ function _refreshTotodileCardLockState() {
   }
   card.title = unlocked
     ? 'Totodile'
-    : 'Locked — beat the game in under 2:00 to unlock';
+    : 'Locked — find a hidden item to unlock';
   if (!unlocked && _selectedModel === 'totodile') {
+    _selectedModel = 'classic';
+  }
+}
+
+// Refresh the Cursed Korra char-card's locked state. Unlocks when the
+// player beats the game in under 2:00.
+function _refreshKorraCardLockState() {
+  const card = document.querySelector('.char-card[data-model="korra"]');
+  if (!card) return;
+  const unlocked = catAppearance.isKorraUnlocked();
+  card.classList.toggle('locked', !unlocked);
+  card.setAttribute('aria-disabled', unlocked ? 'false' : 'true');
+  const nameEl = card.querySelector('.char-name');
+  if (nameEl) {
+    if (!nameEl.dataset.origName) nameEl.dataset.origName = nameEl.textContent || 'Cursed Korra';
+    nameEl.textContent = unlocked
+      ? nameEl.dataset.origName
+      : 'Beat the game in under 2:00';
+  }
+  let badge = card.querySelector('.char-card__lock');
+  if (!unlocked) {
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.className = 'char-card__lock';
+      badge.innerHTML = '<i class="ph ph-lock-simple"></i>';
+      card.appendChild(badge);
+    }
+  } else if (badge) {
+    badge.remove();
+  }
+  card.title = unlocked
+    ? 'Cursed Korra'
+    : 'Locked — beat the game in under 2:00 to unlock';
+  if (!unlocked && _selectedModel === 'korra') {
     _selectedModel = 'classic';
   }
 }
@@ -636,6 +670,7 @@ window._openCharSelect = () => {
   _refreshSpeedPillLockState();
   _refreshTotodileCardLockState();
   _refreshBababooeyCardLockState();
+  _refreshKorraCardLockState();
   // Highlight the previously selected model (or classic on first open)
   document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
   const activeCard = document.querySelector(`.char-card[data-model="${_selectedModel}"]`);
@@ -694,7 +729,16 @@ window._selectCat = (model, el) => {
       void el.offsetWidth;
       el.classList.add('shake');
     }
-    showToast('Totodile locked — beat the game in under 2:00 to unlock');
+    showToast('Totodile locked — find a hidden item to unlock');
+    return;
+  }
+  if (model === 'korra' && !catAppearance.isKorraUnlocked()) {
+    if (el) {
+      el.classList.remove('shake');
+      void el.offsetWidth;
+      el.classList.add('shake');
+    }
+    showToast('Cursed Korra locked — beat the game in under 2:00 to unlock');
     return;
   }
   if (model === 'bababooey' && !catAppearance.isBababooeyUnlocked()) {
@@ -1280,8 +1324,8 @@ function animate(ts) {
       // Persist the Totodile unlock if this run was under 2:00 — fire a
       // celebration toast the very first time it triggers so the player
       // knows there's a new cat waiting in the character select.
-      if (catAppearance.tryUnlockTotodile(finalTime)) {
-        showToast('🐊 Totodile unlocked! Pick him in Choose Your Cat.');
+      if (catAppearance.tryUnlockKorra(finalTime)) {
+        showToast('🐈 Cursed Korra unlocked! Pick her in Choose Your Cat.');
       }
       // Open finish screen immediately and let player edit name inline
       // before saving this run.

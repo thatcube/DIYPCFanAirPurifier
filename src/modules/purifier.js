@@ -2101,7 +2101,7 @@ export function createPurifier(scene) {
         }
         if(result && result.opened && !isTotodileUnlocked()){
           setTotodileUnlocked(true);
-          if(_showToast) _showToast('🐊 Totodile unlocked! Pick him in Choose Your Cat.');
+          if(_showToast) _showToast('🐊 A new cat is now available in Choose Your Cat.');
         }
       }
       return;

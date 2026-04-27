@@ -13,10 +13,9 @@ export let catColorKey = 'charcoal';
 export let catHairKey = 'short';
 
 // ── Totodile unlock ─────────────────────────────────────────────────
-// Totodile is locked until the player beats the game (collects all the
-// regular coins) in under 2 minutes. Unlock state persists in
-// localStorage so it survives reloads.
-export const TOTODILE_UNLOCK_TIME_MS = 120000; // 2:00.000
+// Totodile is locked until the player finds a hidden item in the room.
+// The exact trigger is intentionally not surfaced in-game. Unlock state
+// persists in localStorage so it survives reloads.
 const TOTODILE_UNLOCK_KEY = 'diy_totodile_unlocked';
 
 export function isTotodileUnlocked() {
@@ -29,15 +28,33 @@ export function setTotodileUnlocked(v) {
     else localStorage.removeItem(TOTODILE_UNLOCK_KEY);
   } catch (e) { /* private mode etc. */ }
 }
+
+// ── Cursed Korra unlock ─────────────────────────────────────────────
+// Cursed Korra is locked until the player beats the game (collects all
+// the regular coins) in under 2 minutes. Unlock state persists in
+// localStorage so it survives reloads.
+export const KORRA_UNLOCK_TIME_MS = 120000; // 2:00.000
+const KORRA_UNLOCK_KEY = 'diy_korra_unlocked';
+
+export function isKorraUnlocked() {
+  try { return localStorage.getItem(KORRA_UNLOCK_KEY) === '1'; }
+  catch (e) { return false; }
+}
+export function setKorraUnlocked(v) {
+  try {
+    if (v) localStorage.setItem(KORRA_UNLOCK_KEY, '1');
+    else localStorage.removeItem(KORRA_UNLOCK_KEY);
+  } catch (e) { /* private mode etc. */ }
+}
 /**
  * Call when a run finishes. Returns true if this finish newly unlocked
- * Totodile (so callers can fire a celebration toast).
+ * Cursed Korra (so callers can fire a celebration toast).
  */
-export function tryUnlockTotodile(timeMs) {
+export function tryUnlockKorra(timeMs) {
   const t = Number(timeMs);
-  if (!Number.isFinite(t) || t <= 0 || t >= TOTODILE_UNLOCK_TIME_MS) return false;
-  if (isTotodileUnlocked()) return false;
-  setTotodileUnlocked(true);
+  if (!Number.isFinite(t) || t <= 0 || t >= KORRA_UNLOCK_TIME_MS) return false;
+  if (isKorraUnlocked()) return false;
+  setKorraUnlocked(true);
   return true;
 }
 
