@@ -4039,7 +4039,7 @@ export function createRoom(scene) {
 
       // Tucked into the headboard/door-wall side under the bed, near the
       // window-side rail.
-      const binderX = bedX - 10;       // pre-mirror; ~1ft closer to room center
+      const binderX = bedX - 7;        // pre-mirror; ~0.5ft toward center, slight window-side lean
       const binderZ = bedZ + 32;       // headboard/door-wall side
       const binderRoot = new THREE.Group();
       binderRoot.position.set(binderX, underBedY, binderZ);
