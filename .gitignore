@@ -7,4 +7,17 @@ dist/
 .esphome/
 .claude/worktrees/
 CLAUDE.md
+
+# OS / editor cruft
 .DS_Store
+**/.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Environment / logs
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
