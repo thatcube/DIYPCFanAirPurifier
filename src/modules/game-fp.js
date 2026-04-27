@@ -711,7 +711,7 @@ function _findInteractiveAncestor(obj) {
       p._isCornerDoorHandle || p._isCornerDoor ||
       p._isGuestDoor || p._isGuestDoorHandle ||
       p._isMacbook || p._isWindow || p._isWindowPane || p._isTV || p._isFoodBowl ||
-      p._isPickupSkateboard) return p;
+      p._isPickupSkateboard || p._isPokemonBinder) return p;
   }
   return null;
 }
@@ -770,6 +770,10 @@ function _labelForInteractable(target) {
     if (p._isTV) return { verb: 'Toggle', noun: 'TV' };
     if (p._isFoodBowl) return { verb: 'Fill', noun: 'Food Bowl' };
     if (p._isPickupSkateboard) return { verb: 'Pick up', noun: 'Skateboard' };
+    if (p._isPokemonBinder) {
+      const isOpen = !!(p._pokemonBinderState && p._pokemonBinderState.open);
+      return { verb: isOpen ? 'Close' : 'Open', noun: 'Pokémon Binder' };
+    }
   }
   return null;
 }
@@ -1405,7 +1409,7 @@ export function init(refs) {
     if (obj._isLamp || obj._isCeilLight || obj._isFan || obj._isFilterL || obj._isFilterR ||
       obj._isDrawer || obj._isBifoldLeaf || obj._isBypassPanel || obj._isCornerDoorHandle || obj._isCornerDoor || obj._isWindow || obj._isWindowPane ||
       obj._isMacbook || obj._isTV || obj._isFoodBowl ||
-      obj._isGuestDoor || obj._isGuestDoorHandle || obj._isPickupSkateboard) {
+      obj._isGuestDoor || obj._isGuestDoorHandle || obj._isPickupSkateboard || obj._isPokemonBinder) {
       _interactiveObjects.push(obj);
     }
   });

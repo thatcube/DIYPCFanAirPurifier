@@ -60,7 +60,7 @@ export const CAT_MODEL_PRESETS = {
 
 // Canonical secret-coin IDs used by unlock/progress checks.
 export const SECRET_COIN_IDS = Object.freeze([
-  'secret_cornerDoor',
+  'secret_binder',
   'secret_lamp',
   'secret_pb1',
   'secret_pb2',

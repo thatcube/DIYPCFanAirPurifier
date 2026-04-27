@@ -1966,6 +1966,55 @@ export function createRoom(scene) {
       addRoom(fill);
     }
 
+    // ── Massive grass field surrounding the entire house ──────────
+    // ~10× the original ±300 lawn, wrapping the house on all sides so the
+    // player can roam freely. Sits 1" below the existing flat-yard top so
+    // it tucks under the slope/incline/road pieces without z-fighting.
+    {
+      const fieldSize = 6000;
+      const fieldCenterX = 51;     // pre-mirror house center X (≈ midpoint of -81..183)
+      const fieldCenterZ = 105;    // pre-mirror house center Z (≈ midpoint of -78..289)
+      const field = new THREE.Mesh(
+        new THREE.BoxGeometry(fieldSize, 2, fieldSize),
+        _makeGrassMat(fieldSize, fieldSize));
+      field.position.set(fieldCenterX, flatY - 0.05, fieldCenterZ);
+      field.receiveShadow = true;
+      field._isRoom = true; field._isGuestRoom = true;
+      addRoom(field);
+    }
+
+    // ── House foundation skirt ────────────────────────────────────
+    // Hides the gap between the lowered lawn (flatY) and the house floor
+    // (floorY) on the bedroom/back/hallway sides where the visible walls
+    // were originally built only down to floorY. One slab per house volume.
+    {
+      const skirtMat = new THREE.MeshStandardMaterial({
+        color: 0xa8a298, roughness: 0.95, metalness: 0,
+      });
+      const skirtTopY = floorY;
+      const skirtBotY = flatY - 30;
+      const skirtH = skirtTopY - skirtBotY;
+      const skirtCenterY = (skirtTopY + skirtBotY) / 2;
+      const skirts = [
+        // Bedroom volume
+        { xMin: -82, xMax: 51.5, zMin: -78.5, zMax: 49.5 },
+        // Office/guest-room volume (extends farther +Z for guest-room nook)
+        { xMin: 50.5, xMax: 184, zMin: -78.5, zMax: 69.5 },
+        // Hallway volume
+        { xMin: 10.5, xMax: 51.5, zMin: 49, zMax: 289.5 },
+      ];
+      for (const s of skirts) {
+        const w = s.xMax - s.xMin;
+        const d = s.zMax - s.zMin;
+        const slab = new THREE.Mesh(
+          new THREE.BoxGeometry(w, skirtH, d), skirtMat);
+        slab.position.set((s.xMin + s.xMax) / 2, skirtCenterY, (s.zMin + s.zMax) / 2);
+        slab.receiveShadow = true; slab.castShadow = true;
+        slab._isRoom = true; slab._isGuestRoom = true;
+        addRoom(slab);
+      }
+    }
+
     // ── Outdoor hemisphere light ──────────────────────────────────
     const outdoorHemi = new THREE.HemisphereLight(0x87ceeb, 0x4a8a3a, 0.6);
     outdoorHemi.position.set(_grXmax + 100, floorY + 80, grWinCenterZ);
@@ -4045,6 +4094,177 @@ export function createRoom(scene) {
       spine.rotation.y = -0.3;
       spine._isRoom = true;
       addRoom(spine);
+    }
+
+    // 3. Pokémon card binder — childhood binder with cover/spine art.
+    // Click anywhere on it to open; first open spawns the secret blue coin.
+    {
+      const W = 14;        // body width along local X
+      const D = 11;        // body depth along local Z
+      const baseH = 0.25;  // bottom cover thickness
+      const pagesH = 1.0;  // page-stack height
+      const totalH = 1.7;  // closed binder total height (top of spine)
+      const topH = 0.22;   // top cover thickness
+      const spineThick = 0.55; // spine bulges this far past the body in -X
+
+      // Place far foot-side under the bed so it's visible from the front of
+      // the room (the existing under-bed items sit toward the headboard end).
+      const binderX = bedX - 4;        // pre-mirror; offset from bed center
+      const binderZ = bedZ - 22;       // foot side, away from items above
+      const binderRoot = new THREE.Group();
+      binderRoot.position.set(binderX, underBedY, binderZ);
+      binderRoot.rotation.y = 0.18;    // slight tilt; mirror flips sign — fine
+      binderRoot._isRoom = true;       // X-mirror flips its position only
+      binderRoot._isPokemonBinder = true; // makes any descendant clickable
+      // NOTE: children below are NOT _isRoom — they ride along in local frame
+      // so only binderRoot's X gets mirrored (not double-mirrored children).
+      scene.add(binderRoot);
+
+      const texLoader = new THREE.TextureLoader();
+      const coverTex = texLoader.load('img/childhood_pokemon_binder_cover.jpg', (t) => {
+        t.colorSpace = THREE.SRGBColorSpace;
+        if (state.renderer) t.anisotropy = Math.min(8, state.renderer.capabilities.getMaxAnisotropy());
+      });
+      const spineTex = texLoader.load('img/childhood_pokemon_binder_spine.jpg', (t) => {
+        t.colorSpace = THREE.SRGBColorSpace;
+        if (state.renderer) t.anisotropy = Math.min(8, state.renderer.capabilities.getMaxAnisotropy());
+      });
+
+      const redMat = new THREE.MeshStandardMaterial({ color: 0x6b1313, roughness: 0.72, metalness: 0.04 });
+      const pagesMat = new THREE.MeshStandardMaterial({ color: 0xece2c8, roughness: 0.88 });
+
+      // Bottom cover
+      const bottomCover = new THREE.Mesh(new THREE.BoxGeometry(W, baseH, D), redMat);
+      bottomCover.position.set(0, baseH / 2, 0);
+      bottomCover.receiveShadow = true; bottomCover.castShadow = true;
+      binderRoot.add(bottomCover);
+
+      // Page stack — slightly inset from the spine edge (binder-ring gap)
+      const pagesW = W - 1.2;
+      const pagesD = D - 0.5;
+      const pagesXOffset = 0.55; // shift toward open edge
+      const pages = new THREE.Mesh(new THREE.BoxGeometry(pagesW, pagesH, pagesD), pagesMat);
+      pages.position.set(pagesXOffset, baseH + pagesH / 2, 0);
+      pages.receiveShadow = true;
+      binderRoot.add(pages);
+
+      // Spine — full-height vertical strip on the -X edge with the spine
+      // art on its outer (-X) face.
+      const spineMat = new THREE.MeshStandardMaterial({ map: spineTex, roughness: 0.62 });
+      const spineMats = [
+        redMat,           // +X — inner, never seen
+        spineMat,         // -X — outer, shows spine art
+        redMat, redMat,   // +Y / -Y caps
+        redMat, redMat    // +Z / -Z ends
+      ];
+      const spineMesh = new THREE.Mesh(new THREE.BoxGeometry(spineThick, totalH, D), spineMats);
+      spineMesh.position.set(-W / 2 - spineThick / 2, totalH / 2, 0);
+      spineMesh.castShadow = true; spineMesh.receiveShadow = true;
+      binderRoot.add(spineMesh);
+
+      // Top-cover hinge group at the spine's top edge
+      const hinge = new THREE.Group();
+      hinge.position.set(-W / 2, totalH, 0);
+      binderRoot.add(hinge);
+
+      // Top cover with binder-cover art on its top (+Y) face
+      const coverFaceMat = new THREE.MeshStandardMaterial({ map: coverTex, roughness: 0.55 });
+      const topMats = [
+        redMat, redMat,
+        coverFaceMat,   // +Y — cover art
+        redMat,         // -Y — inner side
+        redMat, redMat
+      ];
+      const topCover = new THREE.Mesh(new THREE.BoxGeometry(W, topH, D), topMats);
+      // Cover extends in +X from the hinge, sitting just below local Y=0 so
+      // the hinge axis runs along the spine's top edge.
+      topCover.position.set(W / 2, -topH / 2, 0);
+      topCover.castShadow = true; topCover.receiveShadow = true;
+      hinge.add(topCover);
+
+      // Closed slant: cover dips toward the open edge because the page stack
+      // is shorter than the spine is tall. atan2(drop, run).
+      const dropAtOpenEdge = totalH - (baseH + pagesH);
+      const closedSlant = -Math.atan2(dropAtOpenEdge, W);
+      hinge.rotation.z = closedSlant;
+
+      // 3×3 grid of yellow rounded "Pokémon cards" sitting on the page stack.
+      // Hidden when the cover is closed.
+      const cardsGroup = new THREE.Group();
+      cardsGroup.visible = false;
+      binderRoot.add(cardsGroup);
+
+      const cardW = 2.6, cardD = 3.6, cardThick = 0.06;
+      const cardMat = new THREE.MeshStandardMaterial({ color: 0xf2c83a, roughness: 0.55, metalness: 0.06 });
+      const cardGeo = (() => {
+        const r = 0.32, hw = cardW / 2, hd = cardD / 2;
+        const sh = new THREE.Shape();
+        sh.moveTo(-hw + r, -hd);
+        sh.lineTo(hw - r, -hd);
+        sh.quadraticCurveTo(hw, -hd, hw, -hd + r);
+        sh.lineTo(hw, hd - r);
+        sh.quadraticCurveTo(hw, hd, hw - r, hd);
+        sh.lineTo(-hw + r, hd);
+        sh.quadraticCurveTo(-hw, hd, -hw, hd - r);
+        sh.lineTo(-hw, -hd + r);
+        sh.quadraticCurveTo(-hw, -hd, -hw + r, -hd);
+        const g = new THREE.ExtrudeGeometry(sh, { depth: cardThick, bevelEnabled: false });
+        g.rotateX(-Math.PI / 2); // extrude along +Y
+        g.translate(0, cardThick, 0); // bottom flush at local y=0
+        return g;
+      })();
+      const colStep = (pagesW - 0.6) / 3;
+      const rowStep = (pagesD - 0.6) / 3;
+      const cardY = baseH + pagesH + 0.005;
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          const card = new THREE.Mesh(cardGeo, cardMat);
+          const cx = (col - 1) * colStep + pagesXOffset;
+          const cz = (row - 1) * rowStep;
+          card.position.set(cx, cardY, cz);
+          card.receiveShadow = true;
+          cardsGroup.add(card);
+        }
+      }
+
+      // ── State + animation ─────────────────────────────────────
+      // Open angle: rotate hinge.z so the cover swings up and over the spine,
+      // settling roughly face-down on the floor on the other side.
+      const openAngle = Math.PI * 1.02;
+      const binderState = { open: false, progress: 0, animTimer: 0, coinSpawned: false };
+      binderRoot._pokemonBinderState = binderState;
+
+      function _applyHinge() {
+        hinge.rotation.z = closedSlant + (openAngle - closedSlant) * binderState.progress;
+        cardsGroup.visible = binderState.progress > 0.45;
+      }
+
+      function _step() {
+        const target = binderState.open ? 1 : 0;
+        binderState.progress += (target - binderState.progress) * 0.16;
+        if (Math.abs(target - binderState.progress) < 0.002) {
+          binderState.progress = target;
+          _applyHinge();
+          binderState.animTimer = 0;
+          return;
+        }
+        _applyHinge();
+        binderState.animTimer = requestAnimationFrame(_step);
+      }
+
+      function togglePokemonBinder() {
+        binderState.open = !binderState.open;
+        let coinPos = null;
+        if (binderState.open && !binderState.coinSpawned) {
+          binderState.coinSpawned = true;
+          // World-space spawn point above the open binder.
+          binderRoot.updateMatrixWorld(true);
+          coinPos = new THREE.Vector3(0, totalH + 7, 0).applyMatrix4(binderRoot.matrixWorld);
+        }
+        if (!binderState.animTimer) binderState.animTimer = requestAnimationFrame(_step);
+        return { opened: binderState.open, coinPos };
+      }
+      window._togglePokemonBinder = togglePokemonBinder;
     }
   }
 

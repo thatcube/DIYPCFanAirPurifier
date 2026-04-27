@@ -548,11 +548,10 @@ function _spawnSecretIfUntriggered(id, parent, pos, opts) {
   playSecretSpawnSfx();
 }
 
-export function spawnSecretCornerDoorCoin() {
-  const fy = getFloorY();
-  // Behind the corner door by the nightstand (same door in the back-right recess).
-  _spawnSecretIfUntriggered('cornerDoor', _coinGroup,
-    new THREE.Vector3(-(SIDE_WALL_X - 12), fy + 8, BACK_WALL_Z - 28), {});
+export function spawnSecretBinderCoin(worldPos) {
+  if (!worldPos) return;
+  // Floats above the open Pokémon binder under the bed.
+  _spawnSecretIfUntriggered('binder', _coinGroup, worldPos.clone(), {});
 }
 
 export function spawnSecretLampCoin() {

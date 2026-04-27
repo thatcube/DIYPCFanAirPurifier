@@ -9,7 +9,7 @@ import { state } from './state.js';
 import { stdMat } from './materials.js';
 import { fpMode as _fpMode, sfxMuted as _sfxMuted } from './game-fp.js';
 import {
-  spawnSecretCornerDoorCoin,
+  spawnSecretBinderCoin,
   spawnSecretLampCoin,
   spawnSecretCeilingLightCoins,
   spawnSecretWindowCoin,
@@ -1846,7 +1846,7 @@ export function createPurifier(scene) {
   function getInteractiveTarget(obj){
     let p=obj;
     while(p){
-      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isBypassPanel||p._isCornerDoorHandle||p._isCornerDoor||p._isGuestDoor||p._isGuestDoorHandle||p._isMacbook||p._isWindow||p._isWindowPane||p._isTV||p._isFoodBowl||p._isPickupSkateboard) return p;
+      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isBypassPanel||p._isCornerDoorHandle||p._isCornerDoor||p._isGuestDoor||p._isGuestDoorHandle||p._isMacbook||p._isWindow||p._isWindowPane||p._isTV||p._isFoodBowl||p._isPickupSkateboard||p._isPokemonBinder) return p;
       p=p.parent;
     }
     return null;
@@ -2085,7 +2085,17 @@ export function createPurifier(scene) {
         const isOpen = _toggleCornerDoor();
         _playDoorCue(!!isOpen, 1);
       }
-      if(_fpMode) spawnSecretCornerDoorCoin();
+      return;
+    }
+    // Clicked Pokémon binder (any part) — toggle open/closed; first open
+    // spawns the secret blue coin (repurposed from the corner-door secret).
+    if(obj._isPokemonBinder){
+      if(typeof window._togglePokemonBinder==='function'){
+        const result = window._togglePokemonBinder();
+        if(_fpMode && result && result.opened && result.coinPos){
+          spawnSecretBinderCoin(result.coinPos);
+        }
+      }
       return;
     }
     // Clicked guest door (handle or panel) — leads to office
