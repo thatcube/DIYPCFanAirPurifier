@@ -45,7 +45,7 @@ export let catIdleAction = null;
 
 // Kept for API compatibility (no-op shim — blob shadow was removed).
 export const catBlobShadow = null;
-export function updateCatBlobShadow() {}
+export function updateCatBlobShadow() { }
 
 // ── Constants ───────────────────────────────────────────────────────
 
@@ -58,9 +58,9 @@ const NOD_PEAK_PITCH = 1.35;   // radians (~77°) distributed across upper-body 
 
 // ── State ───────────────────────────────────────────────────────────
 
-const baseScale     = new THREE.Vector3(1, 1, 1);
+const baseScale = new THREE.Vector3(1, 1, 1);
 const previewBaseScale = new THREE.Vector3(1, 1, 1);
-const baseLocalPos  = new THREE.Vector3();
+const baseLocalPos = new THREE.Vector3();
 const baseLocalQuat = new THREE.Quaternion();
 let gameLoadNonce = 0;
 let nodStartTs = -1e9;
@@ -73,11 +73,11 @@ let _babaRollAnchorReady = false;
 let _babaRollHalfHeight = 0;
 
 // Bone references for procedural animation
-const idleTailBones  = [];
-const idleHeadBones  = [];
+const idleTailBones = [];
+const idleHeadBones = [];
 const idleSpineBones = [];
 const tmpEuler = new THREE.Euler(0, 0, 0, 'XYZ');
-const tmpQuat  = new THREE.Quaternion();
+const tmpQuat = new THREE.Quaternion();
 const tmpQuatB = new THREE.Quaternion();
 const tmpQuatC = new THREE.Quaternion();
 const tmpQuatD = new THREE.Quaternion();
@@ -88,11 +88,11 @@ const boxTmp = new THREE.Box3();
 
 // Bababooey bone refs
 const babaBones = { left: null, right: null, up: null, down: null, mid: null };
-const babaBase  = { left: null, right: null, up: null, down: null, mid: null };
+const babaBase = { left: null, right: null, up: null, down: null, mid: null };
 
 // Toon leg bone refs
 const toonLegBones = {};
-const toonLegBase  = {};
+const toonLegBase = {};
 
 // Korra bone refs (procedural quadruped cat)
 const korraBones = {
@@ -121,14 +121,14 @@ for (const k in totoBones) totoBase[k] = null;
 
 // Preview state
 let previewRenderer = null;
-let previewScene    = null;
-let previewCamera   = null;
+let previewScene = null;
+let previewCamera = null;
 let previewControls = null;
-let previewModel    = null;
-let previewMixer    = null;
+let previewModel = null;
+let previewMixer = null;
 let previewIdleAction = null;
 let previewWalkAction = null;
-let previewLastTs   = 0;
+let previewLastTs = 0;
 let previewW = 0, previewH = 0;
 let previewLoadNonce = 0;
 const previewBaseLocalPos = new THREE.Vector3();
@@ -181,78 +181,82 @@ export function loadGameplayCat(refs = {}) {
  * Shared post-load setup for both GLB and procedural models.
  */
 function _initGameplayCatFromScene(scene, animations, src, refs, nonce) {
-    if (nonce !== gameLoadNonce) return;
-    catModel = scene;
-    _collectIdleBones(catModel);
-    _stripBackdrop(catModel, src);
+  if (nonce !== gameLoadNonce) return;
+  catModel = scene;
+  _collectIdleBones(catModel);
+  _stripBackdrop(catModel, src);
 
-    // Auto-scale
-    const box = new THREE.Box3().setFromObject(catModel);
-    const size = box.getSize(new THREE.Vector3());
-    const h = Math.max(size.y, 0.0001);
-    const w = Math.max(size.x, size.z, 0.0001);
-    const sH = TARGET_HEIGHT / h;
-    const sW = (TARGET_HEIGHT * 1.6) / w;
-    const s = Math.pow(sH, 0.65) * Math.pow(sW, 0.35);
-    catModel.scale.setScalar(s);
-    baseScale.copy(catModel.scale);
+  // Auto-scale
+  const box = new THREE.Box3().setFromObject(catModel);
+  const size = box.getSize(new THREE.Vector3());
+  const h = Math.max(size.y, 0.0001);
+  const w = Math.max(size.x, size.z, 0.0001);
+  const sH = TARGET_HEIGHT / h;
+  const sW = (TARGET_HEIGHT * 1.6) / w;
+  const s = Math.pow(sH, 0.65) * Math.pow(sW, 0.35);
+  catModel.scale.setScalar(s);
+  baseScale.copy(catModel.scale);
 
-    _centerAndGround(catModel);
+  _centerAndGround(catModel);
 
-    baseLocalPos.copy(catModel.position);
-    baseLocalQuat.copy(catModel.quaternion);
-    _cacheBababooeyRollAnchor(catModel, src);
+  baseLocalPos.copy(catModel.position);
+  baseLocalQuat.copy(catModel.quaternion);
+  _cacheBababooeyRollAnchor(catModel, src);
 
-    // Shadows + material cleanup
-    catModel.traverse(o => {
-      if (o.isMesh) {
-        o.castShadow = false; o.receiveShadow = true;
-        if (o.isSkinnedMesh) o.frustumCulled = false;
-        if (o.material && o.material.map) o.material.map.colorSpace = THREE.SRGBColorSpace;
-        const mats = Array.isArray(o.material) ? o.material : [o.material];
-        for (const m of mats) {
-          if (!m) continue;
-          if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
-            m.metalness = 0;
-            m.roughness = Math.max(0.9, Number(m.roughness) || 0);
-            m.envMapIntensity = Math.min(0.08, Number(m.envMapIntensity) || 0.08);
-            if (m.clearcoat !== undefined) m.clearcoat = 0;
-            if (m.sheen !== undefined) m.sheen = 0;
-            m.needsUpdate = true;
-          }
+  // Shadows + material cleanup
+  catModel.traverse(o => {
+    if (o.isMesh) {
+      o.castShadow = false; o.receiveShadow = true;
+      if (o.isSkinnedMesh) o.frustumCulled = false;
+      if (o.material && o.material.map) o.material.map.colorSpace = THREE.SRGBColorSpace;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of mats) {
+        if (!m) continue;
+        if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
+          m.metalness = 0;
+          m.roughness = Math.max(0.9, Number(m.roughness) || 0);
+          m.envMapIntensity = Math.min(0.08, Number(m.envMapIntensity) || 0.08);
+          if (m.clearcoat !== undefined) m.clearcoat = 0;
+          if (m.sheen !== undefined) m.sheen = 0;
+          m.needsUpdate = true;
         }
       }
-    });
-
-    if (refs.applyCatColorToModel) refs.applyCatColorToModel();
-    catGroup.add(catModel);
-
-    // Always create a mixer so procedural-only rigs (like Totodile)
-    // still execute the gameplay animation path.
-    catMixer = new THREE.AnimationMixer(catModel);
-
-    // Animations
-    if (animations && animations.length) {
-      for (const clip of animations) {
-        clip.tracks = clip.tracks.filter(t => !t.name.endsWith('.position'));
-      }
-      for (const clip of animations) {
-        clip.resetDuration();
-      }
-
-      const byName = (names) => {
-        for (const n of names) {
-          const c = animations.find(a => a.name.toLowerCase().includes(n));
-          if (c) return c;
-        }
-        return null;
-      };
-      const walkClip = byName(['walk', 'run', 'gallop']) || animations[0];
-      const idleClip = byName(['idle', 'sit', 'rest']) || animations[0];
-      if (walkClip) { catWalkAction = catMixer.clipAction(walkClip); catWalkAction.play(); catWalkAction.weight = 0; }
-      if (idleClip && idleClip !== walkClip) { catIdleAction = catMixer.clipAction(idleClip); catIdleAction.play(); catIdleAction.weight = 1; }
-      else if (catWalkAction) catWalkAction.weight = 1;
     }
+  });
+
+  if (refs.applyCatColorToModel) refs.applyCatColorToModel();
+  catGroup.add(catModel);
+
+  // Always create a mixer so procedural-only rigs (like Totodile)
+  // still execute the gameplay animation path.
+  catMixer = new THREE.AnimationMixer(catModel);
+
+  // Animations
+  if (animations && animations.length) {
+    for (const clip of animations) {
+      clip.tracks = clip.tracks.filter(t => !t.name.endsWith('.position'));
+    }
+    for (const clip of animations) {
+      clip.resetDuration();
+    }
+
+    const byName = (names) => {
+      for (const n of names) {
+        const c = animations.find(a => a.name.toLowerCase().includes(n));
+        if (c) return c;
+      }
+      return null;
+    };
+    const walkClip = byName(['walk', 'run', 'gallop']) || animations[0];
+    const idleClip = byName(['idle', 'sit', 'rest']) || animations[0];
+    if (walkClip) { catWalkAction = catMixer.clipAction(walkClip); catWalkAction.play(); catWalkAction.weight = 0; }
+    if (idleClip && idleClip !== walkClip) { catIdleAction = catMixer.clipAction(idleClip); catIdleAction.play(); catIdleAction.weight = 1; }
+    else if (catWalkAction) catWalkAction.weight = 1;
+  }
+
+  if (typeof refs.onModelReady === 'function') {
+    try { refs.onModelReady(); } catch (e) { console.warn('onModelReady cb failed', e); }
+  }
 }
 
 export function clearGameplayCat() {
@@ -336,8 +340,8 @@ function _stripBackdrop(model, src) {
       if (!o.isMesh || !o.geometry) return;
       o.geometry.computeBoundingBox();
       const bb = o.geometry.boundingBox;
-      const dims = [bb.max.x-bb.min.x, bb.max.y-bb.min.y, bb.max.z-bb.min.z].sort((a,b)=>b-a);
-      if (dims[2] < dims[0]*0.1 && dims[0]*dims[1] > bigArea) { bigArea = dims[0]*dims[1]; biggest = o; }
+      const dims = [bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z].sort((a, b) => b - a);
+      if (dims[2] < dims[0] * 0.1 && dims[0] * dims[1] > bigArea) { bigArea = dims[0] * dims[1]; biggest = o; }
     });
     if (biggest) toRemove.push(biggest);
   }
@@ -449,30 +453,30 @@ function _collectIdleBones(model) {
   // segment so trailing FBX node-id suffixes (e.g. "_05", "_011") are
   // ignored. All matches are anchored at start of bone name.
   const totoMap = {
-    hips:      /^Hips(?:[._]|\d|$)/i,
-    waist:     /^Waist(?:[._]|\d|$)/i,
-    spine:     /^Spine(?:[._]|\d|$)/i,
-    neck:      /^Neck(?:[._]|\d|$)/i,
-    head:      /^Head(?:[._]|\d|$)/i,
-    jaw:       /^Jaw(?:[._]|\d|$)/i,
-    tail1:     /^Tail1(?:[._]|\d|$)/i,
-    tail2:     /^Tail2(?:[._]|\d|$)/i,
-    lThigh:    /^LThigh(?:[._]|\d|$)/i,
-    lLeg:      /^LLeg(?:[._]|\d|$)/i,
-    lFoot:     /^LFoot(?:[._]|\d|$)/i,
-    lToe:      /^LToe(?:[._]|\d|$)/i,
-    rThigh:    /^RThigh(?:[._]|\d|$)/i,
-    rLeg:      /^RLeg(?:[._]|\d|$)/i,
-    rFoot:     /^RFoot(?:[._]|\d|$)/i,
-    rToe:      /^RToe(?:[._]|\d|$)/i,
+    hips: /^Hips(?:[._]|\d|$)/i,
+    waist: /^Waist(?:[._]|\d|$)/i,
+    spine: /^Spine(?:[._]|\d|$)/i,
+    neck: /^Neck(?:[._]|\d|$)/i,
+    head: /^Head(?:[._]|\d|$)/i,
+    jaw: /^Jaw(?:[._]|\d|$)/i,
+    tail1: /^Tail1(?:[._]|\d|$)/i,
+    tail2: /^Tail2(?:[._]|\d|$)/i,
+    lThigh: /^LThigh(?:[._]|\d|$)/i,
+    lLeg: /^LLeg(?:[._]|\d|$)/i,
+    lFoot: /^LFoot(?:[._]|\d|$)/i,
+    lToe: /^LToe(?:[._]|\d|$)/i,
+    rThigh: /^RThigh(?:[._]|\d|$)/i,
+    rLeg: /^RLeg(?:[._]|\d|$)/i,
+    rFoot: /^RFoot(?:[._]|\d|$)/i,
+    rToe: /^RToe(?:[._]|\d|$)/i,
     lShoulder: /^LShoulder(?:[._]|\d|$)/i,
-    lArm:      /^LArm(?:[._]|\d|$)/i,
-    lForeArm:  /^LForeArm(?:[._]|\d|$)/i,
-    lHand:     /^LHand(?:[._]|\d|$)/i,
+    lArm: /^LArm(?:[._]|\d|$)/i,
+    lForeArm: /^LForeArm(?:[._]|\d|$)/i,
+    lHand: /^LHand(?:[._]|\d|$)/i,
     rShoulder: /^RShoulder(?:[._]|\d|$)/i,
-    rArm:      /^RArm(?:[._]|\d|$)/i,
-    rForeArm:  /^RForeArm(?:[._]|\d|$)/i,
-    rHand:     /^RHand(?:[._]|\d|$)/i
+    rArm: /^RArm(?:[._]|\d|$)/i,
+    rForeArm: /^RForeArm(?:[._]|\d|$)/i,
+    rHand: /^RHand(?:[._]|\d|$)/i
   };
 
   model.traverse(o => {
@@ -482,11 +486,11 @@ function _collectIdleBones(model) {
     if (headRe.test(n)) heads.push(o);
     if (spineRe.test(n)) idleSpineBones.push(o);
     // Bababooey bones
-    if (/joint_Left_04/i.test(n))  { babaBones.left = o; babaBase.left = o.quaternion.clone(); }
+    if (/joint_Left_04/i.test(n)) { babaBones.left = o; babaBase.left = o.quaternion.clone(); }
     if (/joint_Right_05/i.test(n)) { babaBones.right = o; babaBase.right = o.quaternion.clone(); }
-    if (/joint_Up_02/i.test(n))    { babaBones.up = o; babaBase.up = o.quaternion.clone(); }
-    if (/joint_Down_03/i.test(n))  { babaBones.down = o; babaBase.down = o.quaternion.clone(); }
-    if (/joint_M_01/i.test(n))     { babaBones.mid = o; babaBase.mid = o.quaternion.clone(); }
+    if (/joint_Up_02/i.test(n)) { babaBones.up = o; babaBase.up = o.quaternion.clone(); }
+    if (/joint_Down_03/i.test(n)) { babaBones.down = o; babaBase.down = o.quaternion.clone(); }
+    if (/joint_M_01/i.test(n)) { babaBones.mid = o; babaBase.mid = o.quaternion.clone(); }
     // Toon leg bones
     const toonMap = {
       thighBL: /^thigh\.B\.L/i, upperBL: /^leg\.upper\.B\.L/i, lowerBL: /^leg\.lower\.B\.L/i, footBL: /^foot\.B\.L/i,
@@ -510,13 +514,13 @@ function _collectIdleBones(model) {
     }
     // Korra bones (procedural quadruped)
     const korraMap = {
-      hips:   /^Hips$/i,   spine: /^Spine$/i,  chest: /^Chest$/i,
-      neck:   /^Neck$/i,   head:  /^Head$/i,
-      tail1:  /^Tail1$/i,  tail2: /^Tail2$/i,  tail3: /^Tail3$/i,
-      lfLeg:  /^LFrontLeg$/i,  rfLeg:  /^RFrontLeg$/i,
-      lbLeg:  /^LBackLeg$/i,   rbLeg:  /^RBackLeg$/i,
+      hips: /^Hips$/i, spine: /^Spine$/i, chest: /^Chest$/i,
+      neck: /^Neck$/i, head: /^Head$/i,
+      tail1: /^Tail1$/i, tail2: /^Tail2$/i, tail3: /^Tail3$/i,
+      lfLeg: /^LFrontLeg$/i, rfLeg: /^RFrontLeg$/i,
+      lbLeg: /^LBackLeg$/i, rbLeg: /^RBackLeg$/i,
       lfFoot: /^LFrontFoot$/i, rfFoot: /^RFrontFoot$/i,
-      lbFoot: /^LBackFoot$/i,  rbFoot: /^RBackFoot$/i
+      lbFoot: /^LBackFoot$/i, rbFoot: /^RBackFoot$/i
     };
     for (const k in korraMap) {
       if (korraBones[k] == null && korraMap[k].test(n)) {
@@ -1210,7 +1214,7 @@ export function applyTotodileProceduralIdle(ts, intensity) {
   const breath = Math.sin(t * 1.7) * 0.5 + Math.sin(t * 2.6 + 0.6) * 0.18;
   _totoApply(totoBones.spine, totoBase.spine, -breath * 0.045 * k, 0, Math.sin(t * 0.9) * 0.025 * k, 0.55);
   _totoApply(totoBones.waist, totoBase.waist, breath * 0.018 * k, 0, 0, 0.5);
-  _totoApply(totoBones.hips,  totoBase.hips,  breath * 0.012 * k, Math.sin(t * 0.6) * 0.015 * k, 0, 0.45);
+  _totoApply(totoBones.hips, totoBase.hips, breath * 0.012 * k, Math.sin(t * 0.6) * 0.015 * k, 0, 0.45);
 
   // Head bob should read as nodding, not side-looking. Keep it pitch-dominant
   // and let torso/tail provide most lateral motion.
@@ -1227,7 +1231,7 @@ export function applyTotodileProceduralIdle(ts, intensity) {
 
   // Arms — slight relaxed sway. Counter-phase L/R.
   const armSway = Math.sin(t * 1.1) * 0.10 * k;
-  _totoApply(totoBones.lArm, totoBase.lArm,  armSway,  0, 0, 0.45);
+  _totoApply(totoBones.lArm, totoBase.lArm, armSway, 0, 0, 0.45);
   _totoApply(totoBones.rArm, totoBase.rArm, -armSway, 0, 0, 0.45);
 }
 
@@ -1307,8 +1311,8 @@ export function applyTotodileProceduralRun(ts, moveSpeed, moveBlend) {
   const armSwing = 0.55 * stride;
   _totoApply(totoBones.lShoulder, totoBase.lShoulder, sR * 0.18 * stride, 0, sR * 0.06 * stride, 0.5);
   _totoApply(totoBones.rShoulder, totoBase.rShoulder, sL * 0.18 * stride, 0, -sL * 0.06 * stride, 0.5);
-  _totoApply(totoBones.lArm,      totoBase.lArm,      sR * armSwing, 0, 0, 0.6);
-  _totoApply(totoBones.rArm,      totoBase.rArm,      sL * armSwing, 0, 0, 0.6);
+  _totoApply(totoBones.lArm, totoBase.lArm, sR * armSwing, 0, 0, 0.6);
+  _totoApply(totoBones.rArm, totoBase.rArm, sL * armSwing, 0, 0, 0.6);
   // Forearms tuck on the up-swing.
   const foreL = Math.max(0, sR) * 0.5 * stride;
   const foreR = Math.max(0, sL) * 0.5 * stride;
@@ -1322,7 +1326,7 @@ export function applyTotodileProceduralRun(ts, moveSpeed, moveBlend) {
   const hipTwist = sL * 0.11 * blend;
   const hipRoll = sL * (0.040 + walkN * 0.055) * blend;
   const torsoCounterRoll = -hipRoll * 0.62;
-  _totoApply(totoBones.hips,  totoBase.hips,  strideBob * 0.012 * blend, hipTwist, hipRoll, 0.5);
+  _totoApply(totoBones.hips, totoBase.hips, strideBob * 0.012 * blend, hipTwist, hipRoll, 0.5);
   _totoApply(totoBones.waist, totoBase.waist, 0, -hipTwist * 0.45, torsoCounterRoll + sL * 0.020 * blend, 0.48);
   _totoApply(totoBones.spine, totoBase.spine, -strideBob * 0.016 * blend, -hipTwist * 0.3, torsoCounterRoll * 0.45, 0.5);
 
@@ -1381,9 +1385,9 @@ export function applyKorraProceduralIdle(ts, intensity) {
   // Slow, expressive tail sway — only yaw (side-to-side) so the base
   // stays anchored to the body. Layered incommensurate frequencies
   // so the motion never repeats and feels alive.
-  const tailYaw  = (Math.sin(t * 0.55) * 0.30
-                  + Math.sin(t * 0.93 + 1.0) * 0.18
-                  + Math.sin(t * 1.71 + 2.3) * 0.08) * k;
+  const tailYaw = (Math.sin(t * 0.55) * 0.30
+    + Math.sin(t * 0.93 + 1.0) * 0.18
+    + Math.sin(t * 1.71 + 2.3) * 0.08) * k;
   _korraApply(korraBones.tail1, korraBase.tail1, 0, tailYaw, 0, 0.5);
 
   // Subtle weight shift — legs rock very slightly
@@ -1444,15 +1448,15 @@ export function applyKorraProceduralRun(ts, moveSpeed, moveBlend) {
   const liftAngle = 0.15 * blend;  // knee lift
 
   // Left-front + Right-back pair
-  _korraApply(korraBones.lfLeg,  korraBase.lfLeg,  sL * legSwing, 0, 0, 0.65);
+  _korraApply(korraBones.lfLeg, korraBase.lfLeg, sL * legSwing, 0, 0, 0.65);
   _korraApply(korraBones.lfFoot, korraBase.lfFoot, Math.max(0, -cL) * liftAngle, 0, 0, 0.5);
-  _korraApply(korraBones.rbLeg,  korraBase.rbLeg,  sL * legSwing * 0.85, 0, 0, 0.65);
+  _korraApply(korraBones.rbLeg, korraBase.rbLeg, sL * legSwing * 0.85, 0, 0, 0.65);
   _korraApply(korraBones.rbFoot, korraBase.rbFoot, Math.max(0, -cL) * liftAngle, 0, 0, 0.5);
 
   // Right-front + Left-back pair
-  _korraApply(korraBones.rfLeg,  korraBase.rfLeg,  sR * legSwing, 0, 0, 0.65);
+  _korraApply(korraBones.rfLeg, korraBase.rfLeg, sR * legSwing, 0, 0, 0.65);
   _korraApply(korraBones.rfFoot, korraBase.rfFoot, Math.max(0, -cR) * liftAngle, 0, 0, 0.5);
-  _korraApply(korraBones.lbLeg,  korraBase.lbLeg,  sR * legSwing * 0.85, 0, 0, 0.65);
+  _korraApply(korraBones.lbLeg, korraBase.lbLeg, sR * legSwing * 0.85, 0, 0, 0.65);
   _korraApply(korraBones.lbFoot, korraBase.lbFoot, Math.max(0, -cR) * liftAngle, 0, 0, 0.5);
 
   // ── Spine undulation ──

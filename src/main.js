@@ -324,7 +324,7 @@ lighting.applyTimeOfDay(_initMinute, todRefs);
     scene.add(_keyShadowHelper);
   }
 
-  window._debugLights = function(show) {
+  window._debugLights = function (show) {
     _debugHelpers.forEach(h => {
       h.mesh.visible = !!show;
       if (show) {
@@ -430,7 +430,12 @@ scene.add(catAnimation.catGroup);
 catAnimation.catGroup.visible = true;
 
 catAnimation.loadGameplayCat({
-  applyCatColorToModel: catAnimation.applyColorToAll
+  applyCatColorToModel: catAnimation.applyColorToAll,
+  onModelReady: () => {
+    // Cat materials just arrived. Pre-build their shader programs now so
+    // first render in game mode doesn't stutter compiling them mid-frame.
+    try { renderer.compile(scene, camera); } catch (e) {}
+  }
 });
 
 // ── Particles ───────────────────────────────────────────────────────
@@ -464,6 +469,18 @@ gameFp.init({
   showToast,
   roomRefs
 });
+
+// Pre-warm Super Saiyan effect chain (aura mesh, halo, sparkle materials,
+// env PointLight) at startup so first activation in a game run doesn't
+// trigger a shader-recompile stutter. The env light is created visible=true
+// with intensity=0 and stays that way — toggling .visible is what changes
+// the active-light count and forces every PBR material to recompile.
+gameFp.prewarmSuperSaiyan();
+
+// Pre-build shader programs for everything currently in the scene (room,
+// purifier, SS effects). Cat materials are compiled separately when the
+// async cat model finishes loading (see loadGameplayCat onModelReady).
+try { renderer.compile(scene, camera); } catch (e) { console.warn('renderer.compile failed', e); }
 
 // Apply persisted mute settings to all active audio sources.
 coins.setSfxMuted(gameFp.sfxMuted);
@@ -743,7 +760,10 @@ window._startGame = () => {
   gameFp.setSkateMode(skate, { silent: true });
   // Reload cat model with new selection
   catAnimation.loadGameplayCat({
-    applyCatColorToModel: catAnimation.applyColorToAll
+    applyCatColorToModel: catAnimation.applyColorToAll,
+    onModelReady: () => {
+      try { renderer.compile(scene, camera); } catch (e) {}
+    }
   });
   // Enter game mode
   gameFp.toggleFirstPerson();
@@ -895,7 +915,7 @@ window._setPlacement = (mode) => {
 // toggles (plus the inline HUD readout) in sync.
 const FPS_VIS_KEY = 'diy_air_purifier_show_fps_v1';
 let _fpsVisible = false;
-try { _fpsVisible = localStorage.getItem(FPS_VIS_KEY) === '1'; } catch (e) {}
+try { _fpsVisible = localStorage.getItem(FPS_VIS_KEY) === '1'; } catch (e) { }
 
 function _applyFpsVisibility() {
   const fpsEl = document.getElementById('fpsInline');
@@ -916,7 +936,7 @@ function _applyFpsVisibility() {
 
 window._toggleFps = () => {
   _fpsVisible = !_fpsVisible;
-  try { localStorage.setItem(FPS_VIS_KEY, _fpsVisible ? '1' : '0'); } catch (e) {}
+  try { localStorage.setItem(FPS_VIS_KEY, _fpsVisible ? '1' : '0'); } catch (e) { }
   _applyFpsVisibility();
 };
 _applyFpsVisibility();
@@ -1189,7 +1209,7 @@ function animate(ts) {
       const sprint = _camKeys.ctrl ? 3.0 : 1.0;
       const spd = baseSpd * sprint * dtSec;
       if (_camKeys.w || _camKeys.s || _camKeys.a || _camKeys.d ||
-          _camKeys.space || _camKeys.shift) {
+        _camKeys.space || _camKeys.shift) {
         const fwd = _flyFwd.subVectors(controls.target, camera.position);
         const fwdLen = fwd.length();
         if (fwdLen > 1e-4) fwd.multiplyScalar(1 / fwdLen);
@@ -1526,14 +1546,6 @@ function animate(ts) {
       _lastShadowUpdateTs = ts;
     }
   }
-
-  // HARD GUARANTEE: cat never casts a shadow. Traverse the subtree
-  // every frame and force castShadow=false on every mesh. This catches
-  // anything that might re-enable it (appearance updates, model swaps,
-  // HMR reloads, GLB loader onLoad races, etc.)
-  catAnimation.catGroup.traverse(o => {
-    if (o.isMesh) o.castShadow = false;
-  });
 
   // Render
   renderer.render(scene, camera);

@@ -52,42 +52,42 @@ const SKATE_MODE_KEY = 'diy_air_purifier_skate_mode_v1';
 const SKATEBOARD_FOUND_KEY = 'diy_air_purifier_skateboard_found_v1';
 const MPH_VIS_KEY = 'diy_air_purifier_mph_visible_v1';
 
-try { sfxMuted = localStorage.getItem(SFX_MUTE_KEY) === '1'; } catch (e) {}
-try { musicMuted = localStorage.getItem(MUSIC_MUTE_KEY) === '1'; } catch (e) {}
+try { sfxMuted = localStorage.getItem(SFX_MUTE_KEY) === '1'; } catch (e) { }
+try { musicMuted = localStorage.getItem(MUSIC_MUTE_KEY) === '1'; } catch (e) { }
 
 // ── Skateboard unlock (must find the hidden skateboard first) ──────
 export let skateboardFound = false;
-try { skateboardFound = localStorage.getItem(SKATEBOARD_FOUND_KEY) === '1'; } catch (e) {}
+try { skateboardFound = localStorage.getItem(SKATEBOARD_FOUND_KEY) === '1'; } catch (e) { }
 export function isSkateboardFound() { return skateboardFound; }
 export function markSkateboardFound() {
   if (skateboardFound) return;
   skateboardFound = true;
-  try { localStorage.setItem(SKATEBOARD_FOUND_KEY, '1'); } catch (e) {}
+  try { localStorage.setItem(SKATEBOARD_FOUND_KEY, '1'); } catch (e) { }
   _syncSkateToggleUi();
 }
 
 // ── Speed mode (3x top speed, slower acceleration) ──────────────────
 // Gated behind finding every secret coin at least once (see coins.hasFoundAllSecrets).
 export let speedMode = false;
-try { speedMode = localStorage.getItem(SPEED_MODE_KEY) === '1'; } catch (e) {}
+try { speedMode = localStorage.getItem(SPEED_MODE_KEY) === '1'; } catch (e) { }
 // Force-off at boot if the unlock hasn't happened on this device yet.
 if (speedMode && !coins.hasFoundAllSecrets()) {
   speedMode = false;
-  try { localStorage.setItem(SPEED_MODE_KEY, '0'); } catch (e) {}
+  try { localStorage.setItem(SPEED_MODE_KEY, '0'); } catch (e) { }
 }
 export function isSpeedMode() { return speedMode && coins.hasFoundAllSecrets(); }
 export function setSpeedMode(enabled) {
   speedMode = !!enabled && coins.hasFoundAllSecrets();
-  try { localStorage.setItem(SPEED_MODE_KEY, speedMode ? '1' : '0'); } catch (e) {}
+  try { localStorage.setItem(SPEED_MODE_KEY, speedMode ? '1' : '0'); } catch (e) { }
 }
 
 // ── Skate mode (sideways stance + board visual) ────────────────────
 export let skateMode = false;
-try { skateMode = localStorage.getItem(SKATE_MODE_KEY) === '1'; } catch (e) {}
+try { skateMode = localStorage.getItem(SKATE_MODE_KEY) === '1'; } catch (e) { }
 // Force-off at boot if the skateboard hasn't been found on this device yet.
 if (skateMode && !skateboardFound) {
   skateMode = false;
-  try { localStorage.setItem(SKATE_MODE_KEY, '0'); } catch (e) {}
+  try { localStorage.setItem(SKATE_MODE_KEY, '0'); } catch (e) { }
 }
 export function isSkateMode() { return skateMode && skateboardFound; }
 export function getSkateModelLift() { return (skateMode && skateboardFound) ? _skateModelLift : 0; }
@@ -101,7 +101,7 @@ export function setSkateMode(enabled, opts = {}) {
     return;
   }
   skateMode = next;
-  try { localStorage.setItem(SKATE_MODE_KEY, skateMode ? '1' : '0'); } catch (e) {}
+  try { localStorage.setItem(SKATE_MODE_KEY, skateMode ? '1' : '0'); } catch (e) { }
   _syncSkateToggleUi();
   _syncSkateboardVisualState();
   if (skateMode) _initSkateboard();
@@ -109,6 +109,11 @@ export function setSkateMode(enabled, opts = {}) {
     _skateModelLift = 0;
     _silenceSkateRoll(false);
   }
+  // On entering skate mode, seed the lift to the model's baseline trim so
+  // legs don't start the eased lerp at y=0 (which causes a few frames of
+  // visible clipping through the board). The per-frame foot-anchor sampler
+  // takes over from here and eases naturally to the correct target.
+  if (skateMode) _skateModelLift = _getSkateLiftTrimForModel();
   // Reset trick state
   _trickManual = 0; _trickManualHeld = false;
   _trickKickflip = 0; _trickKickflipActive = false;
@@ -124,7 +129,7 @@ try {
     const v = parseFloat(raw);
     if (isFinite(v)) mouseSens = Math.max(0.25, Math.min(2.5, v));
   }
-} catch (e) {}
+} catch (e) { }
 
 function _syncMouseSensUi() {
   const slider = document.getElementById('fpPauseMouseSens');
@@ -137,7 +142,7 @@ export function setMouseSens(v) {
   const n = parseFloat(v);
   if (!isFinite(n)) return;
   mouseSens = Math.max(0.25, Math.min(2.5, n));
-  try { localStorage.setItem(MOUSE_SENS_KEY, String(mouseSens)); } catch (e) {}
+  try { localStorage.setItem(MOUSE_SENS_KEY, String(mouseSens)); } catch (e) { }
   _syncMouseSensUi();
 }
 
@@ -147,12 +152,12 @@ export function syncMouseSensUi() {
 
 // ── MPH HUD visibility ─────────────────────────────────────────────
 export let mphVisible = true;
-try { mphVisible = localStorage.getItem(MPH_VIS_KEY) !== '0'; } catch (e) {}
+try { mphVisible = localStorage.getItem(MPH_VIS_KEY) !== '0'; } catch (e) { }
 
 export function isMphVisible() { return mphVisible; }
 export function setMphVisible(v) {
   mphVisible = !!v;
-  try { localStorage.setItem(MPH_VIS_KEY, mphVisible ? '1' : '0'); } catch (e) {}
+  try { localStorage.setItem(MPH_VIS_KEY, mphVisible ? '1' : '0'); } catch (e) { }
   _syncMphHud();
 }
 
@@ -267,14 +272,14 @@ export function syncSkateToggleUi() {
 
 export function setSfxMuted(muted) {
   sfxMuted = !!muted;
-  try { localStorage.setItem(SFX_MUTE_KEY, sfxMuted ? '1' : '0'); } catch (e) {}
+  try { localStorage.setItem(SFX_MUTE_KEY, sfxMuted ? '1' : '0'); } catch (e) { }
   if (sfxMuted) _silenceSkateRoll(true);
   _syncAudioToggleUi();
 }
 
 export function setMusicMuted(muted) {
   musicMuted = !!muted;
-  try { localStorage.setItem(MUSIC_MUTE_KEY, musicMuted ? '1' : '0'); } catch (e) {}
+  try { localStorage.setItem(MUSIC_MUTE_KEY, musicMuted ? '1' : '0'); } catch (e) { }
   _syncAudioToggleUi();
 }
 
@@ -318,13 +323,13 @@ let _skateLean = 0;
 let _catGroupYaw = 0;
 
 // ── Skate trick state ─────────────────────────────────────────────
-let _trickManual     = 0;      // smoothed 0..1 pitch amount
+let _trickManual = 0;      // smoothed 0..1 pitch amount
 let _trickManualHeld = false;  // E key currently down
-let _trickKickflip       = 0;      // 0..1 animation progress
+let _trickKickflip = 0;      // 0..1 animation progress
 let _trickKickflipActive = false;
-let _trickSpinAngle  = 0;      // cumulative spin angle (radians)
-let _trickSpinSpeed  = 0;      // current spin speed (radians/sec)
-let _trickSpinBoost  = false;  // flag: apply upward kick next frame
+let _trickSpinAngle = 0;      // cumulative spin angle (radians)
+let _trickSpinSpeed = 0;      // current spin speed (radians/sec)
+let _trickSpinBoost = false;  // flag: apply upward kick next frame
 
 // Cached DOM elements (looked up once in init or on first use)
 let _cachedCbBar = null, _cachedCbFill = null, _cachedCbValue = null, _cachedCbLabel = null;
@@ -370,7 +375,7 @@ const _ssGoldHot = new THREE.Color(0xfff8b0);
 const _ssEnvAnchor = new THREE.Vector3();
 
 // Activation gate + active-window timers.
-const SS_HOLD_MS   = 5000;  // how long full charge must be held to activate
+const SS_HOLD_MS = 5000;  // how long full charge must be held to activate
 const SS_ACTIVE_MS = 20000; // duration of super saiyan mode once activated
 const SS_HUD_ENTER_FLASH_MS = 1200;
 let _ssFullChargeSinceTs = 0; // ts when chargePct first hit 100% (0 = not holding)
@@ -452,9 +457,14 @@ function _ensureSuperSaiyanAura() {
 
 function _ensureSuperSaiyanEnvLight() {
   if (_ssEnvLight || !_scene) return;
+  // Created visible=true with intensity=0 and kept that way forever. Toggling
+  // light.visible changes the active light count, which forces Three.js to
+  // recompile every PBR material's shader on first SS activation — a very
+  // visible stutter. Keeping visible permanently true (and modulating only
+  // intensity) means the shader light count is fixed at scene init.
   _ssEnvLight = new THREE.PointLight(0xffe484, 0, 110, 1.25);
   _ssEnvLight.castShadow = false;
-  _ssEnvLight.visible = false;
+  _ssEnvLight.visible = true;
   _scene.add(_ssEnvLight);
 }
 
@@ -462,7 +472,7 @@ function _setSuperSaiyanEnvLightOff() {
   _ssEnvLightIntensity = 0;
   if (!_ssEnvLight) return;
   _ssEnvLight.intensity = 0;
-  _ssEnvLight.visible = false;
+  // Do NOT set visible=false — see _ensureSuperSaiyanEnvLight for why.
 }
 
 function _applySuperSaiyan(strength /* 0..1 sustained */, burst /* 0..1 transient */, ts) {
@@ -696,12 +706,12 @@ function _isObjectVisibleInWorld(obj) {
 function _findInteractiveAncestor(obj) {
   for (let p = obj; p; p = p.parent) {
     if (p._isLamp || p._isCeilLight || p._isFan ||
-        p._isFilterL || p._isFilterR ||
-        p._isDrawer || p._isBifoldLeaf || p._isBypassPanel ||
-        p._isCornerDoorHandle || p._isCornerDoor ||
-        p._isGuestDoor || p._isGuestDoorHandle ||
-        p._isMacbook || p._isWindow || p._isWindowPane || p._isTV || p._isFoodBowl ||
-        p._isPickupSkateboard) return p;
+      p._isFilterL || p._isFilterR ||
+      p._isDrawer || p._isBifoldLeaf || p._isBypassPanel ||
+      p._isCornerDoorHandle || p._isCornerDoor ||
+      p._isGuestDoor || p._isGuestDoorHandle ||
+      p._isMacbook || p._isWindow || p._isWindowPane || p._isTV || p._isFoodBowl ||
+      p._isPickupSkateboard) return p;
   }
   return null;
 }
@@ -1378,8 +1388,8 @@ export function init(refs) {
   _scene = refs.scene;
   _placementOffset = refs.placementOffset || new THREE.Vector3();
   _purifierGroup = refs.purifierGroup || null;
-  _markShadowsDirty = refs.markShadowsDirty || (() => {});
-  _showToast = refs.showToast || (() => {});
+  _markShadowsDirty = refs.markShadowsDirty || (() => { });
+  _showToast = refs.showToast || (() => { });
   _roomRefs = refs.roomRefs || {};
   _purifierRefs = refs.purifierRefs || null;
 
@@ -1393,9 +1403,9 @@ export function init(refs) {
   _interactiveObjects = [];
   _scene.traverse(obj => {
     if (obj._isLamp || obj._isCeilLight || obj._isFan || obj._isFilterL || obj._isFilterR ||
-        obj._isDrawer || obj._isBifoldLeaf || obj._isBypassPanel || obj._isCornerDoorHandle || obj._isCornerDoor || obj._isWindow || obj._isWindowPane ||
-        obj._isMacbook || obj._isTV || obj._isFoodBowl ||
-        obj._isGuestDoor || obj._isGuestDoorHandle || obj._isPickupSkateboard) {
+      obj._isDrawer || obj._isBifoldLeaf || obj._isBypassPanel || obj._isCornerDoorHandle || obj._isCornerDoor || obj._isWindow || obj._isWindowPane ||
+      obj._isMacbook || obj._isTV || obj._isFoodBowl ||
+      obj._isGuestDoor || obj._isGuestDoorHandle || obj._isPickupSkateboard) {
       _interactiveObjects.push(obj);
     }
   });
@@ -1407,6 +1417,24 @@ export function init(refs) {
   _initSkateboard();
   _spawnPickupSkateboard();
   _syncSkateboardVisualState();
+}
+
+/**
+ * Pre-warm the Super Saiyan effect chain so first activation in a run
+ * doesn't cause a shader-recompile stutter.
+ *
+ * What causes the stutter: lazy-creating the SS PointLight adds an active
+ * light to the scene, which changes the WebGL shader light count and
+ * forces Three.js to recompile every PBR material's program. Same for the
+ * 12+ additive sparkle materials — each fresh material is a new shader
+ * key. Doing this work up-front while the scene is already idle avoids
+ * a 100–300ms hitch during gameplay.
+ *
+ * Call once after gameFp.init() and before the first frame.
+ */
+export function prewarmSuperSaiyan() {
+  _ensureSuperSaiyanAura();
+  _ensureSuperSaiyanEnvLight();
 }
 
 function _clearPointerLockRetry() {
@@ -1576,8 +1604,10 @@ function _buildStaticBoxes() {
     // After closet opening, before guest door
     { xMin: -(SIDE_WALL_X + 0.5), xMax: -SIDE_WALL_X, zMin: CLOSET_Z + CLOSET_W / 2, zMax: _guestDoorZmin, yTop: fy + WALL_HEIGHT, room: true },
     // Header above guest door (bedroom side, Z=34..49)
-    { xMin: -(SIDE_WALL_X + 0.5), xMax: -SIDE_WALL_X, zMin: _guestDoorZmin, zMax: 49,
-      yBottom: fy + _guestDoorH, yTop: fy + WALL_HEIGHT, room: true }
+    {
+      xMin: -(SIDE_WALL_X + 0.5), xMax: -SIDE_WALL_X, zMin: _guestDoorZmin, zMax: 49,
+      yBottom: fy + _guestDoorH, yTop: fy + WALL_HEIGHT, room: true
+    }
   );
 
   // ── Closet collision (exact match to monolith _fpBoxesBase) ──
@@ -1758,8 +1788,8 @@ function _buildStaticBoxes() {
     const bxW = 24, bxH = 5, bxD = 16;
     // Shoe box
     _staticBoxes.push({
-      xMin: -(bCX + bxW/2), xMax: -(bCX - bxW/2),
-      zMin: fZ - bxD/2, zMax: fZ + bxD/2,
+      xMin: -(bCX + bxW / 2), xMax: -(bCX - bxW / 2),
+      zMin: fZ - bxD / 2, zMax: fZ + bxD / 2,
       yTop: fy + bxH, yBottom: fy, room: true
     });
     // Feeder body + hopper (cylinder simplified as AABB)
@@ -1828,8 +1858,10 @@ function _buildStaticBoxes() {
     // Front face right of doorway (world X=-51..-47, Z=28.75..29.25)
     { xMin: -51, xMax: -47, zMin: 28.75, zMax: 29.25, yTop: fy + WALL_HEIGHT, room: true },
     // Header above door on extrusion front (Y=68..ceiling)
-    { xMin: -47, xMax: -15, zMin: 28.75, zMax: 29.25,
-      yBottom: fy + 68, yTop: fy + WALL_HEIGHT, room: true }
+    {
+      xMin: -47, xMax: -15, zMin: 28.75, zMax: 29.25,
+      yBottom: fy + 68, yTop: fy + WALL_HEIGHT, room: true
+    }
   );
 
   // ── Back wall solid flanks at Z=49 (around the 40" hallway opening) ──
@@ -1852,8 +1884,10 @@ function _buildStaticBoxes() {
     // Segment after doorway (Z=66..289)
     { xMin: -51.5, xMax: -51, zMin: 66, zMax: hzEnd, yTop: fy + WALL_HEIGHT, room: true },
     // Header above guest doorway (Y=68..ceiling, Z=49..66)
-    { xMin: -51.5, xMax: -51, zMin: hzStart, zMax: 66,
-      yBottom: fy + 68, yTop: fy + WALL_HEIGHT, room: true },
+    {
+      xMin: -51.5, xMax: -51, zMin: hzStart, zMax: 66,
+      yBottom: fy + 68, yTop: fy + WALL_HEIGHT, room: true
+    },
     // End wall at Z=_hallZEnd
     { xMin: -51.5, xMax: -10.5, zMin: hzEnd, zMax: hzEnd + 0.5, yTop: fy + WALL_HEIGHT, room: true }
   );
@@ -1979,14 +2013,14 @@ function _buildStaticBoxes() {
     // ledge as plain AABBs.
     const sillY = gwB - 36;                   // yard sits 3 ft below window sill
     const dropStartX = gXmax + 0.5;           // 183.5
-    const dropEndX   = 255;
-    const dropDY     = -18;                   // gentle 14° drop
-    const flatY      = sillY + dropDY;
-    const flatEndX   = 375;
-    const incEndX    = 411;
-    const incDY      = 12;                    // gentle 18° incline
-    const roadY      = flatY + incDY;
-    const roadEndX   = 543;
+    const dropEndX = 255;
+    const dropDY = -18;                   // gentle 14° drop
+    const flatY = sillY + dropDY;
+    const flatEndX = 375;
+    const incEndX = 411;
+    const incDY = 12;                    // gentle 18° incline
+    const roadY = flatY + incDY;
+    const roadEndX = 543;
 
     // Wide terrain Z extent — matches the visual lawn (±300" centered on the
     // window) so the boundary walls line up with the grass edges.
@@ -2553,7 +2587,7 @@ function _respawn() {
   _isJumping = false;
   _coyoteFrames = 0;
   _jumpBufferFrames = 0;
-  _spaceWasDown = false;  _lastPhysicsTs = 0;
+  _spaceWasDown = false; _lastPhysicsTs = 0;
   _wallContactNx = 0; _wallContactNz = 0; _wallJumpCooldown = 0; _preCollisionSpd = 0; _consecutiveWallJumps = 0; _skateBoostAccum = 0;
   fpPaused = false;
   _ssFullChargeSinceTs = 0;
@@ -2579,7 +2613,7 @@ function _resetWorldState() {
   if (_roomRefs) {
     if (typeof _roomRefs.toggleCornerDoor === 'function') _roomRefs.toggleCornerDoor(false);
     if (typeof _roomRefs.toggleGuestDoor === 'function') _roomRefs.toggleGuestDoor(false);
-    if (typeof _roomRefs.toggleGuestDoor  === 'function') _roomRefs.toggleGuestDoor(false);
+    if (typeof _roomRefs.toggleGuestDoor === 'function') _roomRefs.toggleGuestDoor(false);
   }
   // Filter / drawer collision boxes are cached; force a rebuild.
   _purifierBoxesDirtyFlag = true;
@@ -2828,21 +2862,21 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   // let you still jump for a moment after stepping off; the jump buffer
   // remembers a press right before landing so you don't lose presses.
   // Asymmetric gravity (snappier fall) is below in the gravity section.
-  const JUMP_BASE_VY         = 0.40;  // power on a near-zero-charge release
-  const JUMP_MAX_BONUS       = 0.80;  // extra power at full charge (100%)
-  const JUMP_MEGA_BONUS      = 0.40;  // extra on top when holding past full (~150%)
-  const JUMP_CHARGE_FRAMES   = 36;    // frames to reach full charge (~0.6s)
-  const MEGA_HOLD_FRAMES     = 30;    // ~0.5s hold at full before MEGA bonus kicks in
-  const SS_JUMP_MUL          = isSuperSaiyanActive() ? 1.5 : 1.0; // SS mode: 1.5x jump height
-  const COYOTE_FRAMES        = 6;     // grace frames after walking off a ledge
-  const JUMP_BUFFER_FRAMES   = 8;     // grace frames for a press just before landing
-  const GRAVITY_RISE         = 0.018; // gravity while ascending
-  const GRAVITY_FALL         = 0.028; // stronger gravity while falling — snappier feel
-  const WALL_JUMP_VY_MIN     = 0.85;  // vertical boost at zero speed
-  const WALL_JUMP_VY_MAX     = 1.35;  // vertical boost at full sprint into wall
-  const WALL_JUMP_PUSH_MIN   = 0.30;  // horizontal push at zero speed
-  const WALL_JUMP_PUSH_MAX   = 0.75;  // horizontal push at full sprint
-  const WALL_JUMP_COOLDOWN   = 18;    // frames between wall jumps (anti-spam)
+  const JUMP_BASE_VY = 0.40;  // power on a near-zero-charge release
+  const JUMP_MAX_BONUS = 0.80;  // extra power at full charge (100%)
+  const JUMP_MEGA_BONUS = 0.40;  // extra on top when holding past full (~150%)
+  const JUMP_CHARGE_FRAMES = 36;    // frames to reach full charge (~0.6s)
+  const MEGA_HOLD_FRAMES = 30;    // ~0.5s hold at full before MEGA bonus kicks in
+  const SS_JUMP_MUL = isSuperSaiyanActive() ? 1.5 : 1.0; // SS mode: 1.5x jump height
+  const COYOTE_FRAMES = 6;     // grace frames after walking off a ledge
+  const JUMP_BUFFER_FRAMES = 8;     // grace frames for a press just before landing
+  const GRAVITY_RISE = 0.018; // gravity while ascending
+  const GRAVITY_FALL = 0.028; // stronger gravity while falling — snappier feel
+  const WALL_JUMP_VY_MIN = 0.85;  // vertical boost at zero speed
+  const WALL_JUMP_VY_MAX = 1.35;  // vertical boost at full sprint into wall
+  const WALL_JUMP_PUSH_MIN = 0.30;  // horizontal push at zero speed
+  const WALL_JUMP_PUSH_MAX = 0.75;  // horizontal push at full sprint
+  const WALL_JUMP_COOLDOWN = 18;    // frames between wall jumps (anti-spam)
   const WALL_JUMP_GRAV_EXTRA = 0.55;  // extra gravity multiplier per consecutive wall jump
 
   // Grounded gate matches the old vy≈0 check; _wasGroundedLast is set at the
@@ -3410,7 +3444,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       const manualTarget = (skateMode && _trickManualHeld) ? 1 : 0;
       _trickManual += (manualTarget - _trickManual) * easeAlpha(10, dtSec);
       if (_trickManual < 0.001) _trickManual = 0;
-      const manualAngle = _trickManual * 0.32;
+      const manualAngle = _trickManual * 0.6;
 
       // Compose catGroup orientation via quaternion to avoid Euler gimbal
       // issues when combining yaw + lean + manual pitch.
@@ -3437,7 +3471,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
         // ── Kickflip trick (Q) — board rolls 360° ──────────────────
         if (_trickKickflipActive) {
-          _trickKickflip += dtSec / 0.4;
+          _trickKickflip += dtSec / 0.55;
           if (_trickKickflip >= 1) { _trickKickflip = 0; _trickKickflipActive = false; }
         }
         if (_trickKickflipActive) {
@@ -3451,6 +3485,13 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       // Lift catGroup during manual so the board tail doesn't clip ground
       if (manualAngle > 0) {
         _catGroup.position.y += Math.sin(manualAngle) * 1.5;
+      }
+
+      // Hop arc during kickflip — lifts cat (and board, since the anchor is
+      // parented under catGroup) so the spinning board doesn't clip through
+      // the model and doesn't dip into the floor mid-rotation.
+      if (_trickKickflipActive) {
+        _catGroup.position.y += Math.sin(_trickKickflip * Math.PI) * 7.2;
       }
       _syncSkateboardVisualState();
     }
@@ -3580,11 +3621,18 @@ function _bindInputs() {
         _trickManualHeld = skateMode;
         break;
       case 'KeyF':
-        // Each press adds spin speed while airborne; cap at ~30 rev/s
+        // Each press adds spin speed while airborne, with diminishing
+        // returns: the faster you're already going, the less each tap adds.
+        // Cap at ~30 rev/s.
         if (skateMode && !_wasGroundedLast) {
-          const SPIN_ADD = Math.PI * 2;   // ~1 rev/s per press
-          const SPIN_CAP = Math.PI * 15;  // ~30 rev/s
-          _trickSpinSpeed = Math.min(_trickSpinSpeed + SPIN_ADD, SPIN_CAP);
+          const SPIN_BASE = Math.PI * 2.66; // ~1.33 rev/s base add
+          const SPIN_CAP  = Math.PI * 15;   // ~30 rev/s
+          // Falloff: 1.0 at rest → ~0.2 near cap. Quadratic feels better
+          // than linear here — early presses ramp quickly, later presses
+          // gently top off.
+          const ratio = Math.min(1, _trickSpinSpeed / SPIN_CAP);
+          const falloff = (1 - ratio) * (1 - ratio) * 0.8 + 0.2;
+          _trickSpinSpeed = Math.min(_trickSpinSpeed + SPIN_BASE * falloff, SPIN_CAP);
           _trickSpinBoost = true;
         }
         break;

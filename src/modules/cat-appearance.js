@@ -8,9 +8,9 @@ import { CAT_COLOR_PRESETS, CAT_HAIR_PRESETS, CAT_MODEL_PRESETS } from './consta
 
 // ── State ───────────────────────────────────────────────────────────
 
-export let catModelKey  = 'classic';
-export let catColorKey  = 'charcoal';
-export let catHairKey   = 'short';
+export let catModelKey = 'classic';
+export let catColorKey = 'charcoal';
+export let catHairKey = 'short';
 
 // ── Totodile unlock ─────────────────────────────────────────────────
 // Totodile is locked until the player beats the game (collects all the
@@ -26,7 +26,7 @@ export function isTotodileUnlocked() {
 export function setTotodileUnlocked(v) {
   try {
     if (v) localStorage.setItem(TOTODILE_UNLOCK_KEY, '1');
-    else   localStorage.removeItem(TOTODILE_UNLOCK_KEY);
+    else localStorage.removeItem(TOTODILE_UNLOCK_KEY);
   } catch (e) { /* private mode etc. */ }
 }
 /**
@@ -54,7 +54,7 @@ export function isBababooeyUnlocked() {
 export function setBababooeyUnlocked(v) {
   try {
     if (v) localStorage.setItem(BABABOOEY_UNLOCK_KEY, '1');
-    else   localStorage.removeItem(BABABOOEY_UNLOCK_KEY);
+    else localStorage.removeItem(BABABOOEY_UNLOCK_KEY);
   } catch (e) { /* private mode etc. */ }
 }
 /**
@@ -69,7 +69,7 @@ export function tryUnlockBababooey() {
 
 export function setCatModelKeyRaw(k) { catModelKey = k; }
 export function setCatColorKeyRaw(k) { catColorKey = k; }
-export function setCatHairKeyRaw(k)  { catHairKey = k; }
+export function setCatHairKeyRaw(k) { catHairKey = k; }
 
 // ── Sanitizers ──────────────────────────────────────────────────────
 
@@ -113,19 +113,19 @@ export function getSourcesForModelKey(key) {
 
 // ── Material caches (WeakMaps) ──────────────────────────────────────
 
-const _baseColorMap     = new WeakMap();
+const _baseColorMap = new WeakMap();
 const _baseRoughnessMap = new WeakMap();
 const _baseBumpScaleMap = new WeakMap();
-const _baseEmissiveMap  = new WeakMap();
+const _baseEmissiveMap = new WeakMap();
 const _baseEmissiveIMap = new WeakMap();
 const _boneBaseScaleMap = new WeakMap();
 
 // Scratch objects
-const _tmpA   = new THREE.Color();
-const _tmpB   = new THREE.Color();
-const _tmpC   = new THREE.Color();
+const _tmpA = new THREE.Color();
+const _tmpB = new THREE.Color();
+const _tmpC = new THREE.Color();
 const _tmpHSL = { h: 0, s: 0, l: 0 };
-const _tmpHSLB= { h: 0, s: 0, l: 0 };
+const _tmpHSLB = { h: 0, s: 0, l: 0 };
 const _furTint = new THREE.Color();
 
 // ── Texture recoloring cache ────────────────────────────────────────
@@ -159,7 +159,7 @@ export function recolorFurTexture(srcTex, coatHex) {
     tmpCol.getHSL(tmpH);
     if (tmpH.l > 0.05 && tmpH.l < 0.97) {
       tmpCol.setHSL(tHSL.h, tHSL.s, tmpH.l);
-      d[i]     = Math.round(tmpCol.r * 255);
+      d[i] = Math.round(tmpCol.r * 255);
       d[i + 1] = Math.round(tmpCol.g * 255);
       d[i + 2] = Math.round(tmpCol.b * 255);
     }
@@ -205,13 +205,13 @@ export function getFurNoiseTexture() {
 export function ensureFurShader(mat) {
   if (!mat) return;
   mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uCatFurAmount  = { value: Number(mat.userData._catFurAmount) || 0 };
-    shader.uniforms.uCatFurTint    = { value: new THREE.Color(Number(mat.userData._catFurTintHex) || 0xffffff) };
-    shader.uniforms.uCatCoatTint   = { value: new THREE.Color(Number(mat.userData._catCoatTintHex) || 0xffffff) };
+    shader.uniforms.uCatFurAmount = { value: Number(mat.userData._catFurAmount) || 0 };
+    shader.uniforms.uCatFurTint = { value: new THREE.Color(Number(mat.userData._catFurTintHex) || 0xffffff) };
+    shader.uniforms.uCatCoatTint = { value: new THREE.Color(Number(mat.userData._catCoatTintHex) || 0xffffff) };
     shader.uniforms.uCatCoatAmount = { value: Number(mat.userData._catCoatAmount) || 0 };
-    shader.uniforms.uCatCowAmount  = { value: Number(mat.userData._catCowAmount) || 0 };
-    shader.uniforms.uCatCowColor1  = { value: new THREE.Color(Number(mat.userData._catCowColor1) || 0x333333) };
-    shader.uniforms.uCatCowColor2  = { value: new THREE.Color(Number(mat.userData._catCowColor2) || 0xeeeeee) };
+    shader.uniforms.uCatCowAmount = { value: Number(mat.userData._catCowAmount) || 0 };
+    shader.uniforms.uCatCowColor1 = { value: new THREE.Color(Number(mat.userData._catCowColor1) || 0x333333) };
+    shader.uniforms.uCatCowColor2 = { value: new THREE.Color(Number(mat.userData._catCowColor2) || 0xeeeeee) };
 
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', [
@@ -279,8 +279,8 @@ export function applyHairToBones(model, hairCfg) {
 export function applyAppearanceToModel(model, baseScale) {
   if (!model) return;
   const colorCfg = CAT_COLOR_PRESETS[sanitizeColorKey(catColorKey)] || CAT_COLOR_PRESETS.charcoal;
-  const hairCfg  = CAT_HAIR_PRESETS[sanitizeHairKey(catHairKey)] || CAT_HAIR_PRESETS.short;
-  const isToon   = isToonSource(getModelSource(model));
+  const hairCfg = CAT_HAIR_PRESETS[sanitizeHairKey(catHairKey)] || CAT_HAIR_PRESETS.short;
+  const isToon = isToonSource(getModelSource(model));
   const colorable = isColorable(catModelKey);
 
   model.scale.set(baseScale.x * hairCfg.sx, baseScale.y * hairCfg.sy, baseScale.z * hairCfg.sz);
@@ -288,6 +288,7 @@ export function applyAppearanceToModel(model, baseScale) {
 
   model.traverse(o => {
     if (!o.isMesh || !o.material) return;
+    o.castShadow = false;
     const meshName = String(o.name || '').toLowerCase();
     const mats = Array.isArray(o.material) ? o.material : [o.material];
 
@@ -302,11 +303,11 @@ export function applyAppearanceToModel(model, baseScale) {
       if (!_baseEmissiveMap.has(m)) _baseEmissiveMap.set(m, (m.emissive && m.emissive.isColor) ? m.emissive.clone() : new THREE.Color(0));
       if (!_baseEmissiveIMap.has(m)) _baseEmissiveIMap.set(m, Number(m.emissiveIntensity) || 0);
 
-      const baseCol   = _baseColorMap.get(m);
+      const baseCol = _baseColorMap.get(m);
       const baseRough = _baseRoughnessMap.get(m);
-      const baseBump  = _baseBumpScaleMap.get(m);
-      const baseEmi   = _baseEmissiveMap.get(m);
-      const baseEmiI  = _baseEmissiveIMap.get(m);
+      const baseBump = _baseBumpScaleMap.get(m);
+      const baseEmi = _baseEmissiveMap.get(m);
+      const baseEmiI = _baseEmissiveIMap.get(m);
 
       const isDetail = /(eye|pupil|nose|mouth|tongue|tooth|teeth|whisker|inner|ear)/.test(meshName + ' ' + matName);
 

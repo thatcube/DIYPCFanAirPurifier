@@ -54,7 +54,7 @@ export function windowBeamCurve(minuteOfDay) {
 
 // ── Color constants ─────────────────────────────────────────────────
 
-const GOLDEN_KEY  = 0xffddaa;
+const GOLDEN_KEY = 0xffddaa;
 
 // ── Lights ──────────────────────────────────────────────────────────
 // Exported so other modules can reference them (e.g., game mode
@@ -70,14 +70,14 @@ export let tvGlow;       // TV screen glow
 export let moonGlow;     // moonlight through window at night
 
 // Stubs for removed fill/rim/bounce (kept for compat)
-export const fill   = { intensity: 0, position: { set() {} }, visible: false };
-export const rim    = { intensity: 0, position: { set() {} }, visible: false };
-export const bounce = { intensity: 0, position: { set() {} }, visible: false };
+export const fill = { intensity: 0, position: { set() { } }, visible: false };
+export const rim = { intensity: 0, position: { set() { } }, visible: false };
+export const bounce = { intensity: 0, position: { set() { } }, visible: false };
 
 export const ROOM_LIGHT_BASE = {
-  fill:   { x: -10, y: 12, z: -12 },
-  rim:    { x: -6,  y: 15, z: -18 },
-  bounce: { x: 0,   y: -10, z: 8 }
+  fill: { x: -10, y: 12, z: -12 },
+  rim: { x: -6, y: 15, z: -18 },
+  bounce: { x: 0, y: -10, z: 8 }
 };
 
 export let isNightMode = false;
@@ -103,7 +103,7 @@ export function createLights(isMobile) {
   key.shadow.bias = -0.0005;
   key.shadow.normalBias = 0.04;
   key.shadow.radius = isMobile ? 5 : 8;
-  key.shadow.blurSamples = isMobile ? 8 : 16;
+  key.shadow.blurSamples = 8;
   key.shadow.camera.near = 1;
   key.shadow.camera.far = 350;
   key.shadow.camera.left = -120;
@@ -208,10 +208,10 @@ export function createMoonGlow(leftWallX, winCenterY, winCenterZ) {
  *     _markShadowsDirty }
  */
 export function applyTimeOfDay(minuteOfDay, refs) {
-  const sun  = sunCurve(minuteOfDay);
+  const sun = sunCurve(minuteOfDay);
   const warm = warmthCurve(minuteOfDay);
   const beam = windowBeamCurve(minuteOfDay);
-  const h    = minuteOfDay / 60;
+  const h = minuteOfDay / 60;
   const dayTravel = Math.max(0, Math.min(1, (h - 6.0) / (17.0 - 6.0)));
 
   isNightMode = sun < 0.3;
@@ -329,8 +329,8 @@ export function applyTimeOfDay(minuteOfDay, refs) {
 
 export function formatTime(minutes) {
   const h24 = Math.floor(minutes / 60) % 24;
-  const mn  = Math.floor(minutes % 60);
+  const mn = Math.floor(minutes % 60);
   const ampm = h24 >= 12 ? 'PM' : 'AM';
-  const h12  = h24 % 12 || 12;
+  const h12 = h24 % 12 || 12;
   return h12 + ':' + (mn < 10 ? '0' : '') + mn + ' ' + ampm;
 }
