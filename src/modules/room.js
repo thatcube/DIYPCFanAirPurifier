@@ -4037,12 +4037,13 @@ export function createRoom(scene) {
       const topH = 0.22;   // top cover thickness
       const spineThick = 0.55; // spine bulges this far past the body in -X
 
-      // Tucked into the headboard/window corner under the bed (door-wall side).
-      const binderX = bedX - 22;       // pre-mirror; near window-side rail
+      // Tucked into the headboard/door-wall side under the bed, ~1 foot
+      // closer to the room center than the deep corner.
+      const binderX = bedX - 10;       // pre-mirror; ~12u closer to center post-mirror
       const binderZ = bedZ + 32;       // headboard/door-wall side
       const binderRoot = new THREE.Group();
       binderRoot.position.set(binderX, underBedY, binderZ);
-      binderRoot.rotation.y = -2 * Math.PI / 3; // ~120° (mirror flips sign)
+      binderRoot.rotation.y = -50 * Math.PI / 180; // ~50° (mirror flips sign)
       binderRoot._isRoom = true;       // X-mirror flips its position only
       binderRoot._isPokemonBinder = true; // makes any descendant clickable
       // NOTE: children below are NOT _isRoom — they ride along in local frame
