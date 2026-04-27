@@ -7,3 +7,4 @@ dist/
 .esphome/
 .claude/worktrees/
 CLAUDE.md
+.DS_Store
