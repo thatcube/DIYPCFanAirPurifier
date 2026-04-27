@@ -4040,7 +4040,7 @@ export function createRoom(scene) {
       // Tucked into the headboard/door-wall side under the bed, near the
       // window-side rail.
       const binderX = bedX - 11;       // pre-mirror; nudged toward window wall
-      const binderZ = bedZ + 16;       // nudged toward TV wall
+      const binderZ = bedZ + 22;       // nudged back toward door/headboard wall
       const binderRoot = new THREE.Group();
       binderRoot.position.set(binderX, underBedY, binderZ);
       binderRoot.rotation.y = 130 * Math.PI / 180; // -50° + 180° (mirror flips sign)
