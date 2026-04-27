@@ -1977,7 +1977,7 @@ export function createRoom(scene) {
       const field = new THREE.Mesh(
         new THREE.BoxGeometry(fieldSize, 2, fieldSize),
         _makeGrassMat(fieldSize, fieldSize));
-      field.position.set(fieldCenterX, flatY - 0.05, fieldCenterZ);
+      field.position.set(fieldCenterX, flatY - 1, fieldCenterZ);
       field.receiveShadow = true;
       field._isRoom = true; field._isGuestRoom = true;
       addRoom(field);
@@ -1991,7 +1991,7 @@ export function createRoom(scene) {
       const skirtMat = new THREE.MeshStandardMaterial({
         color: 0xa8a298, roughness: 0.95, metalness: 0,
       });
-      const skirtTopY = floorY;
+      const skirtTopY = floorY - 1;
       const skirtBotY = flatY - 30;
       const skirtH = skirtTopY - skirtBotY;
       const skirtCenterY = (skirtTopY + skirtBotY) / 2;
@@ -4020,83 +4020,11 @@ export function createRoom(scene) {
   duvet.castShadow = true; duvet.receiveShadow = true; duvet._isRoom = true;
   addRoom(duvet);
 
-  // ── Items under the bed (partially hiding the coin) ────────────────
+  // ── Items under the bed ────────────────────────────────────────────
   {
     const underBedY = floorY;
-    const itemX = bedX + 5; // slightly off-center
-    const itemZ = bedZ + 4; // near coin
 
-    // Helper: load SVG to canvas for texture
-    function loadSvgTex(url, size, cb) {
-      const img = new Image();
-      img.onload = () => {
-        const c = document.createElement('canvas');
-        c.width = size; c.height = size;
-        c.getContext('2d').drawImage(img, 0, 0, size, size);
-        cb(new THREE.CanvasTexture(c));
-      };
-      img.crossOrigin = 'anonymous';
-      img.src = url;
-    }
-
-    // 1. Microsoft Surface laptop box — clean white box with MS logo
-    {
-      const boxW = 16, boxD = 12, boxH = 2.5;
-      const boxMat = new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.3, metalness: 0.05 });
-      const surfBox = new THREE.Mesh(new THREE.BoxGeometry(boxW, boxH, boxD), boxMat);
-      surfBox.position.set(itemX, underBedY + boxH / 2 + 0.1, itemZ);
-      surfBox.rotation.y = 0.15;
-      surfBox.castShadow = true; surfBox.receiveShadow = true; surfBox._isRoom = true;
-      addRoom(surfBox);
-      // Microsoft logo on top (async — added after mirror pass, so use post-mirror coords)
-      loadSvgTex('img/Microsoft_logo.svg', 256, (tex) => {
-        const logo = new THREE.Mesh(
-          new THREE.PlaneGeometry(6, 3),
-          new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.3 })
-        );
-        logo.rotation.x = -Math.PI / 2;
-        logo.position.set(-itemX, underBedY + boxH + 0.12, itemZ);
-        logo.rotation.z = -0.15;
-        logo._isRoom = true;
-        scene.add(logo);
-      });
-    }
-
-    // 2. Power BI notebook/binder — dark yellow-gold cover
-    {
-      const nbW = 10, nbD = 7.5, nbH = 0.8;
-      const nbMat = new THREE.MeshStandardMaterial({ color: 0xf2c811, roughness: 0.6, metalness: 0.05 });
-      const notebook = new THREE.Mesh(new THREE.BoxGeometry(nbW, nbH, nbD), nbMat);
-      // Lean it against the Surface box at an angle
-      notebook.position.set(itemX + 8, underBedY + nbH / 2 + 0.1, itemZ - 1);
-      notebook.rotation.y = -0.3;
-      notebook.rotation.z = 0.08; // slight tilt
-      notebook.castShadow = true; notebook.receiveShadow = true; notebook._isRoom = true;
-      addRoom(notebook);
-      // Power BI logo on top (async — post-mirror coords)
-      loadSvgTex('img/Power_BI_Logo.svg', 256, (tex) => {
-        const logo = new THREE.Mesh(
-          new THREE.PlaneGeometry(4, 4),
-          new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.5 })
-        );
-        logo.rotation.x = -Math.PI / 2;
-        logo.position.set(-(itemX + 8), underBedY + nbH + 0.12, itemZ - 1);
-        logo.rotation.z = 0.3;
-        logo._isRoom = true;
-        scene.add(logo);
-      });
-      // Spine detail (darker edge)
-      const spine = new THREE.Mesh(
-        new THREE.BoxGeometry(0.3, nbH + 0.1, nbD),
-        new THREE.MeshStandardMaterial({ color: 0xc9a00e, roughness: 0.5 })
-      );
-      spine.position.set(itemX + 8 - nbW / 2 - 0.15, underBedY + nbH / 2 + 0.1, itemZ - 1);
-      spine.rotation.y = -0.3;
-      spine._isRoom = true;
-      addRoom(spine);
-    }
-
-    // 3. Pokémon card binder — childhood binder with cover/spine art.
+    // Pokémon card binder — childhood binder with cover/spine art.
     // Click anywhere on it to open; first open spawns the secret blue coin.
     {
       const W = 14;        // body width along local X
@@ -4107,10 +4035,10 @@ export function createRoom(scene) {
       const topH = 0.22;   // top cover thickness
       const spineThick = 0.55; // spine bulges this far past the body in -X
 
-      // Place far foot-side under the bed so it's visible from the front of
-      // the room (the existing under-bed items sit toward the headboard end).
-      const binderX = bedX - 4;        // pre-mirror; offset from bed center
-      const binderZ = bedZ - 22;       // foot side, away from items above
+      // Push deeper under the bed (toward the window wall) so it's mostly
+      // tucked out of sight but still readable from the room interior.
+      const binderX = bedX - 16;       // pre-mirror; further under bed
+      const binderZ = bedZ - 22;       // foot side
       const binderRoot = new THREE.Group();
       binderRoot.position.set(binderX, underBedY, binderZ);
       binderRoot.rotation.y = 0.18;    // slight tilt; mirror flips sign — fine
@@ -4259,7 +4187,7 @@ export function createRoom(scene) {
           binderState.coinSpawned = true;
           // World-space spawn point above the open binder.
           binderRoot.updateMatrixWorld(true);
-          coinPos = new THREE.Vector3(0, totalH + 7, 0).applyMatrix4(binderRoot.matrixWorld);
+          coinPos = new THREE.Vector3(0, totalH + 2.2, 0).applyMatrix4(binderRoot.matrixWorld);
         }
         if (!binderState.animTimer) binderState.animTimer = requestAnimationFrame(_step);
         return { opened: binderState.open, coinPos };
