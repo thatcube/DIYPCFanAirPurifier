@@ -1566,6 +1566,20 @@ export function createRoom(scene) {
     wr.castShadow = true; wr.receiveShadow = true;
     wr._isRoom = true; wr._isGuestRoom = true; addRoom(wr);
   }
+  // Outer "front of house" wall — extends the office front wall in +Z all
+  // the way to the end of the hallway, giving the property a continuous
+  // exterior face when looking out the office window. Solid (no openings).
+  {
+    const extZmin = grWallZmax;             // 69.5 (where office front wall ends)
+    const extZmax = _hallZEnd + 0.5;        // 289.5 (matches hallway end-cap)
+    const extLen = extZmax - extZmin;
+    const ext = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, _grHeight, extLen), grWallMat);
+    ext.position.set(grFrontWallX, floorY + _grHeight / 2, (extZmin + extZmax) / 2);
+    ext.castShadow = true; ext.receiveShadow = true;
+    ext._isRoom = true; ext._isGuestRoom = true;
+    addRoom(ext);
+  }
   // LEFT wall (+Z, right next to the door trim when entering).
   {
     const w = new THREE.Mesh(
@@ -1579,8 +1593,8 @@ export function createRoom(scene) {
   }
   // Gyarados painting — framed art hung on the LEFT wall (+Z), centered
   // horizontally on the wall and slightly above eye level. Source image
-  // is 960×1472 (portrait, ~2:3). Photo sits inside a white matte (20%
-  // of the photo's dimensions on each side), then a dark wood frame.
+  // is 960×1472 (portrait, ~2:3). Matte and photo sit flat against the
+  // wall; the wood frame is a raised lip around them.
   {
     const photoW = 14;
     const photoH = 21.47;           // matches source 960:1472 aspect ratio
@@ -1588,26 +1602,56 @@ export function createRoom(scene) {
     const matteMarginY = photoH * 0.20;
     const matteW = photoW + matteMarginX * 2;
     const matteH = photoH + matteMarginY * 2;
-    const frameBorder = 1.25;       // wood frame thickness around the matte
-    const frameDepth = 1.0;         // how far the frame protrudes off the wall
+    const frameBorder = 1.25;       // wood lip thickness on each side
+    const lipDepth = 0.6;           // how far the lip protrudes off the wall
     const centerX = _grCenterX;
     const centerY = floorY + 50;    // natural hang height
     const wallFaceZ = _grZmax;      // interior face of the LEFT wall
 
-    // Frame — dark wood box, back flush with the wall surface.
     const frameMat = new THREE.MeshStandardMaterial({
       color: 0x2b1d12, roughness: 0.55, metalness: 0.05,
     });
-    const frame = new THREE.Mesh(
-      new THREE.BoxGeometry(matteW + frameBorder * 2, matteH + frameBorder * 2, frameDepth),
-      frameMat
-    );
-    frame.position.set(centerX, centerY, wallFaceZ - frameDepth / 2);
-    frame.castShadow = true; frame.receiveShadow = true;
-    frame._isRoom = true; frame._isGuestRoom = true;
-    addRoom(frame);
+    // Four lip pieces forming a picture-frame border. Back face flush with
+    // the wall; front face protrudes by lipDepth toward the room (-Z).
+    const lipZ = wallFaceZ - lipDepth / 2;
+    // Top lip
+    {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(matteW + frameBorder * 2, frameBorder, lipDepth),
+        frameMat);
+      m.position.set(centerX, centerY + matteH / 2 + frameBorder / 2, lipZ);
+      m.castShadow = true; m.receiveShadow = true;
+      m._isRoom = true; m._isGuestRoom = true; addRoom(m);
+    }
+    // Bottom lip
+    {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(matteW + frameBorder * 2, frameBorder, lipDepth),
+        frameMat);
+      m.position.set(centerX, centerY - matteH / 2 - frameBorder / 2, lipZ);
+      m.castShadow = true; m.receiveShadow = true;
+      m._isRoom = true; m._isGuestRoom = true; addRoom(m);
+    }
+    // -X lip
+    {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(frameBorder, matteH, lipDepth),
+        frameMat);
+      m.position.set(centerX - matteW / 2 - frameBorder / 2, centerY, lipZ);
+      m.castShadow = true; m.receiveShadow = true;
+      m._isRoom = true; m._isGuestRoom = true; addRoom(m);
+    }
+    // +X lip
+    {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(frameBorder, matteH, lipDepth),
+        frameMat);
+      m.position.set(centerX + matteW / 2 + frameBorder / 2, centerY, lipZ);
+      m.castShadow = true; m.receiveShadow = true;
+      m._isRoom = true; m._isGuestRoom = true; addRoom(m);
+    }
 
-    // White matte — fills the inside of the frame, facing into the room (-Z).
+    // White matte — sits ~0.05" off the wall, fills the inside of the lip.
     const matteMat = new THREE.MeshStandardMaterial({
       color: 0xf5f1e8, roughness: 0.95, metalness: 0.0,
     });
@@ -1616,13 +1660,13 @@ export function createRoom(scene) {
       matteMat
     );
     matte.rotation.y = Math.PI;
-    matte.position.set(centerX, centerY, wallFaceZ - frameDepth - 0.02);
+    matte.position.set(centerX, centerY, wallFaceZ - 0.05);
     matte.receiveShadow = true;
     matte._isRoom = true; matte._isGuestRoom = true;
     addRoom(matte);
 
-    // Photo — smaller plane in front of the matte; matte border shows
-    // around all four sides as a uniform white margin.
+    // Photo — smaller plane just in front of the matte; matte border
+    // shows around all four sides as a uniform white margin.
     const photoMat = new THREE.MeshStandardMaterial({
       color: 0xffffff, roughness: 0.85, metalness: 0.0,
     });
@@ -1631,7 +1675,7 @@ export function createRoom(scene) {
       photoMat
     );
     photo.rotation.y = Math.PI;
-    photo.position.set(centerX, centerY, wallFaceZ - frameDepth - 0.04);
+    photo.position.set(centerX, centerY, wallFaceZ - 0.07);
     photo.receiveShadow = true;
     photo._isRoom = true; photo._isGuestRoom = true;
     addRoom(photo);
@@ -1647,6 +1691,30 @@ export function createRoom(scene) {
       undefined,
       () => { /* fall back to blank photo if missing */ }
     );
+
+    // Glass-like sheen — overlay the photo+matte with reflective highlights
+    // without refracting the image (which caused noticeable blur at any
+    // distance). MeshPhysicalMaterial w/ clearcoat=1 gives a sharp glossy
+    // top layer; opacity is very low so the underlying photo stays crisp
+    // and only environment reflections "shine" through.
+    const sheenMat = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      roughness: 1.0,
+      metalness: 0.0,
+      transparent: true,
+      opacity: 0.06,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.05,
+      envMapIntensity: 1.6,
+    });
+    const sheen = new THREE.Mesh(
+      new THREE.PlaneGeometry(matteW, matteH),
+      sheenMat
+    );
+    sheen.rotation.y = Math.PI;
+    sheen.position.set(centerX, centerY, wallFaceZ - 0.09);
+    sheen._isRoom = true; sheen._isGuestRoom = true;
+    addRoom(sheen);
   }
 
   // TV wall extension — continues the bedroom's oppWall (Z=oppWallZ) from
@@ -1719,9 +1787,9 @@ export function createRoom(scene) {
   // ─── Outdoor terrain (beyond office front wall) ──────────────────
   // Accessible when the office window is open. Pre-mirror +X extends
   // beyond the front wall at X=183.
-  //   Drop slope:  183.5 → 255  (6 ft down ~48")
+  //   Drop slope:  183.5 → 255  (6 ft, gentle 18" drop)
   //   Flat grass:  255   → 375  (10 ft flat)
-  //   Incline:     375   → 411  (3 ft up ~36")
+  //   Incline:     375   → 411  (3 ft up 12")
   //   Road:        411   → 543  (11 ft flat)
   // Z extent: 200" centered on grWinCenterZ.
   {
@@ -1731,38 +1799,83 @@ export function createRoom(scene) {
     const terrainZw = terrainZmax - terrainZmin;
     const terrainZcenter = grWinCenterZ;
 
-    // Y reference: window sill = grWinBottom = floorY + 23
-    // Outdoor ground starts at sill level, drops 48" over 72"
-    const sillY = grWinBottom;         // floorY + 23
+    // Y reference: window sill = grWinBottom = floorY + 23.
+    // Gentle slopes — earlier the drop was 48" / 71.5" (~34°) and the incline
+    // was 36" / 36" (45°), which read as obvious tilted blocks from inside.
+    // Reduced to ~14° drop and ~18° incline for a more natural yard.
+    // Yard sits ~3 ft below the window sill so the view out the office
+    // window looks down onto the lawn rather than straight across it.
+    const sillY = grWinBottom - 36;    // (floorY + 23) - 36
     const dropStartX = _grXmax + 0.5;  // 183.5
     const dropEndX = 255;
     const dropStartY = sillY;
-    const dropEndY = sillY - 48;     // floorY - 25
+    const dropEndY = sillY - 18;
     const flatStartX = dropEndX;
     const flatEndX = 375;
     const flatY = dropEndY;
     const incStartX = flatEndX;
     const incEndX = 411;
     const incStartY = flatY;
-    const incEndY = flatY + 36;     // floorY + 11
+    const incEndY = flatY + 12;
     const roadStartX = incEndX;
     const roadEndX = 543;
     const roadY = incEndY;
 
-    const grassMat = new THREE.MeshStandardMaterial({ color: 0x4a8a3a, roughness: 0.9, metalness: 0 });
+    // Procedural grass texture — base green with stippled shades and short
+    // blade strokes. Tiled per-slab so each terrain piece reads as grass
+    // rather than a flat green block.
+    const _grassCanvas = document.createElement('canvas');
+    _grassCanvas.width = 256;
+    _grassCanvas.height = 256;
+    {
+      const ctx = _grassCanvas.getContext('2d');
+      ctx.fillStyle = '#4a8a3a';
+      ctx.fillRect(0, 0, 256, 256);
+      for (let i = 0; i < 1400; i++) {
+        const x = Math.random() * 256, y = Math.random() * 256;
+        const s = Math.floor(Math.random() * 50 - 25);
+        ctx.fillStyle = `rgb(${74 + s},${138 + s},${58 + s})`;
+        ctx.fillRect(x, y, 1 + Math.random() * 3, 1 + Math.random() * 3);
+      }
+      for (let i = 0; i < 700; i++) {
+        const x = Math.random() * 256, y = Math.random() * 256;
+        const len = 3 + Math.random() * 5;
+        const s = Math.floor(Math.random() * 60 - 20);
+        ctx.strokeStyle = `rgb(${50 + s},${110 + s},${40 + s})`;
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + (Math.random() - 0.5) * 2, y - len);
+        ctx.stroke();
+      }
+    }
+    const _grassBaseTex = new THREE.CanvasTexture(_grassCanvas);
+    _grassBaseTex.wrapS = _grassBaseTex.wrapT = THREE.RepeatWrapping;
+    _grassBaseTex.anisotropy = 4;
+    function _makeGrassMat(uLen, vLen) {
+      // ~24" per tile keeps blade scale consistent across slab sizes.
+      const tex = _grassBaseTex.clone();
+      tex.needsUpdate = true;
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(Math.max(1, uLen / 24), Math.max(1, vLen / 24));
+      return new THREE.MeshStandardMaterial({
+        map: tex, color: 0xffffff, roughness: 0.95, metalness: 0,
+      });
+    }
+
     const roadMat = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.85, metalness: 0 });
     const curbMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.7, metalness: 0 });
 
     // ── Drop slope (rotated slab) ─────────────────────────────────
     {
       const dx = dropEndX - dropStartX;                    // 71.5
-      const dy = dropEndY - dropStartY;                    // -48
-      const len = Math.sqrt(dx * dx + dy * dy);            // ~86
+      const dy = dropEndY - dropStartY;                    // -18
+      const len = Math.sqrt(dx * dx + dy * dy);
       const angle = Math.atan2(dy, dx);                    // negative (downhill)
       const cx = (dropStartX + dropEndX) / 2;
       const cy = (dropStartY + dropEndY) / 2;
       const slab = new THREE.Mesh(
-        new THREE.BoxGeometry(len, 2, terrainZw), grassMat);
+        new THREE.BoxGeometry(len, 2, terrainZw), _makeGrassMat(len, terrainZw));
       slab.position.set(cx, cy, terrainZcenter);
       slab.rotation.z = -angle; // negate: X-mirror flips position but not rotation.z
       slab.castShadow = true; slab.receiveShadow = true;
@@ -1774,7 +1887,7 @@ export function createRoom(scene) {
     {
       const w = flatEndX - flatStartX;
       const slab = new THREE.Mesh(
-        new THREE.BoxGeometry(w, 2, terrainZw), grassMat);
+        new THREE.BoxGeometry(w, 2, terrainZw), _makeGrassMat(w, terrainZw));
       slab.position.set((flatStartX + flatEndX) / 2, flatY, terrainZcenter);
       slab.castShadow = true; slab.receiveShadow = true;
       slab._isRoom = true; slab._isGuestRoom = true;
@@ -1784,13 +1897,13 @@ export function createRoom(scene) {
     // ── Incline to road (rotated slab) ────────────────────────────
     {
       const dx = incEndX - incStartX;                      // 36
-      const dy = incEndY - incStartY;                      // 36
-      const len = Math.sqrt(dx * dx + dy * dy);            // ~50.9
-      const angle = Math.atan2(dy, dx);                    // ~45°
+      const dy = incEndY - incStartY;                      // 12
+      const len = Math.sqrt(dx * dx + dy * dy);
+      const angle = Math.atan2(dy, dx);
       const cx = (incStartX + incEndX) / 2;
       const cy = (incStartY + incEndY) / 2;
       const slab = new THREE.Mesh(
-        new THREE.BoxGeometry(len, 2, terrainZw), grassMat);
+        new THREE.BoxGeometry(len, 2, terrainZw), _makeGrassMat(len, terrainZw));
       slab.position.set(cx, cy, terrainZcenter);
       slab.rotation.z = -angle; // negate: X-mirror flips position but not rotation.z
       slab.castShadow = true; slab.receiveShadow = true;
@@ -2897,6 +3010,76 @@ export function createRoom(scene) {
     }
     return rightWall;
   })();
+
+  // ─── Bedroom mirror — hung on side wall just past the closet (+Z side) ───
+  // 1.5ft × 4ft (18" × 48") mirror with a 2"-wide raised wooden lip around
+  // it. Mirror sits flat against the wall; the wood is built as four thin
+  // border strips (top/bottom/left/right) that protrude as a lip.
+  {
+    const mirrorW = 18;            // mirror surface width  (1.5 ft, along Z)
+    const mirrorH = 48;            // mirror surface height (4 ft)
+    const borderT = 2;             // wood lip thickness on each side
+    const lipDepth = 0.6;          // how far the lip protrudes off the wall
+    const frameW = mirrorW + borderT * 2;   // 22
+    const frameH = mirrorH + borderT * 2;   // 52
+    const centerY = floorY + 8 + frameH / 2; // 8" off the floor → top at floorY+60
+    // 6" gap from the closet's +Z edge (Z=_bypassZmin=-14).
+    const centerZ = _bypassZmin + 6 + frameW / 2; // = -14 + 6 + 11 = 3
+    const wallFaceX = sideWallX;   // interior face of the right wall
+
+    const borderMat = new THREE.MeshStandardMaterial({
+      color: 0x6b4a2a, roughness: 0.55, metalness: 0.05,
+    });
+    // Four lip pieces forming a picture-frame border. Center X for all of
+    // them is wallFaceX - lipDepth/2 so the back face sits flush with the
+    // wall and the front face protrudes by lipDepth.
+    const lipX = wallFaceX - lipDepth / 2;
+    // Top lip (above the mirror)
+    {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(lipDepth, borderT, frameW), borderMat);
+      m.position.set(lipX, centerY + mirrorH / 2 + borderT / 2, centerZ);
+      m.castShadow = true; m.receiveShadow = true; m._isRoom = true; addRoom(m);
+    }
+    // Bottom lip
+    {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(lipDepth, borderT, frameW), borderMat);
+      m.position.set(lipX, centerY - mirrorH / 2 - borderT / 2, centerZ);
+      m.castShadow = true; m.receiveShadow = true; m._isRoom = true; addRoom(m);
+    }
+    // -Z lip (toward closet)
+    {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(lipDepth, mirrorH, borderT), borderMat);
+      m.position.set(lipX, centerY, centerZ - mirrorW / 2 - borderT / 2);
+      m.castShadow = true; m.receiveShadow = true; m._isRoom = true; addRoom(m);
+    }
+    // +Z lip (toward guest doorway)
+    {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(lipDepth, mirrorH, borderT), borderMat);
+      m.position.set(lipX, centerY, centerZ + mirrorW / 2 + borderT / 2);
+      m.castShadow = true; m.receiveShadow = true; m._isRoom = true; addRoom(m);
+    }
+
+    // Mirror surface — silver-toned, sits ~0.05" off the wall (well behind
+    // the lip's front face, which protrudes lipDepth=0.6").
+    const mirrorMat = new THREE.MeshStandardMaterial({
+      color: 0xd8dde3, roughness: 0.15, metalness: 0.9,
+      emissive: 0x9aa3ad, emissiveIntensity: 0.35,
+      envMapIntensity: 1.6,
+    });
+    const mirror = new THREE.Mesh(
+      new THREE.PlaneGeometry(mirrorW, mirrorH),
+      mirrorMat
+    );
+    mirror.rotation.y = -Math.PI / 2; // normal points -X (into the bedroom)
+    mirror.position.set(wallFaceX - 0.05, centerY, centerZ);
+    mirror.receiveShadow = true;
+    mirror._isRoom = true;
+    addRoom(mirror);
+  }
 
   // (No corner fill needed — the unified right wall extends past Z=49 in
   // one piece, so there's no 0.5" gap between it and the back wall.)
