@@ -1972,69 +1972,46 @@ function _buildStaticBoxes() {
     );
 
     // ── Outdoor terrain collision (beyond office front wall) ──
-    // Stair-step AABBs approximate the slopes since the system is axis-aligned.
-    // Pre-mirror +X extends beyond 183; all coords are already in world space (negated X).
-    const sillY = gwB;                        // window sill Y
+    // The visible yard uses smooth slopes; we don't add stair-step AABBs for
+    // the slopes. Instead, when the player is in the outdoor zone, physics
+    // calls _sampleOutdoorGroundY() to get the exact terrain height for
+    // their current X. We still add boundary walls + a catch floor + a sill
+    // ledge as plain AABBs.
+    const sillY = gwB - 36;                   // yard sits 3 ft below window sill
     const dropStartX = gXmax + 0.5;           // 183.5
     const dropEndX   = 255;
-    const dropDY     = -48;                   // drops 48" over the slope
-    const flatY      = sillY + dropDY;        // floorY - 25
+    const dropDY     = -18;                   // gentle 14° drop
+    const flatY      = sillY + dropDY;
     const flatEndX   = 375;
     const incEndX    = 411;
-    const incDY      = 36;                    // rises 36"
-    const roadY      = flatY + incDY;         // floorY + 11
+    const incDY      = 12;                    // gentle 18° incline
+    const roadY      = flatY + incDY;
     const roadEndX   = 543;
 
-    // Terrain Z extent: 200" centered on window
-    const tZmin = (gwL + gwR) / 2 - 100;
-    const tZmax = (gwL + gwR) / 2 + 100;
-
-    // Drop slope — 6 stair steps, each 12" wide, dropping 8"
-    const dropStepW = (dropEndX - dropStartX) / 6;
-    const dropStepH = Math.abs(dropDY) / 6;
-    for (let i = 0; i < 6; i++) {
-      const sx = dropStartX + i * dropStepW;
-      const sy = sillY - i * dropStepH;
-      _staticBoxes.push({
-        xMin: -(sx + dropStepW), xMax: -sx, zMin: tZmin, zMax: tZmax,
-        yTop: sy, yBottom: sy - dropStepH - 2, room: true
-      });
-    }
-
-    // Flat grass
-    _staticBoxes.push({
-      xMin: -flatEndX, xMax: -dropEndX, zMin: tZmin, zMax: tZmax,
-      yTop: flatY, yBottom: flatY - 2, room: true
-    });
-
-    // Incline — 4 stair steps, each 9" wide, rising 9"
-    const incStepW = (incEndX - flatEndX) / 4;
-    const incStepH = incDY / 4;
-    for (let i = 0; i < 4; i++) {
-      const sx = flatEndX + i * incStepW;
-      const sy = flatY + i * incStepH;
-      _staticBoxes.push({
-        xMin: -(sx + incStepW), xMax: -sx, zMin: tZmin, zMax: tZmax,
-        yTop: sy, yBottom: sy - incStepH - 2, room: true
-      });
-    }
-
-    // Road surface
-    _staticBoxes.push({
-      xMin: -roadEndX, xMax: -incEndX, zMin: tZmin, zMax: tZmax,
-      yTop: roadY, yBottom: roadY - 2, room: true
-    });
+    // Wide terrain Z extent — matches the visual lawn (±300" centered on the
+    // window) so the boundary walls line up with the grass edges.
+    const tZmin = (gwL + gwR) / 2 - 300;
+    const tZmax = (gwL + gwR) / 2 + 300;
 
     // Boundary walls — invisible tall boxes at terrain edges
     const terrainCeil = fy + wh + 20;
     _staticBoxes.push(
       // Far edge (pre-mirror X=543)
       { xMin: -roadEndX - 1, xMax: -roadEndX, zMin: tZmin, zMax: tZmax, yTop: terrainCeil, yBottom: flatY - 40, room: true },
-      // Left Z edge
+      // -Z (left) edge
       { xMin: -roadEndX, xMax: -dropStartX, zMin: tZmin - 1, zMax: tZmin, yTop: terrainCeil, yBottom: flatY - 40, room: true },
-      // Right Z edge
+      // +Z (right) edge
       { xMin: -roadEndX, xMax: -dropStartX, zMin: tZmax, zMax: tZmax + 1, yTop: terrainCeil, yBottom: flatY - 40, room: true }
     );
+
+    // Front-of-house extension wall — solid wall along +Z from the office
+    // front wall to the hallway end, blocking the player from walking around
+    // the side of the house when on the lawn.
+    _staticBoxes.push({
+      xMin: -dropStartX, xMax: -dropStartX + 0.5,
+      zMin: gZmax + 0.5, zMax: 289.5,
+      yTop: fy + wh, yBottom: flatY - 40, room: true
+    });
 
     // Catch floor — safety net well below terrain
     _staticBoxes.push({
@@ -2116,6 +2093,32 @@ function _buildPurifierBoxes() {
     }
   }
   return boxes;
+}
+
+// ── Smooth outdoor terrain ground sampling ─────────────────────────
+// Returns the world-space Y of the lawn/road surface at the given world X.
+// Mirrors the slope segments used by the visual terrain in room.js so the
+// player walks up/down a continuous curve instead of stepped AABBs.
+function _sampleOutdoorGroundY(worldX) {
+  const px = -worldX; // pre-mirror X (positive)
+  const fy = getFloorY();
+  const gwB = (_roomRefs && typeof _roomRefs.grWinBottom === 'number') ? _roomRefs.grWinBottom : (fy + 23);
+  const sillY = gwB - 36;
+  const dropStartX = 183.5, dropEndX = 255, flatEndX = 375, incEndX = 411;
+  const dropDY = -18, incDY = 12;
+  const flatY = sillY + dropDY;
+  const roadY = flatY + incDY;
+  if (px <= dropStartX) return sillY;
+  if (px <= dropEndX) {
+    const t = (px - dropStartX) / (dropEndX - dropStartX);
+    return sillY + t * dropDY;
+  }
+  if (px <= flatEndX) return flatY;
+  if (px <= incEndX) {
+    const t = (px - flatEndX) / (incEndX - flatEndX);
+    return flatY + t * incDY;
+  }
+  return roadY;
 }
 
 function _getBoxes() {
@@ -3083,9 +3086,12 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   let bonkedThisFrame = false;
   let bonkIntensity = 0;
   let groundY = getPlayerFloorY(); // eye-height floor (floorY + EYE_H)
-  // When outdoors (past office far wall), don't override groundY —
-  // the stair-step collision boxes handle floor height naturally.
   const outdoorZone = nx < -183;
+  // When outdoors, sample the smooth terrain height at the player's X so
+  // the ground curves with the visible grass slopes instead of stepping.
+  if (outdoorZone) {
+    groundY = Math.max(groundY, _sampleOutdoorGroundY(nx) + EYE_H);
+  }
   const boxes = _getBoxes();
 
   for (const box of boxes) {
