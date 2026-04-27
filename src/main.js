@@ -527,6 +527,30 @@ function _refreshSpeedPillLockState() {
   }
 }
 
+// Refresh the skate-mode pill's locked/unlocked state. Unlocks once the
+// player has picked up the hidden skateboard.
+function _refreshSkatePillLockState() {
+  const skatePill = document.querySelector('.mode-pill[data-mode="skate"]');
+  if (!skatePill) return;
+  const unlocked = gameFp.isSkateboardFound();
+  skatePill.classList.toggle('locked', !unlocked);
+  skatePill.setAttribute('aria-disabled', unlocked ? 'false' : 'true');
+  const icon = skatePill.querySelector('i');
+  if (icon) icon.className = unlocked ? 'ph ph-sneaker-move' : 'ph ph-lock-simple';
+  const sub = skatePill.querySelector('.mode-pill__sub');
+  if (sub) {
+    sub.textContent = unlocked
+      ? 'Ride on a skateboard'
+      : 'Find the hidden skateboard to unlock';
+  }
+  skatePill.title = unlocked
+    ? 'Skate Mode: ride the skateboard'
+    : 'Find the hidden skateboard to unlock Skate Mode';
+  if (!unlocked && _selectedMode === 'skate') {
+    _selectedMode = 'normal';
+  }
+}
+
 // Refresh the Totodile char-card's locked state + hint label. Mirrors the
 // speed-pill flow: padlock when locked, plain card when unlocked. If the
 // player currently has Totodile selected and somehow it's locked, snap
@@ -668,6 +692,7 @@ window._openCharSelect = () => {
   // _selectedMode (e.g. snap totodile→classic, speed→normal) before we
   // apply the selection highlights below.
   _refreshSpeedPillLockState();
+  _refreshSkatePillLockState();
   _refreshTotodileCardLockState();
   _refreshBababooeyCardLockState();
   _refreshKorraCardLockState();
@@ -770,6 +795,7 @@ window._selectColor = (color, el) => {
 window._selectMode = (mode, el) => {
   const nextMode = mode === 'speed' ? 'speed' : (mode === 'skate' ? 'skate' : 'normal');
   const wantSpeed = nextMode === 'speed';
+  const wantSkate = nextMode === 'skate';
   if (wantSpeed && !coins.hasFoundAllSecrets()) {
     // Locked — give a quick shake + toast and bail.
     if (el) {
@@ -781,6 +807,15 @@ window._selectMode = (mode, el) => {
     const found = coins.getSecretFoundCount();
     const total = coins.getSecretTotal();
     showToast(`Speed Mode locked — find all secret coins to unlock (${found}/${total})`);
+    return;
+  }
+  if (wantSkate && !gameFp.isSkateboardFound()) {
+    if (el) {
+      el.classList.remove('shake');
+      void el.offsetWidth;
+      el.classList.add('shake');
+    }
+    showToast('Skate Mode locked — find the hidden skateboard to unlock');
     return;
   }
   _selectedMode = nextMode;
