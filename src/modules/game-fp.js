@@ -1033,6 +1033,11 @@ function _silenceSkateRoll(immediate = false) {
 function _ensureSkateboardAnchor() {
   if (_skateboardAnchor || !_catGroup) return;
   _skateboardAnchor = new THREE.Group();
+  // ZXY order means rotations are applied to vertices Y → X → Z. So
+  // the anchor's yaw (.y, which orients the board's long axis to +Z)
+  // happens first, then any pitch (.x = nose up/down), then roll (.z =
+  // rotation about the post-yaw forward axis = a real kickflip).
+  _skateboardAnchor.rotation.order = 'ZXY';
   _skateboardAnchor.visible = false;
   _catGroup.add(_skateboardAnchor);
 }
@@ -2092,6 +2097,12 @@ function _buildStaticBoxes() {
       },
       {
         xMin: bedWallX, xMax: bedWallX + 0.5, zMin: bedWinBack, zMax: bedZmax + 0.5,
+        yTop: bedWinT, yBottom: bedWinB, room: true
+      },
+      // Bedroom window opening — the bedroom window is not openable, so
+      // close off the gap between the four surrounding wall pieces.
+      {
+        xMin: bedWallX, xMax: bedWallX + 0.5, zMin: bedWinFront, zMax: bedWinBack,
         yTop: bedWinT, yBottom: bedWinB, room: true
       }
     );
@@ -3470,30 +3481,45 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       while (dYaw < -Math.PI) dYaw += Math.PI * 2;
       _catGroupYaw += dYaw * easeAlpha(19.74, dtSec);
 
-      // ── Board spin trick (F) — accumulating aerial spin ───────────
-      // Each press gives a brief upward impulse; you must keep mashing
-      // to stay airborne. No continuous lift — gravity always wins.
+      // ── Board spin trick (F) — air spin or grounded pivot ─────────
+      // Press F to start spinning. In the air, each tap also gives an
+      // upward kick so you can keep yourself off the ground. Grounded,
+      // spin still accumulates but decays over time and eases the
+      // residual angle back to a clean forward-facing rotation.
       let spinExtra = 0;
-      if (_trickSpinSpeed !== 0) {
+      if (_trickSpinSpeed !== 0 || _trickSpinAngle !== 0) {
+        _trickSpinAngle += _trickSpinSpeed * dtSec;
         if (grounded) {
-          _trickSpinAngle = 0;
-          _trickSpinSpeed = 0;
-          _trickSpinBoost = false;
-        } else {
-          _trickSpinAngle += _trickSpinSpeed * dtSec;
-          spinExtra = _trickSpinAngle;
+          // Friction on the ground — slows the pivot then settles.
+          const SPIN_GROUND_DECAY = Math.PI * 5;
+          const sgn = Math.sign(_trickSpinSpeed) || 1;
+          _trickSpinSpeed = sgn * Math.max(0, Math.abs(_trickSpinSpeed) - SPIN_GROUND_DECAY * dtSec);
+          if (Math.abs(_trickSpinSpeed) < 0.05) {
+            _trickSpinSpeed = 0;
+            // Ease residual angle back toward the nearest full revolution
+            // so the cat finishes facing forward and folds back into the
+            // movement yaw cleanly.
+            const TAU = Math.PI * 2;
+            const target = Math.round(_trickSpinAngle / TAU) * TAU;
+            _trickSpinAngle += (target - _trickSpinAngle) * easeAlpha(11, dtSec);
+            if (Math.abs(target - _trickSpinAngle) < 0.005) _trickSpinAngle = 0;
+          }
         }
+        spinExtra = _trickSpinAngle;
       }
-      // Apply per-press upward impulse (deferred from keydown)
-      // Dampened near ceiling so you can't get stuck up there
+      // Apply per-press upward impulse (deferred from keydown).
+      // Only kicks in the air — on the ground F is a flat pivot.
+      // Dampened near ceiling so you can't get stuck up there.
       if (_trickSpinBoost) {
-        const _flY = getFloorY();
-        const _ceilY = outdoorZone ? (_flY + 200) : (_flY + 80) - 0.5;
-        const headroom = _ceilY - fpPos.y;
-        const HOVER_MARGIN = 10;
-        const ceilDamp = headroom < HOVER_MARGIN ? Math.max(0, headroom / HOVER_MARGIN) : 1;
-        const kick = 0.22 * ceilDamp;
-        fpVy = Math.max(fpVy, kick);
+        if (!grounded) {
+          const _flY = getFloorY();
+          const _ceilY = outdoorZone ? (_flY + 200) : (_flY + 80) - 0.5;
+          const headroom = _ceilY - fpPos.y;
+          const HOVER_MARGIN = 10;
+          const ceilDamp = headroom < HOVER_MARGIN ? Math.max(0, headroom / HOVER_MARGIN) : 1;
+          const kick = 0.22 * ceilDamp;
+          fpVy = Math.max(fpVy, kick);
+        }
         _trickSpinBoost = false;
       }
 
@@ -3683,19 +3709,18 @@ function _bindInputs() {
         _trickManualHeld = skateMode;
         break;
       case 'KeyF':
-        // Each press adds spin speed while airborne, with diminishing
-        // returns: the faster you're already going, the less each tap adds.
-        // Cap at ~30 rev/s.
-        if (skateMode && !_wasGroundedLast) {
+        // Each press adds spin speed. In the air this stacks aerial
+        // 360s with diminishing returns and a small upward kick; on
+        // the ground it acts as a flat pivot that decays back to
+        // forward-facing. Cap at ~30 rev/s.
+        if (skateMode) {
           const SPIN_BASE = Math.PI * 2.66; // ~1.33 rev/s base add
           const SPIN_CAP = Math.PI * 15;   // ~30 rev/s
-          // Falloff: 1.0 at rest → ~0.2 near cap. Quadratic feels better
-          // than linear here — early presses ramp quickly, later presses
-          // gently top off.
           const ratio = Math.min(1, _trickSpinSpeed / SPIN_CAP);
           const falloff = (1 - ratio) * (1 - ratio) * 0.8 + 0.2;
           _trickSpinSpeed = Math.min(_trickSpinSpeed + SPIN_BASE * falloff, SPIN_CAP);
-          _trickSpinBoost = true;
+          // Upward kick only registers in the air.
+          if (!_wasGroundedLast) _trickSpinBoost = true;
         }
         break;
     }
