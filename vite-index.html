@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -19,68 +20,139 @@
        first paint, before the main CSS bundle arrives. -->
   <style>
     #loading {
-      position: fixed; inset: 0;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
       gap: 22px;
       background: radial-gradient(ellipse at 50% 40%, #2a3240 0%, #161b24 70%, #0c0f15 100%);
       color: #cfd9e8;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      font-size: 13px; font-weight: 600; letter-spacing: 0.12em;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
       z-index: 1000;
       transition: opacity 0.5s ease-out;
     }
-    #loading.is-hiding { opacity: 0; pointer-events: none; }
+
+    #loading.is-hiding {
+      opacity: 0;
+      pointer-events: none;
+    }
+
     #loadingCat {
-      width: 128px; height: 128px;
-      filter: drop-shadow(0 6px 18px rgba(0,0,0,0.55));
+      width: 128px;
+      height: 128px;
+      filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.55));
       transform-origin: 50% 55%;
       animation: loadingCatSpin 1.6s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite,
-                 loadingCatJiggle 0.9s ease-in-out infinite;
+        loadingCatJiggle 0.9s ease-in-out infinite;
       will-change: transform;
     }
+
     #loadingLabel {
       opacity: 0.78;
       animation: loadingLabelPulse 1.6s ease-in-out infinite;
     }
+
     #loadingLabel::after {
       content: '';
       display: inline-block;
-      width: 1.1em; text-align: left;
+      width: 1.1em;
+      text-align: left;
       animation: loadingDots 1.2s steps(4, end) infinite;
     }
+
     @keyframes loadingCatSpin {
-      0%   { transform: rotate(0deg)   scale(1); }
-      50%  { transform: rotate(180deg) scale(1.06); }
-      100% { transform: rotate(360deg) scale(1); }
+      0% {
+        transform: rotate(0deg) scale(1);
+      }
+
+      50% {
+        transform: rotate(180deg) scale(1.06);
+      }
+
+      100% {
+        transform: rotate(360deg) scale(1);
+      }
     }
+
     @keyframes loadingCatJiggle {
-      0%, 100% { translate: 0 0; }
-      25%      { translate: 0 -4px; }
-      50%      { translate: 0 0; }
-      75%      { translate: 0 3px; }
+
+      0%,
+      100% {
+        translate: 0 0;
+      }
+
+      25% {
+        translate: 0 -4px;
+      }
+
+      50% {
+        translate: 0 0;
+      }
+
+      75% {
+        translate: 0 3px;
+      }
     }
+
     @keyframes loadingLabelPulse {
-      0%, 100% { opacity: 0.55; }
-      50%      { opacity: 0.95; }
+
+      0%,
+      100% {
+        opacity: 0.55;
+      }
+
+      50% {
+        opacity: 0.95;
+      }
     }
+
     @keyframes loadingDots {
-      0%   { content: ''; }
-      25%  { content: '.'; }
-      50%  { content: '..'; }
-      75%  { content: '...'; }
-      100% { content: ''; }
+      0% {
+        content: '';
+      }
+
+      25% {
+        content: '.';
+      }
+
+      50% {
+        content: '..';
+      }
+
+      75% {
+        content: '...';
+      }
+
+      100% {
+        content: '';
+      }
     }
+
     @media (prefers-reduced-motion: reduce) {
-      #loadingCat { animation: loadingCatSpin 4s linear infinite; }
-      #loadingLabel, #loadingLabel::after { animation: none; }
+      #loadingCat {
+        animation: loadingCatSpin 4s linear infinite;
+      }
+
+      #loadingLabel,
+      #loadingLabel::after {
+        animation: none;
+      }
     }
+
     /* Background-only mode (?bg=1): used by leaderboard.html iframe so the
        3D scene shows behind the share card without any chrome.
        Hide every interactive surface and HUD; keep only the canvas + loader.
        Inline so the chrome never flashes before main.css loads. */
-    html.is-bg #loading { background: transparent; }
+    html.is-bg #loading {
+      background: transparent;
+    }
+
     html.is-bg .panel,
     html.is-bg .panel-fab,
     html.is-bg .part-tooltip,
@@ -95,8 +167,14 @@
     html.is-bg .toast,
     html.is-bg .secret-banner,
     html.is-bg .key-hint,
-    html.is-bg .glass-btn { display: none !important; }
-    html.is-bg, html.is-bg body { cursor: default !important; }
+    html.is-bg .glass-btn {
+      display: none !important;
+    }
+
+    html.is-bg,
+    html.is-bg body {
+      cursor: default !important;
+    }
   </style>
   <script>
     // Run before <body> so the chrome never paints in iframe-bg mode.
@@ -104,442 +182,548 @@
       if (new URLSearchParams(location.search).get('bg') === '1') {
         document.documentElement.classList.add('is-bg');
       }
-    } catch (e) {}
+    } catch (e) { }
   </script>
 </head>
+
 <body>
   <div id="loading" role="status" aria-live="polite" aria-label="Loading">
     <svg id="loadingCat" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-      <polygon points="4.2,13.8 8.4,1.8 13.3,11.4" fill="#3f454d"/>
-      <polygon points="6.3,11.4 8.6,5 11.2,10.5" fill="#2f343b"/>
-      <polygon points="18.7,11.4 23.6,1.8 27.8,13.8" fill="#3f454d"/>
-      <polygon points="20.8,10.5 23.4,5 25.7,11.4" fill="#2f343b"/>
-      <ellipse cx="16" cy="17" rx="11.7" ry="10.8" fill="#4a5159"/>
-      <path d="M14.8,7.2 C16.4,6.7 17.9,7.8 17.9,9.5 C17.9,11.2 17.6,12.5 18.1,14 C18.6,15.5 18.6,17.6 17.8,19.2 C17.1,20.6 14.9,20.6 14.2,19.2 C13.4,17.6 13.4,15.5 13.9,14 C14.4,12.5 14.1,11.2 14.1,9.5 C14.1,8.3 14.3,7.6 14.8,7.2 Z" fill="#f6f4ef"/>
-      <ellipse cx="16" cy="20" rx="6.3" ry="4.7" fill="#f9f7f2"/>
-      <ellipse cx="12" cy="15.6" rx="2.5" ry="1.9" fill="#b6c979"/>
-      <ellipse cx="20" cy="15.6" rx="2.5" ry="1.9" fill="#b6c979"/>
-      <ellipse cx="12.5" cy="15.7" rx="0.55" ry="1.35" fill="#151617"/>
-      <ellipse cx="19.5" cy="15.7" rx="0.55" ry="1.35" fill="#151617"/>
-      <path d="M14.6,19.1 C15.2,18.35 16.8,18.35 17.4,19.1 C17.4,19.9 16.9,20.35 16,20.35 C15.1,20.35 14.6,19.9 14.6,19.1 Z" fill="#d79a93"/>
-      <path d="M16,20.35 L16,21.4" stroke="#7a6a66" stroke-width="0.42" stroke-linecap="round"/>
-      <path d="M16,21.4 C14.95,22.2 13.6,22.3 12.3,21.9" stroke="#7a6a66" stroke-width="0.42" fill="none" stroke-linecap="round"/>
-      <path d="M16,21.4 C17.05,22.2 18.4,22.3 19.7,21.9" stroke="#7a6a66" stroke-width="0.42" fill="none" stroke-linecap="round"/>
+      <polygon points="4.2,13.8 8.4,1.8 13.3,11.4" fill="#3f454d" />
+      <polygon points="6.3,11.4 8.6,5 11.2,10.5" fill="#2f343b" />
+      <polygon points="18.7,11.4 23.6,1.8 27.8,13.8" fill="#3f454d" />
+      <polygon points="20.8,10.5 23.4,5 25.7,11.4" fill="#2f343b" />
+      <ellipse cx="16" cy="17" rx="11.7" ry="10.8" fill="#4a5159" />
+      <path
+        d="M14.8,7.2 C16.4,6.7 17.9,7.8 17.9,9.5 C17.9,11.2 17.6,12.5 18.1,14 C18.6,15.5 18.6,17.6 17.8,19.2 C17.1,20.6 14.9,20.6 14.2,19.2 C13.4,17.6 13.4,15.5 13.9,14 C14.4,12.5 14.1,11.2 14.1,9.5 C14.1,8.3 14.3,7.6 14.8,7.2 Z"
+        fill="#f6f4ef" />
+      <ellipse cx="16" cy="20" rx="6.3" ry="4.7" fill="#f9f7f2" />
+      <ellipse cx="12" cy="15.6" rx="2.5" ry="1.9" fill="#b6c979" />
+      <ellipse cx="20" cy="15.6" rx="2.5" ry="1.9" fill="#b6c979" />
+      <ellipse cx="12.5" cy="15.7" rx="0.55" ry="1.35" fill="#151617" />
+      <ellipse cx="19.5" cy="15.7" rx="0.55" ry="1.35" fill="#151617" />
+      <path
+        d="M14.6,19.1 C15.2,18.35 16.8,18.35 17.4,19.1 C17.4,19.9 16.9,20.35 16,20.35 C15.1,20.35 14.6,19.9 14.6,19.1 Z"
+        fill="#d79a93" />
+      <path d="M16,20.35 L16,21.4" stroke="#7a6a66" stroke-width="0.42" stroke-linecap="round" />
+      <path d="M16,21.4 C14.95,22.2 13.6,22.3 12.3,21.9" stroke="#7a6a66" stroke-width="0.42" fill="none"
+        stroke-linecap="round" />
+      <path d="M16,21.4 C17.05,22.2 18.4,22.3 19.7,21.9" stroke="#7a6a66" stroke-width="0.42" fill="none"
+        stroke-linecap="round" />
       <g stroke="#ececec" stroke-width="0.38" stroke-linecap="round" opacity="0.95">
-        <line x1="10" y1="19.2" x2="3.1" y2="18.3"/>
-        <line x1="10" y1="20.2" x2="2.8" y2="20.8"/>
-        <line x1="22" y1="19.2" x2="28.9" y2="18.3"/>
-        <line x1="22" y1="20.2" x2="29.2" y2="20.8"/>
+        <line x1="10" y1="19.2" x2="3.1" y2="18.3" />
+        <line x1="10" y1="20.2" x2="2.8" y2="20.8" />
+        <line x1="22" y1="19.2" x2="28.9" y2="18.3" />
+        <line x1="22" y1="20.2" x2="29.2" y2="20.8" />
       </g>
     </svg>
     <div id="loadingLabel">Loading</div>
   </div>
   <main>
-  <canvas id="c"></canvas>
+    <canvas id="c"></canvas>
 
-  <!-- Control Panel -->
-  <button class="panel-fab" id="panelFab" aria-label="Open control panel" onclick="document.getElementById('panelL').style.display='flex';this.style.display='none'"><i class="ph ph-sliders-horizontal" aria-hidden="true"></i></button>
-  <aside class="panel panel-l" id="panelL" aria-label="Purifier controls">
-    <div class="panel-header">
-      <h3>Control Center</h3>
-      <button class="panel-close" aria-label="Close control panel" onclick="this.closest('.panel').style.display='none';document.getElementById('panelFab').style.display='flex'"><i class="ph ph-x" aria-hidden="true"></i></button>
-    </div>
-    <div class="panel-scroll">
+    <!-- Control Panel -->
+    <button class="panel-fab" id="panelFab" aria-label="Open control panel"
+      onclick="document.getElementById('panelL').style.display='flex';this.style.display='none'"><i
+        class="ph ph-sliders-horizontal" aria-hidden="true"></i></button>
+    <aside class="panel panel-l" id="panelL" aria-label="Purifier controls">
+      <div class="panel-header">
+        <h3>Control Center</h3>
+        <button class="panel-close" aria-label="Close control panel"
+          onclick="this.closest('.panel').style.display='none';document.getElementById('panelFab').style.display='flex'"><i
+            class="ph ph-x" aria-hidden="true"></i></button>
+      </div>
+      <div class="panel-scroll">
 
-      <!-- Structure -->
-      <div class="section-group">
-        <h4><i class="ph ph-cube"></i> Structure</h4>
-        <div class="ctrl-row"><label><i class="ph ph-layout"></i> Fan layout</label>
-          <div class="seg">
-            <button class="on" id="btnLayoutFB" onclick="window._setLayout&&window._setLayout('fb')">Front+Back</button>
-            <button id="btnLayoutFT" onclick="window._setLayout&&window._setLayout('ft')">Front+Top</button>
-          </div>
-        </div>
-        <div class="ctrl-row"><label><i class="ph ph-hash"></i> Fans per panel</label>
-          <div class="seg">
-            <button id="btnFan3" onclick="window._setFanCount&&window._setFanCount(3)">3</button>
-            <button class="on" id="btnFan4" onclick="window._setFanCount&&window._setFanCount(4)">4</button>
-          </div>
-        </div>
-        <div class="ctrl-row"><label><i class="ph ph-polygon"></i> Edge profile</label>
-          <div class="seg">
-            <button class="on" id="btnEdgeFlat" onclick="window._setEdge&&window._setEdge('flat')">Flat</button>
-            <button id="btnEdgeCurved" onclick="window._setEdge&&window._setEdge('curved')">Curved</button>
-          </div>
-        </div>
-        <div class="ctrl-row"><label><i class="ph ph-drop"></i> Wood species</label>
-          <div class="seg">
-            <button class="on" id="btnStainAsh" onclick="window._setStain&&window._setStain('ash')">Ash</button>
-            <button id="btnStainBirch" onclick="window._setStain&&window._setStain('birch')">Birch</button>
-            <button id="btnStainWalnut" onclick="window._setStain&&window._setStain('walnut')">Walnut</button>
-          </div>
-        </div>
-        <div class="ctrl-row"><label><i class="ph ph-arrows-out"></i> Exploded view</label>
-          <div class="toggle-sw" id="togExplode" onclick="window._toggleExplode&&window._toggleExplode()"></div>
-        </div>
-      </div>
-
-      <!-- Finish & Feet -->
-      <div class="section-group">
-        <h4><i class="ph ph-paint-brush"></i> Finish & Feet</h4>
-        <div class="ctrl-row"><label><i class="ph ph-funnel"></i> Show filters</label>
-          <div class="toggle-sw on" id="togFilter" onclick="window._toggleFilter&&window._toggleFilter()"></div>
-        </div>
-        <div class="ctrl-row"><label><i class="ph ph-grid-four"></i> Fan grills</label>
-          <div class="toggle-sw" id="togGrill" onclick="window._toggleGrills&&window._toggleGrills()"></div>
-        </div>
-        <div class="ctrl-row" id="grillColorSection" style="display:none"><label><i class="ph ph-palette"></i> Grill color</label>
-          <div class="seg">
-            <button class="on" id="btnGrillBlack" onclick="window._setGrillColor&&window._setGrillColor('black')">Black</button>
-            <button id="btnGrillSilver" onclick="window._setGrillColor&&window._setGrillColor('silver')">Silver</button>
-          </div>
-        </div>
-        <div class="ctrl-row"><label><i class="ph ph-sneaker-move"></i> Feet style</label>
-          <div class="seg">
-            <button id="btnFeetPeg" onclick="window._setFeet&&window._setFeet('peg')">Peg</button>
-            <button class="on" id="btnFeetBun" onclick="window._setFeet&&window._setFeet('bun')">Bun</button>
-            <button id="btnFeetRubber" onclick="window._setFeet&&window._setFeet('rubber')">Rubber</button>
-            <button id="btnFeetNone" onclick="window._setFeet&&window._setFeet('none')">None</button>
-          </div>
-        </div>
-        <div class="ctrl-row" id="footDiameterRow"><label><i class="ph ph-circle-dashed"></i> Diameter <span id="footDiaLabel">1.5″</span></label>
-          <input type="range" class="slider" min="0" max="2" step="0.1" value="1.5" aria-label="Foot diameter" oninput="window._setFootDia&&window._setFootDia(this.value);document.getElementById('footDiaLabel').textContent=parseFloat(this.value).toFixed(1)+'\u2033'" />
-        </div>
-        <div class="ctrl-row" id="footHeightRow"><label><i class="ph ph-arrows-vertical"></i> Height <span id="footHtLabel">3.5″</span></label>
-          <input type="range" class="slider" min="0" max="4" step="0.25" value="3.5" aria-label="Foot height" oninput="window._setFootHt&&window._setFootHt(this.value);document.getElementById('footHtLabel').textContent=parseFloat(this.value).toFixed(2)+'\u2033'" />
-        </div>
-        <div class="ctrl-row" id="footAngleRow"><label><i class="ph ph-arrows-out"></i> Angled outward</label>
-          <div class="seg">
-            <button class="on" id="btnFeetStraight" onclick="window._setFeetAngled&&window._setFeetAngled(false)">Straight</button>
-            <button id="btnFeetAngled" onclick="window._setFeetAngled&&window._setFeetAngled(true)">Angled</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Placement -->
-      <div class="section-group">
-        <h4><i class="ph ph-map-pin"></i> Placement</h4>
-        <div class="ctrl-row"><label><i class="ph ph-map-trifold"></i> Position</label>
-          <div class="seg">
-            <button id="btnPlaceFloor" onclick="window._setPlacement&&window._setPlacement('floor')">Floor</button>
-            <button class="on" id="btnPlaceTv" onclick="window._setPlacement&&window._setPlacement('tv')">Under TV</button>
-            <button id="btnPlaceWall" onclick="window._setPlacement&&window._setPlacement('wall')">Wall</button>
-          </div>
-        </div>
-        <div class="slider-row">
-          <label>Turntable</label>
-          <input type="range" min="0" max="360" value="90" id="turntableSlider" aria-label="Turntable angle" oninput="window._setTurntable&&window._setTurntable(this.value);document.getElementById('turntableLabel').textContent=this.value+'°'">
-          <span id="turntableLabel">90°</span>
-        </div>
-      </div>
-
-      <!-- Fans -->
-      <div class="section-group">
-        <h4><i class="ph ph-fan"></i> Fans</h4>
-        <div class="ctrl-row"><label><i class="ph ph-power"></i> Spin fans</label>
-          <div class="toggle-sw on" id="togSpin" onclick="window._toggleSpin&&window._toggleSpin()"></div>
-        </div>
-        <div class="slider-row">
-          <label>Speed</label>
-          <input type="range" min="0" max="1800" value="900" id="fanSpeedSlider" aria-label="Fan speed" oninput="window._setFanSpeed&&window._setFanSpeed(this.value);document.getElementById('fanSpeedVal').textContent=this.value+'rpm'">
-          <span id="fanSpeedVal">900rpm</span>
-        </div>
-        <div class="ctrl-row"><label><i class="ph ph-paint-bucket"></i> Fan color</label>
-          <div class="seg">
-            <button class="on" id="btnFanWhite" onclick="window._setFanColor&&window._setFanColor('white')">White</button>
-            <button id="btnFanBlack" onclick="window._setFanColor&&window._setFanColor('black')">Black</button>
-          </div>
-        </div>
-        <div class="ctrl-row"><label><i class="ph ph-rainbow"></i> RGB Fans</label>
-          <div class="toggle-sw on" id="togRGB" onclick="window._toggleRGB&&window._toggleRGB()"></div>
-        </div>
-      </div>
-
-      <!-- Scene -->
-      <div class="section-group">
-        <h4><i class="ph ph-sun"></i> Scene</h4>
-        <div class="slider-row">
-          <label>Time</label>
-          <input type="range" min="0" max="1439" value="870" id="todSlider" aria-label="Time of day" oninput="window._setTOD&&window._setTOD(this.value)">
-          <span id="todLabel">2:30 PM</span>
-        </div>
-        <div class="ctrl-row"><label><i class="ph ph-eye"></i> Isolate purifier</label>
-          <div class="toggle-sw" id="togIsolate" onclick="window._toggleIsolate&&window._toggleIsolate()"></div>
-        </div>
-        <div class="ctrl-row"><label><i class="ph ph-ruler"></i> Dimensions</label>
-          <div class="toggle-sw" id="togDims" onclick="window._toggleDims&&window._toggleDims()"></div>
-        </div>
-        <div class="ctrl-row"><label><i class="ph ph-scan"></i> X-ray mode</label>
-          <div class="toggle-sw" id="togXray" onclick="window._toggleXray&&window._toggleXray()"></div>
-        </div>
-        <div class="ctrl-row"><label><i class="ph ph-chart-bar"></i> Show FPS</label>
-          <div class="toggle-sw" id="togFps" onclick="window._toggleFps&&window._toggleFps()"></div>
-        </div>
-        <div class="ctrl-row" id="rowQuickCoin" hidden><label><i class="ph ph-lightning"></i> Quick coin mode</label>
-          <div class="toggle-sw" id="togQuickCoin" onclick="window._toggleQuickCoin&&window._toggleQuickCoin()"></div>
-        </div>
-      </div>
-
-    </div>
-  </aside>
-  <div class="part-tooltip" id="partTooltip">
-    <div class="tip-name" id="tipName"></div>
-    <div class="tip-dims" id="tipDims"></div>
-  </div>
-
-  <!-- Game mode -->
-  <button id="playDockBtn" class="glass-btn glass-btn--primary" onclick="window._openCharSelect&&window._openCharSelect()"><i class="ph ph-game-controller"></i> Play mode <kbd class="key-hint">G</kbd></button>
-
-  <!-- Character Select (Smash Bros style) -->
-  <div id="charSelect" role="dialog" aria-modal="true" aria-label="Character select">
-    <div class="char-select-inner">
-      <div class="char-select-header">
-        <h2>Choose Your Cat</h2>
-        <button class="char-back" aria-label="Back" onclick="window._closeCharSelect&&window._closeCharSelect()"><i class="ph ph-x"></i></button>
-      </div>
-      <div class="char-grid">
-        <div class="char-card selected" data-model="classic" role="button" tabindex="0" aria-label="Classic cat" onclick="window._selectCat&&window._selectCat('classic',this)">
-          <canvas class="char-preview" id="previewClassic"></canvas>
-          <div class="char-name">Classic</div>
-          <div class="char-colors" id="classicColors">
-            <button class="color-dot on" data-color="charcoal" style="background:#0a0a12" aria-label="Charcoal" onclick="event.stopPropagation();window._selectColor&&window._selectColor('charcoal',this)"></button>
-            <button class="color-dot" data-color="cream" style="background:#B08030" aria-label="Cream" onclick="event.stopPropagation();window._selectColor&&window._selectColor('cream',this)"></button>
-            <button class="color-dot" data-color="midnight" style="background:#040818" aria-label="Midnight" onclick="event.stopPropagation();window._selectColor&&window._selectColor('midnight',this)"></button>
-            <button class="color-dot" data-color="snow" style="background:#d8d8d8" aria-label="Snow" onclick="event.stopPropagation();window._selectColor&&window._selectColor('snow',this)"></button>
-          </div>
-        </div>
-        <div class="char-card" data-model="toon" role="button" tabindex="0" aria-label="Toon cat" onclick="window._selectCat&&window._selectCat('toon',this)">
-          <canvas class="char-preview" id="previewToon"></canvas>
-          <div class="char-name">Toon</div>
-          <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
-        </div>
-        <div class="char-card" data-model="bababooey" role="button" tabindex="0" aria-label="Bababooey cat" onclick="window._selectCat&&window._selectCat('bababooey',this)">
-          <canvas class="char-preview" id="previewBababooey"></canvas>
-          <div class="char-name">Bababooey</div>
-          <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
-        </div>
-        <div class="char-card" data-model="totodile" role="button" tabindex="0" aria-label="Totodile" onclick="window._selectCat&&window._selectCat('totodile',this)">
-          <canvas class="char-preview" id="previewTotodile"></canvas>
-          <div class="char-name">Totodile</div>
-          <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
-        </div>
-        <div class="char-card" data-model="korra" role="button" tabindex="0" aria-label="Korra" onclick="window._selectCat&&window._selectCat('korra',this)">
-          <canvas class="char-preview" id="previewKorra"></canvas>
-          <div class="char-name">Cursed Korra</div>
-          <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
-        </div>
-      </div>
-      <div class="mode-select" role="group" aria-label="Movement mode">
-        <button type="button" class="mode-pill on" data-mode="normal" onclick="window._selectMode&&window._selectMode('normal',this)">
-          <i class="ph ph-person-simple-walk"></i>
-          <span class="mode-pill__label">Normal</span>
-        </button>
-        <button type="button" class="mode-pill" data-mode="speed" onclick="window._selectMode&&window._selectMode('speed',this)">
-          <i class="ph ph-lightning"></i>
-          <span class="mode-pill__label">Speed</span>
-          <span class="mode-pill__sub">3× top speed · +12 coins</span>
-        </button>
-        <button type="button" class="mode-pill" data-mode="skate" onclick="window._selectMode&&window._selectMode('skate',this)">
-          <i class="ph ph-sneaker-move"></i>
-          <span class="mode-pill__label">Skate</span>
-          <span class="mode-pill__sub">Ride on a skateboard</span>
-        </button>
-      </div>
-      <button class="char-start glass-btn glass-btn--primary" onclick="window._startGame&&window._startGame()">Start run</button>
-    </div>
-  </div>
-
-  <!-- FP HUD -->
-  <div id="fpHud" role="status" aria-live="polite" aria-atomic="false">
-    <div class="run-hud-center run-pill run-pill--combo" aria-label="Run status">
-      <div id="runTimerHud" class="run-pill--timer" aria-label="Run timer">
-        <i class="ph ph-stopwatch run-pill__icon"></i>
-        <div class="run-pill__stack">
-          <span id="runTimerText">00:00.000</span>
-          <span id="fpsInline" class="run-pill__fps" hidden></span>
-        </div>
-      </div>
-      <span class="run-pill__divider" aria-hidden="true"></span>
-      <div id="coinHud" class="run-pill--coins" aria-label="Coins collected">
-        <i class="ph-fill ph-coins run-pill__icon run-pill__icon--gold"></i>
-        <span id="coinCount">0/0</span>
-        <span id="secretCoinHud" class="run-pill__secret" aria-label="Secret coins" style="display:none">
-          <span class="run-pill__sep" aria-hidden="true"></span>
-          <i class="ph-fill ph-coin run-pill__icon run-pill__icon--cyan"></i>
-          <span id="secretCoinCount">0</span>
-        </span>
-      </div>
-      <span id="mphDivider" class="run-pill__divider" aria-hidden="true" style="display:none"></span>
-      <div id="mphHud" class="run-pill--mph" aria-label="Speed" style="display:none">
-        <span id="mphValue">0</span><span class="mph-unit">MPH</span>
-      </div>
-    </div>
-    <span id="runTimerState" class="run-timer-state" hidden></span>
-    <div id="fpShareRow" style="display:none"><button id="fpShareBtn" type="button"><i class="ph ph-copy"></i> Copy result</button></div>
-  </div>
-  <div id="fpCrosshair"></div>
-  <div id="fpCrosshairTooltip"></div>
-  <div id="fpControlsHint">Press <kbd>H</kbd> for controls</div>
-  <div id="fpControlsPanel" role="dialog" aria-label="Controls" style="display:none">
-    <div class="fp-panel-header"><span>Controls</span><button onclick="window._toggleHelp&&window._toggleHelp()" class="fp-panel-close" aria-label="Close controls panel">&times;</button></div>
-    <div class="fp-panel-grid">
-      <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
-      <div><kbd>Space</kbd> Jump (hold to charge)</div>
-      <div><kbd>Shift</kbd> Sprint</div>
-      <div><kbd>V</kbd> Toggle first/third person</div>
-      <div><kbd>K</kbd> Toggle skate mode</div>
-      <div><kbd>Q</kbd> Kickflip (skate)</div>
-      <div><kbd>E</kbd> Manual / wheelie (skate)</div>
-      <div><kbd>F</kbd> Board spin (skate)</div>
-      <div><kbd>R</kbd> Reset run</div>
-      <div><kbd>H</kbd> Toggle this panel</div>
-      <div><kbd>G</kbd> Exit game</div>
-      <div><kbd>Esc</kbd> Pause / resume</div>
-      <div>Click interactive objects</div>
-      <div>Crosshair turns blue on hover</div>
-    </div>
-  </div>
-  <div id="fpChargeBar" aria-label="Jump charge">
-    <div id="fpBarTopRow">
-      <div id="skateUnlockHint" aria-label="Skateboard unlocked">
-        <span class="skate-icon">🛹</span> <kbd>K</kbd> Skateboard
-      </div>
-      <div id="pauseHint" onclick="window._pauseFP&&window._pauseFP()">
-        <kbd>Esc</kbd> Pause
-      </div>
-    </div>
-    <div id="skateTrickHints" aria-label="Skate trick controls">
-      <span><kbd>Q</kbd> Kickflip</span>
-      <span><kbd>E</kbd> Manual</span>
-      <span><kbd>F</kbd> Spin</span>
-    </div>
-    <div id="fpBarDivider"></div>
-    <div class="fp-charge-head">
-      <span class="fp-charge-label"><i class="ph ph-arrow-fat-up"></i> <span id="fpChargeLabel">Jump charge</span></span>
-      <span id="fpChargeValue">Ready</span>
-    </div>
-    <div class="fp-charge-track">
-      <div id="fpChargeFill"></div>
-    </div>
-  </div>
-
-  <!-- Pause overlay -->
-  <div id="fpPauseOverlay" role="dialog" aria-modal="true" aria-label="Pause menu">
-    <div class="pause-card">
-
-      <!-- Action zone: Resume / Reset / Exit — prominent top band -->
-      <div class="pause-action-zone">
-        <div class="pause-action-header">
-          <h2>Paused</h2>
-        </div>
-        <div class="pause-action-btns">
-          <button class="pause-btn pause-btn--hero glass-btn glass-btn--primary" id="fpPauseResume" onclick="window._resumeFP&&window._resumeFP()"><i class="ph-fill ph-play"></i> Resume <kbd class="pause-btn-key">Esc</kbd></button>
-          <button class="pause-btn pause-btn--secondary glass-btn" onclick="window._resetFP&&window._resetFP()"><i class="ph ph-arrow-counter-clockwise"></i> Reset run <kbd class="pause-btn-key">R</kbd></button>
-          <button class="pause-btn pause-btn--secondary glass-btn glass-btn--danger" onclick="window._exitFP&&window._exitFP()"><i class="ph ph-sign-out"></i> Exit</button>
-        </div>
-      </div>
-
-      <!-- Body: settings + leaderboard -->
-      <div class="pause-layout">
-        <!-- Left: settings -->
-        <div class="pause-left">
-
-          <!-- Audio -->
-          <section class="pause-section">
-            <h3 class="pause-section-title"><i class="ph ph-speaker-high"></i> Audio</h3>
-            <div class="pause-toggles">
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph-fill ph-speaker-high"></i> SFX</span>
-                <div class="toggle-sw on" id="fpPauseMuteSfx" role="switch" aria-checked="true" onclick="this.classList.toggle('on');window._toggleMuteSfx&&window._toggleMuteSfx(!this.classList.contains('on'))"></div>
-                <span class="pause-toggle-state" id="fpPauseMuteSfxState">On</span>
-              </div>
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph-fill ph-music-notes"></i> Music</span>
-                <div class="toggle-sw on" id="fpPauseMuteMusic" role="switch" aria-checked="true" onclick="this.classList.toggle('on');window._toggleMuteMusic&&window._toggleMuteMusic(!this.classList.contains('on'))"></div>
-                <span class="pause-toggle-state" id="fpPauseMuteMusicState">On</span>
-              </div>
+        <!-- Structure -->
+        <div class="section-group">
+          <h4><i class="ph ph-cube"></i> Structure</h4>
+          <div class="ctrl-row"><label><i class="ph ph-layout"></i> Fan layout</label>
+            <div class="seg">
+              <button class="on" id="btnLayoutFB"
+                onclick="window._setLayout&&window._setLayout('fb')">Front+Back</button>
+              <button id="btnLayoutFT" onclick="window._setLayout&&window._setLayout('ft')">Front+Top</button>
             </div>
-          </section>
-
-          <!-- Display -->
-          <section class="pause-section">
-            <h3 class="pause-section-title"><i class="ph ph-monitor"></i> Display</h3>
-            <div class="pause-toggles">
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph ph-camera-rotate"></i> Camera</span>
-                <button type="button" class="pause-inline-btn" onclick="window._switchCamFP&&window._switchCamFP()"><span id="fpPauseCamLabel">Third person</span> <kbd>V</kbd></button>
-              </div>
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph ph-gauge"></i> Show FPS</span>
-                <div class="toggle-sw" id="fpPauseShowFps" role="switch" aria-checked="false" onclick="window._toggleFps&&window._toggleFps()"></div>
-                <span class="pause-toggle-state off" id="fpPauseShowFpsState">Off</span>
-              </div>
-              <div class="pause-toggle-row" id="fpPauseShowMphRow" style="display:none">
-                <span class="pause-toggle-label"><i class="ph ph-speedometer"></i> Show MPH</span>
-                <div class="toggle-sw on" id="fpPauseShowMph" role="switch" aria-checked="true" onclick="window._toggleMph&&window._toggleMph()"></div>
-                <span class="pause-toggle-state" id="fpPauseShowMphState">On</span>
-              </div>
-              <div class="pause-toggle-row" id="fpPauseDebugWallsRow" style="display:none">
-                <span class="pause-toggle-label"><i class="ph ph-walls"></i> Wall labels</span>
-                <div class="toggle-sw" id="fpPauseDebugWalls" role="switch" aria-checked="false" onclick="window._toggleDebugWallLabels&&window._toggleDebugWallLabels()"></div>
-                <span class="pause-toggle-state off" id="fpPauseDebugWallsState">Off</span>
-              </div>
+          </div>
+          <div class="ctrl-row"><label><i class="ph ph-hash"></i> Fans per panel</label>
+            <div class="seg">
+              <button id="btnFan3" onclick="window._setFanCount&&window._setFanCount(3)">3</button>
+              <button class="on" id="btnFan4" onclick="window._setFanCount&&window._setFanCount(4)">4</button>
             </div>
-          </section>
-
-          <!-- Controls -->
-          <section class="pause-section">
-            <h3 class="pause-section-title"><i class="ph ph-mouse"></i> Controls</h3>
-            <div class="pause-toggles">
-              <div class="pause-toggle-row pause-toggle-row--slider">
-                <span class="pause-toggle-label"><i class="ph ph-arrows-out-cardinal"></i> Mouse sensitivity</span>
-                <input type="range" id="fpPauseMouseSens" class="pause-range" min="0.25" max="2.5" step="0.05" value="1" aria-label="Mouse sensitivity" oninput="window._setMouseSens&&window._setMouseSens(this.value)">
-                <span class="pause-toggle-state" id="fpPauseMouseSensVal">1.00×</span>
-              </div>
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph ph-sneaker-move"></i> Skate mode</span>
-                <div class="toggle-sw" id="fpPauseSkateMode" role="switch" aria-checked="false" onclick="window._toggleSkateMode&&window._toggleSkateMode()"></div>
-                <span class="pause-toggle-state off" id="fpPauseSkateModeState">Off</span>
-              </div>
+          </div>
+          <div class="ctrl-row"><label><i class="ph ph-polygon"></i> Edge profile</label>
+            <div class="seg">
+              <button class="on" id="btnEdgeFlat" onclick="window._setEdge&&window._setEdge('flat')">Flat</button>
+              <button id="btnEdgeCurved" onclick="window._setEdge&&window._setEdge('curved')">Curved</button>
             </div>
-          </section>
-
-          <!-- Keyboard shortcuts -->
-          <section class="pause-section pause-section--kbd">
-            <h3 class="pause-section-title"><i class="ph ph-keyboard"></i> Keyboard</h3>
-            <div class="pause-controls">
-              <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
-              <div><kbd>Space</kbd> Jump (hold)</div>
-              <div><kbd>Shift</kbd> Sprint</div>
-              <div><kbd>V</kbd> Camera</div>
-              <div><kbd>K</kbd> Skate mode</div>
-              <div><kbd>Q</kbd> Kickflip (skate)</div>
-              <div><kbd>E</kbd> Manual (skate)</div>
-              <div><kbd>F</kbd> Helicopter (skate)</div>
-              <div><kbd>R</kbd> Reset run</div>
-              <div><kbd>Esc</kbd> Resume</div>
+          </div>
+          <div class="ctrl-row"><label><i class="ph ph-drop"></i> Wood species</label>
+            <div class="seg">
+              <button class="on" id="btnStainAsh" onclick="window._setStain&&window._setStain('ash')">Ash</button>
+              <button id="btnStainBirch" onclick="window._setStain&&window._setStain('birch')">Birch</button>
+              <button id="btnStainWalnut" onclick="window._setStain&&window._setStain('walnut')">Walnut</button>
             </div>
-          </section>
+          </div>
+          <div class="ctrl-row"><label><i class="ph ph-arrows-out"></i> Exploded view</label>
+            <div class="toggle-sw" id="togExplode" onclick="window._toggleExplode&&window._toggleExplode()"></div>
+          </div>
         </div>
 
-        <!-- Right: leaderboard -->
-        <div class="pause-right">
-          <h4 class="pause-lb-title"><i class="ph-fill ph-trophy"></i> Leaderboard</h4>
-          <ol id="fpLeaderboardList"></ol>
-          <div id="fpLeaderboardEmpty" class="pause-lb-empty">No runs yet. Collect all coins to post a time!</div>
+        <!-- Finish & Feet -->
+        <div class="section-group">
+          <h4><i class="ph ph-paint-brush"></i> Finish & Feet</h4>
+          <div class="ctrl-row"><label><i class="ph ph-funnel"></i> Show filters</label>
+            <div class="toggle-sw on" id="togFilter" onclick="window._toggleFilter&&window._toggleFilter()"></div>
+          </div>
+          <div class="ctrl-row"><label><i class="ph ph-grid-four"></i> Fan grills</label>
+            <div class="toggle-sw" id="togGrill" onclick="window._toggleGrills&&window._toggleGrills()"></div>
+          </div>
+          <div class="ctrl-row" id="grillColorSection" style="display:none"><label><i class="ph ph-palette"></i> Grill
+              color</label>
+            <div class="seg">
+              <button class="on" id="btnGrillBlack"
+                onclick="window._setGrillColor&&window._setGrillColor('black')">Black</button>
+              <button id="btnGrillSilver"
+                onclick="window._setGrillColor&&window._setGrillColor('silver')">Silver</button>
+            </div>
+          </div>
+          <div class="ctrl-row"><label><i class="ph ph-sneaker-move"></i> Feet style</label>
+            <div class="seg">
+              <button id="btnFeetPeg" onclick="window._setFeet&&window._setFeet('peg')">Peg</button>
+              <button class="on" id="btnFeetBun" onclick="window._setFeet&&window._setFeet('bun')">Bun</button>
+              <button id="btnFeetRubber" onclick="window._setFeet&&window._setFeet('rubber')">Rubber</button>
+              <button id="btnFeetNone" onclick="window._setFeet&&window._setFeet('none')">None</button>
+            </div>
+          </div>
+          <div class="ctrl-row" id="footDiameterRow"><label><i class="ph ph-circle-dashed"></i> Diameter <span
+                id="footDiaLabel">1.5″</span></label>
+            <input type="range" class="slider" min="0" max="2" step="0.1" value="1.5" aria-label="Foot diameter"
+              oninput="window._setFootDia&&window._setFootDia(this.value);document.getElementById('footDiaLabel').textContent=parseFloat(this.value).toFixed(1)+'\u2033'" />
+          </div>
+          <div class="ctrl-row" id="footHeightRow"><label><i class="ph ph-arrows-vertical"></i> Height <span
+                id="footHtLabel">3.5″</span></label>
+            <input type="range" class="slider" min="0" max="4" step="0.25" value="3.5" aria-label="Foot height"
+              oninput="window._setFootHt&&window._setFootHt(this.value);document.getElementById('footHtLabel').textContent=parseFloat(this.value).toFixed(2)+'\u2033'" />
+          </div>
+          <div class="ctrl-row" id="footAngleRow"><label><i class="ph ph-arrows-out"></i> Angled outward</label>
+            <div class="seg">
+              <button class="on" id="btnFeetStraight"
+                onclick="window._setFeetAngled&&window._setFeetAngled(false)">Straight</button>
+              <button id="btnFeetAngled" onclick="window._setFeetAngled&&window._setFeetAngled(true)">Angled</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Placement -->
+        <div class="section-group">
+          <h4><i class="ph ph-map-pin"></i> Placement</h4>
+          <div class="ctrl-row"><label><i class="ph ph-map-trifold"></i> Position</label>
+            <div class="seg">
+              <button id="btnPlaceFloor" onclick="window._setPlacement&&window._setPlacement('floor')">Floor</button>
+              <button class="on" id="btnPlaceTv" onclick="window._setPlacement&&window._setPlacement('tv')">Under
+                TV</button>
+              <button id="btnPlaceWall" onclick="window._setPlacement&&window._setPlacement('wall')">Wall</button>
+            </div>
+          </div>
+          <div class="slider-row">
+            <label>Turntable</label>
+            <input type="range" min="0" max="360" value="90" id="turntableSlider" aria-label="Turntable angle"
+              oninput="window._setTurntable&&window._setTurntable(this.value);document.getElementById('turntableLabel').textContent=this.value+'°'">
+            <span id="turntableLabel">90°</span>
+          </div>
+        </div>
+
+        <!-- Fans -->
+        <div class="section-group">
+          <h4><i class="ph ph-fan"></i> Fans</h4>
+          <div class="ctrl-row"><label><i class="ph ph-power"></i> Spin fans</label>
+            <div class="toggle-sw on" id="togSpin" onclick="window._toggleSpin&&window._toggleSpin()"></div>
+          </div>
+          <div class="slider-row">
+            <label>Speed</label>
+            <input type="range" min="0" max="1800" value="900" id="fanSpeedSlider" aria-label="Fan speed"
+              oninput="window._setFanSpeed&&window._setFanSpeed(this.value);document.getElementById('fanSpeedVal').textContent=this.value+'rpm'">
+            <span id="fanSpeedVal">900rpm</span>
+          </div>
+          <div class="ctrl-row"><label><i class="ph ph-paint-bucket"></i> Fan color</label>
+            <div class="seg">
+              <button class="on" id="btnFanWhite"
+                onclick="window._setFanColor&&window._setFanColor('white')">White</button>
+              <button id="btnFanBlack" onclick="window._setFanColor&&window._setFanColor('black')">Black</button>
+            </div>
+          </div>
+          <div class="ctrl-row"><label><i class="ph ph-rainbow"></i> RGB Fans</label>
+            <div class="toggle-sw on" id="togRGB" onclick="window._toggleRGB&&window._toggleRGB()"></div>
+          </div>
+        </div>
+
+        <!-- Scene -->
+        <div class="section-group">
+          <h4><i class="ph ph-sun"></i> Scene</h4>
+          <div class="slider-row">
+            <label>Time</label>
+            <input type="range" min="0" max="1439" value="870" id="todSlider" aria-label="Time of day"
+              oninput="window._setTOD&&window._setTOD(this.value)">
+            <span id="todLabel">2:30 PM</span>
+          </div>
+          <div class="ctrl-row"><label><i class="ph ph-eye"></i> Isolate purifier</label>
+            <div class="toggle-sw" id="togIsolate" onclick="window._toggleIsolate&&window._toggleIsolate()"></div>
+          </div>
+          <div class="ctrl-row"><label><i class="ph ph-ruler"></i> Dimensions</label>
+            <div class="toggle-sw" id="togDims" onclick="window._toggleDims&&window._toggleDims()"></div>
+          </div>
+          <div class="ctrl-row"><label><i class="ph ph-scan"></i> X-ray mode</label>
+            <div class="toggle-sw" id="togXray" onclick="window._toggleXray&&window._toggleXray()"></div>
+          </div>
+          <div class="ctrl-row"><label><i class="ph ph-chart-bar"></i> Show FPS</label>
+            <div class="toggle-sw" id="togFps" onclick="window._toggleFps&&window._toggleFps()"></div>
+          </div>
+          <div class="ctrl-row" id="rowQuickCoin" hidden><label><i class="ph ph-lightning"></i> Quick coin mode</label>
+            <div class="toggle-sw" id="togQuickCoin" onclick="window._toggleQuickCoin&&window._toggleQuickCoin()"></div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+    <div class="part-tooltip" id="partTooltip">
+      <div class="tip-name" id="tipName"></div>
+      <div class="tip-dims" id="tipDims"></div>
+    </div>
+
+    <!-- Game mode -->
+    <button id="playDockBtn" class="glass-btn glass-btn--primary"
+      onclick="window._openCharSelect&&window._openCharSelect()"><i class="ph ph-game-controller"></i> Play mode <kbd
+        class="key-hint">G</kbd></button>
+
+    <!-- Character Select (Smash Bros style) -->
+    <div id="charSelect" role="dialog" aria-modal="true" aria-label="Character select">
+      <div class="char-select-inner">
+        <div class="char-select-header">
+          <h2>Choose Your Cat</h2>
+          <button class="char-back" aria-label="Back" onclick="window._closeCharSelect&&window._closeCharSelect()"><i
+              class="ph ph-x"></i></button>
+        </div>
+        <div class="char-grid">
+          <div class="char-card selected" data-model="classic" role="button" tabindex="0" aria-label="Classic cat"
+            onclick="window._selectCat&&window._selectCat('classic',this)">
+            <canvas class="char-preview" id="previewClassic"></canvas>
+            <div class="char-name">Classic</div>
+            <div class="char-colors" id="classicColors">
+              <button class="color-dot on" data-color="charcoal" style="background:#0a0a12" aria-label="Charcoal"
+                onclick="event.stopPropagation();window._selectColor&&window._selectColor('charcoal',this)"></button>
+              <button class="color-dot" data-color="cream" style="background:#B08030" aria-label="Cream"
+                onclick="event.stopPropagation();window._selectColor&&window._selectColor('cream',this)"></button>
+              <button class="color-dot" data-color="midnight" style="background:#040818" aria-label="Midnight"
+                onclick="event.stopPropagation();window._selectColor&&window._selectColor('midnight',this)"></button>
+              <button class="color-dot" data-color="snow" style="background:#d8d8d8" aria-label="Snow"
+                onclick="event.stopPropagation();window._selectColor&&window._selectColor('snow',this)"></button>
+            </div>
+          </div>
+          <div class="char-card" data-model="toon" role="button" tabindex="0" aria-label="Toon cat"
+            onclick="window._selectCat&&window._selectCat('toon',this)">
+            <canvas class="char-preview" id="previewToon"></canvas>
+            <div class="char-name">Toon</div>
+            <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
+          </div>
+          <div class="char-card" data-model="bababooey" role="button" tabindex="0" aria-label="Bababooey cat"
+            onclick="window._selectCat&&window._selectCat('bababooey',this)">
+            <canvas class="char-preview" id="previewBababooey"></canvas>
+            <div class="char-name">Bababooey</div>
+            <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
+          </div>
+          <div class="char-card" data-model="totodile" role="button" tabindex="0" aria-label="Totodile"
+            onclick="window._selectCat&&window._selectCat('totodile',this)">
+            <canvas class="char-preview" id="previewTotodile"></canvas>
+            <div class="char-name">Totodile</div>
+            <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
+          </div>
+          <div class="char-card" data-model="korra" role="button" tabindex="0" aria-label="Korra"
+            onclick="window._selectCat&&window._selectCat('korra',this)">
+            <canvas class="char-preview" id="previewKorra"></canvas>
+            <div class="char-name">Cursed Korra</div>
+            <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
+          </div>
+        </div>
+        <div class="mode-select" role="group" aria-label="Movement mode">
+          <button type="button" class="mode-pill on" data-mode="normal"
+            onclick="window._selectMode&&window._selectMode('normal',this)">
+            <i class="ph ph-person-simple-walk"></i>
+            <span class="mode-pill__label">Normal</span>
+          </button>
+          <button type="button" class="mode-pill" data-mode="speed"
+            onclick="window._selectMode&&window._selectMode('speed',this)">
+            <i class="ph ph-lightning"></i>
+            <span class="mode-pill__label">Speed</span>
+            <span class="mode-pill__sub">3× top speed · +12 coins</span>
+          </button>
+          <button type="button" class="mode-pill" data-mode="skate"
+            onclick="window._selectMode&&window._selectMode('skate',this)">
+            <i class="ph ph-sneaker-move"></i>
+            <span class="mode-pill__label">Skate</span>
+            <span class="mode-pill__sub">Ride on a skateboard</span>
+          </button>
+        </div>
+        <button class="char-start glass-btn glass-btn--primary" onclick="window._startGame&&window._startGame()">Start
+          run</button>
+      </div>
+    </div>
+
+    <!-- FP HUD -->
+    <div id="fpHud" role="status" aria-live="polite" aria-atomic="false">
+      <div class="run-hud-center run-pill run-pill--combo" aria-label="Run status">
+        <div id="runTimerHud" class="run-pill--timer" aria-label="Run timer">
+          <i class="ph ph-stopwatch run-pill__icon"></i>
+          <div class="run-pill__stack">
+            <span id="runTimerText">00:00.000</span>
+            <span id="fpsInline" class="run-pill__fps" hidden></span>
+          </div>
+        </div>
+        <span class="run-pill__divider" aria-hidden="true"></span>
+        <div id="coinHud" class="run-pill--coins" aria-label="Coins collected">
+          <i class="ph-fill ph-coins run-pill__icon run-pill__icon--gold"></i>
+          <span id="coinCount">0/0</span>
+          <span id="secretCoinHud" class="run-pill__secret" aria-label="Secret coins" style="display:none">
+            <span class="run-pill__sep" aria-hidden="true"></span>
+            <i class="ph-fill ph-coin run-pill__icon run-pill__icon--cyan"></i>
+            <span id="secretCoinCount">0</span>
+          </span>
+        </div>
+        <span id="mphDivider" class="run-pill__divider" aria-hidden="true" style="display:none"></span>
+        <div id="mphHud" class="run-pill--mph" aria-label="Speed" style="display:none">
+          <span id="mphValue">0</span><span class="mph-unit">MPH</span>
+        </div>
+      </div>
+      <span id="runTimerState" class="run-timer-state" hidden></span>
+      <div id="fpShareRow" style="display:none"><button id="fpShareBtn" type="button"><i class="ph ph-copy"></i> Copy
+          result</button></div>
+    </div>
+    <div id="fpCrosshair"></div>
+    <div id="fpCrosshairTooltip"></div>
+    <div id="fpControlsHint">Press <kbd>H</kbd> for controls</div>
+    <div id="fpControlsPanel" role="dialog" aria-label="Controls" style="display:none">
+      <div class="fp-panel-header"><span>Controls</span><button onclick="window._toggleHelp&&window._toggleHelp()"
+          class="fp-panel-close" aria-label="Close controls panel">&times;</button></div>
+      <div class="fp-panel-grid">
+        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
+        <div><kbd>Space</kbd> Jump (hold to charge)</div>
+        <div><kbd>Shift</kbd> Sprint</div>
+        <div><kbd>V</kbd> Toggle first/third person</div>
+        <div><kbd>K</kbd> Toggle skate mode</div>
+        <div><kbd>Q</kbd> Kickflip (skate)</div>
+        <div><kbd>E</kbd> Manual / wheelie (skate)</div>
+        <div><kbd>F</kbd> Board spin (skate)</div>
+        <div><kbd>R</kbd> Reset run</div>
+        <div><kbd>H</kbd> Toggle this panel</div>
+        <div><kbd>G</kbd> Exit game</div>
+        <div><kbd>Esc</kbd> Pause / resume</div>
+        <div>Click interactive objects</div>
+        <div>Crosshair turns blue on hover</div>
+      </div>
+    </div>
+    <div id="fpChargeBar" aria-label="Jump charge">
+      <div id="fpBarTopRow">
+        <div id="skateUnlockHint" aria-label="Skateboard unlocked">
+          <span class="skate-icon">🛹</span> <kbd>K</kbd> Skateboard
+        </div>
+        <div id="pauseHint" onclick="window._pauseFP&&window._pauseFP()">
+          <kbd>Esc</kbd> Pause
+        </div>
+      </div>
+      <div id="skateTrickHints" aria-label="Skate trick controls">
+        <span><kbd>Q</kbd> Kickflip</span>
+        <span><kbd>E</kbd> Manual</span>
+        <span><kbd>F</kbd> Spin</span>
+      </div>
+      <div id="fpBarDivider"></div>
+      <div class="fp-charge-head">
+        <span class="fp-charge-label"><i class="ph ph-arrow-fat-up"></i> <span id="fpChargeLabel">Jump
+            charge</span></span>
+        <span id="fpChargeValue">Ready</span>
+      </div>
+      <div class="fp-charge-track">
+        <div id="fpChargeFill"></div>
+      </div>
+    </div>
+
+    <!-- Skateboard onboarding overlay (shown once when skateboard is found) -->
+    <div id="fpSkateOnboarding" role="dialog" aria-modal="true" aria-label="Skateboard unlocked">
+      <div class="skate-onboard-card">
+        <div class="skate-onboard-header">
+          <div class="skate-onboard-emoji">🛹</div>
+          <h2>Skate Mode Unlocked!</h2>
+          <p class="skate-onboard-sub">You found the hidden skateboard. Here's how to ride it:</p>
+        </div>
+        <div class="skate-onboard-grid">
+          <div class="skate-onboard-row">
+            <div class="skate-onboard-keys"><kbd>K</kbd></div>
+            <div class="skate-onboard-desc"><b>Get on / off the board</b><br><span>Toggle skate mode anytime</span>
+            </div>
+          </div>
+          <div class="skate-onboard-row">
+            <div class="skate-onboard-keys"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></div>
+            <div class="skate-onboard-desc"><b>Push &amp; steer</b><br><span>Hold W to push faster, A/D to carve</span>
+            </div>
+          </div>
+          <div class="skate-onboard-row">
+            <div class="skate-onboard-keys"><kbd>Space</kbd></div>
+            <div class="skate-onboard-desc"><b>Ollie</b><br><span>Hold to charge a bigger jump</span></div>
+          </div>
+          <div class="skate-onboard-row">
+            <div class="skate-onboard-keys"><kbd>Q</kbd></div>
+            <div class="skate-onboard-desc"><b>Kickflip</b><br><span>While in the air after an ollie</span></div>
+          </div>
+          <div class="skate-onboard-row">
+            <div class="skate-onboard-keys"><kbd>E</kbd></div>
+            <div class="skate-onboard-desc"><b>Manual / wheelie</b><br><span>Hold to balance on back wheels</span></div>
+          </div>
+          <div class="skate-onboard-row">
+            <div class="skate-onboard-keys"><kbd>F</kbd></div>
+            <div class="skate-onboard-desc"><b>Board spin</b><br><span>Tap mid-air; chain spins for tricks</span></div>
+          </div>
+        </div>
+        <div class="skate-onboard-footer">
+          <button class="glass-btn glass-btn--primary" id="fpSkateOnboardingClose"
+            onclick="window._closeSkateOnboarding&&window._closeSkateOnboarding()">Let's skate <kbd>Esc</kbd></button>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Mobile controls -->
-  <div id="mobilePad">
-    <div id="mobileJoystick">
-      <div id="mobileJoyKnob"></div>
+    <!-- Pause overlay -->
+    <div id="fpPauseOverlay" role="dialog" aria-modal="true" aria-label="Pause menu">
+      <div class="pause-card">
+
+        <!-- Action zone: Resume / Reset / Exit — prominent top band -->
+        <div class="pause-action-zone">
+          <div class="pause-action-header">
+            <h2>Paused</h2>
+          </div>
+          <div class="pause-action-btns">
+            <button class="pause-btn pause-btn--hero glass-btn glass-btn--primary" id="fpPauseResume"
+              onclick="window._resumeFP&&window._resumeFP()"><i class="ph-fill ph-play"></i> Resume <kbd
+                class="pause-btn-key">Esc</kbd></button>
+            <button class="pause-btn pause-btn--secondary glass-btn" onclick="window._resetFP&&window._resetFP()"><i
+                class="ph ph-arrow-counter-clockwise"></i> Reset run <kbd class="pause-btn-key">R</kbd></button>
+            <button class="pause-btn pause-btn--secondary glass-btn glass-btn--danger"
+              onclick="window._exitFP&&window._exitFP()"><i class="ph ph-sign-out"></i> Exit</button>
+          </div>
+        </div>
+
+        <!-- Body: settings + leaderboard -->
+        <div class="pause-layout">
+          <!-- Left: settings -->
+          <div class="pause-left">
+
+            <!-- Audio -->
+            <section class="pause-section">
+              <h3 class="pause-section-title"><i class="ph ph-speaker-high"></i> Audio</h3>
+              <div class="pause-toggles">
+                <div class="pause-toggle-row">
+                  <span class="pause-toggle-label"><i class="ph-fill ph-speaker-high"></i> SFX</span>
+                  <div class="toggle-sw on" id="fpPauseMuteSfx" role="switch" aria-checked="true"
+                    onclick="this.classList.toggle('on');window._toggleMuteSfx&&window._toggleMuteSfx(!this.classList.contains('on'))">
+                  </div>
+                  <span class="pause-toggle-state" id="fpPauseMuteSfxState">On</span>
+                </div>
+                <div class="pause-toggle-row">
+                  <span class="pause-toggle-label"><i class="ph-fill ph-music-notes"></i> Music</span>
+                  <div class="toggle-sw on" id="fpPauseMuteMusic" role="switch" aria-checked="true"
+                    onclick="this.classList.toggle('on');window._toggleMuteMusic&&window._toggleMuteMusic(!this.classList.contains('on'))">
+                  </div>
+                  <span class="pause-toggle-state" id="fpPauseMuteMusicState">On</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Display -->
+            <section class="pause-section">
+              <h3 class="pause-section-title"><i class="ph ph-monitor"></i> Display</h3>
+              <div class="pause-toggles">
+                <div class="pause-toggle-row">
+                  <span class="pause-toggle-label"><i class="ph ph-camera-rotate"></i> Camera</span>
+                  <button type="button" class="pause-inline-btn"
+                    onclick="window._switchCamFP&&window._switchCamFP()"><span id="fpPauseCamLabel">Third person</span>
+                    <kbd>V</kbd></button>
+                </div>
+                <div class="pause-toggle-row">
+                  <span class="pause-toggle-label"><i class="ph ph-gauge"></i> Show FPS</span>
+                  <div class="toggle-sw" id="fpPauseShowFps" role="switch" aria-checked="false"
+                    onclick="window._toggleFps&&window._toggleFps()"></div>
+                  <span class="pause-toggle-state off" id="fpPauseShowFpsState">Off</span>
+                </div>
+                <div class="pause-toggle-row" id="fpPauseShowMphRow" style="display:none">
+                  <span class="pause-toggle-label"><i class="ph ph-speedometer"></i> Show MPH</span>
+                  <div class="toggle-sw on" id="fpPauseShowMph" role="switch" aria-checked="true"
+                    onclick="window._toggleMph&&window._toggleMph()"></div>
+                  <span class="pause-toggle-state" id="fpPauseShowMphState">On</span>
+                </div>
+                <div class="pause-toggle-row" id="fpPauseDebugWallsRow" style="display:none">
+                  <span class="pause-toggle-label"><i class="ph ph-walls"></i> Wall labels</span>
+                  <div class="toggle-sw" id="fpPauseDebugWalls" role="switch" aria-checked="false"
+                    onclick="window._toggleDebugWallLabels&&window._toggleDebugWallLabels()"></div>
+                  <span class="pause-toggle-state off" id="fpPauseDebugWallsState">Off</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Controls -->
+            <section class="pause-section">
+              <h3 class="pause-section-title"><i class="ph ph-mouse"></i> Controls</h3>
+              <div class="pause-toggles">
+                <div class="pause-toggle-row pause-toggle-row--slider">
+                  <span class="pause-toggle-label"><i class="ph ph-arrows-out-cardinal"></i> Mouse sensitivity</span>
+                  <input type="range" id="fpPauseMouseSens" class="pause-range" min="0.25" max="2.5" step="0.05"
+                    value="1" aria-label="Mouse sensitivity"
+                    oninput="window._setMouseSens&&window._setMouseSens(this.value)">
+                  <span class="pause-toggle-state" id="fpPauseMouseSensVal">1.00×</span>
+                </div>
+                <div class="pause-toggle-row">
+                  <span class="pause-toggle-label"><i class="ph ph-sneaker-move"></i> Skate mode</span>
+                  <div class="toggle-sw" id="fpPauseSkateMode" role="switch" aria-checked="false"
+                    onclick="window._toggleSkateMode&&window._toggleSkateMode()"></div>
+                  <span class="pause-toggle-state off" id="fpPauseSkateModeState">Off</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Keyboard shortcuts -->
+            <section class="pause-section pause-section--kbd">
+              <h3 class="pause-section-title"><i class="ph ph-keyboard"></i> Keyboard</h3>
+              <div class="pause-controls">
+                <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
+                <div><kbd>Space</kbd> Jump (hold)</div>
+                <div><kbd>Shift</kbd> Sprint</div>
+                <div><kbd>V</kbd> Camera</div>
+                <div><kbd>K</kbd> Skate mode</div>
+                <div><kbd>Q</kbd> Kickflip (skate)</div>
+                <div><kbd>E</kbd> Manual (skate)</div>
+                <div><kbd>F</kbd> Helicopter (skate)</div>
+                <div><kbd>R</kbd> Reset run</div>
+                <div><kbd>Esc</kbd> Resume</div>
+              </div>
+            </section>
+          </div>
+
+          <!-- Right: leaderboard -->
+          <div class="pause-right">
+            <h4 class="pause-lb-title"><i class="ph-fill ph-trophy"></i> Leaderboard</h4>
+            <ol id="fpLeaderboardList"></ol>
+            <div id="fpLeaderboardEmpty" class="pause-lb-empty">No runs yet. Collect all coins to post a time!</div>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
-  <button id="mobileJumpBtn" aria-label="Jump" ontouchstart="window._mobileJump&&window._mobileJump(true)" ontouchend="window._mobileJump&&window._mobileJump(false)"><i class="ph-fill ph-arrow-fat-up" aria-hidden="true"></i></button>
-  <button id="mobileExitBtn" aria-label="Exit game" onclick="window._exitFP&&window._exitFP()"><i class="ph ph-x" aria-hidden="true"></i></button>
+
+    <!-- Mobile controls -->
+    <div id="mobilePad">
+      <div id="mobileJoystick">
+        <div id="mobileJoyKnob"></div>
+      </div>
+    </div>
+    <button id="mobileJumpBtn" aria-label="Jump" ontouchstart="window._mobileJump&&window._mobileJump(true)"
+      ontouchend="window._mobileJump&&window._mobileJump(false)"><i class="ph-fill ph-arrow-fat-up"
+        aria-hidden="true"></i></button>
+    <button id="mobileExitBtn" aria-label="Exit game" onclick="window._exitFP&&window._exitFP()"><i class="ph ph-x"
+        aria-hidden="true"></i></button>
   </main>
 
   <script>
@@ -551,4 +735,5 @@
   </script>
   <script type="module" src="/src/main.js"></script>
 </body>
+
 </html>

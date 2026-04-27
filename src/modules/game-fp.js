@@ -1285,8 +1285,55 @@ function _collectPickupSkateboard() {
   markSkateboardFound();
   _playPickupSfx();
 
-  if (_showToast) _showToast('Skateboard found! Skate mode unlocked! Press K or toggle in pause menu.');
+  // First-time pickup gets the full onboarding modal; subsequent loads
+  // (e.g., from a localStorage-cleared dev session) just toast.
+  let seenOnboarding = false;
+  try { seenOnboarding = localStorage.getItem(SKATE_ONBOARDING_KEY) === '1'; } catch (e) {}
+  if (seenOnboarding) {
+    if (_showToast) _showToast('Skateboard found! Skate mode unlocked! Press K or toggle in pause menu.');
+  } else {
+    _showSkateOnboarding();
+  }
 }
+
+// ── Skateboard onboarding overlay (one-time) ──────────────────────────
+const SKATE_ONBOARDING_KEY = 'diy_skate_onboarding_seen';
+let _skateOnboardingOpen = false;
+let _skateOnboardingFocusTrap = null;
+let _skateOnboardingSavedFocus = null;
+
+function _showSkateOnboarding(force = false) {
+  try {
+    if (!force && localStorage.getItem(SKATE_ONBOARDING_KEY) === '1') return;
+  } catch (e) { /* ignore */ }
+  const overlay = document.getElementById('fpSkateOnboarding');
+  if (!overlay) return;
+  _skateOnboardingOpen = true;
+  overlay.style.display = 'flex';
+  // Pause the game while the onboarding is up so input doesn't leak through.
+  setPaused(true);
+  // Hide the regular pause overlay — onboarding takes precedence.
+  const pause = document.getElementById('fpPauseOverlay');
+  if (pause) pause.style.display = 'none';
+  _skateOnboardingSavedFocus = saveFocus();
+  _skateOnboardingFocusTrap = trapFocus(overlay);
+  const closeBtn = overlay.querySelector('#fpSkateOnboardingClose');
+  if (closeBtn) requestAnimationFrame(() => closeBtn.focus());
+}
+
+function _closeSkateOnboarding() {
+  if (!_skateOnboardingOpen) return;
+  _skateOnboardingOpen = false;
+  const overlay = document.getElementById('fpSkateOnboarding');
+  if (overlay) overlay.style.display = 'none';
+  if (_skateOnboardingFocusTrap) { _skateOnboardingFocusTrap.release(); _skateOnboardingFocusTrap = null; }
+  if (_skateOnboardingSavedFocus) { _skateOnboardingSavedFocus.restore(); _skateOnboardingSavedFocus = null; }
+  try { localStorage.setItem(SKATE_ONBOARDING_KEY, '1'); } catch (e) { /* ignore */ }
+  // Resume back into the game.
+  setPaused(false);
+}
+window._closeSkateOnboarding = _closeSkateOnboarding;
+export function isSkateOnboardingOpen() { return _skateOnboardingOpen; }
 
 function _playPickupSfx() {
   const ac = _ensureSfxAudioCtx();
@@ -3609,6 +3656,7 @@ function _bindInputs() {
       case 'ShiftLeft': case 'ShiftRight': fpKeys.shift = true; break;
       case 'Escape': case 'Tab':
         e.preventDefault();
+        if (_skateOnboardingOpen) { _closeSkateOnboarding(); break; }
         setPaused(!fpPaused);
         break;
       case 'KeyV':
