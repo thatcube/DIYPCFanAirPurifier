@@ -4042,7 +4042,7 @@ export function createRoom(scene) {
       const binderZ = bedZ + 32;       // headboard/door-wall side
       const binderRoot = new THREE.Group();
       binderRoot.position.set(binderX, underBedY, binderZ);
-      binderRoot.rotation.y = 0.18;    // slight tilt; mirror flips sign — fine
+      binderRoot.rotation.y = -2 * Math.PI / 3; // ~120° (mirror flips sign)
       binderRoot._isRoom = true;       // X-mirror flips its position only
       binderRoot._isPokemonBinder = true; // makes any descendant clickable
       // NOTE: children below are NOT _isRoom — they ride along in local frame
