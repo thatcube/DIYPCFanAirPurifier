@@ -1537,11 +1537,13 @@ export function createRoom(scene) {
   const grWallZmin = _grZmin - 0.5;           // full Z range of wall
   const grWallZmax = _grZmax + 0.5;
   {
-    // Below window
-    const bH = grWinBottom - floorY;
+    // Below window — extends well below the floor to act as the visible
+    // foundation/skirt above the lowered yard.
+    const skirt = 60;
+    const bH = grWinBottom - floorY + skirt;
     const w = new THREE.Mesh(
       new THREE.BoxGeometry(0.5, bH, _grWidthZ + 1), grWallMat);
-    w.position.set(grFrontWallX, floorY + bH / 2, _grCenterZ);
+    w.position.set(grFrontWallX, floorY - skirt + bH / 2, _grCenterZ);
     w.castShadow = true; w.receiveShadow = true;
     w._isRoom = true; w._isGuestRoom = true; addRoom(w);
     // Above window
@@ -1569,13 +1571,16 @@ export function createRoom(scene) {
   // Outer "front of house" wall — extends the office front wall in +Z all
   // the way to the end of the hallway, giving the property a continuous
   // exterior face when looking out the office window. Solid (no openings).
+  // Extended below floor level to meet the lowered yard.
   {
     const extZmin = grWallZmax;             // 69.5 (where office front wall ends)
     const extZmax = _hallZEnd + 0.5;        // 289.5 (matches hallway end-cap)
     const extLen = extZmax - extZmin;
+    const skirt = 60;
+    const extH = _grHeight + skirt;
     const ext = new THREE.Mesh(
-      new THREE.BoxGeometry(0.5, _grHeight, extLen), grWallMat);
-    ext.position.set(grFrontWallX, floorY + _grHeight / 2, (extZmin + extZmax) / 2);
+      new THREE.BoxGeometry(0.5, extH, extLen), grWallMat);
+    ext.position.set(grFrontWallX, floorY - skirt + extH / 2, (extZmin + extZmax) / 2);
     ext.castShadow = true; ext.receiveShadow = true;
     ext._isRoom = true; ext._isGuestRoom = true;
     addRoom(ext);
@@ -1793,7 +1798,9 @@ export function createRoom(scene) {
   //   Road:        411   → 543  (11 ft flat)
   // Z extent: 200" centered on grWinCenterZ.
   {
-    const terrainZhalf = 100;
+    // Z extent spans the whole front-of-house run (office window through
+    // hallway end) plus generous overrun so grass reads as a real yard.
+    const terrainZhalf = 300;
     const terrainZmin = grWinCenterZ - terrainZhalf;
     const terrainZmax = grWinCenterZ + terrainZhalf;
     const terrainZw = terrainZmax - terrainZmin;
