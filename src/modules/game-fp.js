@@ -3383,12 +3383,17 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     const inGuestDoorway = focal.x < -51 + 4 && focal.x > -51 - 8
       && focal.z > 34 - 2 && focal.z < 66 + 2;
     const inGuestRoom = focal.x < -51 - 1 && focal.z > -78 && focal.z < 69;
-    const inOutdoor = focal.x < -183;
-    const inHallway = focal.z > 49 - 1 && !inGuestDoorway && !inGuestRoom;
+    // Match physics outdoorZone — true whenever the focal point is outside
+    // all three house volumes (bedroom, office, hallway).
+    const fInBedroom = (focal.x >= -51 && focal.x <= 81 && focal.z >= -78 && focal.z <= 49);
+    const fInOffice = (focal.x >= -183 && focal.x <= -51 && focal.z >= -78 && focal.z <= 69);
+    const fInHallwayVol = (focal.x >= -51 && focal.x <= -11 && focal.z >= 49 && focal.z <= 289);
+    const inOutdoor = !(fInBedroom || fInOffice || fInHallwayVol);
+    const inHallway = focal.z > 49 - 1 && !inGuestDoorway && !inGuestRoom && !inOutdoor;
     let camWallXMin, camWallXMax;
     if (inOutdoor) {
-      camWallXMin = -544 + 1;
-      camWallXMax = -LEFT_WALL_X - 1;
+      camWallXMin = -3000;
+      camWallXMax = 3000;
     } else if (inGuestRoom || inGuestDoorway) {
       camWallXMin = -183 + 1;
       camWallXMax = -LEFT_WALL_X - 1;
