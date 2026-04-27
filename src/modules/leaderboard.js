@@ -268,11 +268,11 @@ async function _lbApiRequest(path, body) {
   const init = body === undefined
     ? { method: 'GET', credentials: 'same-origin' }
     : {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      };
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    };
   const res = await fetch(url, init);
   let payload = {};
   try { payload = await res.json(); } catch (e) { /* ignore */ }
@@ -618,9 +618,9 @@ export function renderLeaderboardPanel() {
     return;
   }
   if (emptyEl) emptyEl.style.display = 'none';
-  // Show top 10 visible entries (after per-player cap) in the pause card
+  // Show top 30 visible entries (after per-player cap) in the pause card
   const vis = _visibleIndices(_leaderboard);
-  const top = vis.slice(0, 10);
+  const top = vis.slice(0, 30);
   const latestEntryId = String(((_lastRunData && _lastRunData.entryId) || (_finishDialogData && _finishDialogData.entryId) || '')).trim();
   list.innerHTML = top.map((idx, rank) => {
     const r = _leaderboard[idx];
@@ -1364,7 +1364,8 @@ function _renderFinishDialog() {
           }</span>
           ${_catBadgeHtml(r)}
           <span class="tm">${formatRunTime(r.timeMs, true)}</span>
-        </li>`);      }
+        </li>`);
+      }
       if (pending && pendingInsertAt >= _leaderboard.length) rows.push(pendingHtml);
     } else {
       rows.push('<li style="opacity:0.62;padding:8px 10px">No runs yet.</li>');
