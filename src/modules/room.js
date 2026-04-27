@@ -4058,6 +4058,11 @@ export function createRoom(scene) {
       const spineTex = texLoader.load('img/childhood_pokemon_binder_spine.jpg', (t) => {
         t.colorSpace = THREE.SRGBColorSpace;
         if (state.renderer) t.anisotropy = Math.min(8, state.renderer.capabilities.getMaxAnisotropy());
+        // Image is 141w × 895h (tall). The spine's -X face is wide×short
+        // (Z=D, Y=totalH). Rotate the texture 90° so the image's long axis
+        // aligns with the long Z axis of the face — preserves aspect ratio.
+        t.center.set(0.5, 0.5);
+        t.rotation = Math.PI / 2;
       });
 
       const redMat = new THREE.MeshStandardMaterial({ color: 0x6b1313, roughness: 0.72, metalness: 0.04 });
