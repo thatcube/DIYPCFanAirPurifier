@@ -4037,9 +4037,9 @@ export function createRoom(scene) {
       const topH = 0.22;   // top cover thickness
       const spineThick = 0.55; // spine bulges this far past the body in -X
 
-      // Tucked into the foot/window corner under the bed.
+      // Tucked into the headboard/window corner under the bed (door-wall side).
       const binderX = bedX - 22;       // pre-mirror; near window-side rail
-      const binderZ = bedZ - 32;       // foot-side rail
+      const binderZ = bedZ + 32;       // headboard/door-wall side
       const binderRoot = new THREE.Group();
       binderRoot.position.set(binderX, underBedY, binderZ);
       binderRoot.rotation.y = 0.18;    // slight tilt; mirror flips sign — fine
