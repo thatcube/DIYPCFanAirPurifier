@@ -1293,7 +1293,7 @@ function _collectPickupSkateboard() {
   // First-time pickup gets the full onboarding modal; subsequent loads
   // (e.g., from a localStorage-cleared dev session) just toast.
   let seenOnboarding = false;
-  try { seenOnboarding = localStorage.getItem(SKATE_ONBOARDING_KEY) === '1'; } catch (e) {}
+  try { seenOnboarding = localStorage.getItem(SKATE_ONBOARDING_KEY) === '1'; } catch (e) { }
   if (seenOnboarding) {
     if (_showToast) _showToast('Skateboard found! Skate mode unlocked! Press K or toggle in pause menu.');
   } else {
@@ -3400,7 +3400,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       camWallXMax = -LEFT_WALL_X - 1;
     }
     // Z bounds must include closet interior (extends to cZ - cIW/2 = -89)
-    const camWallZMin = CLOSET_Z - CLOSET_INTERIOR_W / 2 + 1; // closet -Z side wall
+    let camWallZMin = CLOSET_Z - CLOSET_INTERIOR_W / 2 + 1; // closet -Z side wall
     // Default Z clamp stops at the back-wall inner face. When the player is in
     // the hallway extension (focal X inside the hallway opening and past the
     // back wall), extend Z so the camera can follow. Also extend for office
@@ -3412,10 +3412,20 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     } else {
       camWallZMax = 49 - 1;
     }
+    // Outdoors: the lawn extends far in every direction with no walls, so
+    // open up the Z clamp to match and let the camera follow the cat freely.
+    if (inOutdoor) {
+      camWallZMin = -3000;
+      camWallZMax = 3000;
+    }
     // Camera Y min tracks the player's current ground, not the room floor,
     // so on elevated surfaces (bed, nightstand) it doesn't clip below them.
-    const cyMin = Math.max(floorY + 0.5, fpPos.y - EYE_H + 1.5);
-    const cyMax = (floorY + 80) - 2;
+    // Outdoors the lawn drops well below floorY, so we drop the indoor floor
+    // term and let the camera sit just above the player's feet.
+    const cyMinFloor = inOutdoor ? (fpPos.y - EYE_H - 20) : (floorY + 0.5);
+    const cyMin = Math.max(cyMinFloor, fpPos.y - EYE_H + 1.5);
+    // Outdoors uses the same expanded ceiling as physics (floorY + 200).
+    const cyMax = inOutdoor ? (floorY + 200) - 2 : (floorY + 80) - 2;
     const maxDX = dxC > 0 ? (camWallXMax - focal.x) : (focal.x - camWallXMin);
     const maxDY = dyC > 0 ? (cyMax - focal.y) : (focal.y - cyMin);
     const maxDZ = dzC > 0 ? (camWallZMax - focal.z) : (focal.z - camWallZMin);
