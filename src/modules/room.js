@@ -4027,8 +4027,10 @@ export function createRoom(scene) {
     // Pokémon card binder — childhood binder with cover/spine art.
     // Click anywhere on it to open; first open spawns the secret blue coin.
     {
-      const W = 14;        // body width along local X
-      const D = 11;        // body depth along local Z
+      // Body dimensions match the cover image aspect ratio (788:895 → W:D)
+      // so the cover art on top isn't stretched.
+      const W = 12;        // body width along local X
+      const D = 13.62;     // body depth along local Z (W * 895/788)
       const baseH = 0.25;  // bottom cover thickness
       const pagesH = 1.0;  // page-stack height
       const totalH = 1.7;  // closed binder total height (top of spine)
