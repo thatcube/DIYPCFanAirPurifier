@@ -1762,6 +1762,30 @@ input[type=range]::-moz-range-thumb {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);
   overflow: hidden;
+  position: relative;
+}
+
+/* Threshold markers: 75% = max normal jump, 90% = max MEGA jump.
+   Beyond each marker the bar represents progress to the next tier. */
+.fp-charge-track::before,
+.fp-charge-track::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.fp-charge-track::before {
+  left: 75%;
+}
+
+.fp-charge-track::after {
+  left: 90%;
 }
 
 #fpChargeFill {
@@ -3895,14 +3919,20 @@ input[type=range]:focus-visible {
    absolute-positioned overlay. They're invisible by default; when the
    parent goes ss-active they fade in and run staggered flicker
    animations. Each bolt is a thin diagonal CSS gradient — cheap and
-   doesn't require an SVG asset. Sparks are tiny radial blobs. */
+   doesn't require an SVG asset. Sparks are tiny radial blobs.
+
+   Bolt widths are percentages of the overlay (= container) so the
+   sparks scale with the bar — which itself shrinks/grows depending on
+   whether skate trick hints, the SS row, etc. are visible. The
+   container also clips so bolts can't shoot out the side. */
 #fpBarLightning {
   position: absolute;
   inset: -8px;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.18s ease-out;
-  overflow: visible;
+  overflow: hidden;
+  border-radius: 16px;
   z-index: 1;
 }
 
@@ -3918,11 +3948,11 @@ input[type=range]:focus-visible {
   z-index: 2;
 }
 
-/* Bolt = thin angled streak built from a clipped gradient. Width and
-   length scale via the bolt-N modifiers. */
+/* Bolt = thin angled streak built from a clipped gradient. Yellow/gold
+   to match the Super Saiyan aura. Width is set per-bolt as a percentage
+   so they scale with whatever height the HUD bar happens to be. */
 #fpBarLightning .bolt {
   position: absolute;
-  width: 60px;
   height: 3px;
   background: linear-gradient(90deg,
       transparent 0%,
@@ -3932,28 +3962,31 @@ input[type=range]:focus-visible {
       rgba(255, 240, 170, 0.95) 62%,
       rgba(255, 220, 110, 0.0) 92%,
       transparent 100%);
-  filter: drop-shadow(0 0 6px rgba(255, 215, 110, 0.95)) drop-shadow(0 0 14px rgba(255, 180, 50, 0.75));
+  filter: drop-shadow(0 0 7px rgba(255, 215, 110, 0.95)) drop-shadow(0 0 14px rgba(255, 180, 60, 0.7));
   border-radius: 2px;
   opacity: 0;
   transform-origin: center;
 }
 
-/* Six bolts at different positions / angles / phases. Each runs a
-   different cycle length and uses a different keyframe so the flickers
-   never line up — much more random feeling than the original. */
+/* Six bolts at different positions / angles / phases. Widths are
+   percentages of the container so they always fit, with a max-width
+   cap so they don't get absurdly long on wide layouts. Each uses its
+   own keyframe with a different cycle length so flickers never sync. */
 #fpBarLightning .bolt-1 {
-  top: -10px;
-  left: 4%;
-  width: 140px;
+  top: 8%;
+  left: 2%;
+  width: 38%;
+  max-width: 180px;
   transform: rotate(-22deg);
   animation: hudBoltA 2.3s steps(1, end) infinite;
   animation-delay: 0s;
 }
 
 #fpBarLightning .bolt-2 {
-  top: -14px;
-  left: 26%;
-  width: 110px;
+  top: 4%;
+  left: 24%;
+  width: 28%;
+  max-width: 140px;
   transform: rotate(18deg);
   animation: hudBoltB 1.9s steps(1, end) infinite;
   animation-delay: 0.55s;
@@ -3961,35 +3994,39 @@ input[type=range]:focus-visible {
 
 #fpBarLightning .bolt-3 {
   top: 50%;
-  left: 44%;
-  width: 170px;
+  left: 38%;
+  width: 46%;
+  max-width: 220px;
   transform: rotate(-8deg);
   animation: hudBoltC 2.7s steps(1, end) infinite;
   animation-delay: 1.1s;
 }
 
 #fpBarLightning .bolt-4 {
-  bottom: -8px;
-  right: 14%;
-  width: 130px;
+  bottom: 6%;
+  right: 8%;
+  width: 34%;
+  max-width: 170px;
   transform: rotate(-30deg);
   animation: hudBoltD 2.1s steps(1, end) infinite;
   animation-delay: 0.3s;
 }
 
 #fpBarLightning .bolt-5 {
-  bottom: -12px;
-  left: 10%;
-  width: 95px;
+  bottom: 10%;
+  left: 8%;
+  width: 24%;
+  max-width: 120px;
   transform: rotate(28deg);
   animation: hudBoltE 1.7s steps(1, end) infinite;
   animation-delay: 1.25s;
 }
 
 #fpBarLightning .bolt-6 {
-  top: -4px;
-  right: 6%;
-  width: 160px;
+  top: 12%;
+  right: 4%;
+  width: 42%;
+  max-width: 200px;
   transform: rotate(12deg);
   animation: hudBoltF 2.45s steps(1, end) infinite;
   animation-delay: 0.75s;
@@ -3998,364 +4035,122 @@ input[type=range]:focus-visible {
 /* Sparks = small radial dots that pop and fade like static crackle. */
 #fpBarLightning .spark {
   position: absolute;
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: radial-gradient(circle,
       #fffbe2 0%,
-      rgba(255, 235, 150, 0.95) 35%,
-      rgba(255, 180, 60, 0.55) 65%,
+      rgba(255, 240, 170, 0.95) 35%,
+      rgba(255, 200, 80, 0.5) 65%,
       transparent 100%);
-  filter: drop-shadow(0 0 6px rgba(255, 210, 100, 0.95));
+  filter: drop-shadow(0 0 6px rgba(255, 215, 110, 0.9));
   opacity: 0;
 }
 
 #fpBarLightning .spark-a {
-  top: -5px;
+  top: 6%;
   left: 36%;
-  animation: hudSparkA 1.3s steps(1, end) infinite;
-  animation-delay: 0.4s;
+  animation: hudSparkA 1.8s steps(1, end) infinite;
+  animation-delay: 0.1s;
 }
 
 #fpBarLightning .spark-b {
-  bottom: -6px;
-  right: 32%;
-  animation: hudSparkB 1.55s steps(1, end) infinite;
-  animation-delay: 0.95s;
+  bottom: 8%;
+  right: 28%;
+  animation: hudSparkB 2.4s steps(1, end) infinite;
+  animation-delay: 0.85s;
 }
 
 #fpBarLightning .spark-c {
   top: 38%;
-  right: -5px;
-  animation: hudSparkC 1.85s steps(1, end) infinite;
+  right: 6%;
+  animation: hudSparkC 2.05s steps(1, end) infinite;
   animation-delay: 1.4s;
 }
 
-/* Six different keyframes — irregular on/off intervals across each
-   cycle so no two bolts strobe in the same rhythm. The "on" windows
-   are tiny (1–4% of a cycle) which is what sells the static feel. */
+/* Each bolt gets its own irregular flicker pattern. Different cycle
+   lengths + different on-times make the whole thing feel chaotic. */
 @keyframes hudBoltA {
-
-  0%,
-  11% {
-    opacity: 0;
-  }
-
-  12%,
-  14% {
-    opacity: 1;
-  }
-
-  15%,
-  32% {
-    opacity: 0;
-  }
-
-  33%,
-  34% {
-    opacity: 0.85;
-  }
-
-  35%,
-  71% {
-    opacity: 0;
-  }
-
-  72%,
-  75% {
-    opacity: 1;
-  }
-
-  76%,
-  100% {
-    opacity: 0;
-  }
+  0%, 11% { opacity: 0; }
+  12%, 16% { opacity: 1; }
+  17%, 38% { opacity: 0; }
+  39%, 41% { opacity: 0.85; }
+  42%, 73% { opacity: 0; }
+  74%, 77% { opacity: 0.95; }
+  78%, 100% { opacity: 0; }
 }
 
 @keyframes hudBoltB {
-
-  0%,
-  6% {
-    opacity: 0;
-  }
-
-  7%,
-  9% {
-    opacity: 1;
-  }
-
-  10%,
-  44% {
-    opacity: 0;
-  }
-
-  45%,
-  46% {
-    opacity: 0.7;
-  }
-
-  47%,
-  88% {
-    opacity: 0;
-  }
-
-  89%,
-  92% {
-    opacity: 1;
-  }
-
-  93%,
-  100% {
-    opacity: 0;
-  }
+  0%, 24% { opacity: 0; }
+  25%, 27% { opacity: 1; }
+  28%, 55% { opacity: 0; }
+  56%, 59% { opacity: 0.9; }
+  60%, 100% { opacity: 0; }
 }
 
 @keyframes hudBoltC {
-
-  0%,
-  24% {
-    opacity: 0;
-  }
-
-  25%,
-  28% {
-    opacity: 1;
-  }
-
-  29%,
-  56% {
-    opacity: 0;
-  }
-
-  57%,
-  58% {
-    opacity: 0.6;
-  }
-
-  59%,
-  100% {
-    opacity: 0;
-  }
+  0%, 7% { opacity: 0; }
+  8%, 13% { opacity: 1; }
+  14%, 47% { opacity: 0; }
+  48%, 51% { opacity: 0.8; }
+  52%, 82% { opacity: 0; }
+  83%, 86% { opacity: 1; }
+  87%, 100% { opacity: 0; }
 }
 
 @keyframes hudBoltD {
-
-  0%,
-  17% {
-    opacity: 0;
-  }
-
-  18%,
-  20% {
-    opacity: 1;
-  }
-
-  21%,
-  38% {
-    opacity: 0;
-  }
-
-  39%,
-  41% {
-    opacity: 0.9;
-  }
-
-  42%,
-  64% {
-    opacity: 0;
-  }
-
-  65%,
-  67% {
-    opacity: 0.8;
-  }
-
-  68%,
-  100% {
-    opacity: 0;
-  }
+  0%, 18% { opacity: 0; }
+  19%, 22% { opacity: 0.95; }
+  23%, 64% { opacity: 0; }
+  65%, 68% { opacity: 0.85; }
+  69%, 91% { opacity: 0; }
+  92%, 95% { opacity: 1; }
+  96%, 100% { opacity: 0; }
 }
 
 @keyframes hudBoltE {
-
-  0%,
-  38% {
-    opacity: 0;
-  }
-
-  39%,
-  42% {
-    opacity: 1;
-  }
-
-  43%,
-  79% {
-    opacity: 0;
-  }
-
-  80%,
-  81% {
-    opacity: 0.7;
-  }
-
-  82%,
-  100% {
-    opacity: 0;
-  }
+  0%, 33% { opacity: 0; }
+  34%, 37% { opacity: 1; }
+  38%, 70% { opacity: 0; }
+  71%, 74% { opacity: 0.9; }
+  75%, 100% { opacity: 0; }
 }
 
 @keyframes hudBoltF {
-
-  0%,
-  4% {
-    opacity: 0;
-  }
-
-  5%,
-  8% {
-    opacity: 1;
-  }
-
-  9%,
-  51% {
-    opacity: 0;
-  }
-
-  52%,
-  53% {
-    opacity: 0.5;
-  }
-
-  54%,
-  78% {
-    opacity: 0;
-  }
-
-  79%,
-  82% {
-    opacity: 1;
-  }
-
-  83%,
-  100% {
-    opacity: 0;
-  }
+  0%, 4% { opacity: 0; }
+  5%, 9% { opacity: 0.85; }
+  10%, 42% { opacity: 0; }
+  43%, 46% { opacity: 1; }
+  47%, 79% { opacity: 0; }
+  80%, 83% { opacity: 0.9; }
+  84%, 100% { opacity: 0; }
 }
 
 @keyframes hudSparkA {
-
-  0%,
-  18% {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-
-  19%,
-  24% {
-    opacity: 1;
-    transform: scale(1.3);
-  }
-
-  25%,
-  62% {
-    opacity: 0;
-    transform: scale(0.7);
-  }
-
-  63%,
-  66% {
-    opacity: 0.8;
-    transform: scale(1);
-  }
-
-  67%,
-  100% {
-    opacity: 0;
-    transform: scale(0.7);
-  }
+  0%, 28% { opacity: 0; transform: scale(0.6); }
+  29%, 33% { opacity: 1; transform: scale(1.3); }
+  34%, 67% { opacity: 0; transform: scale(0.8); }
+  68%, 71% { opacity: 0.85; transform: scale(1.1); }
+  72%, 100% { opacity: 0; transform: scale(0.6); }
 }
 
 @keyframes hudSparkB {
-
-  0%,
-  8% {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-
-  9%,
-  13% {
-    opacity: 1;
-    transform: scale(1.4);
-  }
-
-  14%,
-  47% {
-    opacity: 0;
-    transform: scale(0.7);
-  }
-
-  48%,
-  51% {
-    opacity: 0.9;
-    transform: scale(1.1);
-  }
-
-  52%,
-  84% {
-    opacity: 0;
-    transform: scale(0.7);
-  }
-
-  85%,
-  88% {
-    opacity: 1;
-    transform: scale(1.2);
-  }
-
-  89%,
-  100% {
-    opacity: 0;
-    transform: scale(0.7);
-  }
+  0%, 41% { opacity: 0; transform: scale(0.5); }
+  42%, 46% { opacity: 1; transform: scale(1.4); }
+  47%, 88% { opacity: 0; transform: scale(0.7); }
+  89%, 92% { opacity: 0.9; transform: scale(1.2); }
+  93%, 100% { opacity: 0; transform: scale(0.6); }
 }
 
 @keyframes hudSparkC {
-
-  0%,
-  33% {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-
-  34%,
-  38% {
-    opacity: 1;
-    transform: scale(1.3);
-  }
-
-  39%,
-  71% {
-    opacity: 0;
-    transform: scale(0.7);
-  }
-
-  72%,
-  74% {
-    opacity: 0.7;
-    transform: scale(1);
-  }
-
-  75%,
-  100% {
-    opacity: 0;
-    transform: scale(0.7);
-  }
+  0%, 14% { opacity: 0; transform: scale(0.6); }
+  15%, 19% { opacity: 0.95; transform: scale(1.25); }
+  20%, 56% { opacity: 0; transform: scale(0.7); }
+  57%, 60% { opacity: 1; transform: scale(1.35); }
+  61%, 100% { opacity: 0; transform: scale(0.6); }
 }
 
-/* Subtle whole-bar electric flicker — adds a barely-there strobe
-   on top of the existing golden SS glow. Kept VERY low intensity so
-   it doesn't fight the existing gold pulse. */
+/* Subtle whole-bar gold shimmer on top of the existing SS glow. */
 #fpChargeBar.ss-active::before {
   content: "";
   position: absolute;
@@ -4364,47 +4159,19 @@ input[type=range]:focus-visible {
   pointer-events: none;
   background: linear-gradient(120deg,
       transparent 30%,
-      rgba(255, 230, 140, 0.08) 50%,
+      rgba(255, 230, 130, 0.08) 50%,
       transparent 70%);
   opacity: 0;
-  animation: hudCrackle 2.3s steps(1, end) infinite;
+  animation: hudCrackle 3.1s steps(1, end) infinite;
   z-index: 1;
 }
 
 @keyframes hudCrackle {
-
-  0%,
-  19% {
-    opacity: 0;
-  }
-
-  20%,
-  22% {
-    opacity: 1;
-  }
-
-  23%,
-  51% {
-    opacity: 0;
-  }
-
-  52%,
-  54% {
-    opacity: 0.7;
-  }
-
-  55%,
-  83% {
-    opacity: 0;
-  }
-
-  84%,
-  86% {
-    opacity: 0.9;
-  }
-
-  87%,
-  100% {
-    opacity: 0;
-  }
+  0%, 19% { opacity: 0; }
+  20%, 23% { opacity: 1; }
+  24%, 47% { opacity: 0; }
+  48%, 50% { opacity: 0.7; }
+  51%, 81% { opacity: 0; }
+  82%, 85% { opacity: 0.9; }
+  86%, 100% { opacity: 0; }
 }
