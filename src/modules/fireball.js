@@ -296,40 +296,43 @@ function _playWhoosh() {
   if (now - _lastSfxAt < 0.05) return; // throttle ~20 Hz max
   _lastSfxAt = now;
 
-  // Lazily build a short noise buffer once.
+  // Lazily build a longer noise buffer once for the flame body.
   if (!_noiseBuf) {
-    const len = Math.floor(ac.sampleRate * 0.35);
+    const len = Math.floor(ac.sampleRate * 0.7);
     _noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
     const data = _noiseBuf.getChannelData(0);
     for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
   }
 
-  // Filtered noise burst — the "whoosh".
-  const src = ac.createBufferSource();
-  src.buffer = _noiseBuf;
-  const bp = ac.createBiquadFilter();
-  bp.type = 'bandpass';
-  bp.Q.value = 1.1;
-  bp.frequency.setValueAtTime(1600, now);
-  bp.frequency.exponentialRampToValueAtTime(420, now + 0.28);
-  const ng = ac.createGain();
-  ng.gain.setValueAtTime(0.0001, now);
-  ng.gain.linearRampToValueAtTime(0.09, now + 0.015);
-  ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
-  src.connect(bp).connect(ng).connect(ac.destination);
-  src.start(now);
-  src.stop(now + 0.32);
+  // Layer 1: warm low-pass body — the "fwoosh" of flame.
+  // Slow attack avoids the snappy gunshot transient. The cutoff
+  // sweeps DOWN as the sound trails off, like flame fading.
+  const body = ac.createBufferSource();
+  body.buffer = _noiseBuf;
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.Q.value = 0.6;
+  lp.frequency.setValueAtTime(2200, now);
+  lp.frequency.exponentialRampToValueAtTime(380, now + 0.5);
+  const bg = ac.createGain();
+  bg.gain.setValueAtTime(0.0001, now);
+  bg.gain.linearRampToValueAtTime(0.06, now + 0.05);
+  bg.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+  body.connect(lp).connect(bg).connect(ac.destination);
+  body.start(now);
+  body.stop(now + 0.65);
 
-  // Tiny low thump at the start so it has weight.
-  const osc = ac.createOscillator();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(140, now);
-  osc.frequency.exponentialRampToValueAtTime(60, now + 0.14);
-  const og = ac.createGain();
-  og.gain.setValueAtTime(0.0001, now);
-  og.gain.linearRampToValueAtTime(0.05, now + 0.01);
-  og.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
-  osc.connect(og).connect(ac.destination);
-  osc.start(now);
-  osc.stop(now + 0.18);
+  // Layer 2: airy high-pass crackle for the burning feel.
+  const crackle = ac.createBufferSource();
+  crackle.buffer = _noiseBuf;
+  const hp = ac.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = 2400;
+  const cg = ac.createGain();
+  cg.gain.setValueAtTime(0.0001, now);
+  cg.gain.linearRampToValueAtTime(0.018, now + 0.04);
+  cg.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
+  crackle.connect(hp).connect(cg).connect(ac.destination);
+  crackle.start(now);
+  crackle.stop(now + 0.45);
 }
