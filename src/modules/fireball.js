@@ -129,16 +129,24 @@ export function update(dtSec) {
       if (toEmit > 0 && sp.age >= sp.life) {
         sp.age = 0;
         sp.life = TRAIL_LIFE * (0.75 + Math.random() * 0.5);
+        // Spawn behind the haze so the trail is visible immediately,
+        // not buried inside the fireball body (esp. in first-person
+        // where the ball flies away from the camera and would
+        // otherwise occlude its own tail).
+        const speedMag = fb.vel.length() || 1;
+        const backOff = HAZE_RADIUS * (1.1 + Math.random() * 0.6);
         sp.mesh.position.copy(fb.group.position);
+        sp.mesh.position.x -= (fb.vel.x / speedMag) * backOff;
+        sp.mesh.position.y -= (fb.vel.y / speedMag) * backOff;
+        sp.mesh.position.z -= (fb.vel.z / speedMag) * backOff;
         sp.mesh.visible = true;
-        // Embers inherit ~half the head speed → they fall behind at a
-        // visible rate, forming a streaming tail rather than orbiting
-        // the head. Tight lateral jitter keeps the tail slim.
-        const back = 0.40 + Math.random() * 0.18; // 40-58% of head speed
+        // Much slower than the head so the tail keeps stretching out
+        // behind it as time goes on.
+        const back = 0.18 + Math.random() * 0.15; // 18-33% of head speed
         sp.vel.copy(fb.vel).multiplyScalar(back);
-        sp.vel.x += (Math.random() - 0.5) * 6;
-        sp.vel.y += (Math.random() - 0.5) * 5;
-        sp.vel.z += (Math.random() - 0.5) * 6;
+        sp.vel.x += (Math.random() - 0.5) * 7;
+        sp.vel.y += (Math.random() - 0.5) * 6;
+        sp.vel.z += (Math.random() - 0.5) * 7;
         toEmit--;
       }
 
