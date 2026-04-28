@@ -3739,6 +3739,27 @@ export function createPurifier(scene) {
     spinning,
     setSpinning(s) { spinning = s; spinTarget = s ? SPIN_MAX * (fanSpeedPct / 100) : 0; },
     setFanSpeed(pct) { fanSpeedPct = pct; if (spinning) spinTarget = SPIN_MAX * (pct / 100); },
+    areAllFansIndividuallyOff() {
+      // True when every visible rotor is effectively stopped — whether
+      // by clicking each fan individually, via the global spin toggle,
+      // or via the speed slider at 0. Rotors inside hidden groups
+      // (e.g. the alternate panel for a different fan count / layout)
+      // don't count.
+      const active = [];
+      for (const r of allRotors) {
+        let visible = true;
+        let p = r;
+        while (p) {
+          if (p.visible === false) { visible = false; break; }
+          p = p.parent;
+        }
+        if (visible) active.push(r);
+      }
+      if (active.length === 0) return false;
+      // Global stop / 0 speed counts as off for every fan.
+      if (!spinning || fanSpeedPct <= 0) return true;
+      return active.every(r => r.userData.spinning === false);
+    },
     toggleExplode,
     collapseView,
     toggleFilter,
