@@ -1189,13 +1189,14 @@ export function applyCastAnimation(ts, modelKey) {
     // baseQ * euler(...) with high strength so we override the idle
     // dropped-arm pose, instead of compounding small deltas onto it.
     const liftK = curve;                    // signed: peaks then springs back
-    // Pokemon FBX arm bones in this rig need very large rotations to
-    // visibly raise the arms. Up to ~170°.
-    const armPitch = -3.0 * liftK;          // shoulder pitch — arms go up/forward
-    const armSpread = 0.9 * liftK;          // outward roll for windup look
-    const elbowPitch = -1.6 * liftK;        // forearm bend
-    const handPitch = -0.8 * liftK;
-    const shoulderPitch = -1.2 * liftK;
+    // Sign convention (verified against skate's idleDrop): POSITIVE X
+    // pitch raises the arm forward/up; negative drops it. We were
+    // going the wrong way before, which just twisted the dropped arm.
+    const armPitch = 2.6 * liftK;           // shoulder fwd/up swing
+    const armSpread = 0.9 * liftK;          // outward Z roll
+    const elbowPitch = 1.4 * liftK;
+    const handPitch = 0.7 * liftK;
+    const shoulderPitch = 1.1 * liftK;
     // Always slerp at full strength while the cast is active so we
     // dominate the idle/skate poses that ran earlier this frame.
     const strength = Math.abs(liftK) > 0.02 ? 1.0 : 0;
