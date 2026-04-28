@@ -1189,26 +1189,24 @@ export function applyCastAnimation(ts, modelKey) {
     // baseQ * euler(...) with high strength so we override the idle
     // dropped-arm pose, instead of compounding small deltas onto it.
     const liftK = curve;
-    // The skate code raises arms via Z-axis SPREAD (~0.92 rad sideways),
-    // not X pitch — pitch barely moves them visually. So we pile on a
-    // big Z spread (arms fly out & up like a "raise the roof") plus a
-    // forward X push and elbow bend for the throw motion.
-    const spread = 1.6 * liftK;          // big Z spread — primary "arms up" axis
-    const armPitchFwd = 0.55 * liftK;    // small forward pitch
-    const elbowBend = 1.1 * liftK;       // forearm cocks back
-    const handCurl = 0.5 * liftK;
-    const shoulderSpread = 1.2 * liftK;
+    // Pure mirrored Z-spread + symmetric elbow bend. Skip the X-pitch
+    // forward push entirely — combining +Z on one arm and -Z on the
+    // other with any X rotation rotates them in opposite senses (one
+    // forward, one back). Spread alone is symmetric "arms up & out".
+    const spread = 1.55 * liftK;
+    const elbowBend = -1.0 * liftK;      // forearm cocks
+    const handCurl = -0.45 * liftK;
+    const shoulderSpread = 1.15 * liftK;
     const strength = Math.abs(liftK) > 0.02 ? 1.0 : 0;
     if (strength > 0) {
-      // sideSign convention from skate code: lShoulder spread = +Z.
-      _totoApply(totoBones.lShoulder, totoBase.lShoulder, armPitchFwd * 0.5, 0,  shoulderSpread, strength);
-      _totoApply(totoBones.rShoulder, totoBase.rShoulder, armPitchFwd * 0.5, 0, -shoulderSpread, strength);
-      _totoApply(totoBones.lArm,      totoBase.lArm,      armPitchFwd,       0,  spread,         strength);
-      _totoApply(totoBones.rArm,      totoBase.rArm,      armPitchFwd,       0, -spread,         strength);
-      _totoApply(totoBones.lForeArm,  totoBase.lForeArm,  -elbowBend,        0, 0, strength);
-      _totoApply(totoBones.rForeArm,  totoBase.rForeArm,  -elbowBend,        0, 0, strength);
-      _totoApply(totoBones.lHand,     totoBase.lHand,     -handCurl,         0, 0, strength);
-      _totoApply(totoBones.rHand,     totoBase.rHand,     -handCurl,         0, 0, strength);
+      _totoApply(totoBones.lShoulder, totoBase.lShoulder, 0, 0,  shoulderSpread, strength);
+      _totoApply(totoBones.rShoulder, totoBase.rShoulder, 0, 0, -shoulderSpread, strength);
+      _totoApply(totoBones.lArm,      totoBase.lArm,      0, 0,  spread,         strength);
+      _totoApply(totoBones.rArm,      totoBase.rArm,      0, 0, -spread,         strength);
+      _totoApply(totoBones.lForeArm,  totoBase.lForeArm,  elbowBend, 0, 0, strength);
+      _totoApply(totoBones.rForeArm,  totoBase.rForeArm,  elbowBend, 0, 0, strength);
+      _totoApply(totoBones.lHand,     totoBase.lHand,     handCurl,  0, 0, strength);
+      _totoApply(totoBones.rHand,     totoBase.rHand,     handCurl,  0, 0, strength);
     }
   } else if (modelKey === 'bababooey') {
     // No real arms — sell it with a wind-up tilt: lean back at peak,
