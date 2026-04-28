@@ -23,6 +23,7 @@ import * as collision from './modules/game-collision.js';
 import * as spatial from './modules/spatial.js';
 import * as gameFp from './modules/game-fp.js';
 import * as fireball from './modules/fireball.js';
+import * as kamehameha from './modules/kamehameha.js';
 import * as wallFade from './modules/wall-fade.js';
 import { createRoom } from './modules/room.js';
 import * as purifier from './modules/purifier.js';
@@ -455,6 +456,12 @@ particles.init();
 // ── Fireball ability ─────────────────────────────────────────────────
 
 fireball.init({
+  scene,
+  camera,
+  catGroup: catAnimation.catGroup,
+  isFpMode: () => gameFp.fpMode
+});
+kamehameha.init({
   scene,
   camera,
   catGroup: catAnimation.catGroup,
@@ -998,18 +1005,28 @@ function _updateFireballBtnVisibility() {
   }
 }
 
-// Hold-to-charge / release-to-fire kamehameha. Keep the legacy
-// _shootFireball entrypoint for any back-compat callers — it now
-// triggers an instant medium-power blast.
-window._chargeKamehameha = () => {
-  if (fireball.startCharge()) catAnimation.triggerCastCharge();
+// F-key behavior depends on Super Saiyan state:
+//   - Normal: tap/hold spawns spammable fireballs (legacy behavior).
+//   - Super Saiyan: hold to charge kamehameha, release to fire beam.
+// The dispatch happens here so the keyboard handler in game-fp.js
+// stays a thin pass-through and so a charge that was started in SS
+// can still be released cleanly if SS expires mid-hold.
+window._fireballKeyDown = (isRepeat) => {
+  if (gameFp.isSuperSaiyanActive()) {
+    if (isRepeat) return; // autorepeat shouldn't restart charges
+    if (kamehameha.startCharge()) catAnimation.triggerCastCharge();
+  } else {
+    fireball.shoot();
+    catAnimation.triggerCast();
+  }
 };
-window._releaseKamehameha = () => {
-  // End the held pose either way (canceled charges still need to relax),
-  // and only run the release-throw curve if a beam actually fired.
+window._fireballKeyUp = () => {
+  // Always end any held cast pose and any in-progress charge, even if
+  // SS dropped between keydown and keyup.
   catAnimation.endCastCharge();
-  fireball.releaseCharge();
+  if (kamehameha.isCharging()) kamehameha.releaseCharge();
 };
+
 window._shootFireball = () => {
   fireball.shoot();
   catAnimation.triggerCast();
@@ -1677,6 +1694,7 @@ function animate(ts) {
 
   // Fireballs
   fireball.update(dtSec);
+  kamehameha.update(dtSec);
 
   // Wall auto-fade (only in orbit mode — FP resets to opaque)
   if (!gameFp.fpMode) {

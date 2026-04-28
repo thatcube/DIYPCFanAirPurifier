@@ -3724,13 +3724,12 @@ function _bindInputs() {
         _trickManualHeld = skateMode;
         break;
       case 'KeyF':
-        // F is hold-to-charge kamehameha. Keydown (ignoring autorepeat)
-        // begins the charge; the keyup handler below releases it. If
-        // the charge/release hooks aren't wired yet, fall back to the
-        // legacy instant shot so F still does *something*.
-        if (e.repeat) break;
-        if (typeof window._chargeKamehameha === 'function') {
-          window._chargeKamehameha();
+        // F dispatches based on Super Saiyan state — main.js routes to
+        // either fireball spam (normal) or kamehameha charge (SS).
+        // We forward the autorepeat flag so SS charges only START on the
+        // initial press while normal fireballs can still be spammed.
+        if (typeof window._fireballKeyDown === 'function') {
+          window._fireballKeyDown(!!e.repeat);
         } else if (typeof window._shootFireball === 'function') {
           window._shootFireball();
         }
@@ -3763,8 +3762,8 @@ function _bindInputs() {
       case 'ShiftLeft': case 'ShiftRight': fpKeys.shift = false; break;
       case 'KeyE': _trickManualHeld = false; break;
       case 'KeyF':
-        if (typeof window._releaseKamehameha === 'function') {
-          window._releaseKamehameha();
+        if (typeof window._fireballKeyUp === 'function') {
+          window._fireballKeyUp();
         }
         break;
     }
