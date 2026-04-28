@@ -1184,13 +1184,52 @@ export function applyCastAnimation(ts, modelKey) {
     if (korraBones.spine) _applyWeightedBonePitchAbsolute(spineArch, [{ bone: korraBones.spine, weight: 1 }]);
     if (korraBones.chest) _applyWeightedBonePitchAbsolute(spineArch * 0.6, [{ bone: korraBones.chest, weight: 1 }]);
   } else if (modelKey === 'totodile') {
-    const swing = curve * 1.45;
-    const elbow = curve * 0.9;
+    // Big two-arm overhand throw. Use BOTH arms so it reads even if
+    // one shoulder is occluded. Big swing magnitudes — pokemon FBX
+    // arm bones tend to need wide rotations to read past the
+    // procedural idle.
+    const swing = curve * 2.6;   // shoulder pitch (arms fly up & forward)
+    const elbow = curve * 1.6;   // forearm bends
+    const shoulder = curve * 1.2;
     const targets = [];
     if (totoBones.rArm) targets.push({ bone: totoBones.rArm, weight: 1 });
-    if (totoBones.rShoulder) targets.push({ bone: totoBones.rShoulder, weight: 0.4 });
-    if (targets.length) _applyWeightedBoneModelPitch(swing, targets);
-    if (totoBones.rForeArm) _applyWeightedBoneModelPitch(elbow, [{ bone: totoBones.rForeArm, weight: 1 }]);
+    if (totoBones.lArm) targets.push({ bone: totoBones.lArm, weight: 1 });
+    if (targets.length) _applyWeightedBonePitchAbsolute(-swing, targets);
+    const shoulderTargets = [];
+    if (totoBones.rShoulder) shoulderTargets.push({ bone: totoBones.rShoulder, weight: 1 });
+    if (totoBones.lShoulder) shoulderTargets.push({ bone: totoBones.lShoulder, weight: 1 });
+    if (shoulderTargets.length) _applyWeightedBonePitchAbsolute(-shoulder, shoulderTargets);
+    const foreTargets = [];
+    if (totoBones.rForeArm) foreTargets.push({ bone: totoBones.rForeArm, weight: 1 });
+    if (totoBones.lForeArm) foreTargets.push({ bone: totoBones.lForeArm, weight: 1 });
+    if (foreTargets.length) _applyWeightedBonePitchAbsolute(-elbow, foreTargets);
+  } else if (modelKey === 'bababooey') {
+    // No real arms — sell it with a wind-up tilt: lean back at peak,
+    // spring forward on release. Use the existing baba bones.
+    const tilt = -curve * 0.85;
+    const targets = [];
+    if (babaBones.up) targets.push({ bone: babaBones.up, weight: 0.5 });
+    if (babaBones.mid) targets.push({ bone: babaBones.mid, weight: 0.3 });
+    if (babaBones.down) targets.push({ bone: babaBones.down, weight: 0.2 });
+    if (targets.length) _applyWeightedBonePitchAbsolute(tilt, targets);
+    // Stretch up slightly at the peak for a "casting energy" feel.
+    const stretch = 1 + Math.max(0, curve) * 0.10;
+    catModel.scale.set(baseScale.x, baseScale.y * stretch, baseScale.z);
+  } else {
+    // Generic / classic fallback: tilt the whole model back-and-spring
+    // using the root, distributed across spine/head if available.
+    const pitch = -curve * 0.8;
+    const targets = [];
+    for (const b of idleSpineBones) if (b && b.isBone) targets.push({ bone: b, weight: 0.4 });
+    for (const b of idleHeadBones) if (b && b.isBone) targets.push({ bone: b, weight: 0.6 });
+    if (targets.length) {
+      _applyWeightedBonePitchAbsolute(pitch, targets);
+    } else {
+      // Nothing to drive — wobble the root quaternion.
+      tmpEuler.set(pitch * 0.5, 0, 0);
+      tmpQuat.setFromEuler(tmpEuler);
+      catModel.quaternion.multiply(tmpQuat);
+    }
   }
 
   return Math.abs(curve);
