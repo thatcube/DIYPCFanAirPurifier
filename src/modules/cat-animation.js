@@ -1193,10 +1193,10 @@ export function applyCastAnimation(ts, modelKey) {
     // forward push entirely — combining +Z on one arm and -Z on the
     // other with any X rotation rotates them in opposite senses (one
     // forward, one back). Spread alone is symmetric "arms up & out".
-    const spread = 1.05 * liftK;
-    const elbowBend = -0.7 * liftK;
-    const handCurl = -0.3 * liftK;
-    const shoulderSpread = 0.8 * liftK;
+    const spread = 0.85 * liftK;
+    const elbowBend = -0.6 * liftK;
+    const handCurl = -0.25 * liftK;
+    const shoulderSpread = 0.65 * liftK;
     const strength = Math.abs(liftK) > 0.02 ? 1.0 : 0;
     if (strength > 0) {
       _totoApply(totoBones.lShoulder, totoBase.lShoulder, 0, 0,  shoulderSpread, strength);
