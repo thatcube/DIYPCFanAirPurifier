@@ -1199,13 +1199,9 @@ export function applyCastAnimation(ts, modelKey) {
     const shoulderSpread = 0.8 * liftK;
     const strength = Math.abs(liftK) > 0.02 ? 1.0 : 0;
     if (strength > 0) {
-      _totoApply(totoBones.lShoulder, totoBase.lShoulder, 0, 0,  shoulderSpread, strength);
       _totoApply(totoBones.rShoulder, totoBase.rShoulder, 0, 0, -shoulderSpread, strength);
-      _totoApply(totoBones.lArm,      totoBase.lArm,      0, 0,  spread,         strength);
       _totoApply(totoBones.rArm,      totoBase.rArm,      0, 0, -spread,         strength);
-      _totoApply(totoBones.lForeArm,  totoBase.lForeArm,  elbowBend, 0, 0, strength);
       _totoApply(totoBones.rForeArm,  totoBase.rForeArm,  elbowBend, 0, 0, strength);
-      _totoApply(totoBones.lHand,     totoBase.lHand,     handCurl,  0, 0, strength);
       _totoApply(totoBones.rHand,     totoBase.rHand,     handCurl,  0, 0, strength);
     }
   } else if (modelKey === 'bababooey') {
