@@ -1535,8 +1535,7 @@ input[type=range]::-moz-range-thumb {
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
-  row-gap: 18px;
-  padding-bottom: 10px;
+  row-gap: 10px;
 }
 
 /* Left-side cluster groups every "you've unlocked X" hint so they sit
@@ -1546,7 +1545,7 @@ input[type=range]::-moz-range-thumb {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  row-gap: 14px;
+  row-gap: 8px;
   min-width: 0;
 }
 
@@ -1630,6 +1629,7 @@ input[type=range]::-moz-range-thumb {
 #skateTrickHints {
   display: none;
   gap: 8px;
+  margin-top: 14px;
   font-size: 11px;
   font-weight: 600;
   color: #d9f6ff;
