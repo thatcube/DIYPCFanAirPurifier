@@ -1184,26 +1184,31 @@ export function applyCastAnimation(ts, modelKey) {
     if (korraBones.spine) _applyWeightedBonePitchAbsolute(spineArch, [{ bone: korraBones.spine, weight: 1 }]);
     if (korraBones.chest) _applyWeightedBonePitchAbsolute(spineArch * 0.6, [{ bone: korraBones.chest, weight: 1 }]);
   } else if (modelKey === 'totodile') {
-    // Big overhand cast — arms swing up & forward over the head.
+    // Big overhand cast — arms swing all the way overhead.
     // Mirrors how the skate code drives toto arm bones: snap to
     // baseQ * euler(...) with high strength so we override the idle
     // dropped-arm pose, instead of compounding small deltas onto it.
     const liftK = curve;                    // signed: peaks then springs back
-    const armPitch = -1.7 * liftK;          // shoulder pitch — arms go up/forward
-    const armSpread = 0.55 * liftK;         // light outward roll
-    const elbowPitch = -1.1 * liftK;        // forearm bend
-    const handPitch = -0.5 * liftK;
-    const shoulderPitch = -0.6 * liftK;
-    const strength = Math.min(1, Math.abs(liftK) * 1.6);
-    // Left side (sideSign = -1 → spread = +Z, right side flips Z)
-    _totoApply(totoBones.lShoulder, totoBase.lShoulder, shoulderPitch, 0,  armSpread, strength);
-    _totoApply(totoBones.rShoulder, totoBase.rShoulder, shoulderPitch, 0, -armSpread, strength);
-    _totoApply(totoBones.lArm,      totoBase.lArm,      armPitch,      0,  armSpread * 0.6, strength);
-    _totoApply(totoBones.rArm,      totoBase.rArm,      armPitch,      0, -armSpread * 0.6, strength);
-    _totoApply(totoBones.lForeArm,  totoBase.lForeArm,  elbowPitch,    0, 0, strength);
-    _totoApply(totoBones.rForeArm,  totoBase.rForeArm,  elbowPitch,    0, 0, strength);
-    _totoApply(totoBones.lHand,     totoBase.lHand,     handPitch,     0, 0, strength * 0.85);
-    _totoApply(totoBones.rHand,     totoBase.rHand,     handPitch,     0, 0, strength * 0.85);
+    // Pokemon FBX arm bones in this rig need very large rotations to
+    // visibly raise the arms. Up to ~170°.
+    const armPitch = -3.0 * liftK;          // shoulder pitch — arms go up/forward
+    const armSpread = 0.9 * liftK;          // outward roll for windup look
+    const elbowPitch = -1.6 * liftK;        // forearm bend
+    const handPitch = -0.8 * liftK;
+    const shoulderPitch = -1.2 * liftK;
+    // Always slerp at full strength while the cast is active so we
+    // dominate the idle/skate poses that ran earlier this frame.
+    const strength = Math.abs(liftK) > 0.02 ? 1.0 : 0;
+    if (strength > 0) {
+      _totoApply(totoBones.lShoulder, totoBase.lShoulder, shoulderPitch, 0,  armSpread, strength);
+      _totoApply(totoBones.rShoulder, totoBase.rShoulder, shoulderPitch, 0, -armSpread, strength);
+      _totoApply(totoBones.lArm,      totoBase.lArm,      armPitch,      0,  armSpread * 0.6, strength);
+      _totoApply(totoBones.rArm,      totoBase.rArm,      armPitch,      0, -armSpread * 0.6, strength);
+      _totoApply(totoBones.lForeArm,  totoBase.lForeArm,  elbowPitch,    0, 0, strength);
+      _totoApply(totoBones.rForeArm,  totoBase.rForeArm,  elbowPitch,    0, 0, strength);
+      _totoApply(totoBones.lHand,     totoBase.lHand,     handPitch,     0, 0, strength);
+      _totoApply(totoBones.rHand,     totoBase.rHand,     handPitch,     0, 0, strength);
+    }
   } else if (modelKey === 'bababooey') {
     // No real arms — sell it with a wind-up tilt: lean back at peak,
     // spring forward on release. Use the existing baba bones.
