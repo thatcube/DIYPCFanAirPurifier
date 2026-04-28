@@ -9,11 +9,13 @@
     "dev": "vite",
     "dev:api": "node server.js",
     "vite": "vite",
-    "vite:build": "vite build",
+    "vite:build": "npm run assets:optimize && vite build",
     "vite:preview": "vite preview",
     "cf:dev": "npx wrangler dev",
     "cf:deploy": "npx wrangler deploy",
-    "cf:d1:create": "npx wrangler d1 create diy-air-purifier-leaderboard"
+    "cf:d1:create": "npx wrangler d1 create diy-air-purifier-leaderboard",
+    "assets:optimize": "node scripts/optimize-assets.mjs",
+    "assets:optimize:dry": "node scripts/optimize-assets.mjs --dry"
   },
   "dependencies": {
     "@fontsource-variable/nunito-sans": "^5.2.7",
@@ -22,6 +24,10 @@
     "three": "^0.184.0"
   },
   "devDependencies": {
+    "@gltf-transform/core": "^4.3.0",
+    "@gltf-transform/extensions": "^4.3.0",
+    "@gltf-transform/functions": "^4.3.0",
+    "sharp": "^0.34.5",
     "vite": "^8.0.9"
   }
 }

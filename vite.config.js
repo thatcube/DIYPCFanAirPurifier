@@ -44,6 +44,23 @@ export default defineConfig({
         admin: 'admin.html',
         leaderboard: 'leaderboard.html',
         old: 'index.html'
+      },
+      output: {
+        // Use rolldown's advancedChunks (declarative groups). manualChunks
+        // existed but rolldown's auto-splitter was overriding our hints,
+        // dragging three-core into the largest consumer. Groups + priority
+        // gives us a reliable vendor split.
+        advancedChunks: {
+          groups: [
+            { name: 'vendor-three',   test: /[\\/]node_modules[\\/]three[\\/]/, priority: 10 },
+            { name: 'vendor-fonts',   test: /[\\/]node_modules[\\/]@fontsource/, priority: 10 },
+            { name: 'leaderboard',    test: /[\\/]src[\\/]modules[\\/]leaderboard\.js$/, priority: 5 },
+            { name: 'room',           test: /[\\/]src[\\/]modules[\\/]room\.js$/, priority: 5 },
+            { name: 'purifier',       test: /[\\/]src[\\/]modules[\\/]purifier\.js$/, priority: 5 },
+            { name: 'game-fp',        test: /[\\/]src[\\/]modules[\\/]game-fp\.js$/, priority: 5 },
+            { name: 'cat-animation',  test: /[\\/]src[\\/]modules[\\/]cat-animation\.js$/, priority: 5 }
+          ]
+        }
       }
     }
   },

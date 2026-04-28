@@ -30,7 +30,21 @@ import * as purifier from './modules/purifier.js';
 import { createPurifier } from './modules/purifier.js';
 import { initInteractions, coinBump, secretCoinBump } from './modules/ui-interactions.js';
 import { initGlassShine } from './modules/glass-shine.js';
-import { initPreviews, recolorClassicPreview, flushPreviewsOnOpen } from './modules/cat-preview.js';
+let _catPreviewMod = null;
+let _catPreviewPromise = null;
+function _loadCatPreview() {
+  if (_catPreviewMod) return Promise.resolve(_catPreviewMod);
+  if (!_catPreviewPromise) {
+    _catPreviewPromise = import('./modules/cat-preview.js').then(m => {
+      _catPreviewMod = m;
+      return m;
+    });
+  }
+  return _catPreviewPromise;
+}
+const initPreviews = (...args) => _loadCatPreview().then(m => m.initPreviews(...args));
+const flushPreviewsOnOpen = (...args) => _loadCatPreview().then(m => m.flushPreviewsOnOpen(...args));
+const recolorClassicPreview = (...args) => _loadCatPreview().then(m => m.recolorClassicPreview(...args));
 import { initToggleSwitches, initSegButtons, initDecorativeIcons, initClickableDivs, trapFocus, saveFocus } from './modules/a11y.js';
 import {
   SHADOW_UPDATE_INTERVAL_MS, IDLE_FRAME_MS,
