@@ -169,6 +169,37 @@
       color: var(--muted);
       letter-spacing: 0.04em;
     }
+
+    .modeTabs {
+      display: flex;
+      gap: 6px;
+      margin: 0 14px 8px;
+      padding: 4px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+    }
+    .modeTab {
+      flex: 1;
+      appearance: none;
+      background: transparent;
+      border: 0;
+      color: rgba(255, 255, 255, 0.62);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      padding: 8px 12px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .modeTab:hover { color: rgba(255, 255, 255, 0.9); }
+    .modeTab.active {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2) inset;
+    }
     .list { list-style: none; margin: 0; padding: 8px; display: grid; gap: 6px; }
     .row {
       display: grid;
@@ -291,6 +322,10 @@
         <h2 id="boardHeadline">Top times</h2>
         <span id="boardMeta" class="board__meta"></span>
       </header>
+      <div id="modeTabs" class="modeTabs" role="tablist" aria-label="Leaderboard mode">
+        <button type="button" class="modeTab active" role="tab" aria-selected="true" data-lb-mode="normal">Normal · 20 coins</button>
+        <button type="button" class="modeTab" role="tab" aria-selected="false" data-lb-mode="speed">Speed · 32 coins</button>
+      </div>
       <ol id="rows" class="list" aria-live="polite"></ol>
       <div id="empty" class="empty" style="display:none">No runs yet — be the first.</div>
     </section>
@@ -308,6 +343,12 @@
 
     const query = new URLSearchParams(location.search);
     const hitId = query.get('entry') || '';
+    const VALID_MODES = ['normal', 'speed'];
+    function sanitizeMode(v) {
+      const k = String(v || '').trim().toLowerCase();
+      return VALID_MODES.includes(k) ? k : 'normal';
+    }
+    let currentMode = sanitizeMode(query.get('mode'));
 
     function escapeHtml(v) {
       return String(v || '').replace(/[&<>"']/g, (ch) => ({
@@ -375,7 +416,7 @@
     async function loadLeaderboard() {
       let rows = [];
       try {
-        const res = await fetch('/api/leaderboard', { credentials: 'same-origin' });
+        const res = await fetch(`/api/leaderboard?mode=${encodeURIComponent(currentMode)}`, { credentials: 'same-origin' });
         const data = await res.json();
         if (!res.ok || data.ok === false) throw new Error((data && data.message) || `API ${res.status}`);
         rows = Array.isArray(data.leaderboard) ? data.leaderboard : [];
@@ -451,6 +492,30 @@
       setTimeout(() => bgFrame.classList.add('ready'), 4000);
     }
 
+    function syncModeTabsUI() {
+      const tabs = document.querySelectorAll('#modeTabs [data-lb-mode]');
+      tabs.forEach((btn) => {
+        const active = btn.getAttribute('data-lb-mode') === currentMode;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+    }
+
+    document.getElementById('modeTabs').addEventListener('click', (ev) => {
+      const btn = ev.target && ev.target.closest && ev.target.closest('[data-lb-mode]');
+      if (!btn) return;
+      const next = sanitizeMode(btn.getAttribute('data-lb-mode'));
+      if (next === currentMode) return;
+      currentMode = next;
+      const url = new URL(location.href);
+      if (currentMode === 'normal') url.searchParams.delete('mode');
+      else url.searchParams.set('mode', currentMode);
+      history.replaceState(null, '', url.toString());
+      syncModeTabsUI();
+      loadLeaderboard();
+    });
+
+    syncModeTabsUI();
     loadLeaderboard();
   </script>
 </body>
