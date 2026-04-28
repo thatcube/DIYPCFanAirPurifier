@@ -2565,7 +2565,7 @@ export function toggleFirstPerson() {
     coins.fullReset();
     coins.setCoinsVisible(true);
     leaderboard.startTimer();
-    void leaderboard.startSharedRun();
+    void leaderboard.startSharedRun(isSpeedMode() ? 'speed' : 'normal');
 
     // Show cat in third-person
     if (_catGroup) {
@@ -2694,7 +2694,7 @@ function _resetRun() {
   coins.setCoinsVisible(true);
   leaderboard.resetTimer();
   leaderboard.startTimer();
-  void leaderboard.startSharedRun();
+  void leaderboard.startSharedRun(isSpeedMode() ? 'speed' : 'normal');
 }
 
 // ── Set paused ──────────────────────────────────────────────────────
@@ -3728,6 +3728,9 @@ function _bindInputs() {
         // 360s with diminishing returns and a small upward kick; on
         // the ground it acts as a flat pivot that decays back to
         // forward-facing. Cap at ~30 rev/s.
+        // Ignore auto-repeat so players must tap repeatedly rather
+        // than hold the key down to keep accumulating spin.
+        if (e.repeat) break;
         if (skateMode) {
           const SPIN_BASE = Math.PI * 2.66; // ~1.33 rev/s base add
           const SPIN_CAP = Math.PI * 15;   // ~30 rev/s

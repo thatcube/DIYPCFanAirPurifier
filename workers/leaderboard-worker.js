@@ -9,18 +9,21 @@ const SCHEMA_STATEMENTS = [
     cat_model TEXT NOT NULL DEFAULT 'classic',
     player_id TEXT NOT NULL DEFAULT '',
     is_test INTEGER NOT NULL DEFAULT 0,
-    secret_coins INTEGER NOT NULL DEFAULT 0
+    secret_coins INTEGER NOT NULL DEFAULT 0,
+    mode TEXT NOT NULL DEFAULT 'normal'
   )`,
   `CREATE INDEX IF NOT EXISTS idx_lb_time ON leaderboard_entries(time_ms ASC, at_ms ASC)`,
   `CREATE INDEX IF NOT EXISTS idx_lb_name ON leaderboard_entries(name, time_ms ASC, at_ms ASC)`,
   `CREATE INDEX IF NOT EXISTS idx_lb_player ON leaderboard_entries(player_id, time_ms ASC, at_ms ASC)`,
+  `CREATE INDEX IF NOT EXISTS idx_lb_mode ON leaderboard_entries(mode, time_ms ASC, at_ms ASC)`,
   `CREATE TABLE IF NOT EXISTS run_sessions (
     run_id TEXT PRIMARY KEY,
     ip_hash TEXT NOT NULL,
     started_at INTEGER NOT NULL,
     expires_at INTEGER NOT NULL,
     finished INTEGER NOT NULL DEFAULT 0,
-    last_coin_at INTEGER NOT NULL DEFAULT 0
+    last_coin_at INTEGER NOT NULL DEFAULT 0,
+    mode TEXT NOT NULL DEFAULT 'normal'
   )`,
   `CREATE INDEX IF NOT EXISTS idx_runs_expiry ON run_sessions(expires_at)`,
   `CREATE TABLE IF NOT EXISTS run_claims (
@@ -50,7 +53,15 @@ const DEFAULTS = {
   MAX_RUN_MS: 20 * 60 * 1000,
   MIN_COIN_INTERVAL_MS: 120,
   COIN_COUNT: 15,
+  SPEED_EXTRA_COIN_COUNT: 12,
 };
+
+const VALID_MODES = ['normal', 'speed'];
+
+function sanitizeMode(value) {
+  const key = String(value || '').trim().toLowerCase();
+  return VALID_MODES.includes(key) ? key : 'normal';
+}
 
 let dbInitPromise = null;
 
@@ -127,6 +138,7 @@ async function ensureDbInitialized(env) {
     dbInitPromise = (async () => {
       await env.LB_DB.batch(SCHEMA_STATEMENTS.map((sql) => env.LB_DB.prepare(sql).bind()));
       await ensureLeaderboardAppearanceColumns(env.LB_DB);
+      await ensureRunSessionColumns(env.LB_DB);
     })().catch((err) => {
       // Don't cache a rejected promise — next request should retry the
       // migration instead of being permanently poisoned.
@@ -159,6 +171,24 @@ async function ensureLeaderboardAppearanceColumns(db) {
   if (!existing.has('secret_coins')) {
     alters.push(db.prepare(`ALTER TABLE leaderboard_entries ADD COLUMN secret_coins INTEGER NOT NULL DEFAULT 0`).bind());
   }
+  if (!existing.has('mode')) {
+    alters.push(db.prepare(`ALTER TABLE leaderboard_entries ADD COLUMN mode TEXT NOT NULL DEFAULT 'normal'`).bind());
+  }
+  if (alters.length) await db.batch(alters);
+  // Best-effort secondary index for per-mode queries; ignore failures on
+  // older databases where idempotent index creation isn't supported.
+  try {
+    await db.prepare(`CREATE INDEX IF NOT EXISTS idx_lb_mode ON leaderboard_entries(mode, time_ms ASC, at_ms ASC)`).run();
+  } catch (e) { /* ignore */ }
+}
+
+async function ensureRunSessionColumns(db) {
+  const info = await db.prepare(`PRAGMA table_info('run_sessions')`).all();
+  const existing = new Set((info.results || []).map((row) => String(row.name || '')));
+  const alters = [];
+  if (!existing.has('mode')) {
+    alters.push(db.prepare(`ALTER TABLE run_sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'normal'`).bind());
+  }
   if (alters.length) await db.batch(alters);
 }
 
@@ -168,9 +198,29 @@ function getConfig(env) {
     .split(',')
     .map((v) => v.trim())
     .filter(Boolean);
-  const resolvedCoinIds = coinIds.length
+  const normalCoinIds = coinIds.length
     ? coinIds
     : Array.from({ length: defaultCoinCount }, (_, i) => `coin_${i + 1}`);
+
+  // Speed mode adds extra "speed_*" coins on top of the normal set.
+  const speedExtraCount = readNum(env, 'SPEED_EXTRA_COIN_COUNT', DEFAULTS.SPEED_EXTRA_COIN_COUNT);
+  const speedExtraOverride = String(env.SPEED_EXTRA_COIN_IDS || '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+  const speedExtraIds = speedExtraOverride.length
+    ? speedExtraOverride
+    : Array.from({ length: speedExtraCount }, (_, i) => `coin_speed_${i + 1}`);
+  const speedCoinIds = normalCoinIds.concat(speedExtraIds);
+
+  const coinIdsByMode = {
+    normal: normalCoinIds,
+    speed: speedCoinIds,
+  };
+  const coinSetByMode = {
+    normal: new Set(normalCoinIds),
+    speed: new Set(speedCoinIds),
+  };
 
   return {
     MAX_NAME_LEN: readNum(env, 'MAX_NAME_LEN', DEFAULTS.MAX_NAME_LEN),
@@ -180,8 +230,12 @@ function getConfig(env) {
     MIN_RUN_MS: readNum(env, 'MIN_RUN_MS', DEFAULTS.MIN_RUN_MS),
     MAX_RUN_MS: readNum(env, 'MAX_RUN_MS', DEFAULTS.MAX_RUN_MS),
     MIN_COIN_INTERVAL_MS: readNum(env, 'MIN_COIN_INTERVAL_MS', DEFAULTS.MIN_COIN_INTERVAL_MS),
-    COIN_IDS: resolvedCoinIds,
-    COIN_SET: new Set(resolvedCoinIds),
+    // Back-compat: COIN_IDS / COIN_SET keep returning the normal-mode set so
+    // legacy paths (e.g. admin endpoints) behave the same as before.
+    COIN_IDS: normalCoinIds,
+    COIN_SET: coinSetByMode.normal,
+    COIN_IDS_BY_MODE: coinIdsByMode,
+    COIN_SET_BY_MODE: coinSetByMode,
   };
 }
 
@@ -191,14 +245,17 @@ async function handleGetLeaderboard(request, env, cfg) {
   const allowed = await rateLimit(env.LB_DB, ipHash, 'lb_get', 120, 60 * 1000, now);
   if (!allowed) return apiError(429, 'rate_limited', 'Too many requests');
 
-  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg);
+  const url = new URL(request.url);
+  const mode = sanitizeMode(url.searchParams.get('mode'));
+  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg, { mode });
   return jsonResponse(200, {
     ok: true,
     shared: true,
+    mode,
     leaderboard,
     maxEntries: cfg.LB_MAX,
     perPlayer: cfg.LB_PER_PLAYER,
-    requiredCoinCount: cfg.COIN_IDS.length,
+    requiredCoinCount: cfg.COIN_IDS_BY_MODE[mode].length,
     minRunMs: cfg.MIN_RUN_MS,
   });
 }
@@ -211,19 +268,23 @@ async function handleRunStart(request, env, cfg) {
 
   await cleanupExpiredRuns(env.LB_DB, now);
 
+  const body = await parseBody(request);
+  const mode = sanitizeMode(body?.mode);
   const runId = crypto.randomUUID();
   await env.LB_DB.prepare(
-    `INSERT INTO run_sessions (run_id, ip_hash, started_at, expires_at, finished, last_coin_at)
-     VALUES (?, ?, ?, ?, 0, 0)`
+    `INSERT INTO run_sessions (run_id, ip_hash, started_at, expires_at, finished, last_coin_at, mode)
+     VALUES (?, ?, ?, ?, 0, 0, ?)`
   )
-    .bind(runId, ipHash, now, now + cfg.RUN_TTL_MS)
+    .bind(runId, ipHash, now, now + cfg.RUN_TTL_MS, mode)
     .run();
 
+  const coinIds = cfg.COIN_IDS_BY_MODE[mode];
   return jsonResponse(200, {
     ok: true,
     runId,
-    requiredCoinCount: cfg.COIN_IDS.length,
-    coinIds: cfg.COIN_IDS,
+    mode,
+    requiredCoinCount: coinIds.length,
+    coinIds,
     minRunMs: cfg.MIN_RUN_MS,
     maxRunMs: cfg.MAX_RUN_MS,
     serverTime: now,
@@ -241,10 +302,8 @@ async function handleRunCoin(request, env, cfg) {
   const coinId = String(body?.coinId || '');
   if (!runId || !coinId) return apiError(400, 'bad_request', 'runId and coinId are required');
 
-  if (!cfg.COIN_SET.has(coinId)) return apiError(400, 'invalid_coin', 'Unknown coin id');
-
   const run = await env.LB_DB.prepare(
-    `SELECT run_id, ip_hash, started_at, expires_at, finished, last_coin_at
+    `SELECT run_id, ip_hash, started_at, expires_at, finished, last_coin_at, mode
      FROM run_sessions WHERE run_id = ?`
   )
     .bind(runId)
@@ -252,6 +311,11 @@ async function handleRunCoin(request, env, cfg) {
 
   if (!run) return apiError(404, 'run_not_found', 'Run session not found');
   if (run.ip_hash !== ipHash) return apiError(403, 'forbidden', 'Run token does not match this client');
+
+  const runMode = sanitizeMode(run.mode);
+  const coinSet = cfg.COIN_SET_BY_MODE[runMode];
+  const requiredCoinCount = cfg.COIN_IDS_BY_MODE[runMode].length;
+  if (!coinSet.has(coinId)) return apiError(400, 'invalid_coin', 'Unknown coin id');
 
   if (now > Number(run.expires_at)) {
     await deleteRun(env.LB_DB, runId);
@@ -267,7 +331,7 @@ async function handleRunCoin(request, env, cfg) {
 
   if (existingClaim) {
     const coinCount = await getRunCoinCount(env.LB_DB, runId);
-    return jsonResponse(200, { ok: true, coinCount, requiredCoinCount: cfg.COIN_IDS.length });
+    return jsonResponse(200, { ok: true, coinCount, requiredCoinCount });
   }
 
   const lastCoinAt = Number(run.last_coin_at || 0);
@@ -281,7 +345,7 @@ async function handleRunCoin(request, env, cfg) {
   ]);
 
   const coinCount = await getRunCoinCount(env.LB_DB, runId);
-  return jsonResponse(200, { ok: true, coinCount, requiredCoinCount: cfg.COIN_IDS.length });
+  return jsonResponse(200, { ok: true, coinCount, requiredCoinCount });
 }
 
 async function handleRunFinish(request, env, cfg) {
@@ -307,7 +371,7 @@ async function handleRunFinish(request, env, cfg) {
   if (!runId) return apiError(400, 'bad_request', 'runId is required');
 
   const run = await env.LB_DB.prepare(
-    `SELECT run_id, ip_hash, started_at, expires_at, finished
+    `SELECT run_id, ip_hash, started_at, expires_at, finished, mode
      FROM run_sessions WHERE run_id = ?`
   )
     .bind(runId)
@@ -322,10 +386,12 @@ async function handleRunFinish(request, env, cfg) {
   }
   if (Number(run.finished) === 1) return apiError(409, 'run_finished', 'Run already finished');
 
+  const runMode = sanitizeMode(run.mode);
+  const requiredCoinCount = cfg.COIN_IDS_BY_MODE[runMode].length;
   const coinCount = await getRunCoinCount(env.LB_DB, runId);
   // Test runs (Quick Coin Mode etc.) are allowed to submit without claiming
   // the full coin set — they're flagged so admins can purge them at will.
-  if (!isTest && coinCount !== cfg.COIN_IDS.length) {
+  if (!isTest && coinCount !== requiredCoinCount) {
     return apiError(400, 'incomplete_run', 'Not all coins were claimed on the server');
   }
 
@@ -350,7 +416,7 @@ async function handleRunFinish(request, env, cfg) {
   const entryId = await makeEntryId(finalName, Math.floor(elapsed), now);
 
   await env.LB_DB.prepare(
-    `INSERT INTO leaderboard_entries (id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, is_test, secret_coins) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO leaderboard_entries (id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, is_test, secret_coins, mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     entryId,
     finalName,
@@ -361,13 +427,14 @@ async function handleRunFinish(request, env, cfg) {
     catModel,
     playerId,
     isTest,
-    secretCoins
+    secretCoins,
+    runMode
   ).run();
 
   await deleteRun(env.LB_DB, runId);
 
-  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg);
-  await pruneLeaderboard(env.LB_DB, cfg, leaderboard);
+  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg, { mode: runMode });
+  await pruneLeaderboard(env.LB_DB, cfg);
 
   const rank = leaderboard.findIndex((row) => row.id === entryId) + 1;
   const entry = leaderboard.find((row) => row.id === entryId) || {
@@ -379,11 +446,13 @@ async function handleRunFinish(request, env, cfg) {
     catHair,
     catModel,
     playerId,
+    mode: runMode,
   };
 
   return jsonResponse(200, {
     ok: true,
     rank,
+    mode: runMode,
     entry,
     leaderboard,
     maxEntries: cfg.LB_MAX,
@@ -407,7 +476,7 @@ async function handleRunRename(request, env, cfg) {
 
   const target = await env.LB_DB
     .prepare(
-      `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id
+      `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, mode
        FROM leaderboard_entries WHERE id = ? LIMIT 1`
     )
     .bind(entryId)
@@ -432,7 +501,8 @@ async function handleRunRename(request, env, cfg) {
     .bind(name, entryId)
     .run();
 
-  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg);
+  const targetMode = sanitizeMode(target.mode);
+  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg, { mode: targetMode });
   const rank = leaderboard.findIndex((row) => row.id === entryId) + 1;
   const entry = leaderboard.find((row) => row.id === entryId) || {
     id: entryId,
@@ -443,11 +513,13 @@ async function handleRunRename(request, env, cfg) {
     catHair: sanitizeCatHair(target.cat_hair ?? target.catHair),
     catModel: sanitizeCatModel(target.cat_model ?? target.catModel),
     playerId,
+    mode: targetMode,
   };
 
   return jsonResponse(200, {
     ok: true,
     rank: rank > 0 ? rank : 0,
+    mode: targetMode,
     entry,
     leaderboard,
     maxEntries: cfg.LB_MAX,
@@ -481,8 +553,8 @@ async function handleAdminDelete(request, env, cfg) {
   const deleted = Number(result.meta?.changes || 0);
   if (deleted < 1) return apiError(404, 'not_found', 'Entry not found');
 
+  await pruneLeaderboard(env.LB_DB, cfg);
   const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg);
-  await pruneLeaderboard(env.LB_DB, cfg, leaderboard);
   return jsonResponse(200, { ok: true, deletedId: id, leaderboardSize: leaderboard.length });
 }
 
@@ -551,46 +623,59 @@ async function getRunCoinCount(db, runId) {
 
 async function getNormalizedLeaderboard(db, cfg, options = {}) {
   const includeTests = options.includeTests === true;
+  const mode = options.mode == null ? null : sanitizeMode(options.mode);
   const scanLimit = Math.max(cfg.LB_MAX * cfg.LB_PER_PLAYER * 6, 200);
-  const sql = includeTests
-    ? `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, is_test, secret_coins
-       FROM leaderboard_entries ORDER BY time_ms ASC, at_ms ASC LIMIT ?`
-    : `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, is_test, secret_coins
-       FROM leaderboard_entries WHERE is_test = 0 ORDER BY time_ms ASC, at_ms ASC LIMIT ?`;
-  const rows = await db.prepare(sql).bind(scanLimit).all();
+
+  const where = [];
+  if (!includeTests) where.push('is_test = 0');
+  if (mode != null) where.push('mode = ?');
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const sql = `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, is_test, secret_coins, mode
+       FROM leaderboard_entries ${whereSql} ORDER BY time_ms ASC, at_ms ASC LIMIT ?`;
+
+  const stmt = db.prepare(sql);
+  const bound = mode != null ? stmt.bind(mode, scanLimit) : stmt.bind(scanLimit);
+  const rows = await bound.all();
 
   return normalizeLeaderboard(rows.results || [], cfg.LB_MAX, cfg.LB_PER_PLAYER);
 }
 
-async function pruneLeaderboard(db, cfg, normalizedRows) {
-  const keepIds = new Set((normalizedRows || []).map((row) => row.id));
+async function pruneLeaderboard(db, cfg) {
+  // Compute per-mode displayed leaderboards so we keep the best entries
+  // for each mode independently.
+  const keepIds = new Set();
+  for (const mode of VALID_MODES) {
+    const board = await getNormalizedLeaderboard(db, cfg, { mode });
+    for (const row of board) keepIds.add(row.id);
+  }
 
-  // Preserve every distinct player's single best entry, even if it doesn't
-  // fit in the displayed leaderboard. New people who finish a run always
-  // get at least one row in the DB regardless of their time. Group by
-  // stable player_id when present, falling back to display name for legacy
-  // rows with no playerId.
+  // Preserve every distinct (player, mode) pair's single best entry, even
+  // if it doesn't fit in the displayed leaderboard. New people who finish
+  // a run always get at least one row per mode in the DB regardless of
+  // their time.
   const allRows = await db
     .prepare(
-      `SELECT id, name, time_ms, at_ms, player_id
+      `SELECT id, name, time_ms, at_ms, player_id, mode
        FROM leaderboard_entries ORDER BY time_ms ASC, at_ms ASC`
     )
     .all();
 
-  const bestPerPlayer = new Map();
+  const bestPerPlayerMode = new Map();
   for (const row of allRows.results || []) {
     if (!row) continue;
     const id = String(row.id || '').trim();
     if (!id) continue;
     const playerId = sanitizePlayerId(row.player_id);
     const name = sanitizeName(row.name || '', DEFAULTS.MAX_NAME_LEN);
-    const key = playerId ? `id:${playerId}` : `name:${name}`;
-    if (!key || key === 'name:') continue;
+    const rowMode = sanitizeMode(row.mode);
+    const ident = playerId ? `id:${playerId}` : `name:${name}`;
+    if (!ident || ident === 'name:') continue;
+    const key = `${rowMode}|${ident}`;
     // Rows are already ordered by (time_ms ASC, at_ms ASC), so the first
-    // row we see per key is that player's best run.
-    if (!bestPerPlayer.has(key)) bestPerPlayer.set(key, id);
+    // row we see per key is that player's best run for that mode.
+    if (!bestPerPlayerMode.has(key)) bestPerPlayerMode.set(key, id);
   }
-  for (const id of bestPerPlayer.values()) keepIds.add(id);
+  for (const id of bestPerPlayerMode.values()) keepIds.add(id);
 
   const toDelete = [];
   for (const row of allRows.results || []) {
@@ -628,7 +713,8 @@ function normalizeLeaderboard(rows, maxEntries, perPlayer) {
     const secretCoins = Number.isFinite(rawSecret) && rawSecret > 0
       ? Math.floor(rawSecret)
       : 0;
-    clean.push({ id, name, timeMs, at: safeAt, catColor, catHair, catModel, playerId, isTest, secretCoins });
+    const mode = sanitizeMode(row.mode);
+    clean.push({ id, name, timeMs, at: safeAt, catColor, catHair, catModel, playerId, isTest, secretCoins, mode });
   }
 
   clean.sort((a, b) => a.timeMs - b.timeMs || a.at - b.at);
@@ -692,7 +778,7 @@ function sanitizeCatHair(value) {
 
 function sanitizeCatModel(value) {
   const key = String(value || '').trim().toLowerCase();
-  return key === 'classic' || key === 'toon' || key === 'bababooey' || key === 'totodile' ? key : 'classic';
+  return key === 'classic' || key === 'toon' || key === 'bababooey' || key === 'totodile' || key === 'korra' ? key : 'classic';
 }
 
 function sanitizePlayerId(value) {

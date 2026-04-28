@@ -988,12 +988,23 @@ function _checkFanOffUnlock() {
   }
 }
 
+// Poll as a fallback — fan state may change via paths that don't go
+// through our wrappers (e.g. internal setSpinning calls, restored
+// state, or pre-bundle interactions).
+setInterval(_checkFanOffUnlock, 500);
+
+// Expose for debugging from the console.
+window._areFansAllOff = _areFansAllOff;
+window._checkFanOffUnlock = _checkFanOffUnlock;
+window._fireball = fireball;
+
 function _updateFireballBtnVisibility() {
   const btn = document.getElementById('fireballBtn');
   if (!btn) return;
   if (fireball.isUnlocked()) {
     btn.classList.add('is-unlocked');
     btn.removeAttribute('hidden');
+    btn.style.display = ''; // belt + suspenders in case something set inline display:none
   }
 }
 
@@ -1119,7 +1130,7 @@ window._toggleQuickCoin = () => {
   leaderboard.hideShareButton();
   if (gameFp.fpMode) leaderboard.startTimer();
   else leaderboard.resetTimer();
-  void leaderboard.startSharedRun();
+  void leaderboard.startSharedRun(gameFp.isSpeedMode() ? 'speed' : 'normal');
 
   const coinHudCount = document.getElementById('coinCount');
   if (coinHudCount) coinHudCount.textContent = `${coins.coinScore}/${coins.coinTotal}`;

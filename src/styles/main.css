@@ -2470,6 +2470,38 @@ line-height: 1;
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+/* ─── Leaderboard mode tabs ──────────────────────────────────────── */
+.lb-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 8px 0;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+.lb-tab {
+  flex: 1;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.6);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.lb-tab:hover { color: rgba(255, 255, 255, 0.85); }
+.lb-tab.active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2) inset;
+}
+
 /* ─── Leaderboard list (inside pause card) ───────────────────────── */
 #fpLeaderboardList {
   list-style: none;

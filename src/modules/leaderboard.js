@@ -183,7 +183,35 @@ export function getPlayerId() { return _playerId; }
 
 // ── Leaderboard data ────────────────────────────────────────────────
 
+// Run modes that have their own separate leaderboard board.
+export const VALID_LEADERBOARD_MODES = ['normal', 'speed'];
+
+function _sanitizeMode(value) {
+  const key = String(value || '').trim().toLowerCase();
+  return VALID_LEADERBOARD_MODES.includes(key) ? key : 'normal';
+}
+
 let _leaderboard = [];
+// Per-mode cache so switching tabs doesn't lose either side's rows.
+const _leaderboardByMode = { normal: [], speed: [] };
+// Mode of the *currently active* run (set by startSharedRun).
+let _currentRunMode = 'normal';
+// Mode the user is currently viewing on the leaderboard panel.
+let _viewMode = 'normal';
+
+export function getCurrentRunMode() { return _currentRunMode; }
+export function getViewMode() { return _viewMode; }
+
+export function setViewMode(mode) {
+  const next = _sanitizeMode(mode);
+  if (next === _viewMode) return _viewMode;
+  _viewMode = next;
+  _leaderboard = (_leaderboardByMode[_viewMode] || []).slice();
+  renderLeaderboardPanel();
+  // Fetch fresh data for the newly-active tab in the background.
+  void refreshSharedLeaderboard(_viewMode);
+  return _viewMode;
+}
 
 function _escapeHtml(v) {
   return String(v || '').replace(/[&<>"']/g, ch => ({
@@ -209,7 +237,7 @@ function _catBadgeHtml(entry) {
   const model = String((entry && entry.catModel) || 'classic').toLowerCase();
   const emoji = CAT_MODEL_EMOJI[model] || CAT_MODEL_EMOJI.classic;
   const label = CAT_MODEL_LABELS_SHORT[model] || 'Cat';
-  const colorable = (model !== 'bababooey' && model !== 'totodile');
+  const colorable = (model !== 'bababooey' && model !== 'totodile' && model !== 'korra');
   const colorKey = (entry && entry.catColor) || 'charcoal';
   const dot = colorable ? `<span class="catDot" style="background:${_catColorHex(colorKey)}"></span>` : '';
   return `<span class="catBadge" title="${_escapeHtml(colorable ? label + ' · ' + colorKey : label)}"><span class="catEmoji">${emoji}</span>${dot}<span class="catLabel">${label}</span></span>`;
@@ -248,15 +276,24 @@ function _normalizeLeaderboard(rows) {
   return kept;
 }
 
-function _loadLeaderboard() {
-  try {
-    const raw = localStorage.getItem(LB_STORE_KEY);
-    _leaderboard = _normalizeLeaderboard(raw ? JSON.parse(raw) : []);
-  } catch (e) { _leaderboard = []; }
+function _localStoreKeyForMode(mode) {
+  const m = _sanitizeMode(mode);
+  return m === 'normal' ? LB_STORE_KEY : `${LB_STORE_KEY}_${m}`;
 }
 
-function _saveLeaderboard() {
-  try { localStorage.setItem(LB_STORE_KEY, JSON.stringify(_leaderboard)); } catch (e) { /* ignore */ }
+function _loadLeaderboard() {
+  for (const mode of VALID_LEADERBOARD_MODES) {
+    try {
+      const raw = localStorage.getItem(_localStoreKeyForMode(mode));
+      _leaderboardByMode[mode] = _normalizeLeaderboard(raw ? JSON.parse(raw) : []);
+    } catch (e) { _leaderboardByMode[mode] = []; }
+  }
+  _leaderboard = (_leaderboardByMode[_viewMode] || []).slice();
+}
+
+function _saveLeaderboard(mode) {
+  const m = _sanitizeMode(mode || _viewMode);
+  try { localStorage.setItem(_localStoreKeyForMode(m), JSON.stringify(_leaderboardByMode[m] || [])); } catch (e) { /* ignore */ }
 }
 
 export function getEntries() { return _leaderboard; }
@@ -286,29 +323,40 @@ async function _lbApiRequest(path, body) {
   return payload;
 }
 
-export async function refreshSharedLeaderboard() {
+export async function refreshSharedLeaderboard(mode) {
   if (!LB_SHARED_ENABLED) return;
+  const targetMode = _sanitizeMode(mode || _viewMode);
   try {
-    const data = await _lbApiRequest('/leaderboard');
+    const data = await _lbApiRequest(`/leaderboard?mode=${encodeURIComponent(targetMode)}`);
     _sharedOnline = true;
     _statusNote = '';
-    _leaderboard = _normalizeLeaderboard(Array.isArray(data.leaderboard) ? data.leaderboard : []);
+    const list = _normalizeLeaderboard(Array.isArray(data.leaderboard) ? data.leaderboard : []);
+    _leaderboardByMode[targetMode] = list;
+    if (_viewMode === targetMode) _leaderboard = list.slice();
   } catch (e) {
     _sharedOnline = false;
     _statusNote = 'Local fallback';
     _loadLeaderboard();
   }
-  renderLeaderboardPanel();
+  if (_viewMode === targetMode) renderLeaderboardPanel();
 }
 
-export async function startSharedRun() {
+export async function startSharedRun(mode) {
+  const runMode = _sanitizeMode(mode);
+  _currentRunMode = runMode;
+  // Default the visible tab to the mode the player is about to run; this
+  // matches the player's mental model when they open the pause panel.
+  if (_viewMode !== runMode) {
+    _viewMode = runMode;
+    _leaderboard = (_leaderboardByMode[_viewMode] || []).slice();
+  }
   _sharedRunId = '';
   _claimedCoinIds.clear();
   _failedCoinIds.clear();
   _pendingCoinReports.clear();
   if (!LB_SHARED_ENABLED) return;
   try {
-    const data = await _lbApiRequest('/run/start', {});
+    const data = await _lbApiRequest('/run/start', { mode: runMode });
     _sharedRunId = String(data.runId || '');
     _sharedOnline = !!_sharedRunId;
     if (_sharedOnline) _statusNote = '';
@@ -367,7 +415,8 @@ export function reportCoin(coinId) {
 
 // ── Record a finished run (shared API with local fallback) ──────────
 
-function _recordRunLocal(timeMs, coinTotal, secretCoins) {
+function _recordRunLocal(timeMs, coinTotal, secretCoins, mode) {
+  const runMode = _sanitizeMode(mode || _currentRunMode);
   const name = _playerName || 'Player';
   const now = Date.now();
   const entry = {
@@ -376,50 +425,60 @@ function _recordRunLocal(timeMs, coinTotal, secretCoins) {
     catColor: sanitizeColorKey(catColorKey),
     catHair: sanitizeHairKey(catHairKey),
     catModel: sanitizeModelKey(catModelKey),
-    playerId: _playerId
+    playerId: _playerId,
+    mode: runMode
   };
-  _leaderboard = _normalizeLeaderboard(_leaderboard.concat(entry));
-  _saveLeaderboard();
+  const merged = _normalizeLeaderboard((_leaderboardByMode[runMode] || []).concat(entry));
+  _leaderboardByMode[runMode] = merged;
+  if (_viewMode === runMode) _leaderboard = merged.slice();
+  _saveLeaderboard(runMode);
 
   let rank = 0;
-  for (let i = 0; i < _leaderboard.length; i++) {
-    if (_leaderboard[i].id === entry.id) { rank = i + 1; break; }
+  for (let i = 0; i < merged.length; i++) {
+    if (merged[i].id === entry.id) { rank = i + 1; break; }
   }
 
   return {
     entryId: entry.id, rank, name: entry.name,
     timeMs: entry.timeMs, coins: coinTotal, coinTotal,
     secretCoins: secretCoins || 0,
-    catColor: entry.catColor, catHair: entry.catHair, catModel: entry.catModel
+    catColor: entry.catColor, catHair: entry.catHair, catModel: entry.catModel,
+    mode: runMode
   };
 }
 
-async function _recordRunShared(timeMs, coinTotal, secretCoins) {
+async function _recordRunShared(timeMs, coinTotal, secretCoins, mode) {
+  const runMode = _sanitizeMode(mode || _currentRunMode);
   if (!_sharedRunId || !_sharedOnline) {
-    return _recordRunLocal(timeMs, coinTotal, secretCoins);
+    return _recordRunLocal(timeMs, coinTotal, secretCoins, runMode);
   }
   const runId = _sharedRunId;
   await _flushCoinReports();
   if (_failedCoinIds.size) await _reconcileCoinClaims(runId);
+  const finishBody = {
+    runId,
+    mode: runMode,
+    name: _playerName || 'Player',
+    playerId: _playerId,
+    catColor: sanitizeColorKey(catColorKey),
+    catHair: sanitizeHairKey(catHairKey),
+    catModel: sanitizeModelKey(catModelKey),
+    isTest: _isTestSubmission(),
+    timeMs: Math.max(1, Math.floor(Number(timeMs) || 0)),
+    secretCoins: Math.max(0, Math.floor(Number(secretCoins) || 0))
+  };
   try {
-    const data = await _lbApiRequest('/run/finish', {
-      runId,
-      name: _playerName || 'Player',
-      playerId: _playerId,
-      catColor: sanitizeColorKey(catColorKey),
-      catHair: sanitizeHairKey(catHairKey),
-      catModel: sanitizeModelKey(catModelKey),
-      isTest: _isTestSubmission(),
-      timeMs: Math.max(1, Math.floor(Number(timeMs) || 0)),
-      secretCoins: Math.max(0, Math.floor(Number(secretCoins) || 0))
-    });
+    const data = await _lbApiRequest('/run/finish', finishBody);
     _sharedRunId = '';
     _claimedCoinIds.clear();
     _failedCoinIds.clear();
     _pendingCoinReports.clear();
     _sharedOnline = true;
     _statusNote = '';
-    _leaderboard = _normalizeLeaderboard(Array.isArray(data.leaderboard) ? data.leaderboard : []);
+    const responseMode = _sanitizeMode((data && data.mode) || runMode);
+    const list = _normalizeLeaderboard(Array.isArray(data.leaderboard) ? data.leaderboard : []);
+    _leaderboardByMode[responseMode] = list;
+    if (_viewMode === responseMode) _leaderboard = list.slice();
     const serverEntry = (data && data.entry) ? data.entry : {};
     return {
       entryId: String(serverEntry.id || ''),
@@ -430,31 +489,25 @@ async function _recordRunShared(timeMs, coinTotal, secretCoins) {
       secretCoins: secretCoins || 0,
       catColor: sanitizeColorKey(serverEntry.catColor || catColorKey),
       catHair: sanitizeHairKey(serverEntry.catHair || catHairKey),
-      catModel: sanitizeModelKey(serverEntry.catModel || catModelKey)
+      catModel: sanitizeModelKey(serverEntry.catModel || catModelKey),
+      mode: responseMode
     };
   } catch (e) {
     // Retry if incomplete_run (coin claims may have been lost)
     if (e && e.apiCode === 'incomplete_run') {
       try {
         await _reconcileCoinClaims(runId);
-        const retryData = await _lbApiRequest('/run/finish', {
-          runId,
-          name: _playerName || 'Player',
-          playerId: _playerId,
-          catColor: sanitizeColorKey(catColorKey),
-          catHair: sanitizeHairKey(catHairKey),
-          catModel: sanitizeModelKey(catModelKey),
-          isTest: _isTestSubmission(),
-          timeMs: Math.max(1, Math.floor(Number(timeMs) || 0)),
-          secretCoins: Math.max(0, Math.floor(Number(secretCoins) || 0))
-        });
+        const retryData = await _lbApiRequest('/run/finish', finishBody);
         _sharedRunId = '';
         _claimedCoinIds.clear();
         _failedCoinIds.clear();
         _pendingCoinReports.clear();
         _sharedOnline = true;
         _statusNote = '';
-        _leaderboard = _normalizeLeaderboard(Array.isArray(retryData.leaderboard) ? retryData.leaderboard : []);
+        const responseMode = _sanitizeMode((retryData && retryData.mode) || runMode);
+        const list = _normalizeLeaderboard(Array.isArray(retryData.leaderboard) ? retryData.leaderboard : []);
+        _leaderboardByMode[responseMode] = list;
+        if (_viewMode === responseMode) _leaderboard = list.slice();
         const retryEntry = (retryData && retryData.entry) ? retryData.entry : {};
         return {
           entryId: String(retryEntry.id || ''),
@@ -465,7 +518,8 @@ async function _recordRunShared(timeMs, coinTotal, secretCoins) {
           secretCoins: secretCoins || 0,
           catColor: sanitizeColorKey(retryEntry.catColor || catColorKey),
           catHair: sanitizeHairKey(retryEntry.catHair || catHairKey),
-          catModel: sanitizeModelKey(retryEntry.catModel || catModelKey)
+          catModel: sanitizeModelKey(retryEntry.catModel || catModelKey),
+          mode: responseMode
         };
       } catch (_retryErr) {
         // Fall through to local fallback
@@ -479,20 +533,21 @@ async function _recordRunShared(timeMs, coinTotal, secretCoins) {
     if (e && e.apiCode) {
       _sharedOnline = true;
       _statusNote = `Rejected (${e.apiCode})`;
-      void refreshSharedLeaderboard();
-      return { entryId: '', rank: 0, name: _playerName || 'Player', timeMs: Math.floor(timeMs), coins: coinTotal, coinTotal, secretCoins: secretCoins || 0, catColor: sanitizeColorKey(catColorKey), catHair: sanitizeHairKey(catHairKey), catModel: sanitizeModelKey(catModelKey) };
+      void refreshSharedLeaderboard(runMode);
+      return { entryId: '', rank: 0, name: _playerName || 'Player', timeMs: Math.floor(timeMs), coins: coinTotal, coinTotal, secretCoins: secretCoins || 0, catColor: sanitizeColorKey(catColorKey), catHair: sanitizeHairKey(catHairKey), catModel: sanitizeModelKey(catModelKey), mode: runMode };
     }
     _sharedOnline = false;
     _statusNote = 'Local fallback';
-    return _recordRunLocal(timeMs, coinTotal, secretCoins);
+    return _recordRunLocal(timeMs, coinTotal, secretCoins, runMode);
   }
 }
 
-export async function recordRun(timeMs, coinTotal, secretCoins) {
+export async function recordRun(timeMs, coinTotal, secretCoins, mode) {
+  const runMode = _sanitizeMode(mode || _currentRunMode);
   if (LB_SHARED_ENABLED) {
-    return _recordRunShared(timeMs, coinTotal, secretCoins);
+    return _recordRunShared(timeMs, coinTotal, secretCoins, runMode);
   }
-  return _recordRunLocal(timeMs, coinTotal, secretCoins);
+  return _recordRunLocal(timeMs, coinTotal, secretCoins, runMode);
 }
 
 function _latestEntryForPlayer(rows, playerId) {
@@ -507,27 +562,41 @@ function _latestEntryForPlayer(rows, playerId) {
   return latest;
 }
 
+function _findEntryMode(entryId) {
+  const cleanId = String(entryId || '').trim();
+  if (!cleanId) return null;
+  for (const mode of VALID_LEADERBOARD_MODES) {
+    const list = _leaderboardByMode[mode] || [];
+    if (list.some((row) => String(row && row.id || '') === cleanId)) return mode;
+  }
+  return null;
+}
+
 function _renameLatestEntryLocal(entryId, nextName, baseData) {
   const cleanId = String(entryId || '').trim();
   const cleanName = _sanitizePlayerName(nextName || '');
   if (!cleanId || !cleanName) return null;
 
-  const idx = _leaderboard.findIndex((row) => String(row && row.id || '') === cleanId);
+  const targetMode = _findEntryMode(cleanId) || _viewMode;
+  const list = _leaderboardByMode[targetMode] || [];
+  const idx = list.findIndex((row) => String(row && row.id || '') === cleanId);
   if (idx < 0) return null;
 
-  const target = _leaderboard[idx];
+  const target = list[idx];
   const targetPid = _sanitizePlayerId(target.playerId || '');
   if (!targetPid || targetPid !== _playerId) return null;
 
-  const latest = _latestEntryForPlayer(_leaderboard, _playerId);
+  const latest = _latestEntryForPlayer(list, _playerId);
   if (!latest || String(latest.id || '') !== cleanId) return null;
 
-  _leaderboard[idx] = { ...target, name: cleanName };
-  _leaderboard = _normalizeLeaderboard(_leaderboard);
-  _saveLeaderboard();
+  list[idx] = { ...target, name: cleanName };
+  const merged = _normalizeLeaderboard(list);
+  _leaderboardByMode[targetMode] = merged;
+  if (_viewMode === targetMode) _leaderboard = merged.slice();
+  _saveLeaderboard(targetMode);
 
-  const rank = _leaderboard.findIndex((row) => String(row.id || '') === cleanId) + 1;
-  const row = _leaderboard.find((r) => String(r.id || '') === cleanId) || _leaderboard[idx];
+  const rank = merged.findIndex((row) => String(row.id || '') === cleanId) + 1;
+  const row = merged.find((r) => String(r.id || '') === cleanId) || merged[idx];
   return {
     ...(baseData || {}),
     entryId: cleanId,
@@ -537,6 +606,7 @@ function _renameLatestEntryLocal(entryId, nextName, baseData) {
     catColor: sanitizeColorKey((row && row.catColor) || (baseData && baseData.catColor) || catColorKey),
     catHair: sanitizeHairKey((row && row.catHair) || (baseData && baseData.catHair) || catHairKey),
     catModel: sanitizeModelKey((row && row.catModel) || (baseData && baseData.catModel) || catModelKey),
+    mode: targetMode,
   };
 }
 
@@ -555,7 +625,12 @@ async function _renameLatestEntryShared(entryId, nextName, baseData) {
     });
     _sharedOnline = true;
     _statusNote = '';
-    _leaderboard = _normalizeLeaderboard(Array.isArray(data.leaderboard) ? data.leaderboard : _leaderboard);
+    const responseMode = _sanitizeMode((data && data.mode) || _findEntryMode(cleanId) || _currentRunMode);
+    if (Array.isArray(data.leaderboard)) {
+      const list = _normalizeLeaderboard(data.leaderboard);
+      _leaderboardByMode[responseMode] = list;
+      if (_viewMode === responseMode) _leaderboard = list.slice();
+    }
     const serverEntry = (data && data.entry) ? data.entry : {};
     return {
       ...(baseData || {}),
@@ -566,6 +641,7 @@ async function _renameLatestEntryShared(entryId, nextName, baseData) {
       catColor: sanitizeColorKey(serverEntry.catColor || (baseData && baseData.catColor) || catColorKey),
       catHair: sanitizeHairKey(serverEntry.catHair || (baseData && baseData.catHair) || catHairKey),
       catModel: sanitizeModelKey(serverEntry.catModel || (baseData && baseData.catModel) || catModelKey),
+      mode: responseMode,
     };
   } catch (e) {
     if (e && e.apiCode) {
@@ -577,7 +653,7 @@ async function _renameLatestEntryShared(entryId, nextName, baseData) {
       }
       _sharedOnline = true;
       _statusNote = `Rename rejected (${e.apiCode})`;
-      void refreshSharedLeaderboard();
+      void refreshSharedLeaderboard(_viewMode);
       return null;
     }
     _sharedOnline = false;
@@ -608,7 +684,20 @@ function _visibleIndices(board) {
 
 // ── Render leaderboard panel (in-game, shown on pause) ──────────────
 
+function _renderLeaderboardTabs() {
+  const tabsHost = document.getElementById('fpLeaderboardTabs');
+  if (!tabsHost) return;
+  const buttons = tabsHost.querySelectorAll('[data-lb-mode]');
+  buttons.forEach((btn) => {
+    const mode = _sanitizeMode(btn.getAttribute('data-lb-mode'));
+    const active = mode === _viewMode;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+}
+
 export function renderLeaderboardPanel() {
+  _renderLeaderboardTabs();
   const list = document.getElementById('fpLeaderboardList');
   const emptyEl = document.getElementById('fpLeaderboardEmpty');
   if (!list) return;
@@ -654,7 +743,7 @@ function _buildShareText(data) {
   const catModel = sanitizeModelKey(row.catModel || catModelKey);
   const modelEmoji = CAT_MODEL_EMOJI[catModel] || '🐱';
   const modelLabel = CAT_MODEL_LABELS_SHORT[catModel] || 'Cat';
-  const colorChip = (catModel !== 'bababooey' && catModel !== 'totodile')
+  const colorChip = (catModel !== 'bababooey' && catModel !== 'totodile' && catModel !== 'korra')
     ? ` ${CAT_COLOR_EMOJI[catColor] || ''} ${catColor.charAt(0).toUpperCase() + catColor.slice(1)}`
     : '';
   const url = _buildLeaderboardUrl(row.entryId || '', row.timeMs || 0);
@@ -1311,7 +1400,9 @@ function _renderFinishDialog() {
     const editableEntryId = canRenameSavedEntry ? _finishEditableEntryId : '';
     const rows = [];
 
-    if (_leaderboard.length || pending) {
+    const finishMode = _sanitizeMode((data && data.mode) || _currentRunMode);
+    const finishBoard = _leaderboardByMode[finishMode] || [];
+    if (finishBoard.length || pending) {
       // Build an optimistic "pending" row (own-current + pending) so the
       // player can see where their entry is going while the API save is
       // in flight. Position it by time among the local leaderboard; the
@@ -1328,9 +1419,9 @@ function _renderFinishDialog() {
           catColor: data.catColor || catColorKey,
           catHair: data.catHair || catHairKey
         };
-        pendingInsertAt = _leaderboard.length;
-        for (let i = 0; i < _leaderboard.length; i++) {
-          if (pendingTimeMs < _leaderboard[i].timeMs) { pendingInsertAt = i; break; }
+        pendingInsertAt = finishBoard.length;
+        for (let i = 0; i < finishBoard.length; i++) {
+          if (pendingTimeMs < finishBoard[i].timeMs) { pendingInsertAt = i; break; }
         }
         pendingHtml = `<li class="own-current pending" data-entry-id="">
           <span class="rk rk-pending" aria-label="Saving rank">
@@ -1344,14 +1435,14 @@ function _renderFinishDialog() {
         </li>`;
       }
 
-      const visSet = new Set(_visibleIndices(_leaderboard));
+      const visSet = new Set(_visibleIndices(finishBoard));
       let displayRank = 0;
 
-      for (let i = 0; i < _leaderboard.length; i++) {
+      for (let i = 0; i < finishBoard.length; i++) {
         if (pending && i === pendingInsertAt) { displayRank++; rows.push(pendingHtml); }
         if (!visSet.has(i)) continue;
         displayRank++;
-        const r = _leaderboard[i];
+        const r = finishBoard[i];
         const isHistory = !!r.playerId && r.playerId === _playerId;
         const isCurrent = !!ownId && r.id === ownId;
         const rowClass = `${isHistory ? 'own-history ' : ''}${isCurrent ? 'own-current' : ''}`.trim();
@@ -1366,7 +1457,7 @@ function _renderFinishDialog() {
           <span class="tm">${formatRunTime(r.timeMs, true)}</span>
         </li>`);
       }
-      if (pending && pendingInsertAt >= _leaderboard.length) rows.push(pendingHtml);
+      if (pending && pendingInsertAt >= finishBoard.length) rows.push(pendingHtml);
     } else {
       rows.push('<li style="opacity:0.62;padding:8px 10px">No runs yet.</li>');
     }
@@ -1411,9 +1502,20 @@ export function init() {
   _loadLeaderboard();
   _createNameDialogDOM();
   _createFinishDialogDOM();
+  _wireLeaderboardTabs();
   renderLeaderboardPanel();
-  // Fetch shared leaderboard from API (non-blocking)
-  void refreshSharedLeaderboard();
+  // Fetch shared leaderboard from API for both modes (non-blocking).
+  for (const mode of VALID_LEADERBOARD_MODES) void refreshSharedLeaderboard(mode);
+}
+
+function _wireLeaderboardTabs() {
+  const tabsHost = document.getElementById('fpLeaderboardTabs');
+  if (!tabsHost) return;
+  tabsHost.addEventListener('click', (ev) => {
+    const btn = ev.target && ev.target.closest && ev.target.closest('[data-lb-mode]');
+    if (!btn) return;
+    setViewMode(btn.getAttribute('data-lb-mode'));
+  });
 }
 
 // ── Name Dialog DOM ─────────────────────────────────────────────────

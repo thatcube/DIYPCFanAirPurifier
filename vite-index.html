@@ -706,6 +706,11 @@
           <!-- Right: leaderboard -->
           <div class="pause-right">
             <h4 class="pause-lb-title"><i class="ph-fill ph-trophy"></i> Leaderboard</h4>
+            <div id="fpLeaderboardTabs" class="lb-tabs" role="tablist" aria-label="Leaderboard mode">
+              <button type="button" class="lb-tab active" role="tab" aria-selected="true"
+                data-lb-mode="normal">Normal</button>
+              <button type="button" class="lb-tab" role="tab" aria-selected="false" data-lb-mode="speed">Speed</button>
+            </div>
             <ol id="fpLeaderboardList"></ol>
             <div id="fpLeaderboardEmpty" class="pause-lb-empty">No runs yet. Collect all coins to post a time!</div>
           </div>
@@ -726,8 +731,8 @@
         aria-hidden="true"></i></button>
   </main>
 
-  <button id="fireballBtn" type="button" hidden aria-label="Shoot fireball (F)"
-    title="Shoot fireball (F)" onclick="window._shootFireball&&window._shootFireball()">
+  <button id="fireballBtn" type="button" hidden aria-label="Shoot fireball (F)" title="Shoot fireball (F)"
+    onclick="window._shootFireball&&window._shootFireball()">
     <span class="fb-glow" aria-hidden="true"></span>
     <span class="fb-icon" aria-hidden="true">🔥</span>
     <span class="fb-label">FIREBALL</span>
