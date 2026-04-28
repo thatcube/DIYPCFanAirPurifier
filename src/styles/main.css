@@ -1534,6 +1534,18 @@ input[type=range]::-moz-range-thumb {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+/* Left-side cluster groups every "you've unlocked X" hint so they sit
+   next to each other and wrap together when the row is tight. */
+#fpUnlocksCluster {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
 }
 
 #skateUnlockHint {
@@ -1573,6 +1585,45 @@ input[type=range]::-moz-range-thumb {
   margin: 0 2px;
 }
 
+/* ── Fireball unlock hint (top row, mirrors skate hint) ─────────────── */
+#fireballUnlockHint {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffb866;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  text-shadow: 0 0 8px rgba(255, 120, 40, 0.5);
+}
+
+#fireballUnlockHint.visible {
+  display: inline-flex;
+}
+
+#fireballUnlockHint .fb-hint-icon {
+  font-size: 14px;
+  filter: drop-shadow(0 0 4px rgba(255, 120, 40, 0.7));
+}
+
+#fireballUnlockHint kbd {
+  background: rgba(255, 130, 40, 0.18);
+  border: 1px solid rgba(255, 160, 80, 0.45);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 9px;
+  line-height: 1;
+  margin: 0 2px;
+  color: #ffd9a8;
+}
+
+/* Note class used in the controls panel for parenthetical hints. */
+.kbd-hint-note {
+  opacity: 0.6;
+  font-size: 0.85em;
+  margin-left: 2px;
+}
 /* ── Skate trick hints (inside charge bar) ──────────────────────────── */
 #skateTrickHints {
   display: none;
@@ -3772,25 +3823,30 @@ input[type=range]:focus-visible {
   outline-offset: 3px;
 }
 /* ─── Fireball button ─────────────────────────────────────────────── */
-/* Hidden until unlocked (all fans turned off). Floats in bottom-right
-   so it's easy to spam-tap regardless of which panel is open. */
+/* Visible only in game/FP mode, after the player has unlocked it
+   (turn off all fans). Sits opposite the jump button so it's tap-
+   friendly on mobile and click-friendly on desktop. */
 #fireballBtn {
   position: fixed;
-  right: 22px;
+  left: 22px;
   bottom: 22px;
   z-index: 9500;
-  display: inline-flex;
+  display: none;
   align-items: center;
-  gap: 10px;
-  padding: 12px 18px 12px 14px;
+  justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+  width: 76px;
+  height: 76px;
+  padding: 0;
   border: 1px solid rgba(255, 170, 60, 0.55);
-  border-radius: 999px;
+  border-radius: 50%;
   background: radial-gradient(circle at 30% 30%, #ffb347 0%, #ff5a1f 55%, #b81818 100%);
   color: #fff7e8;
   font-family: var(--font-ui, system-ui, sans-serif);
   font-weight: 800;
-  font-size: 14px;
-  letter-spacing: 0.12em;
+  font-size: 9px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
   cursor: pointer;
@@ -3806,6 +3862,11 @@ input[type=range]:focus-visible {
   animation: fireballPulse 1.6s ease-in-out infinite;
 }
 
+/* Only show when the player has unlocked AND we're in FP/play mode. */
+body.play-mode #fireballBtn.is-unlocked {
+  display: inline-flex;
+}
+
 #fireballBtn[hidden] {
   display: none;
 }
@@ -3815,7 +3876,7 @@ input[type=range]:focus-visible {
 }
 
 #fireballBtn:active {
-  transform: translateY(1px) scale(0.96);
+  transform: translateY(1px) scale(0.94);
 }
 
 #fireballBtn:focus-visible {
@@ -3824,7 +3885,7 @@ input[type=range]:focus-visible {
 }
 
 #fireballBtn .fb-icon {
-  font-size: 22px;
+  font-size: 28px;
   line-height: 1;
   filter: drop-shadow(0 0 6px rgba(255, 180, 60, 0.85));
   display: inline-block;
@@ -3832,10 +3893,15 @@ input[type=range]:focus-visible {
   animation: fireballIconWobble 0.9s ease-in-out infinite;
 }
 
+#fireballBtn .fb-label {
+  margin-top: -2px;
+  opacity: 0.92;
+}
+
 #fireballBtn .fb-glow {
   position: absolute;
   inset: -8px;
-  border-radius: 999px;
+  border-radius: 50%;
   background: radial-gradient(circle, rgba(255, 140, 40, 0.55) 0%, rgba(255, 80, 20, 0) 70%);
   filter: blur(10px);
   pointer-events: none;
@@ -3910,13 +3976,14 @@ input[type=range]:focus-visible {
 
 @media (max-width: 540px) {
   #fireballBtn {
-    right: 14px;
-    bottom: 14px;
-    padding: 10px 14px 10px 12px;
-    font-size: 12px;
+    left: 16px;
+    bottom: 16px;
+    width: 68px;
+    height: 68px;
+    font-size: 8px;
   }
 
   #fireballBtn .fb-icon {
-    font-size: 18px;
+    font-size: 24px;
   }
 }

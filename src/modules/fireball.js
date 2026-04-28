@@ -1,8 +1,13 @@
 // ─── Fireball ability ────────────────────────────────────────────────
 // Unlocks when all fans are turned off. Shoots big spammable fireballs
 // from the camera (or cat head in FP mode) forward along the look dir.
-// Each fireball is a glowing core sphere + outer haze + point light +
-// trailing sparks. They self-destruct after a short lifetime.
+//
+// Performance notes:
+//   - All fireballs are pooled. Geometries, materials, meshes, sparks
+//     are built once and reused; spam never allocates or disposes.
+//   - A single shared PointLight follows the newest active fireball
+//     (multi-light scenes force three.js shader recompiles, which is
+//     where the stutter came from). Intensity scales with active count.
 
 import * as THREE from 'three';
 
@@ -10,10 +15,10 @@ import * as THREE from 'three';
 
 const SPEED = 220;   // inches/sec
 const LIFETIME = 2.4;   // seconds
-const MAX_ACTIVE = 24;    // safety cap so spam doesn't kill perf
+const MAX_ACTIVE = 16;    // pool size; older shots recycle
 const CORE_RADIUS = 3.6;
 const HAZE_RADIUS = 6.5;
-const TRAIL_PARTICLES = 14;   // sparks per fireball
+const TRAIL_PARTICLES = 8;    // sparks per fireball (was 14)
 const GRAVITY = -8;    // slight droop (inches/sec^2)
 
 // ── State ───────────────────────────────────────────────────────────
@@ -24,13 +29,22 @@ let _catGroup = null;
 let _isFpMode = () => false;
 
 let _unlocked = false;
-const _active = []; // { group, vel, age, light, sparks: [{mesh, vel, age, life}] }
+let _initBuilt = false;
 
-// Shared geometries / materials (built lazily on first shoot to keep
-// startup cheap)
-let _coreGeo = null;
-let _hazeGeo = null;
-let _sparkGeo = null;
+// Pool: every entry is a complete pre-built fireball + its sparks. The
+// `active` flag tells update() whether to animate it.
+const _pool = [];
+
+// Single shared point light that hops to the newest live fireball.
+let _sharedLight = null;
+
+// Scratch vectors so update() doesn't allocate per frame.
+const _tmpDir = new THREE.Vector3();
+const _tmpOrigin = new THREE.Vector3();
+
+// Persisted unlock — once you've earned it, you keep it.
+const _UNLOCK_KEY = 'fireballUnlocked';
+try { _unlocked = localStorage.getItem(_UNLOCK_KEY) === '1'; } catch (e) { }
 
 // ── Public API ──────────────────────────────────────────────────────
 
@@ -44,192 +58,221 @@ export function init(refs) {
 export function isUnlocked() { return _unlocked; }
 
 export function setUnlocked(v) {
-  _unlocked = !!v;
+  const next = !!v;
+  if (next === _unlocked) return;
+  _unlocked = next;
+  try { localStorage.setItem(_UNLOCK_KEY, _unlocked ? '1' : '0'); } catch (e) { }
 }
 
 export function shoot() {
   if (!_unlocked || !_scene || !_camera) return false;
-  if (_active.length >= MAX_ACTIVE) {
-    // Recycle the oldest to keep spam working without unbounded growth.
-    _despawn(_active[0]);
+  _ensurePool();
+
+  // Pick a slot: prefer an inactive one, otherwise recycle the oldest.
+  let slot = null;
+  for (let i = 0; i < _pool.length; i++) {
+    if (!_pool[i].active) { slot = _pool[i]; break; }
   }
-  _ensureAssets();
-
-  const origin = _getMuzzlePosition();
-  const dir = _getAimDirection();
-
-  const group = new THREE.Group();
-  group.position.copy(origin);
-
-  // Core: bright additive sphere, no shadows.
-  const coreMat = new THREE.MeshBasicMaterial({
-    color: 0xffe9a8,
-    transparent: true,
-    opacity: 1.0,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false
-  });
-  const core = new THREE.Mesh(_coreGeo, coreMat);
-  group.add(core);
-
-  // Inner orange shell.
-  const innerMat = new THREE.MeshBasicMaterial({
-    color: 0xff8a2a,
-    transparent: true,
-    opacity: 0.9,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false
-  });
-  const inner = new THREE.Mesh(_coreGeo, innerMat);
-  inner.scale.setScalar(1.35);
-  group.add(inner);
-
-  // Outer red haze.
-  const hazeMat = new THREE.MeshBasicMaterial({
-    color: 0xff3a16,
-    transparent: true,
-    opacity: 0.55,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false
-  });
-  const haze = new THREE.Mesh(_hazeGeo, hazeMat);
-  group.add(haze);
-
-  // Dynamic point light so it actually lights up the room.
-  const light = new THREE.PointLight(0xff7a2a, 4.0, 80, 1.6);
-  light.castShadow = false;
-  group.add(light);
-
-  _scene.add(group);
-
-  const vel = dir.clone().multiplyScalar(SPEED);
-
-  // Sparks: small additive points trailing behind. Each has its own
-  // little velocity for a dispersing trail.
-  const sparks = [];
-  for (let i = 0; i < TRAIL_PARTICLES; i++) {
-    const sm = new THREE.MeshBasicMaterial({
-      color: i % 2 ? 0xffd070 : 0xff5022,
-      transparent: true,
-      opacity: 0.0, // fade in as fireball travels
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-    const s = new THREE.Mesh(_sparkGeo, sm);
-    s.position.copy(origin);
-    _scene.add(s);
-    sparks.push({
-      mesh: s,
-      vel: dir.clone().multiplyScalar(SPEED * (0.35 + Math.random() * 0.25))
-        .add(new THREE.Vector3(
-          (Math.random() - 0.5) * 18,
-          (Math.random() - 0.5) * 18,
-          (Math.random() - 0.5) * 18
-        )),
-      age: -i * 0.018, // staggered birth
-      life: 0.55 + Math.random() * 0.35
-    });
+  if (!slot) {
+    let oldestAge = -Infinity;
+    for (let i = 0; i < _pool.length; i++) {
+      if (_pool[i].age > oldestAge) { oldestAge = _pool[i].age; slot = _pool[i]; }
+    }
   }
 
-  _active.push({
-    group, core, inner, haze, light,
-    vel,
-    age: 0,
-    sparks
-  });
+  _arm(slot);
   return true;
 }
 
 export function update(dtSec) {
-  if (_active.length === 0) return;
-  for (let i = _active.length - 1; i >= 0; i--) {
-    const fb = _active[i];
-    fb.age += dtSec;
+  if (!_initBuilt) return;
 
-    // Move fireball + slight gravity arc.
+  let liveCount = 0;
+  let newest = null;
+  let newestAge = Infinity;
+
+  for (let i = 0; i < _pool.length; i++) {
+    const fb = _pool[i];
+    if (!fb.active) continue;
+    liveCount++;
+
+    fb.age += dtSec;
     fb.vel.y += GRAVITY * dtSec;
     fb.group.position.addScaledVector(fb.vel, dtSec);
 
-    // Pulse the core / haze for a "burning" feel.
     const pulse = 1 + Math.sin(fb.age * 28) * 0.08;
     fb.core.scale.setScalar(pulse);
     fb.haze.scale.setScalar(1 + Math.sin(fb.age * 18 + 1.3) * 0.12);
     fb.inner.rotation.y += dtSec * 4;
     fb.haze.rotation.z += dtSec * 1.5;
 
-    // Light flicker.
-    fb.light.intensity = 4.0 + Math.sin(fb.age * 40) * 0.9;
-
-    // Fade in early, fade out late.
     const lifeT = fb.age / LIFETIME;
     let alpha = 1.0;
     if (lifeT > 0.7) alpha = Math.max(0, 1 - (lifeT - 0.7) / 0.3);
-    fb.core.material.opacity = alpha;
-    fb.inner.material.opacity = 0.9 * alpha;
-    fb.haze.material.opacity = 0.55 * alpha;
-    fb.light.intensity *= alpha;
+    fb.coreMat.opacity = alpha;
+    fb.innerMat.opacity = 0.9 * alpha;
+    fb.hazeMat.opacity = 0.55 * alpha;
 
-    // Sparks update.
-    for (let j = 0; j < fb.sparks.length; j++) {
-      const sp = fb.sparks[j];
+    // Sparks
+    const sparks = fb.sparks;
+    for (let j = 0; j < sparks.length; j++) {
+      const sp = sparks[j];
       sp.age += dtSec;
       if (sp.age < 0) continue;
       sp.vel.y += GRAVITY * 1.5 * dtSec;
       sp.mesh.position.addScaledVector(sp.vel, dtSec);
       const sLifeT = sp.age / sp.life;
-      sp.mesh.material.opacity = sLifeT < 0.15
+      sp.mat.opacity = sLifeT < 0.15
         ? sLifeT / 0.15
         : Math.max(0, 1 - (sLifeT - 0.15) / 0.85);
       sp.mesh.scale.setScalar(1 - 0.5 * sLifeT);
     }
 
-    if (fb.age >= LIFETIME) {
-      _despawn(fb);
-      _active.splice(i, 1);
+    if (fb.age < newestAge) { newestAge = fb.age; newest = fb; }
+
+    if (fb.age >= LIFETIME) _retire(fb);
+  }
+
+  // Shared light follows the newest fireball, intensity scales with
+  // total live count so spam still feels bright. When nothing's live we
+  // park it off-screen at zero intensity (still cheap; same shader).
+  if (_sharedLight) {
+    if (newest && liveCount > 0) {
+      _sharedLight.position.copy(newest.group.position);
+      const flicker = 0.9 + Math.sin(performance.now() * 0.04) * 0.1;
+      _sharedLight.intensity = Math.min(8, 3.2 + liveCount * 0.6) * flicker;
+    } else {
+      _sharedLight.intensity = 0;
     }
   }
 }
 
 // ── Internals ───────────────────────────────────────────────────────
 
-function _ensureAssets() {
-  if (_coreGeo) return;
-  _coreGeo = new THREE.SphereGeometry(CORE_RADIUS, 20, 14);
-  _hazeGeo = new THREE.SphereGeometry(HAZE_RADIUS, 16, 10);
-  _sparkGeo = new THREE.SphereGeometry(0.85, 8, 6);
+function _ensurePool() {
+  if (_initBuilt) return;
+  _initBuilt = true;
+
+  const coreGeo = new THREE.SphereGeometry(CORE_RADIUS, 16, 10);
+  const hazeGeo = new THREE.SphereGeometry(HAZE_RADIUS, 12, 8);
+  const sparkGeo = new THREE.SphereGeometry(0.85, 6, 4);
+
+  for (let i = 0; i < MAX_ACTIVE; i++) {
+    const group = new THREE.Group();
+    group.visible = false;
+
+    const coreMat = new THREE.MeshBasicMaterial({
+      color: 0xffe9a8, transparent: true, opacity: 1.0,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    const core = new THREE.Mesh(coreGeo, coreMat);
+    group.add(core);
+
+    const innerMat = new THREE.MeshBasicMaterial({
+      color: 0xff8a2a, transparent: true, opacity: 0.9,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    const inner = new THREE.Mesh(coreGeo, innerMat);
+    inner.scale.setScalar(1.35);
+    group.add(inner);
+
+    const hazeMat = new THREE.MeshBasicMaterial({
+      color: 0xff3a16, transparent: true, opacity: 0.55,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    const haze = new THREE.Mesh(hazeGeo, hazeMat);
+    group.add(haze);
+
+    _scene.add(group);
+
+    const sparks = [];
+    for (let j = 0; j < TRAIL_PARTICLES; j++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: j % 2 ? 0xffd070 : 0xff5022,
+        transparent: true, opacity: 0,
+        blending: THREE.AdditiveBlending, depthWrite: false
+      });
+      const mesh = new THREE.Mesh(sparkGeo, mat);
+      mesh.visible = false;
+      _scene.add(mesh);
+      sparks.push({
+        mesh, mat,
+        vel: new THREE.Vector3(),
+        age: 0,
+        life: 0.6
+      });
+    }
+
+    _pool.push({
+      active: false, age: 0,
+      group, core, inner, haze,
+      coreMat, innerMat, hazeMat,
+      vel: new THREE.Vector3(),
+      sparks
+    });
+  }
+
+  // One shared light for the whole system. Single light = stable shader
+  // program = no recompile stutter on rapid fire.
+  _sharedLight = new THREE.PointLight(0xff7a2a, 0, 90, 1.6);
+  _sharedLight.castShadow = false;
+  _scene.add(_sharedLight);
 }
 
-function _getMuzzlePosition() {
-  // FP mode: shoot from the cat's head if we can find it; otherwise
-  // from just below+ahead of the camera so it visibly leaves the player.
-  const out = new THREE.Vector3();
+function _arm(fb) {
+  _getMuzzlePosition(_tmpOrigin);
+  _getAimDirection(_tmpDir);
+
+  fb.active = true;
+  fb.age = 0;
+  fb.group.position.copy(_tmpOrigin);
+  fb.group.visible = true;
+  fb.vel.copy(_tmpDir).multiplyScalar(SPEED);
+
+  fb.coreMat.opacity = 1;
+  fb.innerMat.opacity = 0.9;
+  fb.hazeMat.opacity = 0.55;
+  fb.core.scale.setScalar(1);
+  fb.haze.scale.setScalar(1);
+
+  for (let j = 0; j < fb.sparks.length; j++) {
+    const sp = fb.sparks[j];
+    sp.age = -j * 0.018;
+    sp.life = 0.55 + Math.random() * 0.35;
+    sp.mesh.position.copy(_tmpOrigin);
+    sp.mesh.scale.setScalar(1);
+    sp.mesh.visible = true;
+    sp.mat.opacity = 0;
+    sp.vel.copy(_tmpDir).multiplyScalar(SPEED * (0.35 + Math.random() * 0.25));
+    sp.vel.x += (Math.random() - 0.5) * 18;
+    sp.vel.y += (Math.random() - 0.5) * 18;
+    sp.vel.z += (Math.random() - 0.5) * 18;
+  }
+}
+
+function _retire(fb) {
+  fb.active = false;
+  fb.group.visible = false;
+  for (let j = 0; j < fb.sparks.length; j++) {
+    fb.sparks[j].mesh.visible = false;
+  }
+}
+
+function _getMuzzlePosition(out) {
   if (_isFpMode() && _catGroup) {
     _catGroup.getWorldPosition(out);
-    out.y += 9; // approx head height above cat origin
+    out.y += 9;
   } else {
     out.copy(_camera.position);
   }
-  // Push slightly forward along aim so it doesn't clip the camera.
-  const fwd = _getAimDirection();
+  const fwd = _tmpDir;
+  _getAimDirection(fwd);
   out.addScaledVector(fwd, 6);
   return out;
 }
 
-function _getAimDirection() {
-  const v = new THREE.Vector3();
-  _camera.getWorldDirection(v);
-  v.normalize();
-  return v;
-}
-
-function _despawn(fb) {
-  if (!fb) return;
-  if (fb.group && fb.group.parent) fb.group.parent.remove(fb.group);
-  fb.core.material.dispose();
-  fb.inner.material.dispose();
-  fb.haze.material.dispose();
-  for (const sp of fb.sparks) {
-    if (sp.mesh.parent) sp.mesh.parent.remove(sp.mesh);
-    sp.mesh.material.dispose();
-  }
+function _getAimDirection(out) {
+  _camera.getWorldDirection(out);
+  out.normalize();
+  return out;
 }

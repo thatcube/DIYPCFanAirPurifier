@@ -511,7 +511,8 @@
         <div><kbd>K</kbd> Toggle skate mode</div>
         <div><kbd>Q</kbd> Kickflip (skate)</div>
         <div><kbd>E</kbd> Manual / wheelie (skate)</div>
-        <div><kbd>F</kbd> Fireball + Board spin (in skate mode)</div>
+        <div><kbd>F</kbd> Fireball <span class="kbd-hint-note">(once unlocked)</span></div>
+        <div><kbd>X</kbd> Board spin (skate)</div>
         <div><kbd>R</kbd> Reset run</div>
         <div><kbd>H</kbd> Toggle this panel</div>
         <div><kbd>G</kbd> Exit game</div>
@@ -522,8 +523,13 @@
     </div>
     <div id="fpChargeBar" aria-label="Jump charge">
       <div id="fpBarTopRow">
-        <div id="skateUnlockHint" aria-label="Skateboard unlocked">
-          <span class="skate-icon">🛹</span> <kbd>K</kbd> Skateboard
+        <div id="fpUnlocksCluster">
+          <div id="skateUnlockHint" aria-label="Skateboard unlocked">
+            <span class="skate-icon">🛹</span> <kbd>K</kbd> Skateboard
+          </div>
+          <div id="fireballUnlockHint" aria-label="Fireball unlocked">
+            <span class="fb-hint-icon">🔥</span> <kbd>F</kbd> Fireball
+          </div>
         </div>
         <div id="pauseHint" onclick="window._pauseFP&&window._pauseFP()">
           <kbd>Esc</kbd> Pause
@@ -532,7 +538,7 @@
       <div id="skateTrickHints" aria-label="Skate trick controls">
         <span><kbd>Q</kbd> Kickflip</span>
         <span><kbd>E</kbd> Manual</span>
-        <span><kbd>F</kbd> Spin</span>
+        <span><kbd>X</kbd> Spin</span>
       </div>
       <div id="fpBarDivider"></div>
       <div class="fp-charge-head">

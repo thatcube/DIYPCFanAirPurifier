@@ -460,6 +460,9 @@ fireball.init({
   catGroup: catAnimation.catGroup,
   isFpMode: () => gameFp.fpMode
 });
+// Surface persisted unlock immediately so the HUD/button reflect it
+// on a fresh page load, without waiting for fans to be turned off.
+setTimeout(() => { _updateFireballBtnVisibility(); }, 0);
 
 // ── Wall auto-fade ──────────────────────────────────────────────────
 
@@ -990,10 +993,13 @@ window._fireball = fireball;
 
 function _updateFireballBtnVisibility() {
   const btn = document.getElementById('fireballBtn');
-  if (!btn) return;
-  if (fireball.isUnlocked()) {
+  if (btn && fireball.isUnlocked()) {
     btn.classList.add('is-unlocked');
     btn.removeAttribute('hidden');
+  }
+  const hint = document.getElementById('fireballUnlockHint');
+  if (hint && fireball.isUnlocked()) {
+    hint.classList.add('visible');
   }
 }
 

@@ -3724,18 +3724,20 @@ function _bindInputs() {
         _trickManualHeld = skateMode;
         break;
       case 'KeyF':
-        // F always shoots a fireball (once unlocked) AND, in skate mode,
-        // also adds spin. Skate spin: tap-to-stack aerial 360s with a
-        // small upward kick on each press; on the ground it acts as a
-        // flat pivot. Cap at ~30 rev/s. Ignore auto-repeat so holding
-        // the key doesn't auto-fire.
-        if (e.repeat) break;
+        // F shoots a fireball (once unlocked). Auto-repeat is honored
+        // here so holding F lets you spam — pooling makes that cheap.
         if (typeof window._shootFireball === 'function') {
           window._shootFireball();
         }
+        break;
+      case 'KeyX':
+        // X = skateboard spin (Tony-Hawk-style). Tap to stack aerial
+        // 360s with diminishing returns + small upward kick; on the
+        // ground it acts as a flat pivot. Cap ~30 rev/s. Skate-only.
+        if (e.repeat) break;
         if (skateMode) {
           const SPIN_BASE = Math.PI * 2.66; // ~1.33 rev/s base add
-          const SPIN_CAP = Math.PI * 15;   // ~30 rev/s
+          const SPIN_CAP = Math.PI * 15;    // ~30 rev/s
           const ratio = Math.min(1, _trickSpinSpeed / SPIN_CAP);
           const falloff = (1 - ratio) * (1 - ratio) * 0.8 + 0.2;
           _trickSpinSpeed = Math.min(_trickSpinSpeed + SPIN_BASE * falloff, SPIN_CAP);
