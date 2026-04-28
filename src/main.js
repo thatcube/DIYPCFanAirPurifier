@@ -1000,6 +1000,7 @@ function _updateFireballBtnVisibility() {
 
 window._shootFireball = () => {
   fireball.shoot();
+  catAnimation.triggerCast();
 };
 
 // Placement
@@ -1633,6 +1634,7 @@ function animate(ts) {
       // player clicks on something interactive. Layered on top of the
       // jump deform so it works mid-air too.
       catAnimation.applyClickNod(ts, catAppearance.catModelKey);
+      catAnimation.applyCastAnimation(ts, catAppearance.catModelKey);
       const skateActive = gameFp.isSkateMode();
       const skateYawStrength = skateActive ? Math.max(0.45, Math.min(1, svel / 10)) : 0;
       const skateTurnSignal = skateActive

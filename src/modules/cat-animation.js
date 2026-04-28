@@ -64,6 +64,8 @@ const baseLocalPos = new THREE.Vector3();
 const baseLocalQuat = new THREE.Quaternion();
 let gameLoadNonce = 0;
 let nodStartTs = -1e9;
+let castStartTs = -1e9;
+const CAST_DUR_MS = 480;
 let _babaRunPhase = 0;
 let _babaRunLastTs = -1;
 let _totoRunPhase = 0;
@@ -142,7 +144,10 @@ export function getBaseLocalPos() { return baseLocalPos; }
 export function getBaseLocalQuat() { return baseLocalQuat; }
 
 export function triggerNod() {
-  nodStartTs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  nodStartTs = (typeof performance !== 'undefined' ? performance.now() : Date.now());}
+
+export function triggerCast() {
+  castStartTs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
 }
 
 /**
@@ -1137,6 +1142,81 @@ export function applyClickNod(ts, modelKey) {
   }
 
   return Math.abs(bend);
+}
+
+/**
+ * Apply the fireball cast animation — a fast, exaggerated forward
+ * paw/arm swing layered on top of any other procedural pose. Wind-up
+ * (fast ease-out), then springy return.
+ *
+ * Uses whichever bones are available for the current model:
+ *   - korra: rears up the front paws (rotates LFront + RFront leg
+ *     bones forward, with a small spine arch).
+ *   - totodile: swings the right arm overhand (shoulder + elbow).
+ *   - bababooey/others: skipped — no clear arm rig to drive.
+ */
+export function applyCastAnimation(ts, modelKey) {
+  if (!catModel) return 0;
+  const elapsed = ts - castStartTs;
+  if (elapsed < 0 || elapsed >= CAST_DUR_MS) return 0;
+  const t = elapsed / CAST_DUR_MS;
+
+  // Fast wind-up to peak around t=0.28, springy return.
+  let curve;
+  if (t < 0.28) {
+    const x = t / 0.28;
+    curve = 1 - Math.pow(1 - x, 3);
+  } else {
+    const x = (t - 0.28) / 0.72;
+    const decay = Math.exp(-3.0 * x);
+    curve = decay * Math.cos(x * Math.PI * 1.1);
+  }
+
+  if (modelKey === 'korra') {
+    // Rear up + throw front paws forward. Negative X rotation lifts
+    // the front legs (they point down by default).
+    const lift = -curve * 1.55;          // up to ~88° lift
+    const spineArch = -curve * 0.35;     // small back arch
+    const targets = [];
+    if (korraBones.lfLeg) targets.push({ bone: korraBones.lfLeg, weight: 1 });
+    if (korraBones.rfLeg) targets.push({ bone: korraBones.rfLeg, weight: 1 });
+    if (targets.length) _applyWeightedBonePitchAbsolute(lift, targets);
+    if (korraBones.spine) _applyWeightedBonePitchAbsolute(spineArch, [{ bone: korraBones.spine, weight: 1 }]);
+    if (korraBones.chest) _applyWeightedBonePitchAbsolute(spineArch * 0.6, [{ bone: korraBones.chest, weight: 1 }]);
+  } else if (modelKey === 'totodile') {
+    const swing = curve * 1.45;
+    const elbow = curve * 0.9;
+    const targets = [];
+    if (totoBones.rArm) targets.push({ bone: totoBones.rArm, weight: 1 });
+    if (totoBones.rShoulder) targets.push({ bone: totoBones.rShoulder, weight: 0.4 });
+    if (targets.length) _applyWeightedBoneModelPitch(swing, targets);
+    if (totoBones.rForeArm) _applyWeightedBoneModelPitch(elbow, [{ bone: totoBones.rForeArm, weight: 1 }]);
+  }
+
+  return Math.abs(curve);
+}
+
+// Adds an absolute X-axis rotation on top of the bone's CURRENT pose
+// (i.e. the procedural idle/run output). Used for cast — we want the
+// swing to read regardless of what pose was set this frame.
+function _applyWeightedBonePitchAbsolute(pitch, targets) {
+  let total = 0;
+  for (const t of targets) {
+    if (!t || !t.bone || !t.bone.isBone) continue;
+    total += Number(t.weight) || 0;
+  }
+  if (total <= 0) return 0;
+  let applied = 0;
+  for (const t of targets) {
+    if (!t || !t.bone || !t.bone.isBone) continue;
+    const w = Number(t.weight) || 0;
+    if (w <= 0) continue;
+    tmpEuler.set(pitch * (w / total), 0, 0);
+    tmpQuat.setFromEuler(tmpEuler);
+    t.bone.quaternion.multiply(tmpQuat);
+    applied++;
+  }
+  return applied;
 }
 
 /**
