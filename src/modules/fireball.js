@@ -18,9 +18,11 @@ import { sfxMuted } from './game-fp.js';
 const SPEED = 220;   // inches/sec
 const LIFETIME = 2.4;   // seconds
 const MAX_ACTIVE = 16;    // pool size; older shots recycle
-const CORE_RADIUS = 3.6;
-const HAZE_RADIUS = 6.5;
-const TRAIL_PARTICLES = 8;    // sparks per fireball (was 14)
+const CORE_RADIUS = 5.4;
+const HAZE_RADIUS = 10.5;
+const TRAIL_PARTICLES = 36;   // sparks per fireball (continuously recycled into a trail)
+const TRAIL_LIFE = 0.45;       // seconds each spark stays alive
+const TRAIL_EMIT_RATE = 110;   // sparks emitted per second per fireball
 const GRAVITY = -8;    // slight droop (inches/sec^2)
 
 // ── State ───────────────────────────────────────────────────────────
@@ -113,22 +115,44 @@ export function update(dtSec) {
     let alpha = 1.0;
     if (lifeT > 0.7) alpha = Math.max(0, 1 - (lifeT - 0.7) / 0.3);
     fb.coreMat.opacity = alpha;
-    fb.innerMat.opacity = 0.9 * alpha;
-    fb.hazeMat.opacity = 0.55 * alpha;
+    fb.innerMat.opacity = 1.0 * alpha;
+    fb.hazeMat.opacity = 0.78 * alpha;
 
-    // Sparks
+    fb.emitAccum += dtSec * TRAIL_EMIT_RATE;
+    let toEmit = fb.emitAccum | 0;
+    if (toEmit > 0) fb.emitAccum -= toEmit;
+
     const sparks = fb.sparks;
     for (let j = 0; j < sparks.length; j++) {
       const sp = sparks[j];
+
+      if (toEmit > 0 && sp.age >= sp.life) {
+        sp.age = 0;
+        sp.life = TRAIL_LIFE * (0.75 + Math.random() * 0.5);
+        sp.mesh.position.copy(fb.group.position);
+        sp.mesh.visible = true;
+        // Embers inherit ~half the head speed → they fall behind at a
+        // visible rate, forming a streaming tail rather than orbiting
+        // the head. Tight lateral jitter keeps the tail slim.
+        const back = 0.40 + Math.random() * 0.18; // 40-58% of head speed
+        sp.vel.copy(fb.vel).multiplyScalar(back);
+        sp.vel.x += (Math.random() - 0.5) * 6;
+        sp.vel.y += (Math.random() - 0.5) * 5;
+        sp.vel.z += (Math.random() - 0.5) * 6;
+        toEmit--;
+      }
+
+      if (sp.age >= sp.life) { sp.mesh.visible = false; continue; }
       sp.age += dtSec;
-      if (sp.age < 0) continue;
-      sp.vel.y += GRAVITY * 1.5 * dtSec;
+      sp.vel.y += GRAVITY * 0.5 * dtSec;
       sp.mesh.position.addScaledVector(sp.vel, dtSec);
       const sLifeT = sp.age / sp.life;
-      sp.mat.opacity = sLifeT < 0.15
-        ? sLifeT / 0.15
-        : Math.max(0, 1 - (sLifeT - 0.15) / 0.85);
-      sp.mesh.scale.setScalar(1 - 0.5 * sLifeT);
+      sp.mat.opacity = sLifeT < 0.08
+        ? sLifeT / 0.08
+        : Math.max(0, 1 - (sLifeT - 0.08) / 0.92);
+      // Big and bright at birth, fading down — gives the trail body.
+      const s = 2.2 - 1.7 * sLifeT;
+      sp.mesh.scale.setScalar(Math.max(0.05, s));
     }
 
     if (fb.age < newestAge) { newestAge = fb.age; newest = fb; }
@@ -143,7 +167,7 @@ export function update(dtSec) {
     if (newest && liveCount > 0) {
       _sharedLight.position.copy(newest.group.position);
       const flicker = 0.9 + Math.sin(performance.now() * 0.04) * 0.1;
-      _sharedLight.intensity = Math.min(8, 3.2 + liveCount * 0.6) * flicker;
+      _sharedLight.intensity = Math.min(11, 4.6 + liveCount * 0.7) * flicker;
     } else {
       _sharedLight.intensity = 0;
     }
@@ -165,22 +189,22 @@ function _ensurePool() {
     group.visible = false;
 
     const coreMat = new THREE.MeshBasicMaterial({
-      color: 0xffe9a8, transparent: true, opacity: 1.0,
+      color: 0xfff4c2, transparent: true, opacity: 1.0,
       blending: THREE.AdditiveBlending, depthWrite: false
     });
     const core = new THREE.Mesh(coreGeo, coreMat);
     group.add(core);
 
     const innerMat = new THREE.MeshBasicMaterial({
-      color: 0xff8a2a, transparent: true, opacity: 0.9,
+      color: 0xff9a18, transparent: true, opacity: 1.0,
       blending: THREE.AdditiveBlending, depthWrite: false
     });
     const inner = new THREE.Mesh(coreGeo, innerMat);
-    inner.scale.setScalar(1.35);
+    inner.scale.setScalar(1.45);
     group.add(inner);
 
     const hazeMat = new THREE.MeshBasicMaterial({
-      color: 0xff3a16, transparent: true, opacity: 0.55,
+      color: 0xff4410, transparent: true, opacity: 0.78,
       blending: THREE.AdditiveBlending, depthWrite: false
     });
     const haze = new THREE.Mesh(hazeGeo, hazeMat);
@@ -208,6 +232,7 @@ function _ensurePool() {
 
     _pool.push({
       active: false, age: 0,
+      emitAccum: 0,
       group, core, inner, haze,
       coreMat, innerMat, hazeMat,
       vel: new THREE.Vector3(),
@@ -217,7 +242,7 @@ function _ensurePool() {
 
   // One shared light for the whole system. Single light = stable shader
   // program = no recompile stutter on rapid fire.
-  _sharedLight = new THREE.PointLight(0xff7a2a, 0, 90, 1.6);
+  _sharedLight = new THREE.PointLight(0xff7a2a, 0, 120, 1.6);
   _sharedLight.castShadow = false;
   _scene.add(_sharedLight);
 }
@@ -233,24 +258,22 @@ function _arm(fb) {
   fb.vel.copy(_tmpDir).multiplyScalar(SPEED);
 
   fb.coreMat.opacity = 1;
-  fb.innerMat.opacity = 0.9;
-  fb.hazeMat.opacity = 0.55;
+  fb.innerMat.opacity = 1.0;
+  fb.hazeMat.opacity = 0.78;
   fb.core.scale.setScalar(1);
   fb.haze.scale.setScalar(1);
 
+  // Mark all sparks "dead" so the trail emitter (in update) is the
+  // sole source of trail particles. This avoids a forward-shooting
+  // burst of sparks at spawn that races ahead of the head.
   for (let j = 0; j < fb.sparks.length; j++) {
     const sp = fb.sparks[j];
-    sp.age = -j * 0.018;
-    sp.life = 0.55 + Math.random() * 0.35;
-    sp.mesh.position.copy(_tmpOrigin);
-    sp.mesh.scale.setScalar(1);
-    sp.mesh.visible = true;
+    sp.age = 999;
+    sp.life = 0;
+    sp.mesh.visible = false;
     sp.mat.opacity = 0;
-    sp.vel.copy(_tmpDir).multiplyScalar(SPEED * (0.35 + Math.random() * 0.25));
-    sp.vel.x += (Math.random() - 0.5) * 18;
-    sp.vel.y += (Math.random() - 0.5) * 18;
-    sp.vel.z += (Math.random() - 0.5) * 18;
   }
+  fb.emitAccum = 0;
 }
 
 function _retire(fb) {
