@@ -992,11 +992,6 @@ window._checkFanOffUnlock = _checkFanOffUnlock;
 window._fireball = fireball;
 
 function _updateFireballBtnVisibility() {
-  const btn = document.getElementById('fireballBtn');
-  if (btn && fireball.isUnlocked()) {
-    btn.classList.add('is-unlocked');
-    btn.removeAttribute('hidden');
-  }
   const hint = document.getElementById('fireballUnlockHint');
   if (hint && fireball.isUnlocked()) {
     hint.classList.add('visible');
@@ -1004,14 +999,7 @@ function _updateFireballBtnVisibility() {
 }
 
 window._shootFireball = () => {
-  const ok = fireball.shoot();
-  if (!ok) return;
-  const btn = document.getElementById('fireballBtn');
-  if (btn) {
-    btn.classList.remove('is-firing');
-    void btn.offsetWidth;
-    btn.classList.add('is-firing');
-  }
+  fireball.shoot();
 };
 
 // Placement
