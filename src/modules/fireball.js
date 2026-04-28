@@ -10,6 +10,8 @@
 //     where the stutter came from). Intensity scales with active count.
 
 import * as THREE from 'three';
+import * as coins from './coins.js';
+import { sfxMuted } from './game-fp.js';
 
 // ── Config ──────────────────────────────────────────────────────────
 
@@ -81,6 +83,7 @@ export function shoot() {
   }
 
   _arm(slot);
+  _playWhoosh();
   return true;
 }
 
@@ -275,4 +278,58 @@ function _getAimDirection(out) {
   _camera.getWorldDirection(out);
   out.normalize();
   return out;
+}
+
+// ── SFX ────────────────────────────────────────────────────────────
+// Subtle whoosh + soft low thump. Built from the shared coins audio
+// context (created on first user interaction elsewhere). Throttled so
+// holding F doesn't pile a wall of overlapping bursts.
+
+let _noiseBuf = null;
+let _lastSfxAt = 0;
+
+function _playWhoosh() {
+  if (sfxMuted) return;
+  const ac = coins.getAudioCtx();
+  if (!ac) return;
+  const now = ac.currentTime;
+  if (now - _lastSfxAt < 0.05) return; // throttle ~20 Hz max
+  _lastSfxAt = now;
+
+  // Lazily build a short noise buffer once.
+  if (!_noiseBuf) {
+    const len = Math.floor(ac.sampleRate * 0.35);
+    _noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+    const data = _noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+  }
+
+  // Filtered noise burst — the "whoosh".
+  const src = ac.createBufferSource();
+  src.buffer = _noiseBuf;
+  const bp = ac.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.Q.value = 1.1;
+  bp.frequency.setValueAtTime(1600, now);
+  bp.frequency.exponentialRampToValueAtTime(420, now + 0.28);
+  const ng = ac.createGain();
+  ng.gain.setValueAtTime(0.0001, now);
+  ng.gain.linearRampToValueAtTime(0.09, now + 0.015);
+  ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+  src.connect(bp).connect(ng).connect(ac.destination);
+  src.start(now);
+  src.stop(now + 0.32);
+
+  // Tiny low thump at the start so it has weight.
+  const osc = ac.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(140, now);
+  osc.frequency.exponentialRampToValueAtTime(60, now + 0.14);
+  const og = ac.createGain();
+  og.gain.setValueAtTime(0.0001, now);
+  og.gain.linearRampToValueAtTime(0.05, now + 0.01);
+  og.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+  osc.connect(og).connect(ac.destination);
+  osc.start(now);
+  osc.stop(now + 0.18);
 }
