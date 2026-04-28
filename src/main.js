@@ -194,10 +194,17 @@ controls.maxPolarAngle = Math.PI * 0.48;
 // Lights
 lighting.createLights(state.isMobile);
 
-// Hide loading overlay — fade out so it doesn't snap away, then remove from
-// layout entirely once the transition finishes.
+// Hide loading overlay — fade out so it doesn't snap away. The actual hide
+// is deferred until after the first rendered frame is painted (see end of
+// file, after animate()) so the spinner stays up through the heavy
+// createRoom/createPurifier build + initial shader compilation. Without
+// that, the overlay disappears immediately and users stare at a frozen UI
+// for the full build duration.
 const loadingEl = document.getElementById('loading');
-if (loadingEl) {
+function _hideLoadingOverlay() {
+  if (!loadingEl) return;
+  if (loadingEl._hideStarted) return;
+  loadingEl._hideStarted = true;
   loadingEl.classList.add('is-hiding');
   const _removeLoading = () => { loadingEl.style.display = 'none'; };
   loadingEl.addEventListener('transitionend', _removeLoading, { once: true });
@@ -1656,6 +1663,16 @@ onResize();
 // ── Start ───────────────────────────────────────────────────────────
 
 animate(performance.now());
+
+// Defer hiding the loading overlay until the browser has actually painted
+// the first frame. Two rAFs: the first lets `animate()` schedule + render,
+// the second fires after the browser has composited that frame to screen.
+// This way the spinner stays up through every heavy build step (createRoom,
+// createPurifier, renderer.compile, first render) instead of vanishing
+// instantly while the main thread is still blocked.
+requestAnimationFrame(() => {
+  requestAnimationFrame(_hideLoadingOverlay);
+});
 
 // Init UI micro-interactions (bouncy buttons, press effects)
 initInteractions();

@@ -126,7 +126,13 @@ export function createLights(isMobile) {
   windowSun.shadow.camera.far = 260;
   scene.add(windowSun);
   scene.add(windowSun.target);
-  windowSun.visible = false;
+  // Keep visible = true permanently. Toggling a light's `.visible` changes
+  // the active light count, which mutates Three.js's shader cache key and
+  // forces a full shader recompile on every day↔night transition (visible
+  // multi-frame stutter on weaker GPUs). Modulating `.intensity` to 0 has
+  // no recompile cost — the light still occupies the lights uniform array
+  // but contributes nothing.
+  windowSun.visible = true;
 }
 
 /**
@@ -237,9 +243,11 @@ export function applyTimeOfDay(minuteOfDay, refs) {
   windowSun.color.copy(keyColor);
   const baseKeyIntensity = mix(0.34, 1.85, sun) + warm * 0.18;
   key.intensity = beam > 0 ? Math.max(0.4, baseKeyIntensity * 0.75) * beam : 0;
-  windowSun.visible = beam > 0;
   // SpotLight intensity is in candela (physically correct) — scale up from the
   // legacy baseKeyIntensity so the beam is actually visible on surfaces.
+  // Note: windowSun.visible stays true permanently (see createLights) — we
+  // only modulate intensity so the day↔night toggle never triggers a shader
+  // recompile from a light-count change.
   windowSun.intensity = beam > 0 ? Math.max(50, baseKeyIntensity * 140) * beam : 0;
 
   // Window sun sweep positions
