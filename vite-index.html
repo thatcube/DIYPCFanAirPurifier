@@ -726,6 +726,13 @@
         aria-hidden="true"></i></button>
   </main>
 
+  <button id="fireballBtn" type="button" hidden aria-label="Shoot fireball (F)"
+    title="Shoot fireball (F)" onclick="window._shootFireball&&window._shootFireball()">
+    <span class="fb-glow" aria-hidden="true"></span>
+    <span class="fb-icon" aria-hidden="true">🔥</span>
+    <span class="fb-label">FIREBALL</span>
+  </button>
+
   <script>
     // Show debug wall-label toggle only on localhost
     if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {

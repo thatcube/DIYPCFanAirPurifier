@@ -22,6 +22,7 @@ import * as leaderboard from './modules/leaderboard.js';
 import * as collision from './modules/game-collision.js';
 import * as spatial from './modules/spatial.js';
 import * as gameFp from './modules/game-fp.js';
+import * as fireball from './modules/fireball.js';
 import * as wallFade from './modules/wall-fade.js';
 import { createRoom } from './modules/room.js';
 import * as purifier from './modules/purifier.js';
@@ -450,6 +451,15 @@ catAnimation.loadGameplayCat({
 // ── Particles ───────────────────────────────────────────────────────
 
 particles.init();
+
+// ── Fireball ability ─────────────────────────────────────────────────
+
+fireball.init({
+  scene,
+  camera,
+  catGroup: catAnimation.catGroup,
+  isFpMode: () => gameFp.fpMode
+});
 
 // ── Wall auto-fade ──────────────────────────────────────────────────
 
@@ -945,6 +955,7 @@ window._setTurntable = (val) => {
 // Fan speed
 window._setFanSpeed = (val) => {
   purifierRefs.setFanSpeed(parseInt(val, 10) / 1800 * 100);
+  _checkFanOffUnlock();
 };
 
 // Spin toggle
@@ -952,7 +963,62 @@ window._toggleSpin = () => {
   const tog = document.getElementById('togSpin');
   const isOn = tog && tog.classList.toggle('on');
   purifierRefs.setSpinning(!!isOn);
+  _checkFanOffUnlock();
 };
+
+// ── Fireball unlock ─────────────────────────────────────────────────
+// All fans "off" = spin toggle off OR speed slider at 0.
+function _areFansAllOff() {
+  const spinTog = document.getElementById('togSpin');
+  const spinOn = spinTog ? spinTog.classList.contains('on') : true;
+  const slider = document.getElementById('fanSpeedSlider');
+  const rpm = slider ? parseInt(slider.value, 10) : 900;
+  return !spinOn || rpm === 0;
+}
+
+function _checkFanOffUnlock() {
+  if (fireball.isUnlocked()) {
+    _updateFireballBtnVisibility();
+    return;
+  }
+  if (_areFansAllOff()) {
+    fireball.setUnlocked(true);
+    showToast('🔥 Fireball unlocked! Press F or tap the button to spam.');
+    _updateFireballBtnVisibility();
+  }
+}
+
+function _updateFireballBtnVisibility() {
+  const btn = document.getElementById('fireballBtn');
+  if (!btn) return;
+  if (fireball.isUnlocked()) {
+    btn.classList.add('is-unlocked');
+    btn.removeAttribute('hidden');
+  }
+}
+
+window._shootFireball = () => {
+  const ok = fireball.shoot();
+  if (!ok) return;
+  const btn = document.getElementById('fireballBtn');
+  if (btn) {
+    btn.classList.remove('is-firing');
+    // restart anim
+    void btn.offsetWidth;
+    btn.classList.add('is-firing');
+  }
+};
+
+// Keyboard: F to spam fireballs once unlocked. Don't trap if user is
+// typing in a text input or the FP-mode handler should own the key.
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'f' && e.key !== 'F') return;
+  if (!fireball.isUnlocked()) return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  e.preventDefault();
+  window._shootFireball();
+});
 
 // Placement
 let _prevPlacement = 'tv';
@@ -1611,6 +1677,9 @@ function animate(ts) {
     particles.updateSpinSpeed(animFrameScale);
     particles.update(animFrameScale);
   }
+
+  // Fireballs
+  fireball.update(dtSec);
 
   // Wall auto-fade (only in orbit mode — FP resets to opaque)
   if (!gameFp.fpMode) {
