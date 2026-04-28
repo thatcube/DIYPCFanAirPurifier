@@ -1207,9 +1207,9 @@ export function applyCastAnimation(ts, modelKey) {
       _totoApply(totoBones.rForeArm,  totoBase.rForeArm,  elbowBend, 0, 0, strength);
       _totoApply(totoBones.lHand,     totoBase.lHand,     handCurl,  0, 0, strength);
       _totoApply(totoBones.rHand,     totoBase.rHand,     handCurl,  0, 0, strength);
-      // Open the jaw — Z axis on this rig (X tilted it sideways).
-      const jawOpen = 0.7 * Math.abs(liftK);
-      _totoApply(totoBones.jaw, totoBase.jaw, 0, 0, jawOpen, strength);
+      // Open the jaw — Y axis on this rig (X & Z both tilt it).
+      const jawOpen = -0.7 * Math.abs(liftK);
+      _totoApply(totoBones.jaw, totoBase.jaw, 0, jawOpen, 0, strength);
     }
   } else if (modelKey === 'bababooey') {
     // No real arms — sell it with a wind-up tilt: lean back at peak,
