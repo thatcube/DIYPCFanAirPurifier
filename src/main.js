@@ -998,6 +998,18 @@ function _updateFireballBtnVisibility() {
   }
 }
 
+// Hold-to-charge / release-to-fire kamehameha. Keep the legacy
+// _shootFireball entrypoint for any back-compat callers — it now
+// triggers an instant medium-power blast.
+window._chargeKamehameha = () => {
+  if (fireball.startCharge()) catAnimation.triggerCastCharge();
+};
+window._releaseKamehameha = () => {
+  // End the held pose either way (canceled charges still need to relax),
+  // and only run the release-throw curve if a beam actually fired.
+  catAnimation.endCastCharge();
+  fireball.releaseCharge();
+};
 window._shootFireball = () => {
   fireball.shoot();
   catAnimation.triggerCast();

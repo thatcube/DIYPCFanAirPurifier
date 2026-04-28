@@ -65,6 +65,7 @@ const baseLocalQuat = new THREE.Quaternion();
 let gameLoadNonce = 0;
 let nodStartTs = -1e9;
 let castStartTs = -1e9;
+let castHoldActive = false;
 const CAST_DUR_MS = 480;
 let _babaRunPhase = 0;
 let _babaRunLastTs = -1;
@@ -147,7 +148,26 @@ export function triggerNod() {
   nodStartTs = (typeof performance !== 'undefined' ? performance.now() : Date.now());}
 
 export function triggerCast() {
+  castHoldActive = false;
   castStartTs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+}
+
+// Begin a sustained "wind up + hold" cast pose. Used by the kamehameha
+// charge phase: the pose ramps up to its peak in the first ~28% of the
+// cast duration, then sticks there until endCastCharge() releases it.
+export function triggerCastCharge() {
+  castStartTs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  castHoldActive = true;
+}
+
+// End a sustained charge pose: snap into the spring-back portion of the
+// existing cast curve so the arms recoil naturally.
+export function endCastCharge() {
+  if (!castHoldActive) return;
+  castHoldActive = false;
+  const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  // Place the timeline at the very start of the release portion (t=0.28).
+  castStartTs = now - CAST_DUR_MS * 0.28;
 }
 
 /**
@@ -1158,8 +1178,17 @@ export function applyClickNod(ts, modelKey) {
 export function applyCastAnimation(ts, modelKey) {
   if (!catModel) return 0;
   const elapsed = ts - castStartTs;
-  if (elapsed < 0 || elapsed >= CAST_DUR_MS) return 0;
-  const t = elapsed / CAST_DUR_MS;
+  let t;
+  if (castHoldActive) {
+    // While charging, ramp up to the peak (t=0.28) then clamp there.
+    // Negative elapsed (just-triggered) is fine — the clamp at 0 below
+    // keeps things sane.
+    if (elapsed < 0) return 0;
+    t = Math.min(elapsed / CAST_DUR_MS, 0.28);
+  } else {
+    if (elapsed < 0 || elapsed >= CAST_DUR_MS) return 0;
+    t = elapsed / CAST_DUR_MS;
+  }
 
   // Fast wind-up to peak around t=0.28, springy return.
   let curve;

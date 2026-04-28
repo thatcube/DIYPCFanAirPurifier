@@ -3724,9 +3724,14 @@ function _bindInputs() {
         _trickManualHeld = skateMode;
         break;
       case 'KeyF':
-        // F shoots a fireball (once unlocked). Auto-repeat is honored
-        // here so holding F lets you spam — pooling makes that cheap.
-        if (typeof window._shootFireball === 'function') {
+        // F is hold-to-charge kamehameha. Keydown (ignoring autorepeat)
+        // begins the charge; the keyup handler below releases it. If
+        // the charge/release hooks aren't wired yet, fall back to the
+        // legacy instant shot so F still does *something*.
+        if (e.repeat) break;
+        if (typeof window._chargeKamehameha === 'function') {
+          window._chargeKamehameha();
+        } else if (typeof window._shootFireball === 'function') {
           window._shootFireball();
         }
         break;
@@ -3757,6 +3762,11 @@ function _bindInputs() {
       case 'Space': fpKeys.space = false; break;
       case 'ShiftLeft': case 'ShiftRight': fpKeys.shift = false; break;
       case 'KeyE': _trickManualHeld = false; break;
+      case 'KeyF':
+        if (typeof window._releaseKamehameha === 'function') {
+          window._releaseKamehameha();
+        }
+        break;
     }
   });
 
