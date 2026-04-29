@@ -72,8 +72,20 @@ let _babaRunLastTs = -1;
 let _totoRunPhase = 0;
 let _totoRunLastTs = -1;
 let _babaRollAnchorReady = false;
-// Half-height offset so the spin pivot sits at body center, not the feet.
+// Local-Y offset of the spin pivot above baseLocalPos. For bababooey this is
+// the body's centroid (avg of spine bones), NOT the bbox center — the tail
+// extends one axis and would skew a bbox-based pivot off the actual ball.
 let _babaRollHalfHeight = 0;
+// Effective ball radius: how far below the pivot the body extends. Used to
+// lift the model during the roll so the bottom of the ball sits on the
+// floor instead of clipping through it (his feet sit lower than the body
+// sphere when standing, so grounding-by-feet leaves the body too low once
+// the legs tuck in).
+let _babaRollRadius = 0;
+// Current run blend, 0..1. Read by applyGameplayJumpDeform so it can
+// suppress the squash/stretch while he's rolling — bababooey is already
+// round, any extra deform turns him into a pancake mid-spin.
+let _babaRollBlend = 0;
 
 // Bone references for procedural animation
 const idleTailBones = [];
@@ -425,6 +437,8 @@ function _pinToGround(model, baseLPos) {
 function _resetBababooeyRollAnchor() {
   _babaRollAnchorReady = false;
   _babaRollHalfHeight = 0;
+  _babaRollRadius = 0;
+  _babaRollBlend = 0;
 }
 
 function _cacheBababooeyRollAnchor(model, src) {
@@ -433,13 +447,48 @@ function _cacheBababooeyRollAnchor(model, src) {
   if (!/bababooey/i.test(String(src || ''))) return;
 
   model.updateMatrixWorld(true);
+
+  // ── Pivot Y: average of the spine bones, in local space ────────────
+  // Bababooey is shaped like a furry ball with a tail. A bbox-based
+  // pivot lands inside the tail's extent and pulls the spin axis out
+  // of the body. The Up/Mid/Down spine joints are the actual centerline
+  // of the ball, so averaging them gives a true center of mass.
+  let sumY = 0;
+  let count = 0;
+  model.traverse((o) => {
+    if (!o || !o.isBone) return;
+    if (!/joint_(M_01|Up_02|Down_03)/i.test(String(o.name || ''))) return;
+    o.getWorldPosition(tmpVecA);
+    model.worldToLocal(tmpVecA);
+    sumY += tmpVecA.y;
+    count++;
+  });
+
+  let pivotLocalY;
+  if (count > 0) {
+    pivotLocalY = sumY / count;
+  } else {
+    // Fallback: bbox center (better than nothing if the rig changes).
+    boxTmp.setFromObject(model);
+    if (!Number.isFinite(boxTmp.min.y)) return;
+    boxTmp.getCenter(tmpVecA);
+    model.worldToLocal(tmpVecA);
+    pivotLocalY = tmpVecA.y;
+  }
+  _babaRollHalfHeight = pivotLocalY - baseLocalPos.y;
+
+  // ── Ball radius: smallest bbox half-extent ─────────────────────────
+  // For a sphere with one stick (the tail), width ≈ height ≈ 2R, but
+  // length ≈ 2R + tailLen. Taking the min of the three half-extents
+  // discards the tail-inflated axis and leaves the true body radius.
   boxTmp.setFromObject(model);
-  if (!Number.isFinite(boxTmp.min.y)) return;
-  boxTmp.getCenter(tmpVecA);
-  model.worldToLocal(tmpVecA);
-  // The model is grounded (origin at feet), so the center Y in local
-  // space tells us exactly how far up to shift the pivot for spinning.
-  _babaRollHalfHeight = tmpVecA.y - baseLocalPos.y;
+  if (Number.isFinite(boxTmp.min.x) && Number.isFinite(boxTmp.min.y) && Number.isFinite(boxTmp.min.z)) {
+    const hx = (boxTmp.max.x - boxTmp.min.x) * 0.5;
+    const hy = (boxTmp.max.y - boxTmp.min.y) * 0.5;
+    const hz = (boxTmp.max.z - boxTmp.min.z) * 0.5;
+    _babaRollRadius = Math.min(hx, hy, hz);
+  }
+
   _babaRollAnchorReady = true;
 }
 
@@ -659,6 +708,7 @@ export function applyBababooeyProceduralRun(ts, moveSpeed, moveBlend) {
     _babaRunPhase = 0;
     catModel.quaternion.copy(baseLocalQuat);
     catModel.position.copy(baseLocalPos);
+    _babaRollBlend = 0;
     return;
   }
 
@@ -712,6 +762,23 @@ export function applyBababooeyProceduralRun(ts, moveSpeed, moveBlend) {
   tmpVecA.set(0, hh, 0);
   tmpVecB.copy(tmpVecA).applyQuaternion(tmpQuat);
   catModel.position.copy(baseLocalPos).add(tmpVecA).sub(tmpVecB);
+
+  // Lift the whole model so the bottom of the ball sits on the floor
+  // during the roll. The model is grounded by its feet, but during the
+  // tucked sonic-roll the feet retract and the body sphere becomes the
+  // lowest point. If the pivot sits below ball-radius, the bottom of
+  // the ball would clip through the floor. Blend the lift in with the
+  // run blend so it doesn't pop when starting/stopping.
+  if (_babaRollAnchorReady && _babaRollRadius > 0) {
+    const lift = Math.max(0, _babaRollRadius - hh) * tuck;
+    catModel.position.y += lift;
+  }
+
+  // Expose the current roll blend so applyGameplayJumpDeform can dial
+  // down its squash/stretch — bababooey is already a sphere, any extra
+  // axis-scale during the spin makes him visibly pancake/stretch as
+  // his short and long axes alternate vertically.
+  _babaRollBlend = tuck;
 }
 
 function _applyToonJumpLegs(squash) {
@@ -798,8 +865,13 @@ export function applyGameplayJumpDeform({ dtSec, vy, holdFrames, modelKey }) {
 
   const syK = isSquishy ? 0.55 : (isToon ? 0.60 : 0.35);
   const sxzK = isSquishy ? 0.40 : (isToon ? 0.30 : 0.22);
-  const sy = 1 - s * syK;
-  const sxz = 1 + s * sxzK;
+  // Suppress the squash/stretch while bababooey is rolling — he's
+  // already a sphere, so any axis-scale here makes him visibly pancake
+  // as the spin alternates which axis is vertical. Fades back in as he
+  // slows out of the roll, so landing squash still works when stopped.
+  const rollFade = isBaba ? Math.max(0, 1 - _babaRollBlend) : 1;
+  const sy = 1 - s * syK * rollFade;
+  const sxz = 1 + s * sxzK * rollFade;
   catModel.scale.set(baseScale.x * sxz, baseScale.y * sy, baseScale.z * sxz);
 
   if (isToon) {
