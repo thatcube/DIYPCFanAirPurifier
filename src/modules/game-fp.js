@@ -813,6 +813,7 @@ let _markShadowsDirty = null;
 let _showToast = null;
 let _roomRefs = null;
 let _purifierRefs = null;
+let _onExitFp = null;
 let _fpHud = null;
 let _purifierGroup = null;
 
@@ -1800,6 +1801,7 @@ export function init(refs) {
   _showToast = refs.showToast || (() => { });
   _roomRefs = refs.roomRefs || {};
   _purifierRefs = refs.purifierRefs || null;
+  _onExitFp = refs.onExitFp || null;
 
   // Build static collision boxes from room refs
   _buildStaticBoxes();
@@ -2994,11 +2996,18 @@ export function toggleFirstPerson() {
     _syncSkateboardVisualState();
     _setSuperSaiyanEnvLightOff();
 
-    // Restore orbit camera to look at purifier
-    if (_controls && _placementOffset) {
-      _controls.target.set(_placementOffset.x, _placementOffset.y + 8, _placementOffset.z);
-      _camera.position.set(_placementOffset.x + 25, _placementOffset.y + 20, _placementOffset.z + 35);
+    // Restore orbit camera to a ceiling-corner room overview so the
+    // splash reads against the whole room. _controls is bound lazily
+    // by the inspector chunk on first entry, so on a splash → play →
+    // exit path it can still be null here — without this fallback the
+    // camera would stay wherever the FP run ended (often inside a
+    // wall) and the splash would render over a black/garbled scene.
+    _camera.position.set(-47, 53, -61);
+    if (_controls) {
+      _controls.target.set(-11, 34, -43);
       _controls.update();
+    } else {
+      _camera.lookAt(-11, 34, -43);
     }
 
     if (_markShadowsDirty) _markShadowsDirty();
@@ -3007,6 +3016,10 @@ export function toggleFirstPerson() {
     document.body.classList.remove('play-mode');
     _syncSkateToggleUi();
     _playModeCue(false);
+    // Notify the host so it can show the title splash (or whatever
+    // else it wants to do post-run) instead of leaving the player
+    // staring at a chrome-less canvas.
+    if (_onExitFp) { try { _onExitFp(); } catch (e) { } }
   }
 }
 
@@ -3465,9 +3478,9 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       if (isMega) _cachedCbLabel.textContent = 'MEGA JUMP!';
       else _cachedCbLabel.textContent = 'Jump charge';
     } else if (isMega) {
-      _cachedCbLabel.textContent = 'HOLD for SUPER SAIYAN!';
+      _cachedCbLabel.textContent = 'Hold for Super Saiyan';
     } else if (chargePct >= 1) {
-      _cachedCbLabel.textContent = 'HOLD for MEGA!';
+      _cachedCbLabel.textContent = 'Hold for mega jump';
     } else {
       _cachedCbLabel.textContent = 'Jump charge';
     }

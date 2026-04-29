@@ -468,6 +468,40 @@ function _wireWindowHandlers() {
 // ── Orbit-mode keyboard ─────────────────────────────────────────────
 // W/A/S/D rotate around target (orbit) or translate freely (fly).
 // F toggles fly mode; Space/Shift = world up/down; Ctrl = sprint.
+// P dumps the current camera pose to console + clipboard.
+
+function _dumpCameraPose() {
+  if (!_ctx?.camera) return;
+  const cam = _ctx.camera;
+  // Use the orbit target as the look-at point when available; in fly
+  // mode the user has been driving freely so the target may not match
+  // exactly, fall back to a point one unit forward of the camera.
+  let tx, ty, tz;
+  if (_controls && !_flyMode) {
+    tx = _controls.target.x; ty = _controls.target.y; tz = _controls.target.z;
+  } else {
+    const fwd = new THREE.Vector3();
+    cam.getWorldDirection(fwd);
+    // Project onto the controls target distance (or 25 units) so the
+    // dumped target sits in front of the camera at a useful range.
+    const dist = _controls
+      ? cam.position.distanceTo(_controls.target)
+      : 25;
+    tx = cam.position.x + fwd.x * dist;
+    ty = cam.position.y + fwd.y * dist;
+    tz = cam.position.z + fwd.z * dist;
+  }
+  const r = (n) => Math.round(n);
+  const snippet =
+    `camera.position.set(${r(cam.position.x)}, ${r(cam.position.y)}, ${r(cam.position.z)});\n` +
+    `camera.lookAt(${r(tx)}, ${r(ty)}, ${r(tz)});`;
+  // eslint-disable-next-line no-console
+  console.log('[camera pose]\n' + snippet);
+  try {
+    navigator.clipboard?.writeText(snippet);
+  } catch (e) { /* ignore */ }
+  _ctx.showToast?.(`Pose copied: pos(${r(cam.position.x)}, ${r(cam.position.y)}, ${r(cam.position.z)}) → look(${r(tx)}, ${r(ty)}, ${r(tz)})`);
+}
 
 function _setFlyMode(on) {
   if (!_controls) return;
@@ -500,6 +534,14 @@ function _wireKeyboard() {
     const k = e.key.toLowerCase();
     if (k === 'f' && !e.repeat && !e.metaKey && !e.altKey) {
       _setFlyMode(!_flyMode);
+      e.preventDefault();
+      return;
+    }
+    // P: dump current camera pose (position + look target) to console
+    // and clipboard so you can frame a shot in fly mode and tell me
+    // the exact values to bake in. Toast confirms it landed.
+    if (k === 'p' && !e.repeat && !e.metaKey && !e.altKey && !e.ctrlKey) {
+      _dumpCameraPose();
       e.preventDefault();
       return;
     }

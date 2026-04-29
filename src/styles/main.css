@@ -1748,6 +1748,17 @@ input[type=range]::-moz-range-thumb {
   color: #9fe3ff;
 }
 
+.fp-charge-label kbd {
+  background: rgba(255, 255, 255, 0.13);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 9px;
+  line-height: 1;
+  font-family: var(--font-mono);
+  color: rgba(207, 236, 255, 0.95);
+}
+
 #fpChargeValue {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -3254,6 +3265,15 @@ body:has(#charSelect.open) .part-tooltip {
   display: none !important;
 }
 
+/* Same treatment for the title splash so the room canvas peeks behind a
+   clean overlay with nothing else fighting it for attention. */
+body:has(#titleSplash.open) #playDockBtn,
+body:has(#titleSplash.open) .panel,
+body:has(#titleSplash.open) .panel-fab,
+body:has(#titleSplash.open) .part-tooltip {
+  display: none !important;
+}
+
 body.play-mode #fpHud {
   display: block;
 }
@@ -3266,6 +3286,414 @@ body.play-mode #fps {
   top: 96px;
   right: 16px;
   bottom: auto;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TITLE SPLASH — liquid-glass overlay above the live three.js scene.
+   Also serves as the loading screen: starts in `data-state="loading"`
+   (opaque dark bg, button shows a spinner) and transitions to
+   `data-state="ready"` once the first scene frame paints.
+   ═══════════════════════════════════════════════════════════════════ */
+#titleSplash {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 480;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  overflow: hidden;
+  isolation: isolate;
+  /* Default (ready) bg — soft top/bottom contrast tint, mostly transparent
+     so the live room scene shows through. */
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(8, 10, 16, 0.55) 0%, rgba(8, 10, 16, 0) 55%),
+    radial-gradient(120% 80% at 50% 100%, rgba(8, 10, 16, 0.6) 0%, rgba(8, 10, 16, 0) 55%);
+  backdrop-filter: blur(2px) saturate(1.1);
+  -webkit-backdrop-filter: blur(2px) saturate(1.1);
+  /* Smooth crossfade from the loading-state opaque bg to the ready-state
+     transparent glass once the scene is ready. */
+  transition:
+    background 0.6s ease-out,
+    backdrop-filter 0.6s ease-out,
+    -webkit-backdrop-filter 0.6s ease-out;
+  animation: fadeIn 0.45s var(--ease-out-expo) both;
+}
+
+#titleSplash.open {
+  display: flex;
+}
+
+/* Loading state — splash IS the boot screen. Same liquid-glass UI, but
+   with an opaque dark gradient bg (no scene visible behind) and the play
+   button morphed into a spinner. The 3D scene loads in the background
+   and crossfades in once `data-state` flips to `ready`. */
+#titleSplash[data-state="loading"] {
+  background: radial-gradient(ellipse at 50% 40%, #2a3240 0%, #161b24 70%, #0c0f15 100%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* While loading, the play button can't actually start a run — show a
+   progress cursor so it's obvious it's not idle. */
+#titleSplash[data-state="loading"] .title-splash-play {
+  cursor: progress;
+}
+
+/* ─── Splash background ───────────────────────────────────────── */
+.title-splash-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Subtle dotted grid kept for engineering-side-project flavor; sits over
+   the glass so it doesn't fight with the liquid orbs. */
+.title-splash-grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, #000 30%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, #000 30%, transparent 80%);
+  opacity: 0.5;
+}
+
+/* ─── Frosted-glass hero card ─────────────────────────────────── */
+/* Uses the canonical liquid-glass tokens (--glass, --glass-blur,
+   --glass-specular, --glass-border) shared with .panel,
+   .skate-onboard-card, finish dialog, etc. so every glass surface in
+   the app refracts the world the same way. The cool dark tint also
+   keeps white text legible against the busy live scene behind. */
+.title-splash-card {
+  position: relative;
+  z-index: 1;
+  max-width: 720px;
+  width: 100%;
+  text-align: center;
+  color: #fff;
+  padding: 44px 36px 36px;
+  border-radius: 32px;
+  background-color: var(--glass);
+  background-image: var(--glass-specular);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 32px 0 rgba(255, 255, 255, 0.03),
+    0 30px 80px rgba(0, 0, 0, 0.5),
+    0 1px 0 rgba(0, 0, 0, 0.5);
+  animation: bounceIn 0.6s var(--spring) both;
+}
+
+/* Top sheen — slim refractive glaze across the very top of the card. */
+.title-splash-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 6%;
+  right: 6%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.7) 50%,
+    transparent 100%
+  );
+  border-radius: 32px 32px 0 0;
+  pointer-events: none;
+}
+
+.title-splash-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: rgba(255, 220, 195, 0.88);
+  background-color: var(--glass-soft);
+  background-image: var(--glass-specular);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  padding: 7px 14px 7px 12px;
+  margin-bottom: 22px;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.title-splash-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffb066;
+  box-shadow: 0 0 12px rgba(255, 176, 102, 0.85);
+  animation: splashDotPulse 2s ease-in-out infinite;
+}
+
+@keyframes splashDotPulse {
+  0%,
+  100% { opacity: 0.6; transform: scale(0.85); }
+  50%  { opacity: 1;   transform: scale(1.15); }
+}
+
+/* Big duotone title with a hot-pink offset shadow for hero punch. */
+.title-splash-title {
+  position: relative;
+  font-size: clamp(48px, 9.5vw, 104px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 0.92;
+  margin: 0 0 22px;
+  display: inline-block;
+}
+
+.title-splash-title-main {
+  position: relative;
+  background: linear-gradient(180deg, #ffffff 0%, #ffe4c8 45%, #ffb066 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.15);
+  display: inline-block;
+}
+
+.title-splash-title-shadow {
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(255, 102, 168, 0.55);
+  transform: translate(7px, 7px);
+  z-index: -1;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .title-splash-title-shadow {
+    transform: translate(4px, 4px);
+    -webkit-text-stroke-width: 1px;
+  }
+}
+
+.title-splash-tagline {
+  font-size: clamp(15px, 1.7vw, 17px);
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.82);
+  margin: 0 auto 32px;
+  max-width: 540px;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+}
+
+.title-splash-tagline strong {
+  color: #ffe4c8;
+  font-weight: 600;
+}
+
+/* ─── Liquid glass play button ────────────────────────────────── */
+.title-splash-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+/* ─── Splash play button — hero sizing on top of .glass-btn--primary ───
+   The button uses the canonical .glass-btn .glass-btn--primary classes
+   in markup, so its glass surface, blur, hover lift, cursor-tracked
+   shine, and click-flash all match the rest of the in-game UI exactly.
+   This rule only adds the hero-specific differences: pill shape, larger
+   padding, bigger font, fixed min-width so the Play / Loading… / Hang
+   tight… state swaps don't reflow the button. */
+.title-splash-play {
+  /* Fixed min-width so swapping between “Play”, “Loading…”, and
+     “Hang tight…” doesn’t reflow the button. 280px comfortably fits
+     the longest state copy + spinner. */
+  min-width: 280px;
+  padding: 18px 56px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  /* Slightly stronger drop-shadow than a normal glass-btn since this is
+     the hero CTA over a busy live scene. */
+  box-shadow:
+    0 12px 36px rgba(0, 0, 0, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.title-splash-play:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 4px;
+}
+
+/* Three swappable content rows inside the play button — only one is shown
+   at a time based on splash data-state and the button's own .is-waiting
+   class. Default visibility is set here; data-state rules toggle them. */
+.title-splash-play-content {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+#titleSplash[data-state="loading"] .title-splash-play-content--loading {
+  display: inline-flex;
+}
+
+#titleSplash[data-state="ready"] .title-splash-play-content--ready {
+  display: inline-flex;
+}
+
+/* Player clicked Play before the scene was ready — keep them on the splash
+   with a spinner in the button until we can drop them into char select. */
+#titleSplash[data-state="ready"] .title-splash-play.is-waiting .title-splash-play-content--ready {
+  display: none;
+}
+
+#titleSplash[data-state="ready"] .title-splash-play.is-waiting .title-splash-play-content--waiting {
+  display: inline-flex;
+}
+
+.title-splash-play.is-waiting {
+  cursor: progress;
+}
+
+/* Spinner inside the play button. White-on-glass to match the
+   .glass-btn--primary surface. */
+.title-splash-play-spinner {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(255, 255, 255, 0.22);
+  border-top-color: rgba(255, 255, 255, 0.92);
+  animation: splashSpinnerRotate 0.85s linear infinite;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+@keyframes splashSpinnerRotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title-splash-play-spinner {
+    animation: splashSpinnerRotate 2.4s linear infinite;
+  }
+}
+
+.title-splash-cta-meta {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* ─── Glass chips ─────────────────────────────────────────────── */
+.title-splash-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.title-splash-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.78);
+  background-color: var(--glass-soft);
+  background-image: var(--glass-specular);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.title-splash-chip i {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+/* ─── Disclaimer + credit ─────────────────────────────────────── */
+.title-splash-disclaimer {
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0 auto;
+  max-width: 520px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.title-splash-disclaimer a {
+  color: rgba(255, 196, 145, 0.95);
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(255, 196, 145, 0.45);
+}
+
+.title-splash-disclaimer a:hover {
+  color: #ffd9b8;
+  border-bottom-color: rgba(255, 217, 184, 0.85);
+}
+
+.title-splash-credit {
+  margin: 14px auto 0;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.title-splash-credit a {
+  color: #ffe4c8;
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  border-bottom: 1px solid rgba(255, 228, 200, 0.4);
+  padding-bottom: 1px;
+  transition: border-color 0.18s ease, color 0.18s ease;
+}
+
+.title-splash-credit a:hover {
+  color: #fff;
+  border-bottom-color: rgba(255, 255, 255, 0.9);
+}
+
+@media (max-width: 540px) {
+  .title-splash-card {
+    padding: 32px 22px 26px;
+    border-radius: 26px;
+  }
+
+  .title-splash-play {
+    width: 100%;
+    padding: 16px 24px;
+  }
+}
+
+body.play-mode #titleSplash {
+  display: none !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════════

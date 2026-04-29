@@ -8,6 +8,10 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+  <!-- App stylesheet loaded as a render-blocking <link> (instead of
+       imported from JS) so the splash screen — which doubles as the
+       loading screen — paints fully styled on the very first frame. -->
+  <link rel="stylesheet" href="/src/styles/main.css">
   <!-- Warm the HTTP cache for the character-select previews so the 3D cats
        are ready by the time the user reaches that screen. Kept as `fetch`
        (not `image`) so the browser reuses the response for our GLTFLoader
@@ -16,148 +20,18 @@
   <link rel="preload" as="fetch" type="model/gltf-binary" crossorigin="anonymous" href="/assets/tooncat.glb">
   <link rel="preload" as="fetch" type="model/gltf-binary" crossorigin="anonymous" href="/assets/totodile.glb">
   <link rel="preload" as="fetch" type="model/gltf-binary" crossorigin="anonymous" href="/assets/bababooey_cat.glb">
-  <!-- Loading-screen styles inlined so the spinner is pretty from the very
-       first paint, before the main CSS bundle arrives. -->
+  <!-- Tiny inline critical CSS — only the iframe-bg overrides need to be
+       inline so the leaderboard share-card iframe never flashes any
+       chrome before main.css loads. The full splash treatment lives in
+       main.css (loaded as a render-blocking <link> above), so the splash
+       paints fully styled on the very first frame as the loading screen. -->
   <style>
-    #loading {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 22px;
-      background: radial-gradient(ellipse at 50% 40%, #2a3240 0%, #161b24 70%, #0c0f15 100%);
-      color: #cfd9e8;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      z-index: 1000;
-      transition: opacity 0.5s ease-out;
-    }
-
-    #loading.is-hiding {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    #loadingCat {
-      width: 128px;
-      height: 128px;
-      filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.55));
-      transform-origin: 50% 55%;
-      animation: loadingCatSpin 1.6s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite,
-        loadingCatJiggle 0.9s ease-in-out infinite;
-      will-change: transform;
-    }
-
-    #loadingLabel {
-      opacity: 0.78;
-      animation: loadingLabelPulse 1.6s ease-in-out infinite;
-    }
-
-    #loadingLabel::after {
-      content: '';
-      display: inline-block;
-      width: 1.1em;
-      text-align: left;
-      animation: loadingDots 1.2s steps(4, end) infinite;
-    }
-
-    @keyframes loadingCatSpin {
-      0% {
-        transform: rotate(0deg) scale(1);
-      }
-
-      50% {
-        transform: rotate(180deg) scale(1.06);
-      }
-
-      100% {
-        transform: rotate(360deg) scale(1);
-      }
-    }
-
-    @keyframes loadingCatJiggle {
-
-      0%,
-      100% {
-        translate: 0 0;
-      }
-
-      25% {
-        translate: 0 -4px;
-      }
-
-      50% {
-        translate: 0 0;
-      }
-
-      75% {
-        translate: 0 3px;
-      }
-    }
-
-    @keyframes loadingLabelPulse {
-
-      0%,
-      100% {
-        opacity: 0.55;
-      }
-
-      50% {
-        opacity: 0.95;
-      }
-    }
-
-    @keyframes loadingDots {
-      0% {
-        content: '';
-      }
-
-      25% {
-        content: '.';
-      }
-
-      50% {
-        content: '..';
-      }
-
-      75% {
-        content: '...';
-      }
-
-      100% {
-        content: '';
-      }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      #loadingCat {
-        animation: loadingCatSpin 4s linear infinite;
-      }
-
-      #loadingLabel,
-      #loadingLabel::after {
-        animation: none;
-      }
-    }
-
-    /* Background-only mode (?bg=1): used by leaderboard.html iframe so the
-       3D scene shows behind the share card without any chrome.
-       Hide every interactive surface and HUD; keep only the canvas + loader.
-       Inline so the chrome never flashes before main.css loads. */
-    html.is-bg #loading {
-      background: transparent;
-    }
-
     html.is-bg .panel,
     html.is-bg .panel-fab,
     html.is-bg .part-tooltip,
     html.is-bg #playDockBtn,
     html.is-bg #charSelect,
+    html.is-bg #titleSplash,
     html.is-bg #fpHud,
     html.is-bg #fpCrosshair,
     html.is-bg #fpCrosshairTooltip,
@@ -187,40 +61,69 @@
 </head>
 
 <body>
-  <div id="loading" role="status" aria-live="polite" aria-label="Loading">
-    <svg id="loadingCat" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-      <polygon points="4.2,13.8 8.4,1.8 13.3,11.4" fill="#3f454d" />
-      <polygon points="6.3,11.4 8.6,5 11.2,10.5" fill="#2f343b" />
-      <polygon points="18.7,11.4 23.6,1.8 27.8,13.8" fill="#3f454d" />
-      <polygon points="20.8,10.5 23.4,5 25.7,11.4" fill="#2f343b" />
-      <ellipse cx="16" cy="17" rx="11.7" ry="10.8" fill="#4a5159" />
-      <path
-        d="M14.8,7.2 C16.4,6.7 17.9,7.8 17.9,9.5 C17.9,11.2 17.6,12.5 18.1,14 C18.6,15.5 18.6,17.6 17.8,19.2 C17.1,20.6 14.9,20.6 14.2,19.2 C13.4,17.6 13.4,15.5 13.9,14 C14.4,12.5 14.1,11.2 14.1,9.5 C14.1,8.3 14.3,7.6 14.8,7.2 Z"
-        fill="#f6f4ef" />
-      <ellipse cx="16" cy="20" rx="6.3" ry="4.7" fill="#f9f7f2" />
-      <ellipse cx="12" cy="15.6" rx="2.5" ry="1.9" fill="#b6c979" />
-      <ellipse cx="20" cy="15.6" rx="2.5" ry="1.9" fill="#b6c979" />
-      <ellipse cx="12.5" cy="15.7" rx="0.55" ry="1.35" fill="#151617" />
-      <ellipse cx="19.5" cy="15.7" rx="0.55" ry="1.35" fill="#151617" />
-      <path
-        d="M14.6,19.1 C15.2,18.35 16.8,18.35 17.4,19.1 C17.4,19.9 16.9,20.35 16,20.35 C15.1,20.35 14.6,19.9 14.6,19.1 Z"
-        fill="#d79a93" />
-      <path d="M16,20.35 L16,21.4" stroke="#7a6a66" stroke-width="0.42" stroke-linecap="round" />
-      <path d="M16,21.4 C14.95,22.2 13.6,22.3 12.3,21.9" stroke="#7a6a66" stroke-width="0.42" fill="none"
-        stroke-linecap="round" />
-      <path d="M16,21.4 C17.05,22.2 18.4,22.3 19.7,21.9" stroke="#7a6a66" stroke-width="0.42" fill="none"
-        stroke-linecap="round" />
-      <g stroke="#ececec" stroke-width="0.38" stroke-linecap="round" opacity="0.95">
-        <line x1="10" y1="19.2" x2="3.1" y2="18.3" />
-        <line x1="10" y1="20.2" x2="2.8" y2="20.8" />
-        <line x1="22" y1="19.2" x2="28.9" y2="18.3" />
-        <line x1="22" y1="20.2" x2="29.2" y2="20.8" />
-      </g>
-    </svg>
-    <div id="loadingLabel">Loading</div>
-  </div>
   <main>
     <canvas id="c"></canvas>
+
+    <!-- Title / splash screen — also serves as the loading screen.
+         Starts with `class="open"` and `data-state="loading"` so the dark
+         boot background paints instantly (matching the inline critical CSS
+         above). After the first scene frame paints, main.js flips it to
+         `data-state="ready"` and the liquid-glass treatment fades in over
+         the live room canvas. -->
+    <div id="titleSplash" class="open" data-state="loading" role="dialog" aria-modal="true" aria-label="My Room, The Game — title screen">
+      <div class="title-splash-bg" aria-hidden="true">
+        <div class="title-splash-grid"></div>
+      </div>
+      <div class="title-splash-card">
+        <div class="title-splash-eyebrow">
+          <span class="title-splash-dot" aria-hidden="true"></span>
+          <span>A tiny three.js side-quest</span>
+        </div>
+        <h1 class="title-splash-title">
+          <span class="title-splash-title-shadow" aria-hidden="true">My Room,<br />The Game</span>
+          <span class="title-splash-title-main">My Room,<br />The Game</span>
+        </h1>
+        <p class="title-splash-tagline">
+          A 3D replica of my room. Run around as <strong>Korra</strong> (my cat, professionally cursed-looking),
+          collect every coin, and snoop out a few hidden secret coins tucked around the place.
+        </p>
+        <div class="title-splash-cta">
+          <button class="title-splash-play glass-btn glass-btn--primary" type="button"
+            onclick="window._startFromSplash&&window._startFromSplash()">
+            <span class="title-splash-play-content title-splash-play-content--ready">
+              <span>Play</span>
+            </span>
+            <span class="title-splash-play-content title-splash-play-content--loading" aria-hidden="true">
+              <span class="title-splash-play-spinner"></span>
+              <span>Loading…</span>
+            </span>
+            <span class="title-splash-play-content title-splash-play-content--waiting" aria-hidden="true">
+              <span class="title-splash-play-spinner"></span>
+              <span>Hang tight…</span>
+            </span>
+          </button>
+          <div class="title-splash-cta-meta">
+            <span class="title-splash-kbd">No install · runs in your browser</span>
+          </div>
+        </div>
+        <div class="title-splash-chips" aria-label="What’s in the game">
+          <span class="title-splash-chip"><i class="ph ph-cat"></i> Pick your cat</span>
+          <span class="title-splash-chip"><i class="ph ph-fire"></i> Throw fireballs</span>
+          <span class="title-splash-chip"><i class="ph ph-lightning"></i> Power up</span>
+          <span class="title-splash-chip"><i class="ph ph-coin"></i> Hidden secrets</span>
+          <span class="title-splash-chip"><i class="ph ph-shooting-star"></i> …and a few surprises</span>
+        </div>
+        <p class="title-splash-disclaimer">
+          For-fun side project — every wall, lamp, and very-cursed cat hand-modeled in code.
+          Rooms are missing, things will break, animations are jank.
+          Built with <a href="https://threejs.org/" target="_blank" rel="noopener noreferrer">three.js</a>,
+          a sprinkle of WebGL, and way too many evenings.
+        </p>
+        <p class="title-splash-credit">
+          made by <a href="https://brandonmoore.design" target="_blank" rel="noopener noreferrer">Brandon Moore</a>
+        </p>
+      </div>
+    </div>
 
     <!-- Control Panel: injected by the lazy `inspector-mode.js` chunk
          on first pause-menu Inspect click. Only the part-tooltip stays
@@ -392,7 +295,7 @@
       </div>
       <div id="fpBarDivider"></div>
       <div class="fp-charge-head">
-        <span class="fp-charge-label"><i class="ph ph-arrow-fat-up"></i> <span id="fpChargeLabel">Jump
+        <span class="fp-charge-label"><kbd>Space</kbd> <span id="fpChargeLabel">Jump
             charge</span></span>
         <span id="fpChargeValue">Ready</span>
       </div>

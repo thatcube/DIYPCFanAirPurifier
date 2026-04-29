@@ -5,25 +5,32 @@
 
 import * as THREE from 'three';
 import * as coins from './coins.js';
+import * as fireball from './fireball.js';
 import { sfxMuted } from './game-fp.js';
 
 // ── Config ──────────────────────────────────────────────────────────
 
 const CHARGE_MIN_SEC = 0.28;
 const CHARGE_FULL_SEC = 1.10;
-const ORB_BASE_RADIUS = 1.6;
-const ORB_MAX_RADIUS = 7.5;
+const ORB_BASE_RADIUS = 1.3;
+const ORB_MAX_RADIUS = 5.5;
 const ORB_FORWARD = 4;
 const ORB_DOWN = 0;
 
 const BEAM_BASE_LEN = 240;
 const BEAM_MAX_LEN = 620;
 const BEAM_BASE_RADIUS = 3.2;
-const BEAM_MAX_RADIUS = 9.0;
+const BEAM_MAX_RADIUS = 6.5;
 const BEAM_EXTEND_SEC = 0.10;
-const BEAM_HOLD_BASE_SEC = 0.18;
-const BEAM_HOLD_FULL_SEC = 0.55;
-const BEAM_FADE_SEC = 0.22;
+const BEAM_HOLD_BASE_SEC = 1.20;
+const BEAM_HOLD_FULL_SEC = 3.20;
+const BEAM_FADE_SEC = 0.40;
+
+// Burn-mark cadence while the beam is sustained against a surface.
+const SCORCH_STEP_INCHES = 0.9;   // distance between stamps along the trail
+const SCORCH_MAX_STAMPS_PER_FRAME = 18; // safety cap when beam sweeps fast
+const SCORCH_SIZE_MUL_BASE = 1.4;  // beam scorches are bigger than fireball ones
+const SCORCH_SIZE_MUL_FULL = 2.6;
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -41,10 +48,25 @@ let _beamActive = false;
 let _beamPhase = 'idle';
 let _beamPhaseStartTs = 0;
 let _beamHoldDur = 0;
-let _beamMaxLen = 0;
+let _beamFullLen = 0;          // full range when nothing's in the way
+let _beamMaxLen = 0;            // current visual length (clamped to nearest hit)
 let _beamMaxRad = 0;
+let _beamSizeMul = 1;
+let _beamScorchAccum = 0;
+let _beamHasLastScorch = false;
+const _beamLastScorchPoint = new THREE.Vector3();
+let _beamLastScorchObj = null;
+let _beamHit = null;            // last raycast result (or null if hit nothing)
+const _beamHitPoint = new THREE.Vector3();
+const _beamHitNormal = new THREE.Vector3();
 const _beamOrigin = new THREE.Vector3();
 const _beamDir = new THREE.Vector3();
+
+const _beamRaycaster = new THREE.Raycaster();
+const _beamRcResults = [];
+const _tmpScorchPoint = new THREE.Vector3();
+const _tmpInvNormal = new THREE.Vector3();
+const _tmpScorchHit = { point: new THREE.Vector3(), face: null, object: null };
 
 let _orbGroup = null;
 let _orbCore = null;
@@ -67,6 +89,13 @@ const _tmpUp = new THREE.Vector3(0, 1, 0);
 let _chargeOsc = null;
 let _chargeGain = null;
 let _chargeFilter = null;
+
+// Sustain layer that plays for the duration of the beam (post-release):
+// a filtered noise hiss + a low rumble, both fading out with the beam.
+let _sustainSrc = null;
+let _sustainGain = null;
+let _sustainHum = null;
+let _sustainHumGain = null;
 
 // ── Public API ──────────────────────────────────────────────────────
 
@@ -131,27 +160,49 @@ export function update(dtSec) {
   }
 
   if (_beamActive) {
+    // Re-aim every frame so the beam tracks the player (origin) and
+    // their current look direction, then re-raycast so the visual
+    // length and burn point follow whatever's currently in the way.
+    _refreshBeamAim();
+
     const phaseElapsed = (t - _beamPhaseStartTs) / 1000;
     if (_beamPhase === 'extend') {
       const k = Math.min(1, phaseElapsed / BEAM_EXTEND_SEC);
       const eased = 1 - Math.pow(1 - k, 3);
-      _setBeamScale(eased * _beamMaxLen, _beamMaxRad, 1);
+      // Beam thins from full burst radius down to ~35% during extend,
+      // and the cap shrinks from a big flash to a tiny pinpoint.
+      const radMul = 1 - 0.65 * eased;
+      const capMul = 1.5 - 1.32 * eased;
+      _setBeamScale(eased * _beamMaxLen, _beamMaxRad * radMul, 1, capMul);
       if (k >= 1) { _beamPhase = 'hold'; _beamPhaseStartTs = t; }
     } else if (_beamPhase === 'hold') {
       const wob = 1 + 0.06 * Math.sin(phaseElapsed * 28);
-      _setBeamScale(_beamMaxLen, _beamMaxRad * wob, 1);
+      // Sustain phase: thin beam + tiny pulsing muzzle flare so the
+      // cat isn't hidden behind a giant orb.
+      const radMul = 0.35 * wob;
+      const capMul = 0.18 + 0.04 * Math.sin(phaseElapsed * 22);
+      _setBeamScale(_beamMaxLen, _beamMaxRad * radMul, 1, capMul);
+      // Burn a continuous trail along the surface as the beam sweeps.
+      if (_beamHit) {
+        _emitBeamScorchTrail();
+      } else {
+        _beamHasLastScorch = false;
+      }
       if (phaseElapsed >= _beamHoldDur) { _beamPhase = 'fade'; _beamPhaseStartTs = t; }
     } else if (_beamPhase === 'fade') {
       const k = Math.min(1, phaseElapsed / BEAM_FADE_SEC);
       const alpha = 1 - k;
-      _setBeamScale(_beamMaxLen, _beamMaxRad * (1 - 0.4 * k), alpha);
+      _setBeamScale(_beamMaxLen, _beamMaxRad * 0.35 * (1 - 0.4 * k), alpha, 0.18);
       if (k >= 1) {
         _beamActive = false;
         _beamPhase = 'idle';
         _beamGroup.visible = false;
         if (_beamLight) _beamLight.intensity = 0;
+        _stopSustainSfx();
       }
     }
+    // SFX mute should kill the sustained whoosh immediately.
+    if (sfxMuted && _sustainSrc) _stopSustainSfx();
   }
 }
 
@@ -161,9 +212,19 @@ function _fireBeam(ratio) {
   _getMuzzlePosition(_beamOrigin);
   _getAimDirection(_beamDir);
 
-  _beamMaxLen = BEAM_BASE_LEN + (BEAM_MAX_LEN - BEAM_BASE_LEN) * ratio;
+  _beamFullLen = BEAM_BASE_LEN + (BEAM_MAX_LEN - BEAM_BASE_LEN) * ratio;
   _beamMaxRad = BEAM_BASE_RADIUS + (BEAM_MAX_RADIUS - BEAM_BASE_RADIUS) * ratio;
   _beamHoldDur = BEAM_HOLD_BASE_SEC + (BEAM_HOLD_FULL_SEC - BEAM_HOLD_BASE_SEC) * ratio;
+  _beamSizeMul = SCORCH_SIZE_MUL_BASE + (SCORCH_SIZE_MUL_FULL - SCORCH_SIZE_MUL_BASE) * ratio;
+  _beamScorchAccum = 0;
+  _beamHasLastScorch = false;
+  _beamLastScorchObj = null;
+
+  // Initial raycast & beam-group placement; the per-frame _refreshBeamAim
+  // will keep these updated so the beam follows the player after release.
+  _beamHit = _raycastBeam(_beamOrigin, _beamDir, _beamFullLen);
+  _beamMaxLen = _beamHit ? Math.max(1, _beamHit.distance) : _beamFullLen;
+  if (_beamHit) _emitBeamScorchTrail();
 
   _beamGroup.position.copy(_beamOrigin);
   _tmpQuat.setFromUnitVectors(_tmpUp, _beamDir);
@@ -181,9 +242,116 @@ function _fireBeam(ratio) {
   _beamPhaseStartTs = _now();
 
   _playReleaseSfx(ratio);
+  _startSustainSfx(ratio);
 }
 
-function _setBeamScale(lengthInches, radiusInches, alpha) {
+// Recompute origin/direction from the current player pose, re-orient
+// the beam group, re-raycast against the world to update visual length
+// and the burn point. Called every frame while the beam is alive.
+function _refreshBeamAim() {
+  _getMuzzlePosition(_beamOrigin);
+  _getAimDirection(_beamDir);
+  _beamGroup.position.copy(_beamOrigin);
+  _tmpQuat.setFromUnitVectors(_tmpUp, _beamDir);
+  _beamGroup.quaternion.copy(_tmpQuat);
+  _beamHit = _raycastBeam(_beamOrigin, _beamDir, _beamFullLen);
+  _beamMaxLen = _beamHit ? Math.max(1, _beamHit.distance) : _beamFullLen;
+  if (_beamLight) _beamLight.position.copy(_beamOrigin);
+}
+
+// Raycast forward from origin along dir, up to maxDist. Skips objects
+// we own (beam meshes / orb / scorch decals all flag _fireballSkip).
+function _raycastBeam(origin, dir, maxDist) {
+  if (!_scene) return null;
+  _beamRaycaster.set(origin, dir);
+  // Push the near plane out a bit so the cat / player collider /
+  // anything attached to the camera doesn't count as the first hit
+  // and freeze the beam in mid-air.
+  _beamRaycaster.near = 4;
+  _beamRaycaster.far = maxDist;
+  _beamRaycaster.camera = _camera;
+  _beamRcResults.length = 0;
+  _beamRaycaster.intersectObject(_scene, true, _beamRcResults);
+  for (let i = 0; i < _beamRcResults.length; i++) {
+    const h = _beamRcResults[i];
+    let o = h.object;
+    let skip = false;
+    while (o) {
+      if (o.userData && o.userData._fireballSkip) { skip = true; break; }
+      // Never let the player's own cat block the beam.
+      if (_catGroup && o === _catGroup) { skip = true; break; }
+      o = o.parent;
+    }
+    if (skip) continue;
+    // Cache normal + point so we can reuse them every frame in hold.
+    _beamHitPoint.copy(h.point);
+    if (h.face && h.object && h.object.matrixWorld) {
+      _beamHitNormal.copy(h.face.normal)
+        .transformDirection(h.object.matrixWorld)
+        .normalize();
+    } else {
+      _beamHitNormal.copy(dir).multiplyScalar(-1);
+    }
+    return h;
+  }
+  return null;
+}
+
+// Stamp scorch decals continuously along the path the hit point
+// traces over the surface. Produces a drawn-line look instead of
+// scattered splatter circles. Skips when the beam jumps surfaces.
+function _emitBeamScorchTrail() {
+  if (!_beamHit) return;
+  const hitObj = _beamHit.object || null;
+  // First stamp on this surface — drop one decal and seed the path.
+  if (!_beamHasLastScorch || hitObj !== _beamLastScorchObj) {
+    _stampScorchAt(_beamHitPoint);
+    _beamLastScorchPoint.copy(_beamHitPoint);
+    _beamLastScorchObj = hitObj;
+    _beamHasLastScorch = true;
+    return;
+  }
+  const dx = _beamHitPoint.x - _beamLastScorchPoint.x;
+  const dy = _beamHitPoint.y - _beamLastScorchPoint.y;
+  const dz = _beamHitPoint.z - _beamLastScorchPoint.z;
+  const dist = Math.hypot(dx, dy, dz);
+  if (dist < SCORCH_STEP_INCHES) return;
+  const steps = Math.min(
+    SCORCH_MAX_STAMPS_PER_FRAME,
+    Math.floor(dist / SCORCH_STEP_INCHES)
+  );
+  const inv = 1 / dist;
+  const ux = dx * inv, uy = dy * inv, uz = dz * inv;
+  for (let i = 1; i <= steps; i++) {
+    const d = i * SCORCH_STEP_INCHES;
+    _tmpScorchPoint.set(
+      _beamLastScorchPoint.x + ux * d,
+      _beamLastScorchPoint.y + uy * d,
+      _beamLastScorchPoint.z + uz * d
+    );
+    _stampScorchAt(_tmpScorchPoint);
+  }
+  // Advance the cursor by exactly the number of steps we stamped so
+  // remainder distance carries cleanly into the next frame.
+  const advance = steps * SCORCH_STEP_INCHES;
+  _beamLastScorchPoint.x += ux * advance;
+  _beamLastScorchPoint.y += uy * advance;
+  _beamLastScorchPoint.z += uz * advance;
+}
+
+function _stampScorchAt(point) {
+  _tmpScorchHit.point.copy(point);
+  // _spawnScorch transforms hit.face.normal by hit.object.matrixWorld.
+  // We already store the world-space normal, so feed null/no-face and
+  // pass -normal as the travel dir so the fallback (-travelDir) yields
+  // exactly our world normal.
+  _tmpScorchHit.face = null;
+  _tmpScorchHit.object = null;
+  _tmpInvNormal.copy(_beamHitNormal).multiplyScalar(-1);
+  fireball.spawnLaserScorch(_tmpScorchHit, _tmpInvNormal, _beamSizeMul);
+}
+
+function _setBeamScale(lengthInches, radiusInches, alpha, capMul = 1.5) {
   if (!_beamGroup) return;
   const lenY = Math.max(0.001, lengthInches);
   const setMesh = (mesh, radiusMul, baseAlpha) => {
@@ -199,7 +367,7 @@ function _setBeamScale(lengthInches, radiusInches, alpha) {
   setMesh(_beamOuter, 1.15, 0.35);
 
   if (_beamCap) {
-    _beamCap.scale.setScalar(radiusInches * 1.5);
+    _beamCap.scale.setScalar(radiusInches * capMul);
     _beamCap.position.set(0, 0, 0);
     if (_beamCap.material) _beamCap.material.opacity = 0.9 * alpha;
   }
@@ -278,6 +446,11 @@ function _ensureBuilt() {
   _beamOuter = mkBeamMesh(0x3aa6ff, 0.35, 998);
   _beamMid = mkBeamMesh(0x9be8ff, 0.75, 999);
   _beamCore = mkBeamMesh(0xffffff, 1.0, 1000);
+  // Flag every beam mesh so our own raycast (and the fireball's) skips them.
+  _beamOuter.userData._fireballSkip = true;
+  _beamMid.userData._fireballSkip = true;
+  _beamCore.userData._fireballSkip = true;
+  _beamGroup.userData._fireballSkip = true;
   _beamGroup.add(_beamOuter);
   _beamGroup.add(_beamMid);
   _beamGroup.add(_beamCore);
@@ -288,6 +461,7 @@ function _ensureBuilt() {
     blending: THREE.AdditiveBlending,
   }));
   _beamCap.renderOrder = 1001;
+  _beamCap.userData._fireballSkip = true;
   _beamGroup.add(_beamCap);
 
   _beamLight = new THREE.PointLight(0x66ccff, 0, 600, 1.5);
@@ -299,9 +473,10 @@ function _ensureBuilt() {
 function _getMuzzlePosition(out) {
   if (_isFpMode() && _catGroup) {
     _catGroup.getWorldPosition(out);
-    out.y += 5;
+    out.y += 1;
   } else {
     out.copy(_camera.position);
+    out.y -= 4;
   }
   const fwd = _tmpDir;
   _getAimDirection(fwd);
@@ -400,4 +575,81 @@ function _playReleaseSfx(ratio) {
   body.connect(lp).connect(bg).connect(ac.destination);
   body.start(now);
   body.stop(now + 0.9);
+}
+
+// Sustained "blast" loop while the beam is still being projected after
+// the initial release. Filtered white noise hiss + a sub rumble; both
+// auto-fade as the beam's hold + fade phases play out.
+function _startSustainSfx(ratio) {
+  if (sfxMuted) return;
+  const ac = coins.getAudioCtx();
+  if (!ac) return;
+  _stopSustainSfx();
+
+  const now = ac.currentTime;
+  const power = 0.55 + 0.45 * ratio;
+  const totalSec = BEAM_EXTEND_SEC + _beamHoldDur + BEAM_FADE_SEC;
+
+  if (!_noiseBuf) {
+    const len = Math.floor(ac.sampleRate * 0.9);
+    _noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+    const data = _noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+  }
+
+  // Hiss layer: looping bandpassed noise — the "spraying" beam body.
+  _sustainSrc = ac.createBufferSource();
+  _sustainSrc.buffer = _noiseBuf;
+  _sustainSrc.loop = true;
+  const bp = ac.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.Q.value = 0.9;
+  bp.frequency.setValueAtTime(1400, now);
+  bp.frequency.linearRampToValueAtTime(2200, now + totalSec);
+  _sustainGain = ac.createGain();
+  _sustainGain.gain.setValueAtTime(0.0001, now);
+  _sustainGain.gain.linearRampToValueAtTime(0.085 * power, now + 0.10);
+  // Hold most of the duration, then ramp to silence by the end.
+  _sustainGain.gain.setValueAtTime(0.085 * power, now + totalSec - BEAM_FADE_SEC);
+  _sustainGain.gain.exponentialRampToValueAtTime(0.0001, now + totalSec);
+  _sustainSrc.connect(bp).connect(_sustainGain).connect(ac.destination);
+  _sustainSrc.start(now);
+  _sustainSrc.stop(now + totalSec + 0.05);
+
+  // Sub rumble layer: low sine, gives the beam weight.
+  _sustainHum = ac.createOscillator();
+  _sustainHum.type = 'sine';
+  _sustainHum.frequency.setValueAtTime(58, now);
+  _sustainHum.frequency.linearRampToValueAtTime(46, now + totalSec);
+  _sustainHumGain = ac.createGain();
+  _sustainHumGain.gain.setValueAtTime(0.0001, now);
+  _sustainHumGain.gain.linearRampToValueAtTime(0.11 * power, now + 0.12);
+  _sustainHumGain.gain.setValueAtTime(0.11 * power, now + totalSec - BEAM_FADE_SEC);
+  _sustainHumGain.gain.exponentialRampToValueAtTime(0.0001, now + totalSec);
+  _sustainHum.connect(_sustainHumGain).connect(ac.destination);
+  _sustainHum.start(now);
+  _sustainHum.stop(now + totalSec + 0.05);
+}
+
+function _stopSustainSfx() {
+  const ac = coins.getAudioCtx();
+  const now = ac ? ac.currentTime : 0;
+  if (_sustainGain && ac) {
+    try {
+      _sustainGain.gain.cancelScheduledValues(now);
+      _sustainGain.gain.setValueAtTime(_sustainGain.gain.value, now);
+      _sustainGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+    } catch (e) { }
+  }
+  if (_sustainHumGain && ac) {
+    try {
+      _sustainHumGain.gain.cancelScheduledValues(now);
+      _sustainHumGain.gain.setValueAtTime(_sustainHumGain.gain.value, now);
+      _sustainHumGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+    } catch (e) { }
+  }
+  try { _sustainSrc && _sustainSrc.stop(now + 0.1); } catch (e) { }
+  try { _sustainHum && _sustainHum.stop(now + 0.1); } catch (e) { }
+  _sustainSrc = null; _sustainGain = null;
+  _sustainHum = null; _sustainHumGain = null;
 }

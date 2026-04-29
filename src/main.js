@@ -4,7 +4,10 @@
 
 import * as THREE from 'three';
 import '@fontsource-variable/nunito-sans';
-import './styles/main.css';
+// main.css is loaded via <link rel="stylesheet"> in the HTML head so the
+// full splash UI (which doubles as the loading screen) paints styled on
+// the very first frame, instead of waiting for this JS module to import
+// and inject it.
 
 // ── Module imports ──────────────────────────────────────────────────
 
@@ -215,21 +218,28 @@ function _loadInspector() {
 // Lights
 lighting.createLights(state.isMobile);
 
-// Hide loading overlay — fade out so it doesn't snap away. The actual hide
-// is deferred until after the first rendered frame is painted (see end of
-// file, after animate()) so the spinner stays up through the heavy
-// createRoom/createPurifier build + initial shader compilation. Without
-// that, the overlay disappears immediately and users stare at a frozen UI
-// for the full build duration.
-const loadingEl = document.getElementById('loading');
-function _hideLoadingOverlay() {
-  if (!loadingEl) return;
-  if (loadingEl._hideStarted) return;
-  loadingEl._hideStarted = true;
-  loadingEl.classList.add('is-hiding');
-  const _removeLoading = () => { loadingEl.style.display = 'none'; };
-  loadingEl.addEventListener('transitionend', _removeLoading, { once: true });
-  setTimeout(_removeLoading, 900); // safety net if transitionend doesn't fire
+// The title splash is also the loading screen. It's open from page load
+// (HTML markup has `class="open" data-state="loading"`) so the dark boot
+// gradient paints instantly via the inline critical CSS in index.html.
+// Once the first scene frame paints, `_markSplashReady()` flips the state
+// to `ready` and the liquid-glass treatment fades in over the live scene.
+const splashEl = document.getElementById('titleSplash');
+function _markSplashReady() {
+  if (!splashEl) return;
+  if (splashEl.dataset.state === 'ready') return;
+  splashEl.dataset.state = 'ready';
+  window._appReady = true;
+  // If the player clicked Play before we were ready, drop them straight
+  // into char select now. The button has been showing a "Hang tight…"
+  // spinner the whole time.
+  if (window._pendingStart) {
+    window._pendingStart = false;
+    // Defer one frame so the data-state CSS transition starts visibly
+    // before we yank the splash away.
+    requestAnimationFrame(() => {
+      window._startFromSplash?.();
+    });
+  }
 }
 ensureGlassBlurCompat();
 
@@ -269,8 +279,12 @@ purifierRefs.showWallBracket(false);
 // No OrbitControls yet (lazy-loaded on first Inspect click); use a one-
 // shot lookAt so the initial framing is correct even before controls
 // take over.
-camera.position.set(placementOffset.x + 25, 20, placementOffset.z + 35);
-camera.lookAt(placementOffset.x, 8, placementOffset.z);
+// Splash/post-game preview camera: hand-tuned in fly mode to frame
+// the room from a high corner. Absolute coords (not purifier-relative)
+// because this framing is about the room, not the purifier — the
+// inspector retarget below handles purifier focus.
+camera.position.set(-47, 53, -61);
+camera.lookAt(-11, 34, -43);
 
 // ── Wire time-of-day lighting ───────────────────────────────────────
 
@@ -515,7 +529,19 @@ gameFp.init({
   purifierRefs,
   markShadowsDirty,
   showToast,
-  roomRefs
+  roomRefs,
+  // Show the title splash any time we leave a run — covers G-key exits,
+  // pause-menu exit, and the mobile X button. Skip if another flow has
+  // already claimed the post-FP screen (inspector, char-select reset,
+  // finish dialog) by setting the one-shot suppress flag.
+  onExitFp: () => {
+    if (gameFp.fpMode) return;
+    if (_suppressSplashOnce) { _suppressSplashOnce = false; return; }
+    if (leaderboard.isFinishDialogOpen && leaderboard.isFinishDialogOpen()) return;
+    const cs = document.getElementById('charSelect');
+    if (cs && cs.classList.contains('open')) return;
+    window._openSplash?.();
+  }
 });
 
 // Pre-warm Super Saiyan effect chain (aura mesh, halo, sparkle materials,
@@ -710,6 +736,9 @@ let _charSelectSavedFocus = null;
 window._openCharSelect = () => {
   // Release pointer lock if held
   if (document.pointerLockElement) document.exitPointerLock();
+  // Hide the splash if it's open — the picker takes over from here.
+  const sp = document.getElementById('titleSplash');
+  if (sp) sp.classList.remove('open');
   const cs = document.getElementById('charSelect');
   if (cs) {
     cs.classList.add('open');
@@ -756,6 +785,9 @@ window._closeCharSelect = () => {
   if (cs) cs.classList.remove('open');
   if (_charSelectFocusTrap) { _charSelectFocusTrap.release(); _charSelectFocusTrap = null; }
   if (_charSelectSavedFocus) { _charSelectSavedFocus.restore(); _charSelectSavedFocus = null; }
+  // Closing the picker without starting a run drops the user back on the
+  // title splash so they never land on a chrome-less, blank canvas.
+  if (!gameFp.fpMode) window._openSplash?.();
 };
 
 // Escape key closes char select
@@ -766,10 +798,62 @@ document.getElementById('charSelect')?.addEventListener('keydown', e => {
     window._closeCharSelect();
   }
 });
-// Game-first: auto-open the character select on every boot.
-setTimeout(() => {
-  if (!gameFp.fpMode) window._openCharSelect();
-}, 120);
+
+// ── Title splash ────────────────────────────────────────────────────
+// Shown on first boot (where it doubles as the loading screen — see
+// _markSplashReady above) and any time the player exits a run, so they
+// always have a clear "Play" entry point instead of staring at an empty
+// room canvas.
+window._openSplash = () => {
+  if (gameFp.fpMode) return;
+  if (document.pointerLockElement) document.exitPointerLock();
+  // If the char select is still open, close it first so they don't stack.
+  const cs = document.getElementById('charSelect');
+  if (cs && cs.classList.contains('open')) {
+    cs.classList.remove('open');
+    if (_charSelectFocusTrap) { _charSelectFocusTrap.release(); _charSelectFocusTrap = null; }
+    if (_charSelectSavedFocus) { _charSelectSavedFocus.restore(); _charSelectSavedFocus = null; }
+  }
+  const sp = document.getElementById('titleSplash');
+  if (!sp) return;
+  sp.classList.add('open');
+  // If we're re-entering the splash after a run, the scene is already
+  // ready — make sure we don't accidentally show the loading appearance.
+  if (window._appReady && sp.dataset.state !== 'ready') {
+    sp.dataset.state = 'ready';
+  }
+  // Clear any stale "waiting for ready" button state from a previous
+  // early-click attempt.
+  const btn = sp.querySelector('.title-splash-play');
+  btn?.classList.remove('is-waiting');
+  window._pendingStart = false;
+  requestAnimationFrame(() => {
+    btn?.focus();
+  });
+};
+window._closeSplash = () => {
+  const sp = document.getElementById('titleSplash');
+  if (sp) sp.classList.remove('open');
+};
+window._startFromSplash = () => {
+  // If the player tapped Play before the scene finished loading, leave
+  // the splash up and morph the button into a spinner. _markSplashReady
+  // will pick up the pending intent and complete the transition.
+  if (!window._appReady) {
+    const sp = document.getElementById('titleSplash');
+    const btn = sp?.querySelector('.title-splash-play');
+    btn?.classList.add('is-waiting');
+    window._pendingStart = true;
+    return;
+  }
+  window._closeSplash();
+  window._openCharSelect();
+};
+
+// The splash is in the HTML markup with class="open" data-state="loading"
+// already, so it's visible from the very first paint as the loading
+// screen. _markSplashReady (called after the first scene frame paints)
+// flips it to data-state="ready" and reveals the liquid-glass treatment.
 
 // Eagerly warm the character-select previews in the background so the 3D cats
 // are already fetched, parsed, and rendered by the time the user opens the
@@ -901,10 +985,11 @@ window._startGame = () => {
   }
 };
 
-// G key opens character select instead of directly entering game
+// G key: in-game it exits cleanly back to the title splash;
+// out of game it opens the character select.
 window._toggleFP = () => {
   if (gameFp.fpMode) {
-    gameFp.toggleFirstPerson(); // exit
+    window._exitFP(); // exit through the splash so we never land blank
   } else {
     window._openCharSelect(); // open character select
   }
@@ -943,6 +1028,9 @@ window._exitFP = () => {
   if (roomRefs && typeof roomRefs.resetMacbookProximity === 'function') {
     roomRefs.resetMacbookProximity();
   }
+  // Drop the player back on the title splash so they always have a clear
+  // entry point instead of staring at a chrome-less room canvas.
+  window._openSplash?.();
 };
 window._toggleMuteSfx = (checked) => {
   gameFp.setSfxMuted(checked);
@@ -960,11 +1048,18 @@ window._syncAudioUi = () => gameFp.syncAudioToggleUi();
 window._switchCamFP = () => gameFp.setCamMode();
 window._setMouseSens = (v) => gameFp.setMouseSens(v);
 window._toggleSkateMode = () => gameFp.setSkateMode(!gameFp.isSkateMode());
+
+// Suppresses the post-FP title splash for one transition. Set true
+// just before any flow that exits FP and then immediately takes over
+// the screen with another overlay (inspector, char-select reset, etc).
+let _suppressSplashOnce = false;
+
 window._playAgain = () => {
   leaderboard.closeFinishDialog();
   leaderboard.hideShareButton();
   gameFp.releasePauseFocusTrap();
   gameFp.clearPauseState();
+  _suppressSplashOnce = true;
   gameFp.toggleFirstPerson();
   setTimeout(() => window._openCharSelect(), 100);
 };
@@ -984,6 +1079,7 @@ window._enterInspector = async () => {
   if (document.pointerLockElement) document.exitPointerLock();
   gameFp.releasePauseFocusTrap();
   gameFp.clearPauseState();
+  _suppressSplashOnce = true;
   if (gameFp.fpMode) gameFp.toggleFirstPerson();
   if (roomRefs && typeof roomRefs.resetMacbookProximity === 'function') {
     roomRefs.resetMacbookProximity();
@@ -1113,7 +1209,9 @@ window._setPlacement = (mode) => {
   if (btn) btn.classList.add('on');
 
   // Re-aim camera/controls — controls only exist once the inspector
-  // chunk has loaded; before then just reposition the camera.
+  // chunk has loaded; before then just reposition the camera. This
+  // path runs when the user repositions the purifier in inspector
+  // mode, so we focus on the purifier (not the splash room overview).
   camera.position.set(placementOffset.x + 25, placementOffset.y + 20, placementOffset.z + 35);
   if (_inspectorMod && _inspectorMod.retargetControls) {
     _inspectorMod.retargetControls(placementOffset);
@@ -1574,14 +1672,15 @@ onResize();
 
 animate(performance.now());
 
-// Defer hiding the loading overlay until the browser has actually painted
-// the first frame. Two rAFs: the first lets `animate()` schedule + render,
-// the second fires after the browser has composited that frame to screen.
-// This way the spinner stays up through every heavy build step (createRoom,
-// createPurifier, renderer.compile, first render) instead of vanishing
-// instantly while the main thread is still blocked.
+// Defer flipping the splash to its `ready` state until the browser has
+// actually painted the first scene frame. Two rAFs: the first lets
+// `animate()` schedule + render, the second fires after the browser has
+// composited that frame to screen. This way the splash stays in its
+// loading-state appearance through every heavy build step (createRoom,
+// createPurifier, renderer.compile, first render) instead of revealing the
+// liquid-glass treatment over a still-empty canvas.
 requestAnimationFrame(() => {
-  requestAnimationFrame(_hideLoadingOverlay);
+  requestAnimationFrame(_markSplashReady);
 });
 
 // Init UI micro-interactions (bouncy buttons, press effects)

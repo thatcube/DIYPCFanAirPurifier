@@ -30,7 +30,7 @@ const HIT_BACKOFF = 0.6;       // pull impact point back along travel dir (inche
 const SCORCH_RADIUS = 6.0;     // burn mark size on hit surface (inches)
 const SCORCH_LIFE = 6.0;       // seconds the scorch stays before fading
 const SCORCH_FADE = 1.5;       // seconds of fade-out at end of life
-const SCORCH_MAX = 24;         // cap so we don't accumulate forever
+const SCORCH_MAX = 240;        // cap so we don't accumulate forever
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -67,6 +67,7 @@ const _scorches = [];
 let _scorchIdx = 0;
 let _scorchGeo = null;
 let _scorchTexPool = null;
+let _laserScorchTexPool = null;
 const SCORCH_TEX_VARIANTS = 6;
 const _tmpNormal = new THREE.Vector3();
 const _tmpUp = new THREE.Vector3(0, 1, 0);
@@ -85,6 +86,21 @@ export function init(refs) {
 }
 
 export function isUnlocked() { return _unlocked; }
+
+// Allow other ability modules (e.g. kamehameha) to drop scorch marks
+// using the same texture pool & ring buffer the fireballs use, so a
+// single shared cap covers everything.
+export function spawnScorch(hit, travelDir, sizeMul = 1) {
+  _spawnScorch(hit, travelDir, sizeMul);
+}
+
+// Variant of spawnScorch that uses a tighter, much darker, "laser
+// burn" texture instead of the soft-edged soot splat. Same ring buffer
+// + cap, but pulls from a dedicated texture pool so the look stays
+// clean (no spatter, no streaks).
+export function spawnLaserScorch(hit, travelDir, sizeMul = 1) {
+  _spawnScorch(hit, travelDir, sizeMul, /*laser*/ true);
+}
 
 export function setUnlocked(v) {
   const next = !!v;
@@ -450,7 +466,7 @@ function _triggerExplosion(fb) {
 // Place a dark circular scorch on the hit surface. Uses the hit's face
 // normal (transformed into world space) so it lies flat against walls,
 // floors, ceilings — anything we hit. Reused via a ring buffer.
-function _spawnScorch(hit, travelDir, fireballSize = 1) {
+function _spawnScorch(hit, travelDir, fireballSize = 1, laser = false) {
   if (!_scene) return;
 
   // Compute world-space normal. Falls back to the reverse of travel
@@ -479,7 +495,14 @@ function _spawnScorch(hit, travelDir, fireballSize = 1) {
       _scorchTexPool.push(_buildScorchTexture());
     }
   }
-  const pickedTex = _scorchTexPool[(Math.random() * _scorchTexPool.length) | 0];
+  if (laser && !_laserScorchTexPool) {
+    _laserScorchTexPool = [];
+    for (let i = 0; i < SCORCH_TEX_VARIANTS; i++) {
+      _laserScorchTexPool.push(_buildLaserScorchTexture());
+    }
+  }
+  const activePool = laser ? _laserScorchTexPool : _scorchTexPool;
+  const pickedTex = activePool[(Math.random() * activePool.length) | 0];
 
   let entry = _scorches[_scorchIdx];
   if (!entry) {
@@ -526,16 +549,19 @@ function _spawnScorch(hit, travelDir, fireballSize = 1) {
 
   // Scorch size is tied to the fireball that made it. Center is dense
   // and dark; edges fall off and stay sparse even on big splats.
-  const SCORCH_TO_FIREBALL = 0.75;
+  const SCORCH_TO_FIREBALL = laser ? 0.35 : 0.75;
   const sizeJitter = (0.85 + Math.random() * 0.3) * fireballSize * SCORCH_TO_FIREBALL;
-  const stretchX = 0.8 + Math.random() * 0.5;
-  const stretchY = 0.8 + Math.random() * 0.5;
+  // Laser scorches stay nearly round; fireball ones get more stretch.
+  const stretchRange = laser ? 0.15 : 0.5;
+  const stretchBase = laser ? 0.92 : 0.8;
+  const stretchX = stretchBase + Math.random() * stretchRange;
+  const stretchY = stretchBase + Math.random() * stretchRange;
   entry.mesh.scale.set(
     sizeJitter * stretchX,
     sizeJitter * stretchY,
     1
   );
-  entry.mat.opacity = 0.7 + Math.random() * 0.3;
+  entry.mat.opacity = laser ? (0.92 + Math.random() * 0.08) : (0.7 + Math.random() * 0.3);
   entry.mat.userData._baseOp = entry.mat.opacity;
   entry.mesh.visible = true;
   entry.age = 0;
@@ -649,6 +675,69 @@ function _buildScorchTexture() {
     ctx.ellipse(0, 0, w, h, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// Tight, near-black "laser burn" decal: deep pure-black core, narrow
+// charred ring, no spatter or streaks. Reads as a clean cauterized
+// pinpoint instead of an ink splat.
+function _buildLaserScorchTexture() {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, size, size);
+
+  const cx = size / 2;
+  const cy = size / 2;
+
+  // Outer falloff: very faint smoke-ring far from center, fades to 0.
+  const halo = ctx.createRadialGradient(cx, cy, size * 0.18, cx, cy, size * 0.46);
+  halo.addColorStop(0.0, 'rgba(0,0,0,0.55)');
+  halo.addColorStop(0.6, 'rgba(0,0,0,0.18)');
+  halo.addColorStop(1.0, 'rgba(0,0,0,0.0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(cx, cy, size * 0.46, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Charred ring: thin warm-black border just outside the burn hole.
+  const ring = ctx.createRadialGradient(cx, cy, size * 0.10, cx, cy, size * 0.20);
+  ring.addColorStop(0.0, 'rgba(8,3,1,0.0)');
+  ring.addColorStop(0.55, 'rgba(8,3,1,0.85)');
+  ring.addColorStop(1.0, 'rgba(0,0,0,0.0)');
+  ctx.fillStyle = ring;
+  ctx.beginPath();
+  ctx.arc(cx, cy, size * 0.20, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Hot dark core: pure black through the middle.
+  const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.13);
+  core.addColorStop(0.0, 'rgba(0,0,0,1.0)');
+  core.addColorStop(0.6, 'rgba(0,0,0,0.98)');
+  core.addColorStop(1.0, 'rgba(0,0,0,0.0)');
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.arc(cx, cy, size * 0.13, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Tiny per-variant breakup so repeated marks don't read identical.
+  const breakCount = 6 + ((Math.random() * 6) | 0);
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  for (let i = 0; i < breakCount; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const r = size * (0.13 + Math.random() * 0.06);
+    const x = cx + Math.cos(a) * r;
+    const y = cy + Math.sin(a) * r;
+    ctx.beginPath();
+    ctx.arc(x, y, 0.6 + Math.random() * 1.4, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   const tex = new THREE.CanvasTexture(canvas);
