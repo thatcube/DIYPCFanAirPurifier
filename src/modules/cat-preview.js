@@ -32,11 +32,11 @@ function _applyLoopPause(action, ts, pauseSeconds) {
 }
 
 const MODEL_MAP = {
-  classic:   { src: 'assets/cat.glb' },
-  toon:      { src: 'assets/tooncat.glb' },
+  classic: { src: 'assets/cat.glb' },
+  toon: { src: 'assets/tooncat.glb' },
   bababooey: { src: 'assets/bababooey_cat.glb' },
-  totodile:  { src: 'assets/totodile.glb' },
-  korra:     { src: null, procedural: true },
+  totodile: { src: 'assets/totodile.glb' },
+  korra: { src: null, procedural: true },
 };
 
 /**
@@ -255,11 +255,11 @@ function _processLoadedModel(preview, entry, gltf, preset) {
 export function initPreviews() {
   const loader = new GLTFLoader();
   const entries = [
-    { key: 'classic',   canvasId: 'previewClassic' },
-    { key: 'toon',      canvasId: 'previewToon' },
+    { key: 'classic', canvasId: 'previewClassic' },
+    { key: 'toon', canvasId: 'previewToon' },
     { key: 'bababooey', canvasId: 'previewBababooey' },
-    { key: 'totodile',  canvasId: 'previewTotodile' },
-    { key: 'korra',     canvasId: 'previewKorra' },
+    { key: 'totodile', canvasId: 'previewTotodile' },
+    { key: 'korra', canvasId: 'previewKorra' },
   ];
 
   for (const entry of entries) {

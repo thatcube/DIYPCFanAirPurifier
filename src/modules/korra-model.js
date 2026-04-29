@@ -15,11 +15,11 @@ import * as THREE from 'three';
 
 // ── Colors ─────────────────────────────────────────────────────────
 
-const GREY      = new THREE.Color(0x6b7b8d);
-const WHITE     = new THREE.Color(0xf0ede8);
-const PINK      = 0xd4b0ab;
+const GREY = new THREE.Color(0x6b7b8d);
+const WHITE = new THREE.Color(0xf0ede8);
+const PINK = 0xd4b0ab;
 const EYE_GREEN = 0x8fad5a;
-const PUPIL     = 0x111111;
+const PUPIL = 0x111111;
 const EYE_WHITE = 0xf5f5f0;
 
 // ── Material helpers ───────────────────────────────────────────────
@@ -65,11 +65,11 @@ function _mat(hex, opts = {}) {
   });
 }
 
-const greyMat     = _mat(0x6b7b8d);
-const whiteMat    = _mat(0xf0ede8);
-const pinkMat     = _mat(PINK, { fur: false });
+const greyMat = _mat(0x6b7b8d);
+const whiteMat = _mat(0xf0ede8);
+const pinkMat = _mat(PINK, { fur: false });
 const eyeGreenMat = _mat(EYE_GREEN, { rough: 0.3, emissive: EYE_GREEN, ei: 0.08, fur: false });
-const pupilMat    = _mat(PUPIL, { rough: 0.5, fur: false });
+const pupilMat = _mat(PUPIL, { rough: 0.5, fur: false });
 const eyeWhiteMat = _mat(EYE_WHITE, { rough: 0.4, fur: false });
 
 const vcMat = new THREE.MeshStandardMaterial({
@@ -78,14 +78,14 @@ const vcMat = new THREE.MeshStandardMaterial({
 });
 
 // Quick geo helpers for small detail parts
-const _sphere   = (r, w = 10, h = 8) => new THREE.SphereGeometry(r, w, h);
+const _sphere = (r, w = 10, h = 8) => new THREE.SphereGeometry(r, w, h);
 const _cylinder = (rt, rb, ht, seg = 8) => new THREE.CylinderGeometry(rt, rb, ht, seg);
-const _cone     = (r, ht, seg = 6) => new THREE.ConeGeometry(r, ht, seg);
+const _cone = (r, ht, seg = 6) => new THREE.ConeGeometry(r, ht, seg);
 
 // Merge two BufferGeometries into one (position + normal + index only)
 function _mergeBufferGeometries(a, b) {
   const ap = a.attributes.position, bp = b.attributes.position;
-  const an = a.attributes.normal,   bn = b.attributes.normal;
+  const an = a.attributes.normal, bn = b.attributes.normal;
   const verts = new Float32Array(ap.count * 3 + bp.count * 3);
   const norms = new Float32Array(an.count * 3 + bn.count * 3);
   verts.set(ap.array); verts.set(bp.array, ap.count * 3);
@@ -223,10 +223,10 @@ function _paintVCBody(geo) {
     const absNz = Math.abs(nz);
     // How much grey is allowed to extend down — peaks in the middle of torso
     const midBody = 1 - absNz * absNz;            // 1 at center, 0 at ends
-    const sideWhiten  = nx * nx * (0.3 + 0.4 * (1 - midBody)); // sides whiten more at ends
+    const sideWhiten = nx * nx * (0.3 + 0.4 * (1 - midBody)); // sides whiten more at ends
     const frontWhiten = Math.pow(Math.max(0, nz), 1.2) * 3.0;  // very strong whiten at chest end
-    const backWhiten  = Math.max(0, -nz) * 0.15;  // mild whiten toward hips
-    const threshold   = sideWhiten + frontWhiten + backWhiten - 0.55;
+    const backWhiten = Math.max(0, -nz) * 0.15;  // mild whiten toward hips
+    const threshold = sideWhiten + frontWhiten + backWhiten - 0.55;
 
     const isGrey = ny > threshold;
     const c = isGrey ? GREY : WHITE;
@@ -577,14 +577,14 @@ export function buildKorraModel() {
   // Starts inside the body (positive Z) so it visually connects to the torso.
   const tailR = 0.026;
   const tailCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0, -0.04,  0.12),   // deep inside body
-    new THREE.Vector3(0, -0.02,  0.06),   // still inside body
-    new THREE.Vector3(0,  0.00,  0.00),   // tail base at bone origin
-    new THREE.Vector3(0,  0.03, -0.07),
-    new THREE.Vector3(0,  0.06, -0.14),
-    new THREE.Vector3(0,  0.08, -0.20),
-    new THREE.Vector3(0,  0.09, -0.24),
-    new THREE.Vector3(0,  0.10, -0.26),
+    new THREE.Vector3(0, -0.04, 0.12),   // deep inside body
+    new THREE.Vector3(0, -0.02, 0.06),   // still inside body
+    new THREE.Vector3(0, 0.00, 0.00),   // tail base at bone origin
+    new THREE.Vector3(0, 0.03, -0.07),
+    new THREE.Vector3(0, 0.06, -0.14),
+    new THREE.Vector3(0, 0.08, -0.20),
+    new THREE.Vector3(0, 0.09, -0.24),
+    new THREE.Vector3(0, 0.10, -0.26),
   ], false, 'catmullrom', 0.5);
   const tailMat = greyMat.clone();
   tailMat.side = THREE.DoubleSide;
@@ -614,23 +614,23 @@ export function buildKorraModel() {
 function _buildSkeleton() {
   const b = (name) => { const bone = new THREE.Bone(); bone.name = name; return bone; };
 
-  const root    = b('Root');
-  const hips    = b('Hips');
-  const spine   = b('Spine');
-  const chest   = b('Chest');
-  const neck    = b('Neck');
-  const head    = b('Head');
-  const tail1   = b('Tail1');
-  const tail2   = b('Tail2');
-  const tail3   = b('Tail3');
-  const lfLeg   = b('LFrontLeg');
-  const rfLeg   = b('RFrontLeg');
-  const lbLeg   = b('LBackLeg');
-  const rbLeg   = b('RBackLeg');
-  const lfFoot  = b('LFrontFoot');
-  const rfFoot  = b('RFrontFoot');
-  const lbFoot  = b('LBackFoot');
-  const rbFoot  = b('RBackFoot');
+  const root = b('Root');
+  const hips = b('Hips');
+  const spine = b('Spine');
+  const chest = b('Chest');
+  const neck = b('Neck');
+  const head = b('Head');
+  const tail1 = b('Tail1');
+  const tail2 = b('Tail2');
+  const tail3 = b('Tail3');
+  const lfLeg = b('LFrontLeg');
+  const rfLeg = b('RFrontLeg');
+  const lbLeg = b('LBackLeg');
+  const rbLeg = b('RBackLeg');
+  const lfFoot = b('LFrontFoot');
+  const rfFoot = b('RFrontFoot');
+  const lbFoot = b('LBackFoot');
+  const rbFoot = b('RBackFoot');
 
   root.add(hips);
   hips.add(spine);

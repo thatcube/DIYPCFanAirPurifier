@@ -44,7 +44,7 @@ function sanitizePlayerId(id) {
 
 function sanitizeCatModel(value) {
   const key = String(value || '').trim().toLowerCase();
-  return key === 'classic' || key === 'toon' || key === 'bababooey' || key === 'totodile' ? key : 'classic';
+  return key === 'classic' || key === 'toon' || key === 'bababooey' || key === 'totodile' || key === 'korra' ? key : 'classic';
 }
 function sanitizeCatColor(value) {
   const key = String(value || '').trim().toLowerCase();
