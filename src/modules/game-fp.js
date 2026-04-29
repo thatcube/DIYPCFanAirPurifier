@@ -711,7 +711,7 @@ function _findInteractiveAncestor(obj) {
       p._isCornerDoorHandle || p._isCornerDoor ||
       p._isGuestDoor || p._isGuestDoorHandle ||
       p._isMacbook || p._isWindow || p._isWindowPane || p._isTV || p._isFoodBowl ||
-      p._isPickupSkateboard || p._isPokemonBinder) return p;
+      p._isPickupSkateboard || p._isPokemonBinder || p._isStandingDesk) return p;
   }
   return null;
 }
@@ -765,6 +765,10 @@ function _labelForInteractable(target) {
     if (p._isFan) return { verb: 'Toggle', noun: 'Fan' };
     if (p._isFilterL || p._isFilterR) return { verb: 'Slide', noun: 'Filter' };
     if (p._isWindowPane) return { verb: _roomRefs && _roomRefs.isOfficeWindowOpen() ? 'Close' : 'Open', noun: 'Window' };
+    if (p._isStandingDesk) {
+      const sd = _roomRefs && _roomRefs.standingDesk;
+      return { verb: sd && sd.raised ? 'Lower' : 'Raise', noun: 'Desk' };
+    }
     if (p._isWindow) return { verb: 'Toggle', noun: 'Day/Night' };
     if (p._isMacbook) return { verb: 'Toggle', noun: 'MacBook' };
     if (p._isTV) return { verb: 'Toggle', noun: 'TV' };
@@ -2493,6 +2497,96 @@ function _getBoxes() {
           yTop: wy + hh, yBottom: wy - hh
         });
       }
+    }
+  }
+
+  // ── Standing desk (rises with sd.rise) ──
+  // Desktop, monitors, monitor arm posts, and PC case all lift together.
+  // The two leg posts telescope (top tracks desktop, bottom anchored on
+  // floor). Geometry mirrors the static block we previously had — every
+  // yTop / yBottom above the floor gets offset by sd.rise.
+  if (_roomRefs && _roomRefs.standingDesk) {
+    const sd = _roomRefs.standingDesk;
+    const rise = sd.rise || 0;
+    const fy = getFloorY();
+    const deskW = sd.deskW != null ? sd.deskW : 84;
+    const deskD = sd.deskD != null ? sd.deskD : 30;
+    const deskX = sd.deskX != null ? sd.deskX : 164;     // pre-mirror
+    const deskZ = sd.deskZ != null ? sd.deskZ : 27;
+    const deskLegH = sd.deskLegH != null ? sd.deskLegH : 28;
+    const deskTopH = sd.deskTopH != null ? sd.deskTopH : 1.5;
+    const deskSurface = fy + deskLegH + deskTopH + rise;
+    // Desktop slab — standable; walk-under clearance below.
+    result.push({
+      xMin: -(deskX + deskD / 2), xMax: -(deskX - deskD / 2),
+      zMin: deskZ - deskW / 2, zMax: deskZ + deskW / 2,
+      yTop: deskSurface, yBottom: fy + deskLegH + rise
+    });
+    // Two telescoping leg posts (3" thick) — top rises with desk, bottom
+    // stays on floor.
+    for (const legSide of [-1, 1]) {
+      const legZ = deskZ + legSide * (deskW / 2 - 4);
+      result.push({
+        xMin: -(deskX + 1.5), xMax: -(deskX - 1.5),
+        zMin: legZ - 1.5, zMax: legZ + 1.5,
+        yTop: fy + deskLegH + rise, yBottom: fy
+      });
+    }
+    // Monitor hitboxes — 3 OLED monitors on 6" arms.
+    const monW = 24, monD = 0.5, monH = 14, monStandH = 6;
+    const monBaseX = deskX + deskD / 2 - 5;
+    const monYBot = deskSurface + monStandH;
+    const monYTop = monYBot + monH;
+    const monPad = 1;
+    // Center monitor (axis-aligned)
+    result.push({
+      xMin: -(monBaseX + monD / 2 + monPad), xMax: -(monBaseX - monD / 2 - monPad),
+      zMin: deskZ - monW / 2, zMax: deskZ + monW / 2,
+      yTop: monYTop, yBottom: monYBot
+    });
+    // Angled side monitors approximated as 3 AABB strips each
+    const monAngle = 0.6;
+    const cosA = Math.cos(monAngle), sinA = Math.sin(monAngle);
+    const stripW = monW / 3;
+    const stripHalfD = (monD * cosA + stripW * sinA) / 2 + monPad;
+    const stripHalfW = (monD * sinA + stripW * cosA) / 2;
+    const lMonX = monBaseX - 8, lMonZ = deskZ - monW + 2;
+    const rMonX = monBaseX - 8, rMonZ = deskZ + monW - 2;
+    for (const localZ of [-stripW, 0, stripW]) {
+      const lx = lMonX + localZ * sinA;
+      const lz = lMonZ + localZ * cosA;
+      result.push({
+        xMin: -(lx + stripHalfD), xMax: -(lx - stripHalfD),
+        zMin: lz - stripHalfW, zMax: lz + stripHalfW,
+        yTop: monYTop, yBottom: monYBot
+      });
+      const rx = rMonX - localZ * sinA;
+      const rz = rMonZ + localZ * cosA;
+      result.push({
+        xMin: -(rx + stripHalfD), xMax: -(rx - stripHalfD),
+        zMin: rz - stripHalfW, zMax: rz + stripHalfW,
+        yTop: monYTop, yBottom: monYBot
+      });
+    }
+    // Monitor arm posts (thin pillars between desktop and screens)
+    for (const mz of [deskZ, lMonZ, rMonZ]) {
+      result.push({
+        xMin: -(monBaseX + 1), xMax: -(monBaseX - 1),
+        zMin: mz - 1, zMax: mz + 1,
+        yTop: monYBot, yBottom: deskSurface
+      });
+    }
+    // Thorzone Nanoq R PC case on desktop (rises with desk).
+    {
+      const pcD = 13.4, pcW = 6.7, pcH = 9.8;
+      const pcX = 164 + 30 / 2 - 13.4 / 2 - 1;
+      const pcZ = 27 + 24 + 6;
+      const pcBot = deskSurface;
+      result.push({
+        xMin: -(pcX + pcD / 2), xMax: -(pcX - pcD / 2),
+        zMin: pcZ - pcW / 2, zMax: pcZ + pcW / 2,
+        yTop: pcBot + pcH, yBottom: pcBot
+      });
     }
   }
 

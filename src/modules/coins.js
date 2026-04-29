@@ -206,7 +206,8 @@ export function addCoin(parent, localPos, opts) {
     sparkles,
     isDynamic: !!(opts && opts.isDynamic),
     highJump: !!(opts && opts.highJump),
-    speedModeOnly: !!(opts && opts.speedModeOnly)
+    speedModeOnly: !!(opts && opts.speedModeOnly),
+    onStandingDesk: !!(opts && opts.onStandingDesk)
   });
   if (!secret) coinTotal++;
 }
@@ -437,6 +438,17 @@ export function spawnRoomCoins(roomRefs) {
   //   ~5" above the ball so it reads as balanced on the knob.
   addCoin(_coinGroup, new THREE.Vector3(-13.65, fy + 29.5, 133), {});
 
+  // ── Office coins ─────────────────────────────────────────────────
+  // The secret blue desk-top coin (id 'secret_drawer') is spawned on demand
+  // by spawnSecretDrawerCoin() the first time the standing desk is raised.
+  // 14f. Inside the office (bypass) closet — on the floor, mid-closet.
+  //   Closet interior pre-mirror: X=51..87 (innerCx≈69), Z=-14..32 (cz=9).
+  addCoin(_coinGroup, new THREE.Vector3(-69, fy + 3, 9), {});
+  // 14g. On the office closet upper shelf (middle section, jump challenge).
+  //   Shelf top Y ≈ fy + 56.4. Shelf center pre-mirror X ≈ 58.6.
+  //   Shelf Z spans -13.5..31.5 → middle of section 2 ≈ Z=2.5.
+  addCoin(_coinGroup, new THREE.Vector3(-58.6, fy + 58.9, 2.5), {});
+
   // 15. Hidden inside a random nightstand drawer (moves with the drawer when opened)
   if (roomRefs && roomRefs.drawers && roomRefs.drawers.length > 0) {
     const drawerIdx = Math.floor(Math.random() * roomRefs.drawers.length);
@@ -583,16 +595,35 @@ export function spawnSecretCeilingLightCoins() {
   playSecretSpawnSfx();
 }
 
+// Shift basePos.y of every active coin tagged onStandingDesk. Called from
+// the standing-desk raise/lower lerp so the coin rides on the desktop.
+export function nudgeStandingDeskCoins(deltaY) {
+  if (!deltaY) return;
+  for (const c of coins) {
+    if (c && c.onStandingDesk && c.basePos) c.basePos.y += deltaY;
+  }
+}
+
 export function spawnSecretWindowCoin() {
   const fy = getFloorY();
   _spawnSecretIfUntriggered('window', _coinGroup,
     new THREE.Vector3(-LEFT_WALL_X - 2, getWinCenterY() - WIN_H / 2 + 3, WIN_CENTER_Z), {});
 }
 
+// Spawned the first time the player raises the standing desk. The coin
+// sits on top of the desktop and is tagged onStandingDesk so the desk
+// lerp can drag it up/down with the surface. Reset by resetSecrets().
 export function spawnSecretDrawerCoin() {
   const fy = getFloorY();
+  // Pre-mirror desk: X=164, Z=27, top Y=fy+30 at sit height. Use the
+  // raised height (fy+30+rise) so it spawns at the desk's current top.
+  // Caller is purifier.js click handler — it spawns this when sd is being
+  // raised, so the desk-lerp will then carry the coin up by sd.max.
+  // Y here is base (sit) Y; the lerp delta from rise=0 → rise=max will
+  // lift basePos by sd.max via nudgeStandingDeskCoins.
   _spawnSecretIfUntriggered('drawer', _coinGroup,
-    new THREE.Vector3(-BED_X, fy + BED_CLEARANCE - 1.8, BED_Z + BED_L / 2 - 8), {});
+    new THREE.Vector3(-(164 - 6), fy + 30 + 2.5, 27),
+    { onStandingDesk: true });
 }
 
 export function spawnSecretMacbookCoin() {

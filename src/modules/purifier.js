@@ -17,6 +17,7 @@ import {
   spawnSecretMacbookCoin,
   spawnSecretTvCoin,
   spawnSecretFoodBowlCoin,
+  nudgeStandingDeskCoins,
   getAudioCtx as _getAudioCtx,
   setAudioCtx as _setAudioCtx
 } from './coins.js';
@@ -82,6 +83,135 @@ export function createPurifier(scene) {
     osc.connect(gain).connect(ac.destination);
     osc.start(now);
     osc.stop(now + dur + 0.02);
+  }
+
+  // Standing desk linear-actuator sound. Real sit-stand desks (Jiecang,
+  // Linak, etc.) sound like a high-pitched gear whine (~480-650 Hz) with
+  // a subtle ratcheting modulation — NOT a vacuum drone. We layer:
+  //   • narrow-Q band-passed noise around 540 Hz → that "machined gear
+  //     teeth grinding" texture (the dominant tone of a real desk motor)
+  //   • a soft 96 Hz triangle hum for the body of the motor
+  //   • a slow ~7 Hz amplitude LFO so the whine pulses like real gears
+  //   • a tiny relay click at start and end
+  // Returns a master gain node so the caller can attenuate it by
+  // distance each frame; null if SFX muted / no AC.
+  function _playStandingDeskMotor(durSec, raising = true) {
+    if (_sfxMuted) return null;
+    const ac = _ensureUiSfxAC();
+    if (!ac) return null;
+    const now = ac.currentTime;
+    const dur = Math.max(0.2, durSec);
+    const fadeIn = 0.22;
+    const fadeOut = 0.28;
+    const sustainEnd = now + dur - fadeOut;
+    const stopAt = now + dur + 0.05;
+
+    // Distance-attenuator gain (driven by lerp tick). Baseline 1.0; lerp
+    // tick multiplies by a 0..1 distance factor each frame.
+    const distGain = ac.createGain();
+    distGain.gain.value = 1.0;
+    distGain.connect(ac.destination);
+
+    // Master envelope (fade in, sustain, fade out).
+    const env = ac.createGain();
+    env.gain.setValueAtTime(0.0001, now);
+    env.gain.linearRampToValueAtTime(1.0, now + fadeIn);
+    env.gain.setValueAtTime(1.0, sustainEnd);
+    env.gain.linearRampToValueAtTime(0.0001, now + dur);
+    env.connect(distGain);
+
+    // ── L1: Fundamental motor hum (60-200 Hz column drone) ──
+    // Sine + sawtooth blended; raise pitch ~10% under load (going up).
+    const f1 = raising ? 110 : 96;   // sustained pitch
+    const f1Peak = raising ? 118 : 102; // mid-travel peak from inertia
+    const fund = ac.createOscillator();
+    fund.type = 'sine';
+    fund.frequency.setValueAtTime(f1 * 0.92, now);
+    fund.frequency.linearRampToValueAtTime(f1Peak, now + dur * 0.5);
+    fund.frequency.linearRampToValueAtTime(f1 * 0.95, now + dur);
+    const fundG = ac.createGain();
+    fundG.gain.value = 0.06;
+    fund.connect(fundG).connect(env);
+    fund.start(now);
+    fund.stop(stopAt);
+
+    // Slight harmonic body — sawtooth one octave up, low-passed.
+    const body = ac.createOscillator();
+    body.type = 'sawtooth';
+    body.frequency.setValueAtTime(f1 * 2, now);
+    body.frequency.linearRampToValueAtTime(f1Peak * 2, now + dur * 0.5);
+    body.frequency.linearRampToValueAtTime(f1 * 2 * 0.95, now + dur);
+    const bodyLP = ac.createBiquadFilter();
+    bodyLP.type = 'lowpass';
+    bodyLP.frequency.value = 600;
+    bodyLP.Q.value = 0.7;
+    const bodyG = ac.createGain();
+    bodyG.gain.value = 0.018;
+    body.connect(bodyLP).connect(bodyG).connect(env);
+    body.start(now);
+    body.stop(stopAt);
+
+    // ── L2: Gearbox chatter — bandpass noise ~1.5 kHz ──
+    const noiseDur = dur + 0.1;
+    const bufLen = Math.ceil(ac.sampleRate * noiseDur);
+    const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+    const noise = ac.createBufferSource();
+    noise.buffer = buf;
+    const gearBP = ac.createBiquadFilter();
+    gearBP.type = 'bandpass';
+    gearBP.frequency.value = 1500;
+    gearBP.Q.value = 2.2;
+    const gearG = ac.createGain();
+    gearG.gain.value = 0.014;
+    noise.connect(gearBP).connect(gearG).connect(env);
+    noise.start(now);
+    noise.stop(stopAt);
+
+    // ── L3: VFD/electrical whine — thin high tone ~4 kHz ──
+    // This is the "unmistakably motorized" overlay.
+    const whine = ac.createOscillator();
+    whine.type = 'sine';
+    const fW = raising ? 4200 : 3800;
+    whine.frequency.setValueAtTime(fW * 0.97, now);
+    whine.frequency.linearRampToValueAtTime(fW, now + dur * 0.5);
+    whine.frequency.linearRampToValueAtTime(fW * 0.96, now + dur);
+    // Subtle 2nd harmonic for shimmer.
+    const whine2 = ac.createOscillator();
+    whine2.type = 'sine';
+    whine2.frequency.setValueAtTime(fW * 1.5, now);
+    whine2.frequency.linearRampToValueAtTime(fW * 1.5 * 1.03, now + dur * 0.5);
+    whine2.frequency.linearRampToValueAtTime(fW * 1.5 * 0.99, now + dur);
+    const whineG = ac.createGain();
+    whineG.gain.value = 0.0009;
+    const whineG2 = ac.createGain();
+    whineG2.gain.value = 0.0003;
+    whine.connect(whineG).connect(env);
+    whine2.connect(whineG2).connect(env);
+    whine.start(now);
+    whine.stop(stopAt);
+    whine2.start(now);
+    whine2.stop(stopAt);
+
+    // ── Start clunk (overcoming static friction) ──
+    const clunk = (t, freqHi, freqLo, amp) => {
+      const c = ac.createOscillator();
+      const cg = ac.createGain();
+      c.type = 'square';
+      c.frequency.setValueAtTime(freqHi, t);
+      c.frequency.exponentialRampToValueAtTime(freqLo, t + 0.05);
+      cg.gain.setValueAtTime(0.0001, t);
+      cg.gain.linearRampToValueAtTime(amp, t + 0.006);
+      cg.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+      c.connect(cg).connect(distGain);
+      c.start(t);
+      c.stop(t + 0.09);
+    };
+    clunk(now, 160, 70, 0.06);                 // start shudder
+    clunk(now + dur - 0.01, 140, 60, 0.05);    // end thunk/settle
+
+    return distGain;
   }
 
   function _playDoorCue(opening, intensity = 1) {
@@ -1850,7 +1980,7 @@ export function createPurifier(scene) {
   function getInteractiveTarget(obj){
     let p=obj;
     while(p){
-      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isBypassPanel||p._isCornerDoorHandle||p._isCornerDoor||p._isGuestDoor||p._isGuestDoorHandle||p._isMacbook||p._isWindow||p._isWindowPane||p._isTV||p._isFoodBowl||p._isPickupSkateboard||p._isPokemonBinder) return p;
+      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isBypassPanel||p._isCornerDoorHandle||p._isCornerDoor||p._isGuestDoor||p._isGuestDoorHandle||p._isMacbook||p._isWindow||p._isWindowPane||p._isTV||p._isFoodBowl||p._isPickupSkateboard||p._isPokemonBinder||p._isStandingDesk) return p;
       p=p.parent;
     }
     return null;
@@ -2227,7 +2357,29 @@ export function createPurifier(scene) {
       const targetZ=grp.position.z + deltaZ;
       grp._drawerSlide=newSlide;
       _drawerLerps.push({obj:grp, targetZ});
-      if(_fpMode) spawnSecretDrawerCoin();
+      return;
+    }
+    // Clicked the office sit-stand desk → toggle raise/lower. The desktop,
+    // monitors, monitor arms, PC case, keyboard, and mouse all rise as a
+    // unit; the leg posts telescope (scale.y) so their tops stay flush with
+    // the bottom of the desktop while the feet stay anchored on the floor.
+    if(obj._isStandingDesk){
+      const refs = (typeof window !== 'undefined') ? window._roomRefs : null;
+      if(!refs || !refs.standingDesk) return;
+      const sd = refs.standingDesk;
+      if(_standingDeskLerps.length) return; // already animating
+      sd.raised = !sd.raised;
+      sd.target = sd.raised ? sd.max : 0;
+      _standingDeskLerps.push({ sd });
+      // Motor whir for the full duration of travel (rise speed = 1.6"/s).
+      const travel = Math.abs(sd.target - sd.rise);
+      const motorGain = _playStandingDeskMotor(travel / 1.6, sd.raised);
+      // Stash the gain node + desk world position on the lerp entry so the
+      // tick loop can fade by distance.
+      _standingDeskLerps[_standingDeskLerps.length - 1].motorGain = motorGain;
+      // First time raising → reveal the secret blue coin on the desktop.
+      // The desk lerp drags onStandingDesk-tagged coins up with the surface.
+      if(sd.raised && _fpMode) spawnSecretDrawerCoin();
       return;
     }
     // Clicked a bifold closet leaf → toggle fold
@@ -2372,6 +2524,7 @@ export function createPurifier(scene) {
   const _bifoldLerps=[];
   const _bypassLerps=[];
   const _windowLerps=[];
+  const _standingDeskLerps=[];
   
   // macOS trackpad pinch-to-zoom → model zoom (Safari gesture events)
   let gestureStartRadius;
@@ -3652,6 +3805,72 @@ export function createPurifier(scene) {
         if (Math.abs(pane.position.y - wm._slideTarget) < 0.02) {
           pane.position.y = wm._slideTarget;
           _windowLerps.splice(i, 1);
+        }
+      }
+    }
+
+    // Standing desk raise/lower lerp — moves desktop + monitors + arms + PC
+    // + keyboard + mouse together; telescopes leg posts so their top stays
+    // glued to the bottom of the desktop while the feet stay on the floor.
+    // Also drags any coin tagged onStandingDesk so it rides on the surface.
+    if (_standingDeskLerps.length > 0) {
+      // Real sit-stand desks creep up at ~1.5"/sec. With a 16" rise that's
+      // ~10s end-to-end — use a linear ramp instead of an ease-out so the
+      // motion has that steady, slightly painful mechanical feel.
+      const DESK_SPEED = 1.6; // inches per second
+      // Desk world position (post-mirror): X=-164, Z=27. Y tracks deskTopY.
+      const DESK_WX = -164, DESK_WZ = 27;
+      // Distance attenuation curve — full volume within 30", silent past 220".
+      const NEAR = 30, FAR = 220;
+      for (let i = _standingDeskLerps.length - 1; i >= 0; i--) {
+        const entry = _standingDeskLerps[i];
+        const sd = entry.sd;
+        // Update motor distance gain (only when in FP mode; otherwise full).
+        if (entry.motorGain) {
+          let vol = 1.0;
+          // Respect SFX mute mid-play (motor can run ~13s).
+          if (_sfxMuted) vol = 0;
+          else if (_fpMode && _fpPos) {
+            const dx = _fpPos.x - DESK_WX;
+            const dz = _fpPos.z - DESK_WZ;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            if (dist >= FAR) vol = 0;
+            else if (dist <= NEAR) vol = 1;
+            else {
+              // Smooth fade: cosine ease so it doesn't pop at the edges.
+              const t = (dist - NEAR) / (FAR - NEAR);
+              vol = 0.5 + 0.5 * Math.cos(t * Math.PI);
+            }
+          }
+          entry.motorGain.gain.value = vol;
+        }
+        const dir = Math.sign(sd.target - sd.rise);
+        const step = DESK_SPEED * dtSec * dir;
+        let newRise = sd.rise + step;
+        // Clamp so we don't overshoot.
+        if ((dir > 0 && newRise > sd.target) || (dir < 0 && newRise < sd.target)) {
+          newRise = sd.target;
+        }
+        const delta = newRise - sd.rise;
+        sd.rise = newRise;
+        // Lift every part that rides on the desktop.
+        for (const p of sd.riseParts) {
+          p.mesh.position.y = p.baseY + sd.rise;
+        }
+        // Telescope each leg post — bottom stays on floor, top tracks desk.
+        for (const lp of sd.legPosts) {
+          // Cache the original (rise=0) center Y the first time we see it.
+          if (lp.baseY === undefined) lp.baseY = lp.mesh.position.y;
+          const newH = lp.baseH + sd.rise;
+          lp.mesh.scale.y = newH / lp.baseH;
+          // Center shifts up by rise/2 so the bottom face stays on the floor.
+          lp.mesh.position.y = lp.baseY + sd.rise / 2;
+        }
+        // Drag any coin tagged onStandingDesk so it rides the surface.
+        if (delta) nudgeStandingDeskCoins(delta);
+        if (Math.abs(sd.rise - sd.target) < 0.02) {
+          sd.rise = sd.target;
+          _standingDeskLerps.splice(i, 1);
         }
       }
     }

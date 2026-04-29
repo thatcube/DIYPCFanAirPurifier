@@ -1436,6 +1436,7 @@ export function createRoom(scene) {
   let _grOutdoorMesh; // guest-room outdoor backdrop — material swapped after outdoorMat init
   let _officeWindowModel = null;
   let _officeWindowOpen = false;
+  let _standingDeskRef = null;
   const _grXmin = 51;              // BACK wall — shared wall w/ hallway (has the door)
   const _grXmax = 183;             // FRONT wall — where desk faces (132" deep)
   const _grZmin = oppWallZ;        // TV wall serves as the -Z boundary (no separate RIGHT wall)
@@ -2183,30 +2184,46 @@ export function createRoom(scene) {
 
     // ─ Adjustable sit-stand desk — 84"W × 30"D × 30"H (standing: ~44"H) ─
     // Against the +X far wall, facing -X (toward the door). Flush with LEFT wall.
+    // The desktop, monitors, arms, PC, keyboard, mouse, and cross-bar all
+    // rise together when interacted with. Leg posts telescope (scale Y) so
+    // their tops stay flush with the bottom of the desktop. Feet stay on
+    // the floor. roomRefs exposes references for the click handler in
+    // purifier.js and the dynamic collision in game-fp.js.
     const deskW = 84, deskD = 30, deskTopH = 1.5;
     const deskLegH = 28; // current height (sitting position)
+    const deskRiseMax = 22; // standing position: 28 + 22 = 50" leg height
     const deskX = _grXmax - 4 - deskD / 2;               // 4" from far wall → 164
     const deskZ = _grZmax - deskW / 2;                    // flush against LEFT wall
     const deskTopY = floorY + deskLegH + deskTopH / 2;
 
+    // Parts that rise with the desktop (top + everything mounted on it).
+    // Each entry: { mesh, baseY }. Updated by the standing-desk lerp.
+    const standingDeskRiseParts = [];
+    const _trackRise = (mesh) => { standingDeskRiseParts.push({ mesh, baseY: mesh.position.y }); mesh._isStandingDesk = true; return mesh; };
+    // Telescoping leg posts: scale Y so the top stays under the desktop
+    // while the bottom remains anchored at the floor.
+    const standingDeskLegPosts = []; // { mesh, baseH }
+
     // Desktop surface
-    const deskTop = roomBox(deskD, deskTopH, deskW, deskTopColor,
-      deskX, deskTopY, deskZ, 0, 0, 0);
+    const deskTop = _trackRise(roomBox(deskD, deskTopH, deskW, deskTopColor,
+      deskX, deskTopY, deskZ, 0, 0, 0));
     deskTop._isOffice = true;
 
     // Desk frame — two T-shaped legs (left and right)
     for (const side of [-1, 1]) {
       const legZ = deskZ + side * (deskW / 2 - 4);
-      // Vertical post
-      roomBox(3, deskLegH, 3, legColor,
+      // Vertical post — telescopes (scale.y) so its top tracks the desktop.
+      const post = roomBox(3, deskLegH, 3, legColor,
         deskX, floorY + deskLegH / 2, legZ, 0, 0, 0);
-      // Foot (horizontal stabilizer along desk depth)
+      post._isStandingDesk = true;
+      standingDeskLegPosts.push({ mesh: post, baseH: deskLegH });
+      // Foot (horizontal stabilizer along desk depth) — stays on floor
       roomBox(deskD - 4, 1.5, 3, legColor,
         deskX, floorY + 0.75, legZ, 0, 0, 0);
     }
-    // Cross-bar between legs (under desktop)
-    roomBox(2, 2, deskW - 8, legColor,
-      deskX, deskTopY - deskTopH / 2 - 1, deskZ, 0, 0, 0);
+    // Cross-bar between legs (under desktop) — rises with desktop
+    _trackRise(roomBox(2, 2, deskW - 8, legColor,
+      deskX, deskTopY - deskTopH / 2 - 1, deskZ, 0, 0, 0));
 
     // ─ 3 OLED Monitors — 27" each (24"W × 14"H × 0.5"D), on monitor arms ─
     const monW = 24, monH = 14, monD = 0.5;
@@ -2263,7 +2280,9 @@ export function createRoom(scene) {
       const s = new THREE.Mesh(new THREE.PlaneGeometry(monW - 1, monH - 1), screenMat);
       s.rotation.y = Math.PI / 2;
       s.position.set(monBaseX - scrOff, monY, deskZ);
-      s._isRoom = true; s._isOffice = true; addRoom(s);
+      s._isRoom = true; s._isOffice = true; s._isStandingDesk = true;
+      standingDeskRiseParts.push({ mesh: s, baseY: s.position.y });
+      addRoom(s);
     }
     // Left screen (rotated, offset along rotated normal)
     {
@@ -2271,7 +2290,9 @@ export function createRoom(scene) {
       s.rotation.y = Math.PI / 2 + monSideAngle;
       const nx = -Math.cos(monSideAngle), nz = Math.sin(monSideAngle);
       s.position.set(monSideX + nx * scrOff, monY, deskZ - monSideOff + nz * scrOff);
-      s._isRoom = true; s._isOffice = true; addRoom(s);
+      s._isRoom = true; s._isOffice = true; s._isStandingDesk = true;
+      standingDeskRiseParts.push({ mesh: s, baseY: s.position.y });
+      addRoom(s);
     }
     // Right screen (rotated, offset along rotated normal)
     {
@@ -2279,14 +2300,16 @@ export function createRoom(scene) {
       s.rotation.y = Math.PI / 2 - monSideAngle;
       const nx = -Math.cos(monSideAngle), nz = -Math.sin(monSideAngle);
       s.position.set(monSideX + nx * scrOff, monY, deskZ + monSideOff + nz * scrOff);
-      s._isRoom = true; s._isOffice = true; addRoom(s);
+      s._isRoom = true; s._isOffice = true; s._isStandingDesk = true;
+      standingDeskRiseParts.push({ mesh: s, baseY: s.position.y });
+      addRoom(s);
     }
 
     // Keyboard + mouse on desk (toward chair side, -X)
-    roomBox(6, 0.4, 16, 0x2a2a2a,
-      deskX - 4, deskTopY + deskTopH / 2 + 0.2, deskZ, 0, 0, 0);
-    roomBox(3, 0.4, 2.5, 0x2a2a2a,
-      deskX - 4, deskTopY + deskTopH / 2 + 0.2, deskZ + 12, 0, 0, 0);
+    _trackRise(roomBox(6, 0.4, 16, 0x2a2a2a,
+      deskX - 4, deskTopY + deskTopH / 2 + 0.2, deskZ, 0, 0, 0));
+    _trackRise(roomBox(3, 0.4, 2.5, 0x2a2a2a,
+      deskX - 4, deskTopY + deskTopH / 2 + 0.2, deskZ + 12, 0, 0, 0));
 
     // ─ Thorzone Nanoq R — SFF PC case on left side of desk ─
     // ~13.4"L × 6.7"W × 9.8"H — long side is depth (X), short side is width (Z)
@@ -2320,7 +2343,9 @@ export function createRoom(scene) {
       );
       panel.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
       panel.position.set(pcX, pcCenterY, pcZ + side * (pcW / 2 - 0.05));
-      panel._isRoom = true; panel._isOffice = true; addRoom(panel);
+      panel._isRoom = true; panel._isOffice = true; panel._isStandingDesk = true;
+      standingDeskRiseParts.push({ mesh: panel, baseY: panel.position.y });
+      addRoom(panel);
     }
 
     // Front face — walnut wood vertical slats (faces -X toward chair)
@@ -2347,17 +2372,34 @@ export function createRoom(scene) {
         })
       );
       backPanel.position.set(pcX + pcD / 2 - 0.05, pcCenterY, pcZ);
-      backPanel._isRoom = true; backPanel._isOffice = true; addRoom(backPanel);
+      backPanel._isRoom = true; backPanel._isOffice = true; backPanel._isStandingDesk = true;
+      standingDeskRiseParts.push({ mesh: backPanel, baseY: backPanel.position.y });
+      addRoom(backPanel);
     }
 
     // Small feet
     for (const sx of [-1, 1]) {
       for (const sz of [-1, 1]) {
-        roomBox(1.2, 0.35, 1, 0x999999,
+        _trackRise(roomBox(1.2, 0.35, 1, 0x999999,
           pcX + sx * (pcD / 2 - 1.2), pcBaseY + 0.18, pcZ + sz * (pcW / 2 - 0.8),
-          0, 0, 0);
+          0, 0, 0));
       }
     }
+
+    // Expose standing-desk handle for click + lerp + collision.
+    // World-space (post-mirror) coords: deskX → -deskX, deskZ stays.
+    _standingDeskRef = {
+      riseParts: standingDeskRiseParts,
+      legPosts: standingDeskLegPosts,
+      raised: false,
+      rise: 0,
+      target: 0,
+      max: deskRiseMax,
+      // Pre-mirror coords (for collision math, which works in pre-mirror).
+      deskX, deskZ, deskW, deskD, deskLegH, deskTopH,
+      // World-space (post-mirror) desktop top surface; coin uses this.
+      getDeskTopWorldY() { return deskTopY + deskTopH / 2 + this.rise; },
+    };
   }
 
   // Book stack — between mug and lamp
@@ -4280,7 +4322,7 @@ export function createRoom(scene) {
 
   // Freeze world matrices on all static room objects (skip bifold — they animate)
   scene.traverse(obj => {
-    if (obj.isMesh && !obj.isPoints && obj._isRoom && !obj._isBifoldLeaf) {
+    if (obj.isMesh && !obj.isPoints && obj._isRoom && !obj._isBifoldLeaf && !obj._isStandingDesk) {
       obj.updateMatrixWorld(true);
       obj.matrixAutoUpdate = false;
     }
@@ -4624,6 +4666,7 @@ export function createRoom(scene) {
     grWinBottom: typeof grWinBottom !== 'undefined' ? grWinBottom : 0,
     grWinTop: typeof grWinTop !== 'undefined' ? grWinTop : 0,
     grWinLeft: typeof grWinLeft !== 'undefined' ? grWinLeft : 0,
-    grWinRight: typeof grWinRight !== 'undefined' ? grWinRight : 0
+    grWinRight: typeof grWinRight !== 'undefined' ? grWinRight : 0,
+    standingDesk: _standingDeskRef
   };
 }

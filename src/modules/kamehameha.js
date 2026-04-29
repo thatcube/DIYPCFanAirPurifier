@@ -126,6 +126,8 @@ export function update(dtSec) {
     const heldSec = (t - _chargeStartTs) / 1000;
     _chargeRatio = Math.min(1, heldSec / CHARGE_FULL_SEC);
     _updateOrbTransform(t);
+    // Cut the charge whir if SFX gets muted mid-charge.
+    if (sfxMuted && _chargeOsc) _stopChargeSfx();
   }
 
   if (_beamActive) {
