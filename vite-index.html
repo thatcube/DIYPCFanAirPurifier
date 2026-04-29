@@ -222,178 +222,13 @@
   <main>
     <canvas id="c"></canvas>
 
-    <!-- Control Panel -->
-    <button class="panel-fab" id="panelFab" aria-label="Open control panel"
-      onclick="document.getElementById('panelL').style.display='flex';this.style.display='none'"><i
-        class="ph ph-sliders-horizontal" aria-hidden="true"></i></button>
-    <aside class="panel panel-l" id="panelL" aria-label="Purifier controls">
-      <div class="panel-header">
-        <h3>Control Center</h3>
-        <button class="panel-close" aria-label="Close control panel"
-          onclick="this.closest('.panel').style.display='none';document.getElementById('panelFab').style.display='flex'"><i
-            class="ph ph-x" aria-hidden="true"></i></button>
-      </div>
-      <div class="panel-scroll">
-
-        <!-- Structure -->
-        <div class="section-group">
-          <h4><i class="ph ph-cube"></i> Structure</h4>
-          <div class="ctrl-row"><label><i class="ph ph-layout"></i> Fan layout</label>
-            <div class="seg">
-              <button class="on" id="btnLayoutFB"
-                onclick="window._setLayout&&window._setLayout('fb')">Front+Back</button>
-              <button id="btnLayoutFT" onclick="window._setLayout&&window._setLayout('ft')">Front+Top</button>
-            </div>
-          </div>
-          <div class="ctrl-row"><label><i class="ph ph-hash"></i> Fans per panel</label>
-            <div class="seg">
-              <button id="btnFan3" onclick="window._setFanCount&&window._setFanCount(3)">3</button>
-              <button class="on" id="btnFan4" onclick="window._setFanCount&&window._setFanCount(4)">4</button>
-            </div>
-          </div>
-          <div class="ctrl-row"><label><i class="ph ph-polygon"></i> Edge profile</label>
-            <div class="seg">
-              <button class="on" id="btnEdgeFlat" onclick="window._setEdge&&window._setEdge('flat')">Flat</button>
-              <button id="btnEdgeCurved" onclick="window._setEdge&&window._setEdge('curved')">Curved</button>
-            </div>
-          </div>
-          <div class="ctrl-row"><label><i class="ph ph-drop"></i> Wood species</label>
-            <div class="seg">
-              <button class="on" id="btnStainAsh" onclick="window._setStain&&window._setStain('ash')">Ash</button>
-              <button id="btnStainBirch" onclick="window._setStain&&window._setStain('birch')">Birch</button>
-              <button id="btnStainWalnut" onclick="window._setStain&&window._setStain('walnut')">Walnut</button>
-            </div>
-          </div>
-          <div class="ctrl-row"><label><i class="ph ph-arrows-out"></i> Exploded view</label>
-            <div class="toggle-sw" id="togExplode" onclick="window._toggleExplode&&window._toggleExplode()"></div>
-          </div>
-        </div>
-
-        <!-- Finish & Feet -->
-        <div class="section-group">
-          <h4><i class="ph ph-paint-brush"></i> Finish & Feet</h4>
-          <div class="ctrl-row"><label><i class="ph ph-funnel"></i> Show filters</label>
-            <div class="toggle-sw on" id="togFilter" onclick="window._toggleFilter&&window._toggleFilter()"></div>
-          </div>
-          <div class="ctrl-row"><label><i class="ph ph-grid-four"></i> Fan grills</label>
-            <div class="toggle-sw" id="togGrill" onclick="window._toggleGrills&&window._toggleGrills()"></div>
-          </div>
-          <div class="ctrl-row" id="grillColorSection" style="display:none"><label><i class="ph ph-palette"></i> Grill
-              color</label>
-            <div class="seg">
-              <button class="on" id="btnGrillBlack"
-                onclick="window._setGrillColor&&window._setGrillColor('black')">Black</button>
-              <button id="btnGrillSilver"
-                onclick="window._setGrillColor&&window._setGrillColor('silver')">Silver</button>
-            </div>
-          </div>
-          <div class="ctrl-row"><label><i class="ph ph-sneaker-move"></i> Feet style</label>
-            <div class="seg">
-              <button id="btnFeetPeg" onclick="window._setFeet&&window._setFeet('peg')">Peg</button>
-              <button class="on" id="btnFeetBun" onclick="window._setFeet&&window._setFeet('bun')">Bun</button>
-              <button id="btnFeetRubber" onclick="window._setFeet&&window._setFeet('rubber')">Rubber</button>
-              <button id="btnFeetNone" onclick="window._setFeet&&window._setFeet('none')">None</button>
-            </div>
-          </div>
-          <div class="ctrl-row" id="footDiameterRow"><label><i class="ph ph-circle-dashed"></i> Diameter <span
-                id="footDiaLabel">1.5″</span></label>
-            <input type="range" class="slider" min="0" max="2" step="0.1" value="1.5" aria-label="Foot diameter"
-              oninput="window._setFootDia&&window._setFootDia(this.value);document.getElementById('footDiaLabel').textContent=parseFloat(this.value).toFixed(1)+'\u2033'" />
-          </div>
-          <div class="ctrl-row" id="footHeightRow"><label><i class="ph ph-arrows-vertical"></i> Height <span
-                id="footHtLabel">3.5″</span></label>
-            <input type="range" class="slider" min="0" max="4" step="0.25" value="3.5" aria-label="Foot height"
-              oninput="window._setFootHt&&window._setFootHt(this.value);document.getElementById('footHtLabel').textContent=parseFloat(this.value).toFixed(2)+'\u2033'" />
-          </div>
-          <div class="ctrl-row" id="footAngleRow"><label><i class="ph ph-arrows-out"></i> Angled outward</label>
-            <div class="seg">
-              <button class="on" id="btnFeetStraight"
-                onclick="window._setFeetAngled&&window._setFeetAngled(false)">Straight</button>
-              <button id="btnFeetAngled" onclick="window._setFeetAngled&&window._setFeetAngled(true)">Angled</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Placement -->
-        <div class="section-group">
-          <h4><i class="ph ph-map-pin"></i> Placement</h4>
-          <div class="ctrl-row"><label><i class="ph ph-map-trifold"></i> Position</label>
-            <div class="seg">
-              <button id="btnPlaceFloor" onclick="window._setPlacement&&window._setPlacement('floor')">Floor</button>
-              <button class="on" id="btnPlaceTv" onclick="window._setPlacement&&window._setPlacement('tv')">Under
-                TV</button>
-              <button id="btnPlaceWall" onclick="window._setPlacement&&window._setPlacement('wall')">Wall</button>
-            </div>
-          </div>
-          <div class="slider-row">
-            <label>Turntable</label>
-            <input type="range" min="0" max="360" value="90" id="turntableSlider" aria-label="Turntable angle"
-              oninput="window._setTurntable&&window._setTurntable(this.value);document.getElementById('turntableLabel').textContent=this.value+'°'">
-            <span id="turntableLabel">90°</span>
-          </div>
-        </div>
-
-        <!-- Fans -->
-        <div class="section-group">
-          <h4><i class="ph ph-fan"></i> Fans</h4>
-          <div class="ctrl-row"><label><i class="ph ph-power"></i> Spin fans</label>
-            <div class="toggle-sw on" id="togSpin" onclick="window._toggleSpin&&window._toggleSpin()"></div>
-          </div>
-          <div class="slider-row">
-            <label>Speed</label>
-            <input type="range" min="0" max="1800" value="900" id="fanSpeedSlider" aria-label="Fan speed"
-              oninput="window._setFanSpeed&&window._setFanSpeed(this.value);document.getElementById('fanSpeedVal').textContent=this.value+'rpm'">
-            <span id="fanSpeedVal">900rpm</span>
-          </div>
-          <div class="ctrl-row"><label><i class="ph ph-paint-bucket"></i> Fan color</label>
-            <div class="seg">
-              <button class="on" id="btnFanWhite"
-                onclick="window._setFanColor&&window._setFanColor('white')">White</button>
-              <button id="btnFanBlack" onclick="window._setFanColor&&window._setFanColor('black')">Black</button>
-            </div>
-          </div>
-          <div class="ctrl-row"><label><i class="ph ph-rainbow"></i> RGB Fans</label>
-            <div class="toggle-sw on" id="togRGB" onclick="window._toggleRGB&&window._toggleRGB()"></div>
-          </div>
-        </div>
-
-        <!-- Scene -->
-        <div class="section-group">
-          <h4><i class="ph ph-sun"></i> Scene</h4>
-          <div class="slider-row">
-            <label>Time</label>
-            <input type="range" min="0" max="1439" value="870" id="todSlider" aria-label="Time of day"
-              oninput="window._setTOD&&window._setTOD(this.value)">
-            <span id="todLabel">2:30 PM</span>
-          </div>
-          <div class="ctrl-row"><label><i class="ph ph-eye"></i> Isolate purifier</label>
-            <div class="toggle-sw" id="togIsolate" onclick="window._toggleIsolate&&window._toggleIsolate()"></div>
-          </div>
-          <div class="ctrl-row"><label><i class="ph ph-ruler"></i> Dimensions</label>
-            <div class="toggle-sw" id="togDims" onclick="window._toggleDims&&window._toggleDims()"></div>
-          </div>
-          <div class="ctrl-row"><label><i class="ph ph-scan"></i> X-ray mode</label>
-            <div class="toggle-sw" id="togXray" onclick="window._toggleXray&&window._toggleXray()"></div>
-          </div>
-          <div class="ctrl-row"><label><i class="ph ph-chart-bar"></i> Show FPS</label>
-            <div class="toggle-sw" id="togFps" onclick="window._toggleFps&&window._toggleFps()"></div>
-          </div>
-          <div class="ctrl-row" id="rowQuickCoin" hidden><label><i class="ph ph-lightning"></i> Quick coin mode</label>
-            <div class="toggle-sw" id="togQuickCoin" onclick="window._toggleQuickCoin&&window._toggleQuickCoin()"></div>
-          </div>
-        </div>
-
-      </div>
-    </aside>
+    <!-- Control Panel: injected by the lazy `inspector-mode.js` chunk
+         on first pause-menu Inspect click. Only the part-tooltip stays
+         here because purifier.js captures it at module-init time. -->
     <div class="part-tooltip" id="partTooltip">
       <div class="tip-name" id="tipName"></div>
       <div class="tip-dims" id="tipDims"></div>
     </div>
-
-    <!-- Game mode -->
-    <button id="playDockBtn" class="glass-btn glass-btn--primary"
-      onclick="window._openCharSelect&&window._openCharSelect()"><i class="ph ph-game-controller"></i> Play mode <kbd
-        class="key-hint">G</kbd></button>
 
     <!-- Character Select (Smash Bros style) -->
     <div id="charSelect" role="dialog" aria-modal="true" aria-label="Character select">
@@ -721,6 +556,8 @@
                 <div><kbd>R</kbd> Reset run</div>
                 <div><kbd>Esc</kbd> Resume</div>
               </div>
+              <button class="pause-link pause-link--footer" type="button"
+                onclick="window._enterInspector&&window._enterInspector()"><i class="ph ph-magnifying-glass"></i> Inspect air purifier</button>
             </section>
           </div>
 

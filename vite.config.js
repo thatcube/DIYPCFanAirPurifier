@@ -58,7 +58,8 @@ export default defineConfig({
             { name: 'room',           test: /[\\/]src[\\/]modules[\\/]room\.js$/, priority: 5 },
             { name: 'purifier',       test: /[\\/]src[\\/]modules[\\/]purifier\.js$/, priority: 5 },
             { name: 'game-fp',        test: /[\\/]src[\\/]modules[\\/]game-fp\.js$/, priority: 5 },
-            { name: 'cat-animation',  test: /[\\/]src[\\/]modules[\\/]cat-animation\.js$/, priority: 5 }
+            { name: 'cat-animation',  test: /[\\/]src[\\/]modules[\\/]cat-animation\.js$/, priority: 5 },
+            { name: 'inspector-mode', test: /[\\/]src[\\/]modules[\\/](inspector-mode|particles|wall-fade)\.js$/, priority: 5 }
           ]
         }
       }

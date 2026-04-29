@@ -3,7 +3,6 @@
 // render loop.
 
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import '@fontsource-variable/nunito-sans';
 import './styles/main.css';
 
@@ -199,13 +198,21 @@ function _applyFpPerformanceProfile(fpActive) {
   onResize();
 }
 
-// OrbitControls
-const controls = new OrbitControls(camera, canvas);
-controls.enableDamping = true;
-controls.dampingFactor = 0.08;
-controls.minDistance = 8;
-controls.maxDistance = 3000;
-controls.maxPolarAngle = Math.PI * 0.48;
+// OrbitControls + customization aside live in the lazy `inspector-mode.js`
+// chunk. We dynamic-import on first pause-menu Inspect click. The
+// promise is cached so subsequent enter()s reuse the loaded module.
+let _inspectorMod = null;
+let _inspectorPromise = null;
+function _loadInspector() {
+  if (_inspectorMod) return Promise.resolve(_inspectorMod);
+  if (!_inspectorPromise) {
+    _inspectorPromise = import('./modules/inspector-mode.js').then(m => {
+      _inspectorMod = m;
+      return m;
+    });
+  }
+  return _inspectorPromise;
+}
 
 // Lights
 lighting.createLights(state.isMobile);
@@ -260,10 +267,12 @@ purifierGroup.rotation.y = 90 * Math.PI / 180;
 purifierRefs.showConsoleProps(true);
 purifierRefs.showWallBracket(false);
 
-// Position camera — orbit around the purifier (Under TV position)
+// Position camera — orbit around the purifier (Under TV position).
+// No OrbitControls yet (lazy-loaded on first Inspect click); use a one-
+// shot lookAt so the initial framing is correct even before controls
+// take over.
 camera.position.set(placementOffset.x + 25, 20, placementOffset.z + 35);
-controls.target.set(placementOffset.x, 8, placementOffset.z);
-controls.update();
+camera.lookAt(placementOffset.x, 8, placementOffset.z);
 
 // ── Wire time-of-day lighting ───────────────────────────────────────
 
@@ -502,7 +511,7 @@ leaderboard.setCallbacks({
 gameFp.init({
   camera,
   canvas,
-  controls,
+  controls: null, // late-bound: inspector-mode calls gameFp.setControls() on first enter
   catGroup: catAnimation.catGroup,
   scene,
   placementOffset,
@@ -889,7 +898,13 @@ window._startGame = () => {
   });
   // Enter game mode
   gameFp.toggleFirstPerson();
-  wallFade.resetAll();
+  // Reset wall auto-fade if the inspector module ever loaded it.
+  if (_inspectorMod && typeof _inspectorMod !== 'undefined') {
+    // wall-fade lives inside the inspector chunk; reach in via the
+    // module's re-export if present, otherwise no-op (game mode never
+    // fades walls anyway).
+    try { _inspectorMod.resetWallFade?.(); } catch (e) { }
+  }
 };
 
 // G key opens character select instead of directly entering game
@@ -960,33 +975,52 @@ window._playAgain = () => {
   setTimeout(() => window._openCharSelect(), 100);
 };
 
-// ── Panel control bridges ───────────────────────────────────────────
+// ── Inspector mode (lazy) ───────────────────────────────────────────
+// Pause-menu Inspect button: exits FP, opens the customization panel.
+// First click dynamically loads the inspector chunk (OrbitControls,
+// particles, wall-fade, all panel handlers + UI). After that it's a
+// fast toggle.
 
-// Time-of-day slider
-window._setTOD = (val) => {
-  const m = parseInt(val, 10);
-  lighting.applyTimeOfDay(m, todRefs);
-  const todLabel = document.getElementById('todLabel');
-  if (todLabel) todLabel.textContent = lighting.formatTime(m);
-  markShadowsDirty();
+window._enterInspector = async () => {
+  // Close any pause/finish overlays and exit FP cleanly.
+  leaderboard.closeFinishDialog();
+  leaderboard.hideShareButton();
+  const pause = document.getElementById('fpPauseOverlay');
+  if (pause) pause.style.display = 'none';
+  if (document.pointerLockElement) document.exitPointerLock();
+  gameFp.releasePauseFocusTrap();
+  gameFp.clearPauseState();
+  if (gameFp.fpMode) gameFp.toggleFirstPerson();
+  if (roomRefs && typeof roomRefs.resetMacbookProximity === 'function') {
+    roomRefs.resetMacbookProximity();
+  }
+  // Lazy-load + activate the inspector.
+  const mod = await _loadInspector();
+  await mod.enter({
+    camera, canvas, renderer, scene,
+    purifierRefs, roomRefs, purifierGroup, placementOffset,
+    gameFp, lighting, todRefs, spatial, state,
+    coins, leaderboard,
+    markShadowsDirty, showToast,
+    syncFpsToggle: _applyFpsVisibility,
+    syncQuickCoinToggle: _syncQuickCoinToggleState,
+    gateQuickCoinRow: _gateQuickCoinRowToLocalhost,
+  });
+  _inspectorTick = mod.tick;
 };
 
-// Turntable
-window._setTurntable = (val) => {
-  purifierGroup.rotation.y = parseFloat(val) * Math.PI / 180;
+window._exitInspector = () => {
+  if (_inspectorMod) _inspectorMod.exit();
+  // Drop the per-frame tick reference (keeps the module loaded but
+  // skips its work in animate()).
+  _inspectorTick = null;
+  // Return to the game-first entry point.
+  window._openCharSelect();
 };
 
-// Fan speed
-window._setFanSpeed = (val) => {
-  purifierRefs.setFanSpeed(parseInt(val, 10) / 1800 * 100);
-};
+// Per-frame hook the animate loop calls when set.
+let _inspectorTick = null;
 
-// Spin toggle
-window._toggleSpin = () => {
-  const tog = document.getElementById('togSpin');
-  const isOn = tog && tog.classList.toggle('on');
-  purifierRefs.setSpinning(!!isOn);
-};
 
 // ── Fireball unlock ─────────────────────────────────────────────────
 // Unlocks ONLY when every visible fan rotor has been individually
@@ -1083,10 +1117,14 @@ window._setPlacement = (mode) => {
   const btn = document.getElementById(btnId);
   if (btn) btn.classList.add('on');
 
-  // Re-aim camera at the purifier
-  controls.target.set(placementOffset.x, placementOffset.y + 8, placementOffset.z);
+  // Re-aim camera/controls — controls only exist once the inspector
+  // chunk has loaded; before then just reposition the camera.
   camera.position.set(placementOffset.x + 25, placementOffset.y + 20, placementOffset.z + 35);
-  controls.update();
+  if (_inspectorMod && _inspectorMod.retargetControls) {
+    _inspectorMod.retargetControls(placementOffset);
+  } else {
+    camera.lookAt(placementOffset.x, placementOffset.y + 8, placementOffset.z);
+  }
   markShadowsDirty();
   gameFp.invalidatePurifierCollision();
 };
@@ -1163,189 +1201,16 @@ window._mobileJump = (down) => {
 
 // ── Purifier control bridges ────────────────────────────────────────
 
-window._toggleExplode = () => purifierRefs.toggleExplode();
-window._toggleFilter = () => { purifierRefs.toggleFilter(); gameFp.invalidatePurifierCollision(); };
-window._toggleGrills = () => purifierRefs.toggleGrills();
-window._setGrillColor = (c) => purifierRefs.setGrillColor(c);
-window._toggleDims = () => purifierRefs.toggleDimensions();
+// Inspector-only purifier UI handlers (window._setStain, _setLayout,
+// _setFanCount, _setEdge, _setFeet, _setFootDia, _setFootHt,
+// _setFeetAngled, _setFanColor, _toggleRGB, _toggleXray, _toggleIsolate,
+// _toggleExplode, _toggleFilter, _toggleGrills, _setGrillColor,
+// _toggleDims, _setTurntable, _setFanSpeed, _toggleSpin, _setTOD) all
+// live in the lazy `inspector-mode.js` chunk and are wired on first
+// Inspect click.
 
-window._setStain = (mode) => {
-  purifierRefs.setStain(mode);
-};
-
-window._setLayout = (mode) => {
-  purifierRefs.setLayout(mode);
-  document.querySelectorAll('#btnLayoutFB,#btnLayoutFT').forEach(b => b.classList.remove('on'));
-  const btn = document.getElementById(mode === 'fb' ? 'btnLayoutFB' : 'btnLayoutFT');
-  if (btn) btn.classList.add('on');
-};
-
-window._setFanCount = (n) => {
-  purifierRefs.setFanCount(n);
-  document.querySelectorAll('#btnFan3,#btnFan4').forEach(b => b.classList.remove('on'));
-  const btn = document.getElementById(n === 4 ? 'btnFan4' : 'btnFan3');
-  if (btn) btn.classList.add('on');
-};
-
-window._setEdge = (mode) => {
-  purifierRefs.setEdgeProfile(mode);
-  document.querySelectorAll('#btnEdgeFlat,#btnEdgeCurved').forEach(b => b.classList.remove('on'));
-  const btn = document.getElementById(mode === 'flat' ? 'btnEdgeFlat' : 'btnEdgeCurved');
-  if (btn) btn.classList.add('on');
-};
-
-window._setFeet = (style) => {
-  purifierRefs.setFeetStyle(style);
-  document.querySelectorAll('#btnFeetPeg,#btnFeetBun,#btnFeetRubber,#btnFeetNone').forEach(b => b.classList.remove('on'));
-  const id = style === 'peg' ? 'btnFeetPeg' : style === 'bun' ? 'btnFeetBun' : style === 'rubber' ? 'btnFeetRubber' : 'btnFeetNone';
-  const btn = document.getElementById(id);
-  if (btn) btn.classList.add('on');
-  markShadowsDirty();
-  gameFp.invalidatePurifierCollision();
-};
-
-window._setFootDia = (val) => {
-  purifierRefs.setFootDiameter(parseFloat(val));
-  markShadowsDirty();
-  gameFp.invalidatePurifierCollision();
-};
-
-const _initialBunFootH = state.bunFootH;
-let _footYOffset = 0; // tracks Y shift from foot height changes
-
-window._setFootHt = (val) => {
-  const newH = parseFloat(val);
-  purifierRefs.setFootHeight(newH);
-  // Move the purifier group so the bottom stays on the floor
-  const newOffset = newH - _initialBunFootH;
-  const delta = newOffset - _footYOffset;
-  _footYOffset = newOffset;
-  purifierGroup.position.y += delta;
-  placementOffset.y += delta;
-  markShadowsDirty();
-};
-
-window._setFeetAngled = (angled) => {
-  purifierRefs.setFeetAngled(angled);
-  document.querySelectorAll('#btnFeetStraight,#btnFeetAngled').forEach(b => b.classList.remove('on'));
-  document.getElementById(angled ? 'btnFeetAngled' : 'btnFeetStraight')?.classList.add('on');
-  markShadowsDirty();
-};
-
-window._setFanColor = (mode) => {
-  purifierRefs.setFanColor(mode);
-  document.querySelectorAll('#btnFanWhite,#btnFanBlack').forEach(b => b.classList.remove('on'));
-  const btn = document.getElementById(mode === 'white' ? 'btnFanWhite' : 'btnFanBlack');
-  if (btn) btn.classList.add('on');
-};
-
-window._toggleRGB = () => {
-  purifierRefs.toggleFanRGB();
-  const tog = document.getElementById('togRGB');
-  if (tog) tog.classList.toggle('on');
-};
-
-window._toggleXray = () => {
-  if (!purifierRefs.toggleXray) return;
-  const isOn = purifierRefs.toggleXray();
-  const tog = document.getElementById('togXray');
-  if (tog) tog.classList.toggle('on', isOn);
-  markShadowsDirty();
-};
-
-window._toggleIsolate = () => {
-  const tog = document.getElementById('togIsolate');
-  const isOn = tog ? tog.classList.toggle('on') : false;
-  // Toggle room visibility
-  scene.traverse(obj => {
-    if (obj._isRoom) obj.visible = !isOn;
-  });
-  // Adjust fog/background
-  if (isOn) {
-    scene.fog.density = 0;
-    renderer.setClearColor(0x0a0e14, 1);
-  } else {
-    lighting.applyTimeOfDay(parseInt(document.getElementById('todSlider')?.value || '870', 10), todRefs);
-  }
-  markShadowsDirty();
-};
-
-// ── Orbit mode keyboard camera ──────────────────────────────────────
-// Default (orbit): W/S tilt up/down, A/D rotate around target.
-// Fly mode (toggle with F): WASD moves freely relative to look direction,
-// Space = up, Shift = down, hold Ctrl for 3× sprint. Mouse drag still
-// looks around (OrbitControls). No collision, no altitude cap — you can
-// fly through walls, above the ceiling, anywhere.
-
-const _camKeys = {
-  w: false, a: false, s: false, d: false,
-  space: false, shift: false, ctrl: false,
-};
-let _flyMode = false;
-// Saved orbit limits so we can restore them when exiting fly mode.
-const _orbitSaved = {
-  maxPolarAngle: controls.maxPolarAngle,
-  minDistance: controls.minDistance,
-  maxDistance: controls.maxDistance,
-};
-
-function setFlyMode(on) {
-  _flyMode = !!on;
-  if (_flyMode) {
-    // Open up the orbit limits so you can look straight up and fly far.
-    controls.maxPolarAngle = Math.PI;       // allow looking fully up/down
-    controls.minDistance = 0.01;            // get right up to things
-    controls.maxDistance = 100000;          // essentially unbounded
-    showToast('Fly mode ON — WASD + Space/Shift, Ctrl to sprint, F to exit');
-  } else {
-    controls.maxPolarAngle = _orbitSaved.maxPolarAngle;
-    controls.minDistance = _orbitSaved.minDistance;
-    controls.maxDistance = _orbitSaved.maxDistance;
-    showToast('Fly mode OFF');
-  }
-  // Clear any stuck keys so we don't keep drifting.
-  _camKeys.w = _camKeys.a = _camKeys.s = _camKeys.d = false;
-  _camKeys.space = _camKeys.shift = _camKeys.ctrl = false;
-}
-
-document.addEventListener('keydown', e => {
-  if (gameFp.fpMode) return;
-  if (leaderboard.isNameDialogOpen()) return;
-  const cs = document.getElementById('charSelect');
-  if (cs && cs.classList.contains('open')) return;
-  const t = e.target;
-  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
-  const code = e.code;
-  const k = e.key.toLowerCase();
-  if (k === 'f' && !e.repeat && !e.metaKey && !e.altKey) {
-    setFlyMode(!_flyMode);
-    e.preventDefault();
-    return;
-  }
-  if (k === 'w' || k === 'a' || k === 's' || k === 'd') {
-    _camKeys[k] = true;
-    e.preventDefault();
-    return;
-  }
-  if (_flyMode) {
-    if (code === 'Space') { _camKeys.space = true; e.preventDefault(); }
-    else if (code === 'ShiftLeft' || code === 'ShiftRight') { _camKeys.shift = true; }
-    else if (code === 'ControlLeft' || code === 'ControlRight') { _camKeys.ctrl = true; }
-  }
-});
-document.addEventListener('keyup', e => {
-  const code = e.code;
-  const k = e.key.toLowerCase();
-  if (k === 'w' || k === 'a' || k === 's' || k === 'd') _camKeys[k] = false;
-  if (code === 'Space') _camKeys.space = false;
-  if (code === 'ShiftLeft' || code === 'ShiftRight') _camKeys.shift = false;
-  if (code === 'ControlLeft' || code === 'ControlRight') _camKeys.ctrl = false;
-});
-// If we lose focus (alt-tab, devtools), release all keys.
-window.addEventListener('blur', () => {
-  _camKeys.w = _camKeys.a = _camKeys.s = _camKeys.d = false;
-  _camKeys.space = _camKeys.shift = _camKeys.ctrl = false;
-});
+// Orbit-mode keyboard, fly mode, and OrbitControls limits live in the
+// lazy `inspector-mode.js` chunk. Nothing to wire here.
 
 // ── Render loop ─────────────────────────────────────────────────────
 
@@ -1377,44 +1242,9 @@ function animate(ts) {
   const dtSec = Math.min(rawDt / 1000, 0.1);
   const animFrameScale = dtSec * 60;
 
-  // Controls (only in orbit mode)
-  if (!gameFp.fpMode) {
-    controls.update();
-    if (_flyMode) {
-      // Free-fly: translate both camera AND orbit target along the
-      // camera's look direction so mouse-drag rotation still works.
-      // WASD = forward/back/strafe (relative to look, full 3D incl. pitch).
-      // Space / Shift = world up / down. Ctrl = 3× sprint.
-      const baseSpd = 60; // inches per second (room is ~175" wide)
-      const sprint = _camKeys.ctrl ? 3.0 : 1.0;
-      const spd = baseSpd * sprint * dtSec;
-      if (_camKeys.w || _camKeys.s || _camKeys.a || _camKeys.d ||
-        _camKeys.space || _camKeys.shift) {
-        const fwd = _flyFwd.subVectors(controls.target, camera.position);
-        const fwdLen = fwd.length();
-        if (fwdLen > 1e-4) fwd.multiplyScalar(1 / fwdLen);
-        else fwd.set(0, 0, -1);
-        const right = _flyRight.crossVectors(fwd, camera.up).normalize();
-        _flyMove.set(0, 0, 0);
-        if (_camKeys.w) _flyMove.addScaledVector(fwd, spd);
-        if (_camKeys.s) _flyMove.addScaledVector(fwd, -spd);
-        if (_camKeys.d) _flyMove.addScaledVector(right, spd);
-        if (_camKeys.a) _flyMove.addScaledVector(right, -spd);
-        if (_camKeys.space) _flyMove.y += spd;
-        if (_camKeys.shift) _flyMove.y -= spd;
-        camera.position.add(_flyMove);
-        controls.target.add(_flyMove);
-      }
-    } else {
-      // Orbit: A/D rotate around target, W/S tilt up/down.
-      if (_camKeys.w || _camKeys.a || _camKeys.s || _camKeys.d) {
-        const rotSpd = 0.025; // radians per frame
-        if (_camKeys.a) controls.rotateLeft(rotSpd);
-        if (_camKeys.d) controls.rotateLeft(-rotSpd);
-        if (_camKeys.w) controls.rotateUp(rotSpd);
-        if (_camKeys.s) controls.rotateUp(-rotSpd);
-      }
-    }
+  // Inspector tick (only when inspector is loaded + active)
+  if (!gameFp.fpMode && _inspectorTick) {
+    _inspectorTick(ts, dtSec, animFrameScale);
   }
 
   // Game mode physics
@@ -1789,20 +1619,7 @@ _syncQuickCoinToggleState();
 const _shareBtn = document.getElementById('fpShareBtn');
 if (_shareBtn) _shareBtn.addEventListener('click', () => leaderboard.copyLastResult());
 
-// Scroll fade on panel-scroll — fade bottom edge when more content below
-{
-  const ps = document.querySelector('.panel-scroll');
-  if (ps) {
-    const checkFade = () => {
-      const canScroll = ps.scrollHeight > ps.clientHeight + 1;
-      const atBottom = ps.scrollTop + ps.clientHeight >= ps.scrollHeight - 2;
-      ps.classList.toggle('scroll-fade', canScroll && !atBottom);
-    };
-    ps.addEventListener('scroll', checkFade, { passive: true });
-    window.addEventListener('resize', checkFade);
-    new MutationObserver(checkFade).observe(ps, { childList: true, subtree: true, attributes: true });
-    checkFade();
-  }
-}
+// Panel scroll-fade observer lives inside the inspector chunk (set up
+// when the panel HTML is injected on first Inspect click).
 
 console.log('[main] Render loop started');
