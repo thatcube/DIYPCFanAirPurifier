@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { state } from './state.js';
 import { stdMat } from './materials.js';
-import { fpMode as _fpMode, sfxMuted as _sfxMuted } from './game-fp.js';
+import { fpMode as _fpMode, sfxMuted as _sfxMuted, fpPos as _fpPos } from './game-fp.js';
 import {
   spawnSecretBinderCoin,
   spawnSecretLampCoin,

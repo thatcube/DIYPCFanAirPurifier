@@ -13,7 +13,6 @@ import { createRenderer, createScene } from './modules/renderer.js';
 import { stdMat } from './modules/materials.js';
 import * as lighting from './modules/lighting.js';
 import * as music from './modules/music.js';
-import * as particles from './modules/particles.js';
 import * as catAppearance from './modules/cat-appearance.js';
 import * as catAnimation from './modules/cat-animation.js';
 import * as coins from './modules/coins.js';
@@ -442,7 +441,7 @@ function _syncQuickCoinToggleState() {
 // Quick coin mode is a dev-only toggle — only show the row on localhost so
 // non-dev visitors can't accidentally flip it (their runs would then be
 // flagged as test runs and hidden from the public leaderboard).
-(function _gateQuickCoinRowToLocalhost() {
+function _gateQuickCoinRowToLocalhost() {
   const row = document.getElementById('rowQuickCoin');
   if (!row) return;
   const host = String(window.location.hostname || '').toLowerCase();
@@ -453,7 +452,8 @@ function _syncQuickCoinToggleState() {
     // who toggled it before stop submitting test runs.
     if (coins.isQuickCoinMode()) coins.setQuickCoinMode(false);
   }
-})();
+}
+_gateQuickCoinRowToLocalhost();
 
 _syncQuickCoinToggleState();
 
@@ -543,7 +543,6 @@ if (roomRefs && typeof roomRefs.setMacbookMuted === 'function') {
 let _selectedModel = 'classic';
 let _selectedColor = 'charcoal';
 let _selectedMode = gameFp.isSpeedMode() ? 'speed' : (gameFp.isSkateMode() ? 'skate' : 'normal');
-const _PLAY_PATH_AUTO_OPEN = /^\/play\/?$/.test(window.location.pathname);
 
 // Refresh the speed-mode pill's locked/unlocked state + progress label every
 // time the character select opens. The unlock progresses across runs.
@@ -767,11 +766,10 @@ document.getElementById('charSelect')?.addEventListener('keydown', e => {
     window._closeCharSelect();
   }
 });
-if (_PLAY_PATH_AUTO_OPEN) {
-  setTimeout(() => {
-    if (!gameFp.fpMode) window._openCharSelect();
-  }, 120);
-}
+// Game-first: auto-open the character select on every boot.
+setTimeout(() => {
+  if (!gameFp.fpMode) window._openCharSelect();
+}, 120);
 
 // Eagerly warm the character-select previews in the background so the 3D cats
 // are already fetched, parsed, and rendered by the time the user opens the
@@ -1099,7 +1097,7 @@ window._setPlacement = (mode) => {
   if (mode === 'wall') {
     purifierRefs.setFeetStyle('none');
   } else if (_prevPlacement === 'wall') {
-    purifierRefs.setFeetStyle('bun'); // restore default
+    purifierRefs.setFeetStyle('bun');
   }
   _prevPlacement = mode;
 
@@ -1215,11 +1213,6 @@ let _lastFrameTs = 0;
 let _fpsFrames = 0;
 let _fpsLast = performance.now();
 let _lastCoinDomUpdate = 0;
-
-// Scratch vectors for fly-mode translation (avoid per-frame allocs)
-const _flyFwd = new THREE.Vector3();
-const _flyRight = new THREE.Vector3();
-const _flyMove = new THREE.Vector3();
 
 // Cached DOM refs for per-frame updates
 const _elRunTimer = document.getElementById('runTimerText');

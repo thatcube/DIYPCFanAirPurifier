@@ -365,6 +365,9 @@ function _ensureChargeLight() {
 // sphere/halo around the cat.
 let _ssAura = null;          // additive yellow sphere child of _catGroup
 let _ssHalo = null;          // additive yellow ring/sprite child of _catGroup
+let _ssFlameBody = null;     // additive gold "body" sphere that connects spike bases into one silhouette
+let _ssSpikes = null;        // THREE.Group of cone-spike meshes (flame silhouette like the show)
+let _ssSpikesMat = null;     // shared material for spikes (modulate opacity once)
 let _ssSparkles = null;      // array of orbiting gold diamond meshes during SS
 let _ssMatCache = null;      // Map<material, {emissive:Color, intensity:number}>
 let _ssAuraStrength = 0;     // smoothed 0..1 drive value
@@ -2299,86 +2302,8 @@ function _buildStaticBoxes() {
   );
 
   // ── Guest room furniture collision ──
-  // Desk against the +X far wall (pre-mirror X≈164, Z≈27)
-  // 84"W × 30"D × 30"H, flush against LEFT (+Z) wall
-  {
-    const deskW = 84, deskD = 30;
-    const deskX = 183 - 4 - deskD / 2; // 164 pre-mirror
-    const deskZ = 69 - deskW / 2;       // 27, flush against LEFT wall
-    const deskSurface = fy + 30;         // leg height (28) + top slab (1.5) ≈ 30
-    // Desk body — standable surface
-    _staticBoxes.push({
-      xMin: -(deskX + deskD / 2), xMax: -(deskX - deskD / 2),
-      zMin: deskZ - deskW / 2, zMax: deskZ + deskW / 2,
-      yTop: deskSurface, yBottom: fy, room: true
-    });
-    // ── Monitor collision — 3 OLED monitors with angled side hitboxes ──
-    // Dimensions match room.js: 24"W × 14"H × 0.5"D each, on 6" arms
-    const monW = 24, monD = 0.5, monH = 14, monStandH = 6;
-    const monBaseX = deskX + deskD / 2 - 5; // 174 pre-mirror (near wall)
-    const monYBot = deskSurface + monStandH; // bottom of screen
-    const monYTop = monYBot + monH;          // top of screen
-    const monPad = 1; // collision padding
-
-    // Center monitor — axis-aligned, tight AABB
-    _staticBoxes.push({
-      xMin: -(monBaseX + monD / 2 + monPad), xMax: -(monBaseX - monD / 2 - monPad),
-      zMin: deskZ - monW / 2, zMax: deskZ + monW / 2,
-      yTop: monYTop, yBottom: monYBot, room: true
-    });
-
-    // Angled side monitors — 3 AABB strips each to approximate rotation
-    const monAngle = 0.6; // radians (~34°), matches room.js monSideAngle
-    const cosA = Math.cos(monAngle), sinA = Math.sin(monAngle);
-    const stripW = monW / 3; // 8" per strip
-    const stripHalfD = (monD * cosA + stripW * sinA) / 2 + monPad;
-    const stripHalfW = (monD * sinA + stripW * cosA) / 2;
-
-    // Left monitor: pre-mirror center (monBaseX-8, _, deskZ - monW + 2)
-    const lMonX = monBaseX - 8, lMonZ = deskZ - monW + 2;
-    // Right monitor: pre-mirror center (monBaseX-8, _, deskZ + monW - 2)
-    const rMonX = monBaseX - 8, rMonZ = deskZ + monW - 2;
-
-    for (const localZ of [-stripW, 0, stripW]) {
-      // Left monitor strips (rotY = +0.4)
-      const lx = lMonX + localZ * sinA;
-      const lz = lMonZ + localZ * cosA;
-      _staticBoxes.push({
-        xMin: -(lx + stripHalfD), xMax: -(lx - stripHalfD),
-        zMin: lz - stripHalfW, zMax: lz + stripHalfW,
-        yTop: monYTop, yBottom: monYBot, room: true
-      });
-      // Right monitor strips (rotY = -0.4, sinA negated)
-      const rx = rMonX - localZ * sinA;
-      const rz = rMonZ + localZ * cosA;
-      _staticBoxes.push({
-        xMin: -(rx + stripHalfD), xMax: -(rx - stripHalfD),
-        zMin: rz - stripHalfW, zMax: rz + stripHalfW,
-        yTop: monYTop, yBottom: monYBot, room: true
-      });
-    }
-
-    // Monitor arm posts (thin 1.5" collision pillars between desk and screens)
-    for (const mz of [deskZ, lMonZ, rMonZ]) {
-      _staticBoxes.push({
-        xMin: -(monBaseX + 1), xMax: -(monBaseX - 1),
-        zMin: mz - 1, zMax: mz + 1,
-        yTop: monYBot, yBottom: deskSurface, room: true
-      });
-    }
-  }
-  // Thorzone Nanoq R PC case on desk (left side, pre-mirror Z≈57, on desk surface)
-  {
-    const pcD = 13.4, pcW = 6.7, pcH = 9.8;
-    const pcX = 164 + 30 / 2 - 13.4 / 2 - 1; // pushed near wall edge (deskD=30)
-    const pcZ = 27 + 24 + 6;
-    const pcBot = fy + 30;
-    _staticBoxes.push({
-      xMin: -(pcX + pcD / 2), xMax: -(pcX - pcD / 2),
-      zMin: pcZ - pcW / 2, zMax: pcZ + pcW / 2,
-      yTop: pcBot + pcH, yBottom: pcBot, room: true
-    });
-  }
+  // Standing desk + monitors + PC are dynamic (rise with the desk lerp);
+  // see _appendDynamicBoxes below for their AABBs.
 
   // ── Guest room walls (behind the hallway's +X door) ──
   // Pre-mirror footprint X=51..183, Z=-78..69. Shares the bedroom's TV wall
@@ -2694,7 +2619,11 @@ function _getBoxes() {
     }
   }
 
-  // Corner door (by nightstand) — dynamic collision from animated panel.
+  // Corner door (by nightstand) — dynamic OBB collision tracking the
+  // animated panel. The OBB is ALWAYS active so the player can never walk
+  // through a door at any angle. While in contact, the OBB's applyPush
+  // hook drives the door's hinge physics in room.js (slow walk = barely
+  // budges, slam = flicks open).
   if (_roomRefs && _roomRefs.getCornerDoorPanelMesh) {
     const doorPanel = _roomRefs.getCornerDoorPanelMesh();
     if (doorPanel && doorPanel.parent) {
@@ -2717,12 +2646,13 @@ function _getBoxes() {
         yTop: _doorWP.y + doorHeight / 2,
         yBottom: _doorWP.y - doorHeight / 2,
         obb: true,
-        room: true
+        room: true,
+        applyPush: _roomRefs.applyPushCornerDoor || null
       });
     }
   }
 
-  // Guest door (bedroom right wall, past extrusion) — dynamic OBB collision.
+  // Guest door (bedroom right wall, past extrusion) — same physics model.
   if (_roomRefs && _roomRefs.getGuestDoorPanelMesh) {
     const gPanel = _roomRefs.getGuestDoorPanelMesh();
     if (gPanel && gPanel.parent) {
@@ -2743,7 +2673,8 @@ function _getBoxes() {
         yTop: _doorWP.y + gHeight / 2,
         yBottom: _doorWP.y - gHeight / 2,
         obb: true,
-        room: true
+        room: true,
+        applyPush: _roomRefs.applyPushGuestDoor || null
       });
     }
   }
@@ -3284,9 +3215,11 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     if (_wallContactNx !== 0 || _wallContactNz !== 0) _skateBoostAccum = 0;
 
     const skateBase = (fpKeys.shift ? 0.95 : 0.60) * speedMul;
-    // Progressive boost: grows while holding input, uncapped
+    // Progressive boost: grows while holding input, uncapped. Rate is
+    // half the original so it takes ~2× longer to reach any given
+    // top speed (still infinite ceiling).
     if (inputActive) {
-      const boostRate = (fpKeys.shift ? 0.012 : 0.007) * speedMul;
+      const boostRate = (fpKeys.shift ? 0.006 : 0.0035) * speedMul;
       _skateBoostAccum += boostRate * frameScale;
     }
     const skateSpd = skateBase + _skateBoostAccum;
@@ -3744,6 +3677,10 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
           // Rotate push vector back to world space (trig pre-computed)
           const pushWX = pushLX * box.cosB - pushLZ * box.sinB;
           const pushWZ = pushLX * box.sinB + pushLZ * box.cosB;
+          // Door physics: pass contact point + push-out force vector so
+          // the door computes torque (lever × force). This is direction-
+          // correct regardless of which face the player pressed.
+          if (box.applyPush) box.applyPush(nx, nz, pushWX, pushWZ);
           nx += pushWX;
           nz += pushWZ;
           // Kill velocity along push direction

@@ -1081,28 +1081,92 @@ export function createRoom(scene) {
   tagAll(doorFrame, { _isRoom: true });
   addRoom(doorFrame);
 
-  // Simple smooth hinge animation for the corner door.
-  let _cornerDoorOpen = false;
+  // Corner-door physics:
+  //   _cornerDoorAngle  — current rotation (rad), source of truth
+  //   _cornerDoorOmega  — angular velocity (rad/frame), driven by player pushes
+  //   _cornerDoorAnimTarget — non-null when click toggle is animating to a
+  //                           fixed angle; physics push cancels it.
+  // Push model is torque-based: the player's push-out force (from collision
+  // resolution) is crossed with the lever arm from pivot to contact point.
+  // This is direction-correct regardless of which face the player presses
+  // and at any door angle — no swing-direction state needed.
   let _cornerDoorAngle = 0;
+  let _cornerDoorOmega = 0;
+  let _cornerDoorAnimTarget = null;
   let _cornerDoorAnim = 0;
   const _cornerDoorOpenAngle = 72 * Math.PI / 180;
+  const _cornerDoorMaxAngle = _cornerDoorOpenAngle * 1.05;
   function _stepCornerDoor() {
-    const target = _cornerDoorOpen ? _cornerDoorOpenAngle : 0;
-    _cornerDoorAngle += (target - _cornerDoorAngle) * 0.22;
+    if (_cornerDoorAnimTarget !== null) {
+      const t = _cornerDoorAnimTarget;
+      _cornerDoorAngle += (t - _cornerDoorAngle) * 0.22;
+      if (Math.abs(t - _cornerDoorAngle) < 0.001) {
+        _cornerDoorAngle = t;
+        _cornerDoorAnimTarget = null;
+        _cornerDoorOmega = 0;
+      }
+    } else if (Math.abs(_cornerDoorOmega) > 1e-4) {
+      _cornerDoorAngle += _cornerDoorOmega;
+      _cornerDoorOmega *= 0.93;
+    }
+    if (_cornerDoorAngle > _cornerDoorMaxAngle) {
+      _cornerDoorAngle = _cornerDoorMaxAngle;
+      if (_cornerDoorOmega > 0) _cornerDoorOmega = 0;
+    } else if (_cornerDoorAngle < -_cornerDoorMaxAngle) {
+      _cornerDoorAngle = -_cornerDoorMaxAngle;
+      if (_cornerDoorOmega < 0) _cornerDoorOmega = 0;
+    }
     cornerDoorPivot.rotation.y = _cornerDoorAngle;
-    if (Math.abs(target - _cornerDoorAngle) > 0.001) {
+    const animating = (_cornerDoorAnimTarget !== null) || (Math.abs(_cornerDoorOmega) > 1e-4);
+    if (animating) {
       _cornerDoorAnim = requestAnimationFrame(_stepCornerDoor);
     } else {
-      _cornerDoorAngle = target;
-      cornerDoorPivot.rotation.y = _cornerDoorAngle;
       _cornerDoorAnim = 0;
     }
   }
-  function toggleCornerDoor(forceOpen) {
-    _cornerDoorOpen = (typeof forceOpen === 'boolean') ? forceOpen : !_cornerDoorOpen;
-    if (_cornerDoorAnim) cancelAnimationFrame(_cornerDoorAnim);
-    _cornerDoorAnim = requestAnimationFrame(_stepCornerDoor);
-    return _cornerDoorOpen;
+  function _kickCornerDoorAnim() {
+    if (!_cornerDoorAnim) _cornerDoorAnim = requestAnimationFrame(_stepCornerDoor);
+  }
+  function toggleCornerDoor(forceOpen, swingSign) {
+    const isOpen = Math.abs(_cornerDoorAngle) > 0.05;
+    const open = (typeof forceOpen === 'boolean') ? forceOpen : !isOpen;
+    if (open) {
+      const sign = (swingSign === 1 || swingSign === -1)
+        ? swingSign
+        : (_cornerDoorAngle >= 0 ? 1 : -1);
+      _cornerDoorAnimTarget = sign * _cornerDoorOpenAngle;
+    } else {
+      _cornerDoorAnimTarget = 0;
+    }
+    _kickCornerDoorAnim();
+    return open;
+  }
+  // Torque-based push: caller supplies contact point (player world XZ) and
+  // the push-out force vector applied to the player. Newton's third law
+  // gives equal/opposite force on the door; cross with lever from pivot
+  // gives the Y-axis torque that drives angular velocity.
+  function applyPushCornerDoor(contactX, contactZ, pushOutX, pushOutZ) {
+    const fmagSq = pushOutX * pushOutX + pushOutZ * pushOutZ;
+    if (!(fmagSq > 1e-8)) return;
+    _cornerDoorAnimTarget = null;
+    cornerDoorPivot.updateWorldMatrix(true, false);
+    const px = cornerDoorPivot.matrixWorld.elements[12];
+    const pz = cornerDoorPivot.matrixWorld.elements[14];
+    const leverX = contactX - px;
+    const leverZ = contactZ - pz;
+    // Force on door = -pushOut (collision pushed player +pushOut).
+    const fx = -pushOutX, fz = -pushOutZ;
+    // Torque about +Y: τ_y = lever_z * f_x - lever_x * f_z
+    const torque = leverZ * fx - leverX * fz;
+    const t = Math.max(-25, Math.min(25, torque));
+    // Pure angular-impulse model — no instantaneous angle kick (was causing
+    // visible snap on hard contacts). Clamp peak omega so successive
+    // contact frames while overlapping can't accumulate into a spike.
+    _cornerDoorOmega += t * 0.018;
+    const MAX_OMEGA = 0.14; // rad/frame ≈ 8°/frame
+    if (_cornerDoorOmega > MAX_OMEGA) _cornerDoorOmega = MAX_OMEGA;
+    else if (_cornerDoorOmega < -MAX_OMEGA) _cornerDoorOmega = -MAX_OMEGA;
+    _kickCornerDoorAnim();
   }
 
   // Collect all back wall + recess meshes for fading
@@ -1336,6 +1400,7 @@ export function createRoom(scene) {
   let toggleGuestDoor = null;
   let _guestDoorOpenState = () => false;
   let _guestDoorPanelMesh = null;
+  let applyPushGuestDoor = null;
   {
     const panelThick = 1.4;
     const panelH = _guestDoorH - 0.5;
@@ -1400,29 +1465,78 @@ export function createRoom(scene) {
     tagAll(frame, { _isRoom: true });
     addRoom(frame);
 
-    // Hinge animation.
-    let _open = false;
-    _guestDoorOpenState = () => _open;
+    // Guest-door physics — same torque-based model as corner door.
     let _angle = 0;
+    let _omega = 0;
+    let _animTarget = null;
     let _anim = 0;
-    const _openAngle = 82 * Math.PI / 180;  // positive = swing into office (+X)
+    const _openAngle = 82 * Math.PI / 180;
+    const _maxAngle = _openAngle * 1.05;
+    _guestDoorOpenState = () => Math.abs(_angle) > 0.05;
     const _step = () => {
-      const target = _open ? _openAngle : 0;
-      _angle += (target - _angle) * 0.22;
+      if (_animTarget !== null) {
+        _angle += (_animTarget - _angle) * 0.22;
+        if (Math.abs(_animTarget - _angle) < 0.001) {
+          _angle = _animTarget;
+          _animTarget = null;
+          _omega = 0;
+        }
+      } else if (Math.abs(_omega) > 1e-4) {
+        _angle += _omega;
+        _omega *= 0.93;
+      }
+      if (_angle > _maxAngle) { _angle = _maxAngle; if (_omega > 0) _omega = 0; }
+      else if (_angle < -_maxAngle) { _angle = -_maxAngle; if (_omega < 0) _omega = 0; }
       pivot.rotation.y = _angle;
-      if (Math.abs(target - _angle) > 0.001) {
+      const animating = (_animTarget !== null) || (Math.abs(_omega) > 1e-4);
+      if (animating) {
         _anim = requestAnimationFrame(_step);
       } else {
-        _angle = target;
-        pivot.rotation.y = _angle;
         _anim = 0;
       }
     };
-    toggleGuestDoor = (forceOpen) => {
-      _open = (typeof forceOpen === 'boolean') ? forceOpen : !_open;
-      if (_anim) cancelAnimationFrame(_anim);
-      _anim = requestAnimationFrame(_step);
-      return _open;
+    const _kick = () => { if (!_anim) _anim = requestAnimationFrame(_step); };
+    toggleGuestDoor = (forceOpen, swingSign) => {
+      const isOpen = Math.abs(_angle) > 0.05;
+      const open = (typeof forceOpen === 'boolean') ? forceOpen : !isOpen;
+      if (open) {
+        const sign = (swingSign === 1 || swingSign === -1)
+          ? swingSign
+          : (_angle >= 0 ? 1 : -1);
+        _animTarget = sign * _openAngle;
+      } else {
+        _animTarget = 0;
+      }
+      _kick();
+      return open;
+    };
+    // Pivot world X (post-mirror): room.js applies an _isRoom X-mirror, so
+    // the world pivot X is -hingeX. Player on hallway side (worldX >
+    // pivotWorldX) → swingSign=+1 (door swings into office, away from
+    // player). Office side → swingSign=-1.
+    // Pivot world X (post-mirror): room.js applies an _isRoom X-mirror, so
+    // the world pivot X is -hingeX. Player on hallway side (worldX >
+    // pivotWorldX) — swingSign=+1 (door swings into office, away from
+    // player). Office side — swingSign=-1.
+    applyPushGuestDoor = (contactX, contactZ, pushOutX, pushOutZ) => {
+      const fmagSq = pushOutX * pushOutX + pushOutZ * pushOutZ;
+      if (!(fmagSq > 1e-8)) return;
+      _animTarget = null;
+      pivot.updateWorldMatrix(true, false);
+      const px = pivot.matrixWorld.elements[12];
+      const pz = pivot.matrixWorld.elements[14];
+      const leverX = contactX - px;
+      const leverZ = contactZ - pz;
+      const fx = -pushOutX, fz = -pushOutZ;
+      const torque = leverZ * fx - leverX * fz;
+      const t = Math.max(-25, Math.min(25, torque));
+      // Pure angular-impulse — no instant angle kick (snap), with peak
+      // omega clamp so successive contact frames can't spike.
+      _omega += t * 0.018;
+      const MAX_OMEGA = 0.14;
+      if (_omega > MAX_OMEGA) _omega = MAX_OMEGA;
+      else if (_omega < -MAX_OMEGA) _omega = -MAX_OMEGA;
+      _kick();
     };
   }
 
@@ -2232,8 +2346,8 @@ export function createRoom(scene) {
     const monBaseX = deskX + deskD / 2 - 5; // near back of desk (wall side)
 
     // Center monitor (faces -X in pre-mirror → +X in world, toward chair)
-    const monCenter = roomBox(monD, monH, monW, monitorColor,
-      monBaseX, monY, deskZ, 0, 0, 0);
+    const monCenter = _trackRise(roomBox(monD, monH, monW, monitorColor,
+      monBaseX, monY, deskZ, 0, 0, 0));
     monCenter._isOffice = true;
     monCenter.material.roughness = 0.2; monCenter.material.metalness = 0.5;
 
@@ -2241,14 +2355,14 @@ export function createRoom(scene) {
     const monSideX = monBaseX - 8;
     const monSideAngle = 0.6;
     const monSideOff = monW - 2; // Z offset from center
-    const monLeft = roomBox(monD, monH, monW, monitorColor,
-      monSideX, monY, deskZ - monSideOff, 0, monSideAngle, 0);
+    const monLeft = _trackRise(roomBox(monD, monH, monW, monitorColor,
+      monSideX, monY, deskZ - monSideOff, 0, monSideAngle, 0));
     monLeft._isOffice = true;
     monLeft.material.roughness = 0.2; monLeft.material.metalness = 0.5;
 
     // Right monitor (angled inward ~34°, pulled forward toward chair)
-    const monRight = roomBox(monD, monH, monW, monitorColor,
-      monSideX, monY, deskZ + monSideOff, 0, -monSideAngle, 0);
+    const monRight = _trackRise(roomBox(monD, monH, monW, monitorColor,
+      monSideX, monY, deskZ + monSideOff, 0, -monSideAngle, 0));
     monRight._isOffice = true;
     monRight.material.roughness = 0.2; monRight.material.metalness = 0.5;
 
@@ -2256,17 +2370,17 @@ export function createRoom(scene) {
     const armPostY = deskTopY + deskTopH / 2 + monStandH / 2;
     const armX = monBaseX + 1.5; // just behind center monitor
     // Center vertical post (single mount point)
-    roomBox(2, monStandH, 2, metalColor,
-      armX, armPostY, deskZ, 0, 0, 0);
+    _trackRise(roomBox(2, monStandH, 2, metalColor,
+      armX, armPostY, deskZ, 0, 0, 0));
     // Horizontal arm spanning left to right monitor
     const armSpan = monSideOff * 2; // distance between outer monitors
-    roomBox(1.5, 1.5, armSpan, metalColor,
-      armX, deskTopY + deskTopH / 2 + monStandH, deskZ, 0, 0, 0);
+    _trackRise(roomBox(1.5, 1.5, armSpan, metalColor,
+      armX, deskTopY + deskTopH / 2 + monStandH, deskZ, 0, 0, 0));
     // Short forward arms to outer monitors (reach from post to monSideX)
     const armReach = armX - monSideX; // from post to side monitors
     for (const side of [-1, 1]) {
-      roomBox(armReach, 1.5, 1.5, metalColor,
-        monSideX + armReach / 2, deskTopY + deskTopH / 2 + monStandH, deskZ + side * monSideOff, 0, 0, 0);
+      _trackRise(roomBox(armReach, 1.5, 1.5, metalColor,
+        monSideX + armReach / 2, deskTopY + deskTopH / 2 + monStandH, deskZ + side * monSideOff, 0, 0, 0));
     }
 
     // Screen glow (3 emissive planes, offset from monitor face toward chair)
@@ -2323,15 +2437,15 @@ export function createRoom(scene) {
     const pcCenterY = pcBaseY + pcH / 2;
 
     // Main body — light silver aluminum shell
-    const pcBody = roomBox(pcD, pcH, pcW, pcSilver,
-      pcX, pcCenterY, pcZ, 0, 0, 0);
+    const pcBody = _trackRise(roomBox(pcD, pcH, pcW, pcSilver,
+      pcX, pcCenterY, pcZ, 0, 0, 0));
     pcBody._isOffice = true;
     pcBody.material.roughness = 0.28;
     pcBody.material.metalness = 0.75;
 
     // Top panel — dark perforation inset
-    roomBox(pcD - 1, 0.12, pcW - 0.6, pcDark,
-      pcX, pcBaseY + pcH - 0.08, pcZ, 0, 0, 0);
+    _trackRise(roomBox(pcD - 1, 0.12, pcW - 0.6, pcDark,
+      pcX, pcBaseY + pcH - 0.08, pcZ, 0, 0, 0));
 
     // Long side panels — dark vent insets (±Z faces)
     for (const side of [-1, 1]) {
@@ -2355,12 +2469,12 @@ export function createRoom(scene) {
       const frontX = pcX - pcD / 2 + 0.05;
       for (let i = 0; i < slatCount; i++) {
         const sz = pcZ - (pcW - 0.8) / 2 + slatGap * (i + 0.5);
-        roomBox(0.25, pcH - 2, slatW, pcWood,
-          frontX, pcCenterY, sz, 0, 0, 0);
+        _trackRise(roomBox(0.25, pcH - 2, slatW, pcWood,
+          frontX, pcCenterY, sz, 0, 0, 0));
       }
       // Center accent strip
-      roomBox(0.12, pcH - 2.5, 0.35, 0xf0f0f0,
-        frontX - 0.08, pcCenterY, pcZ, 0, 0, 0);
+      _trackRise(roomBox(0.12, pcH - 2.5, 0.35, 0xf0f0f0,
+        frontX - 0.08, pcCenterY, pcZ, 0, 0, 0));
     }
 
     // Back face — dark vent panel (exhaust, faces +X)
@@ -4629,10 +4743,12 @@ export function createRoom(scene) {
     windowIsNight: _windowIsNight,
     leftWallX,
     toggleCornerDoor,
-    isCornerDoorOpen: () => _cornerDoorOpen,
+    applyPushCornerDoor,
+    isCornerDoorOpen: () => Math.abs(_cornerDoorAngle) > 0.05,
     getCornerDoorPanelMesh: () => doorPanel,
     getCornerDoorAngle: () => _cornerDoorAngle,
     toggleGuestDoor: toggleGuestDoor || (() => false),
+    applyPushGuestDoor: applyPushGuestDoor || (() => {}),
     isGuestDoorOpen: _guestDoorOpenState,
     getGuestDoorPanelMesh: () => _guestDoorPanelMesh,
     doorKnobs,
