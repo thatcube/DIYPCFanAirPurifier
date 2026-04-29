@@ -23,7 +23,6 @@ import * as spatial from './modules/spatial.js';
 import * as gameFp from './modules/game-fp.js';
 import * as fireball from './modules/fireball.js';
 import * as kamehameha from './modules/kamehameha.js';
-import * as wallFade from './modules/wall-fade.js';
 import { createRoom } from './modules/room.js';
 import * as purifier from './modules/purifier.js';
 import { createPurifier } from './modules/purifier.js';
@@ -472,9 +471,8 @@ catAnimation.loadGameplayCat({
   }
 });
 
-// ── Particles ───────────────────────────────────────────────────────
-
-particles.init();
+// ── Particles & wall-fade live in the lazy inspector chunk ─────────
+// They're inspector-only effects (game mode skips both). No init here.
 
 // ── Fireball ability ─────────────────────────────────────────────────
 
@@ -494,9 +492,7 @@ kamehameha.init({
 // on a fresh page load, without waiting for fans to be turned off.
 setTimeout(() => { _updateFireballBtnVisibility(); }, 0);
 
-// ── Wall auto-fade ──────────────────────────────────────────────────
-
-wallFade.init(scene, roomRefs);
+// ── Wall auto-fade lives in the lazy inspector chunk ───────────────
 
 // ── Leaderboard + finish dialog ──────────────────────────────────────
 
@@ -1080,7 +1076,8 @@ window._shootFireball = () => {
   catAnimation.triggerCast();
 };
 
-// Placement
+// Placement (inspector-only). Bridge stays here so it works even before
+// the inspector chunk loads — but it's only invoked from inspector UI.
 let _prevPlacement = 'tv';
 window._setPlacement = (mode) => {
   const offsets = spatial.PLACEMENT_OFFSETS[mode] || spatial.PLACEMENT_OFFSETS.floor;
@@ -1530,20 +1527,12 @@ function animate(ts) {
   // Purifier animations (fan spin, explode lerp, filter/drawer/bifold)
   purifierRefs.update(dtSec, animFrameScale, gameFp.fpMode);
 
-  // Particles — skip in game mode for better FPS
-  if (!gameFp.fpMode) {
-    particles.updateSpinSpeed(animFrameScale);
-    particles.update(animFrameScale);
-  }
+  // Particles + wall auto-fade are inspector-only; the inspector chunk
+  // ticks them via _inspectorTick above when active.
 
   // Fireballs
   fireball.update(dtSec);
   kamehameha.update(dtSec);
-
-  // Wall auto-fade (only in orbit mode — FP resets to opaque)
-  if (!gameFp.fpMode) {
-    wallFade.update(camera, controls.target, _flyMode);
-  }
 
   // Shadow throttle — update on dirty flag OR periodically.
   // In FP (game) mode: update EVERY frame. Throttling at 8 Hz while

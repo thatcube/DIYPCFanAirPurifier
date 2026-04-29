@@ -13,8 +13,8 @@ const CHARGE_MIN_SEC = 0.28;
 const CHARGE_FULL_SEC = 1.10;
 const ORB_BASE_RADIUS = 1.6;
 const ORB_MAX_RADIUS = 7.5;
-const ORB_FORWARD = 14;
-const ORB_DOWN = 1.5;
+const ORB_FORWARD = 4;
+const ORB_DOWN = 0;
 
 const BEAM_BASE_LEN = 240;
 const BEAM_MAX_LEN = 620;
@@ -299,13 +299,13 @@ function _ensureBuilt() {
 function _getMuzzlePosition(out) {
   if (_isFpMode() && _catGroup) {
     _catGroup.getWorldPosition(out);
-    out.y += 9;
+    out.y += 5;
   } else {
     out.copy(_camera.position);
   }
   const fwd = _tmpDir;
   _getAimDirection(fwd);
-  out.addScaledVector(fwd, 6);
+  out.addScaledVector(fwd, 3);
   return out;
 }
 

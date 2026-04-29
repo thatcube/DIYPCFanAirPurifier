@@ -273,7 +273,7 @@ export function syncSkateToggleUi() {
 export function setSfxMuted(muted) {
   sfxMuted = !!muted;
   try { localStorage.setItem(SFX_MUTE_KEY, sfxMuted ? '1' : '0'); } catch (e) { }
-  if (sfxMuted) _silenceSkateRoll(true);
+  if (sfxMuted) { _silenceSkateRoll(true); _silenceSsAudio(true); }
   _syncAudioToggleUi();
 }
 
@@ -427,6 +427,102 @@ function _ensureSuperSaiyanAura() {
   _ssHalo.userData.clickPassthrough = true;
   _catGroup.add(_ssHalo);
 
+  // Flame body shell — soft inner glow that fills the gaps between spike
+  // valleys so the silhouette reads as one continuous flame, not a star
+  // floating in space.
+  const bodyMat = new THREE.MeshBasicMaterial({
+    color: 0xffe070,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  _ssFlameBody = new THREE.Mesh(new THREE.SphereGeometry(3.6, 20, 14), bodyMat);
+  _ssFlameBody.position.set(0, 2.5, 0);
+  _ssFlameBody.renderOrder = 999;
+  _ssFlameBody.frustumCulled = false;
+  _ssFlameBody.userData.clickPassthrough = true;
+  _ssFlameBody.scale.set(0.9, 1.25, 0.9);
+  _catGroup.add(_ssFlameBody);
+
+  // Single connected 3D flame silhouette. We start with a subdivided
+  // icosphere (one continuous closed mesh) and displace each vertex outward
+  // by a function that is high near a small set of "spike directions" and
+  // low between them. The result is one volumetric star — looks spiky from
+  // any angle, with all spikes joined through a shared inner shell.
+  _ssSpikesMat = new THREE.MeshBasicMaterial({
+    color: 0xfff080,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+  // Pick spike directions: golden-angle distribution, biased to the upper
+  // hemisphere so flames go up; one tall spike straight up.
+  const SPIKE_COUNT = 16;
+  const SPIKES = [];
+  for (let i = 0; i < SPIKE_COUNT; i++) {
+    const t = (i + 0.5) / SPIKE_COUNT;
+    const phi = Math.acos(1 - 1.4 * t); // 0..~120deg from +Y
+    const theta = i * 2.399963;
+    const dir = new THREE.Vector3(
+      Math.sin(phi) * Math.cos(theta),
+      Math.cos(phi),
+      Math.sin(phi) * Math.sin(theta),
+    ).normalize();
+    const upBias = Math.max(0, dir.y);
+    const len = 5.0 + upBias * 6.5 + Math.random() * 1.5;
+    SPIKES.push({ dir, len });
+  }
+  // Force the tallest spike straight up so the silhouette has a clear peak.
+  SPIKES[0].dir.set(0, 1, 0);
+  SPIKES[0].len = 13.0;
+
+  const flameGeo = new THREE.IcosahedronGeometry(1, 4); // ~640 verts, smooth
+  const posAttrInit = flameGeo.getAttribute('position');
+  const vertCount = posAttrInit.count;
+  const baseDirs = new Float32Array(vertCount * 3);     // unit direction per vertex
+  const baseR = new Float32Array(vertCount);          // per-vertex target radius
+  const tipMask = new Float32Array(vertCount);          // 0..1, 1 = at a spike tip
+  const phases = new Float32Array(vertCount);
+  const VALLEY_R = 3.0;
+  const SPIKE_SHARPNESS = 7.0; // higher = pointier spikes
+  const tmp = new THREE.Vector3();
+  for (let i = 0; i < vertCount; i++) {
+    tmp.fromBufferAttribute(posAttrInit, i).normalize();
+    baseDirs[i * 3] = tmp.x;
+    baseDirs[i * 3 + 1] = tmp.y;
+    baseDirs[i * 3 + 2] = tmp.z;
+    // Find the spike whose direction this vertex is most aligned with.
+    let bestDot = -Infinity;
+    let bestLen = 0;
+    for (const s of SPIKES) {
+      const d = tmp.x * s.dir.x + tmp.y * s.dir.y + tmp.z * s.dir.z;
+      if (d > bestDot) { bestDot = d; bestLen = s.len; }
+    }
+    // Sharp falloff so only verts very close to the spike axis reach the tip;
+    // the rest blend smoothly back to the valley shell, joining all spikes.
+    const sharp = Math.pow(Math.max(0, bestDot), SPIKE_SHARPNESS);
+    tipMask[i] = sharp;
+    baseR[i] = VALLEY_R + sharp * (bestLen - VALLEY_R);
+    phases[i] = Math.random() * Math.PI * 2;
+    posAttrInit.setXYZ(i, tmp.x * baseR[i], tmp.y * baseR[i], tmp.z * baseR[i]);
+  }
+  posAttrInit.needsUpdate = true;
+  flameGeo.computeVertexNormals();
+  _ssSpikes = new THREE.Mesh(flameGeo, _ssSpikesMat);
+  _ssSpikes.position.set(0, 2.5, 0);
+  _ssSpikes.renderOrder = 998;
+  _ssSpikes.frustumCulled = false;
+  _ssSpikes.userData.clickPassthrough = true;
+  _ssSpikes.userData.baseDirs = baseDirs;
+  _ssSpikes.userData.baseR = baseR;
+  _ssSpikes.userData.tipMask = tipMask;
+  _ssSpikes.userData.phases = phases;
+  _ssSpikes.userData.vertCount = vertCount;
+  _catGroup.add(_ssSpikes);
+
   // Gold diamond sparkles — small OctahedronGeometry, distinct from the round
   // blue Sprites used on the skateboard pickup. Orbit the cat during SS.
   const diamondGeo = new THREE.OctahedronGeometry(0.28, 0);
@@ -490,7 +586,7 @@ function _applySuperSaiyan(strength /* 0..1 sustained */, burst /* 0..1 transien
   // Burst additively boosts opacity back to the original "full-blown" look
   // for the first few seconds of activation, then decays back to the dim
   // sustained glow.
-  const auraOpacity = Math.min(1, s * 0.22 + b * 0.55) * flicker;
+  const auraOpacity = Math.min(1, s * 0.14 + b * 0.36) * flicker;
   _ssAura.material.opacity = auraOpacity;
   _ssAura.visible = auraOpacity > 0.005;
   const pulse = 1 + 0.08 * Math.sin(ts * 0.02);
@@ -499,10 +595,77 @@ function _applySuperSaiyan(strength /* 0..1 sustained */, burst /* 0..1 transien
   _ssAura.scale.setScalar(baseScale * pulse);
 
   if (_ssHalo) {
-    const haloOpacity = Math.min(1, s * 0.13 + b * 0.4) * flicker;
+    const haloOpacity = Math.min(1, s * 0.08 + b * 0.26) * flicker;
     _ssHalo.material.opacity = haloOpacity;
     _ssHalo.visible = haloOpacity > 0.005;
     _ssHalo.scale.setScalar(baseScale * (1.05 + 0.06 * Math.sin(ts * 0.018)));
+  }
+
+  // Flame spikes — drive shared opacity, then per-spike length flicker so
+  // tips dance like the show's aura instead of sitting static.
+  // Gate body+spikes on active SS only — no pre-activation flame hint.
+  const ssActive = isSuperSaiyanActive();
+  if (_ssFlameBody) {
+    // Body matches spike opacity so the rim reads as one continuous flame.
+    const bodyOpacity = ssActive
+      ? Math.min(1, b * 0.36) * flicker
+      : 0;
+    _ssFlameBody.material.opacity = bodyOpacity;
+    _ssFlameBody.visible = bodyOpacity > 0.005;
+    // During sustain, shrink overall and squash to be wider/shorter; the
+    // burst flash temporarily restores the taller original silhouette.
+    const sustain = 1 - b;
+    const bodyOverall = baseScale * (1 - sustain * 0.35);
+    const bodyWide = 1 + sustain * 0.45;
+    const bodyShort = 1 - sustain * 0.40;
+    _ssFlameBody.scale.set(
+      bodyOverall * 0.85 * bodyWide,
+      bodyOverall * (1.15 + 0.05 * Math.sin(ts * 0.014)) * bodyShort,
+      bodyOverall * 0.85 * bodyWide,
+    );
+  }
+  if (_ssSpikes && _ssSpikesMat) {
+    const spikeOpacity = ssActive
+      ? Math.min(1, b * 0.55) * flicker
+      : 0;
+    _ssSpikesMat.opacity = spikeOpacity;
+    _ssSpikes.visible = spikeOpacity > 0.005;
+    const breathe = 0.92 + 0.12 * Math.sin(ts * 0.012);
+    const sustain = 1 - b;
+    const spikeOverall = baseScale * (1 - sustain * 0.35);
+    const spikeWide = 1 + sustain * 0.45;
+    const spikeShort = 1 - sustain * 0.40;
+    _ssSpikes.scale.set(
+      spikeOverall * breathe * spikeWide,
+      spikeOverall * breathe * spikeShort,
+      spikeOverall * breathe * spikeWide,
+    );
+
+    // Volumetric flicker — wobble each vertex along its own outward direction
+    // so spike tips dance while the inner shell stays roughly stable. Tip
+    // verts (high tipMask) wobble more than valley verts.
+    const u = _ssSpikes.userData;
+    const baseDirs = u.baseDirs;
+    const baseR = u.baseR;
+    const tipMask = u.tipMask;
+    const phases = u.phases;
+    const vc = u.vertCount;
+    const posAttr = _ssSpikes.geometry.getAttribute('position');
+    const tt = ts * 0.005;
+    const tipBoost = 1 + b * 0.35;
+    for (let i = 0; i < vc; i++) {
+      const tm = tipMask[i];
+      const wob = 1
+        + tm * (0.20 * Math.sin(tt * 1.4 + phases[i])
+          + 0.10 * Math.sin(tt * 2.7 + phases[i] * 1.7))
+        + (1 - tm) * 0.04 * Math.sin(tt * 0.9 + phases[i]);
+      const r = baseR[i] * wob * (1 + (tipBoost - 1) * tm);
+      const dx = baseDirs[i * 3];
+      const dy = baseDirs[i * 3 + 1];
+      const dz = baseDirs[i * 3 + 2];
+      posAttr.setXYZ(i, dx * r, dy * r, dz * r);
+    }
+    posAttr.needsUpdate = true;
   }
 
   // Walk meshes once and patch emissive. Cache originals so we can restore
@@ -511,7 +674,9 @@ function _applySuperSaiyan(strength /* 0..1 sustained */, burst /* 0..1 transien
   const wantOverride = total > 0.005;
   _catGroup.traverse((obj) => {
     if (!obj.isMesh || !obj.material) return;
-    if (obj === _ssAura || obj === _ssHalo || (_ssSparkles && _ssSparkles.includes(obj))) return;
+    if (obj === _ssAura || obj === _ssHalo || obj === _ssFlameBody
+      || obj === _ssSpikes
+      || (_ssSparkles && _ssSparkles.includes(obj))) return;
     const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
     for (const m of mats) {
       if (!m || !('emissive' in m)) continue;
@@ -527,7 +692,7 @@ function _applySuperSaiyan(strength /* 0..1 sustained */, burst /* 0..1 transien
         // Blend original emissive toward gold based on strength + burst.
         const goldMix = Math.min(1, s * 0.5 + b * 0.5);
         m.emissive.copy(entry.emissive).lerp(_ssGoldHot, goldMix);
-        m.emissiveIntensity = entry.intensity + (s * 0.55 + b * 0.95) * flicker;
+        m.emissiveIntensity = entry.intensity + (s * 0.32 + b * 0.55) * flicker;
       } else {
         m.emissive.copy(entry.emissive);
         m.emissiveIntensity = entry.intensity;
@@ -557,7 +722,7 @@ function _applySuperSaiyan(strength /* 0..1 sustained */, burst /* 0..1 transien
       sp.rotation.y = tSec * sp._rotSpeed * 0.7 + sp._phase;
       // Opacity fades in/out with twinkle
       const twinkle = 0.4 + 0.6 * Math.abs(Math.sin(tSec * 4.5 + sp._phase * 3));
-      sp.material.opacity = Math.min(1, (s * 0.7 + b * 0.9)) * twinkle * flicker;
+      sp.material.opacity = Math.min(1, (s * 0.45 + b * 0.6)) * twinkle * flicker;
       // Scale pulses slightly
       const sc = sp._baseScale * (0.7 + 0.3 * Math.sin(tSec * 3 + sp._phase * 2));
       sp.scale.setScalar(sc * (1 + b * 0.5));
@@ -576,7 +741,7 @@ function _applySuperSaiyanEnvLight(anchor, strength /* 0..1 */, burst /* 0..1 */
   // Subtle during pre-glow, clearly visible during active + burst.
   let targetI = 0;
   if (total > 0.001) {
-    targetI = 10 + s * 46 + b * 70;
+    targetI = 6 + s * 28 + b * 44;
     targetI *= 0.9 + 0.1 * Math.sin(ts * 0.041);
   }
   const lerpK = 1 - Math.exp(-Math.max(0, dtSec) * 14);
@@ -1032,6 +1197,186 @@ function _silenceSkateRoll(immediate = false) {
   _skateRollGain.gain.cancelScheduledValues(now);
   if (immediate) _skateRollGain.gain.setValueAtTime(0, now);
   else _skateRollGain.gain.setTargetAtTime(0, now, 0.03);
+}
+
+// ── Super Saiyan audio ────────────────────────────────────────────
+// Three layers, all driven from the SS update block in updatePhysics:
+//   1. Charge-up hum   — rises in pitch + volume while holding past full
+//                        charge, silent otherwise.
+//   2. Activation burst — one-shot swoop + boom + sparkle when SS triggers.
+//   3. Ambient pulse    — low sustained drone with slow LFO-driven gain
+//                        wobble while SS mode is active.
+let _ssChargeOsc = null, _ssChargeOsc2 = null, _ssChargeGain = null, _ssChargeFilter = null;
+let _ssAmbientOsc = null, _ssAmbientOsc2 = null, _ssAmbientGain = null;
+let _ssAmbientLfo = null, _ssAmbientLfoGain = null;
+
+function _ensureSsChargeAudio() {
+  if (_ssChargeOsc && _ssChargeGain) return _bonkAC;
+  const ac = _ensureSfxAudioCtx();
+  if (!ac) return null;
+  // Two low oscillators feeding a lowpass filter — the filter cutoff opens
+  // up as the charge progresses, which gives the rising "energy" feel
+  // without ever getting shrill.
+  const o1 = ac.createOscillator(); o1.type = 'sine'; o1.frequency.value = 55;
+  const o2 = ac.createOscillator(); o2.type = 'triangle'; o2.frequency.value = 82;
+  o2.detune.value = -7;
+  const filt = ac.createBiquadFilter();
+  filt.type = 'lowpass';
+  filt.frequency.value = 220;
+  filt.Q.value = 0.6;
+  const g = ac.createGain(); g.gain.value = 0;
+  o1.connect(filt); o2.connect(filt); filt.connect(g); g.connect(ac.destination);
+  o1.start(); o2.start();
+  _ssChargeOsc = o1; _ssChargeOsc2 = o2; _ssChargeGain = g;
+  _ssChargeFilter = filt;
+  return ac;
+}
+
+// progress: 0..1 across the entire post-full-charge window (MEGA + SS hold).
+function _setSsChargeTarget(progress) {
+  const want = !sfxMuted && progress > 0.001;
+  if (!want) {
+    if (_ssChargeGain && _bonkAC) {
+      const now = _bonkAC.currentTime;
+      _ssChargeGain.gain.cancelScheduledValues(now);
+      _ssChargeGain.gain.setTargetAtTime(0, now, 0.04);
+    }
+    return;
+  }
+  const ac = _ensureSsChargeAudio();
+  if (!ac || !_ssChargeGain) return;
+  const now = ac.currentTime;
+  const p = Math.min(1, Math.max(0, progress));
+  const targetGain = 0.008 + Math.pow(p, 1.4) * 0.06;
+  // Keep the fundamental low — only nudge it up a little so it doesn't
+  // get whistly. The body of the rise comes from filter cutoff opening.
+  const f1 = 55 + p * 35;     //  55 →  90 Hz
+  const f2 = 82 + p * 50;     //  82 → 132 Hz
+  const cutoff = 200 + Math.pow(p, 1.2) * 700; // 200 → ~900 Hz
+  _ssChargeGain.gain.cancelScheduledValues(now);
+  _ssChargeGain.gain.setTargetAtTime(targetGain, now, 0.05);
+  _ssChargeOsc.frequency.cancelScheduledValues(now);
+  _ssChargeOsc.frequency.setTargetAtTime(f1, now, 0.08);
+  _ssChargeOsc2.frequency.cancelScheduledValues(now);
+  _ssChargeOsc2.frequency.setTargetAtTime(f2, now, 0.08);
+  if (_ssChargeFilter) {
+    _ssChargeFilter.frequency.cancelScheduledValues(now);
+    _ssChargeFilter.frequency.setTargetAtTime(cutoff, now, 0.08);
+  }
+}
+
+function _silenceSsCharge(immediate = false) {
+  if (!_ssChargeGain || !_bonkAC) return;
+  const now = _bonkAC.currentTime;
+  _ssChargeGain.gain.cancelScheduledValues(now);
+  if (immediate) _ssChargeGain.gain.setValueAtTime(0, now);
+  else _ssChargeGain.gain.setTargetAtTime(0, now, 0.04);
+}
+
+let _ssBurstBuffer = null;
+let _ssBurstLoading = false;
+const SS_BURST_URL = 'assets/Super Saiyan Transformation Sound Effect.mp3';
+// Lead-time before SS activation when the transformation sample starts
+// playing. The sample's climax should align with the visual pop, not lag
+// behind it — most "transformation" SFX have a windup before the boom.
+const SS_BURST_LEAD_MS = 430;
+let _ssBurstFiredForCurrentHold = false;
+
+function _loadSsBurstBuffer() {
+  if (_ssBurstBuffer || _ssBurstLoading) return;
+  const ac = _ensureSfxAudioCtx();
+  if (!ac) return;
+  _ssBurstLoading = true;
+  fetch(SS_BURST_URL)
+    .then((r) => r.ok ? r.arrayBuffer() : Promise.reject(new Error('ss burst fetch failed')))
+    .then((buf) => new Promise((res, rej) => ac.decodeAudioData(buf, res, rej)))
+    .then((decoded) => { _ssBurstBuffer = decoded; })
+    .catch(() => { /* fall back to synth burst */ })
+    .finally(() => { _ssBurstLoading = false; });
+}
+
+function _playSuperSaiyanBurst() {
+  const ac = _ensureSfxAudioCtx();
+  if (!ac || sfxMuted) return;
+
+  // Prefer the real transformation sample. Kick off the load lazily on
+  // first call so we don't fetch audio before the player ever needs it.
+  if (!_ssBurstBuffer && !_ssBurstLoading) _loadSsBurstBuffer();
+
+  if (_ssBurstBuffer) {
+    const src = ac.createBufferSource();
+    src.buffer = _ssBurstBuffer;
+    const g = ac.createGain();
+    g.gain.value = 0.1;
+    src.connect(g).connect(ac.destination);
+    src.start(ac.currentTime);
+    return;
+  }
+
+  // Fallback synth burst (used until the sample finishes loading).
+  const now = ac.currentTime;
+  _playTone({ freq: 220, endFreq: 110, dur: 0.5, gain: 0.05, type: 'sine' });
+}
+
+function _ensureSsAmbientAudio() {
+  if (_ssAmbientOsc && _ssAmbientGain) return _bonkAC;
+  const ac = _ensureSfxAudioCtx();
+  if (!ac) return null;
+  const o1 = ac.createOscillator(); o1.type = 'sine'; o1.frequency.value = 60;
+  const o2 = ac.createOscillator(); o2.type = 'sine'; o2.frequency.value = 90;
+  o2.detune.value = 7;
+  const g = ac.createGain(); g.gain.value = 0;
+  // LFO modulates the master gain for a slow energy pulse.
+  const lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 1.6;
+  const lfoGain = ac.createGain(); lfoGain.gain.value = 0;
+  o1.connect(g); o2.connect(g);
+  lfo.connect(lfoGain);
+  lfoGain.connect(g.gain);
+  g.connect(ac.destination);
+  o1.start(); o2.start(); lfo.start();
+  _ssAmbientOsc = o1; _ssAmbientOsc2 = o2; _ssAmbientGain = g;
+  _ssAmbientLfo = lfo; _ssAmbientLfoGain = lfoGain;
+  return ac;
+}
+
+function _setSsAmbientTarget(active) {
+  const want = !!active && !sfxMuted;
+  if (!want) {
+    if (_ssAmbientGain && _bonkAC) {
+      const now = _bonkAC.currentTime;
+      _ssAmbientGain.gain.cancelScheduledValues(now);
+      _ssAmbientGain.gain.setTargetAtTime(0, now, 0.25);
+    }
+    if (_ssAmbientLfoGain && _bonkAC) {
+      const now = _bonkAC.currentTime;
+      _ssAmbientLfoGain.gain.cancelScheduledValues(now);
+      _ssAmbientLfoGain.gain.setTargetAtTime(0, now, 0.25);
+    }
+    return;
+  }
+  const ac = _ensureSsAmbientAudio();
+  if (!ac || !_ssAmbientGain) return;
+  const now = ac.currentTime;
+  _ssAmbientGain.gain.cancelScheduledValues(now);
+  _ssAmbientGain.gain.setTargetAtTime(0.022, now, 0.4);
+  _ssAmbientLfoGain.gain.cancelScheduledValues(now);
+  _ssAmbientLfoGain.gain.setTargetAtTime(0.014, now, 0.5);
+}
+
+function _silenceSsAudio(immediate = false) {
+  _silenceSsCharge(immediate);
+  if (_ssAmbientGain && _bonkAC) {
+    const now = _bonkAC.currentTime;
+    _ssAmbientGain.gain.cancelScheduledValues(now);
+    if (immediate) _ssAmbientGain.gain.setValueAtTime(0, now);
+    else _ssAmbientGain.gain.setTargetAtTime(0, now, 0.1);
+  }
+  if (_ssAmbientLfoGain && _bonkAC) {
+    const now = _bonkAC.currentTime;
+    _ssAmbientLfoGain.gain.cancelScheduledValues(now);
+    if (immediate) _ssAmbientLfoGain.gain.setValueAtTime(0, now);
+    else _ssAmbientLfoGain.gain.setTargetAtTime(0, now, 0.1);
+  }
 }
 
 function _ensureSkateboardAnchor() {
@@ -1495,6 +1840,7 @@ export function init(refs) {
 export function prewarmSuperSaiyan() {
   _ensureSuperSaiyanAura();
   _ensureSuperSaiyanEnvLight();
+  _loadSsBurstBuffer();
 }
 
 function _clearPointerLockRetry() {
@@ -2754,11 +3100,13 @@ function _respawn() {
   _ssBurstStartTs = 0;
   _ssHudFlashUntilTs = 0;
   _ssChargeShake = 0;
+  _ssBurstFiredForCurrentHold = false;
   _skateLean = 0;
   _trickManual = 0; _trickManualHeld = false;
   _trickKickflip = 0; _trickKickflipActive = false;
   _trickSpinAngle = 0; _trickSpinSpeed = 0; _trickSpinBoost = false;
   _silenceSkateRoll(true);
+  _silenceSsAudio(true);
   _ssShakeOffset.set(0, 0, 0);
   _setSuperSaiyanEnvLightOff();
 }
@@ -2825,6 +3173,7 @@ export function setPaused(paused) {
     fpLookDY = 0;
     _lastPhysicsTs = 0;
     _silenceSkateRoll(true);
+    _silenceSsAudio();
 
     // Show pause overlay (unless finish is showing)
     if (overlay && !finishOpen) {
@@ -3140,33 +3489,60 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     : 0;
   const isMega = megaPct >= 1;
 
+  // Bar phases differ based on whether Super Saiyan is already active:
+  //   Normal:  0–75% normal jump → 75–90% MEGA → 90–100% Super Saiyan
+  //   SS active: 0–80% normal jump → 80–100% MEGA (SS phase is gone — you're
+  //              already in it, and you can't re-trigger while active)
+  const ssActive = isSuperSaiyanActive();
+  const ssHoldMs = (_ssFullChargeSinceTs > 0 && onGround) ? Math.max(0, ts - _ssFullChargeSinceTs) : 0;
+  const megaCompleteMs = (MEGA_HOLD_FRAMES / 60) * 1000;
+  const ssBarProgress = (isMega && !ssActive)
+    ? Math.min(1, Math.max(0, (ssHoldMs - megaCompleteMs) / Math.max(1, SS_HOLD_MS - megaCompleteMs)))
+    : 0;
+  let displayPct;
+  if (ssActive) {
+    if (isMega) displayPct = 80 + megaPct * 20;
+    else displayPct = chargePct * 80;
+  } else if (isMega) {
+    displayPct = 90 + ssBarProgress * 10;
+  } else if (chargePct >= 1) {
+    displayPct = 75 + megaPct * 15;
+  } else {
+    displayPct = chargePct * 75;
+  }
+
   if (_cachedCbFill) {
-    // Show charge % normally, or overfill to represent MEGA
-    const displayPct = isMega ? 100 : Math.round(chargePct * 100);
     _cachedCbFill.style.width = `${displayPct}%`;
   }
   if (_cachedCbBar) {
-    _cachedCbBar.classList.toggle('charging', chargePct > 0);
+    const charging = chargePct > 0 || isMega;
+    _cachedCbBar.classList.toggle('charging', charging);
     _cachedCbBar.classList.toggle('charged', chargePct >= 0.95);
-    _cachedCbBar.classList.toggle('tier-1', chargePct > 0 && chargePct <= 0.99 && !isMega);
-    _cachedCbBar.classList.toggle('tier-2', chargePct >= 0.99 && !isMega);
+    _cachedCbBar.classList.toggle('tier-1', chargePct > 0 && chargePct < 1 && !isMega);
+    _cachedCbBar.classList.toggle('tier-2', chargePct >= 1 && !isMega);
     _cachedCbBar.classList.toggle('tier-3', isMega);
-    _cachedCbBar.classList.toggle('at-gate', chargePct >= 0.99 && !isMega);
+    // 'at-gate' label pulse only makes sense when there's a next tier to
+    // unlock by holding longer. While SS is active, MEGA is the top tier
+    // and there's no further hold benefit — so don't pulse there.
+    _cachedCbBar.classList.toggle('at-gate', chargePct >= 1 && !isMega && !ssActive);
   }
   if (_cachedCbLabel) {
-    if (isMega) {
-      _cachedCbLabel.textContent = 'MEGA JUMP!';
-    } else if (chargePct >= 0.99) {
+    if (ssActive) {
+      // SS already active — only the two normal tiers remain.
+      if (isMega) _cachedCbLabel.textContent = 'MEGA JUMP!';
+      else _cachedCbLabel.textContent = 'Jump charge';
+    } else if (isMega) {
+      _cachedCbLabel.textContent = 'HOLD for SUPER SAIYAN!';
+    } else if (chargePct >= 1) {
       _cachedCbLabel.textContent = 'HOLD for MEGA!';
-    } else if (chargePct > 0) {
-      _cachedCbLabel.textContent = 'Jump charge';
     } else {
       _cachedCbLabel.textContent = 'Jump charge';
     }
   }
   if (_cachedCbValue) {
+    const isCharging = chargePct > 0 || isMega;
     _cachedCbValue.textContent = onGround
-      ? (chargePct > 0 ? `${Math.round(chargePct * 100)}%` : 'Ready')
+      ? (isCharging ? `${Math.round(displayPct)}%` : 'Ready')
       : 'Air';
   }
 
@@ -3206,6 +3582,15 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
         const k = Math.min(1, (heldMs - SS_CHARGE_HINT_MS) / Math.max(1, SS_HOLD_MS - SS_CHARGE_HINT_MS));
         chargingStrength = k * 0.4;
       }
+      // Pre-fire the transformation sample so its climax aligns with the
+      // visual pop instead of trailing it. Guarded by a per-hold flag so
+      // we only play it once per activation attempt.
+      if (!isSuperSaiyanActive() && !_ssBurstFiredForCurrentHold
+        && heldMs >= (SS_HOLD_MS - SS_BURST_LEAD_MS)) {
+        _silenceSsCharge();
+        _playSuperSaiyanBurst();
+        _ssBurstFiredForCurrentHold = true;
+      }
       // Promote to active once the 5s hold completes (only if not already
       // active — don't restart during the 20s window).
       if (!isSuperSaiyanActive() && heldMs >= SS_HOLD_MS) {
@@ -3213,9 +3598,22 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
         _ssBurstStartTs = ts;
         _ssHudFlashUntilTs = ts + SS_HUD_ENTER_FLASH_MS;
         _ssFullChargeSinceTs = 0;
-        // Consume the hold so we don't immediately fire a MEGA jump on release.
+        // Fire a fully-charged MEGA jump with the SS multiplier baked in.
+        // SS_JUMP_MUL was sampled at frame start when SS wasn't active yet,
+        // so apply 1.5x explicitly here.
+        if (canJump) {
+          fpVy = (JUMP_BASE_VY + JUMP_MAX_BONUS + JUMP_MEGA_BONUS) * 1.5;
+          _playJumpCue(1.5);
+          _isJumping = true;
+          _coyoteFrames = 0;
+          firedThisFrame = true;
+        }
+        // Consume the hold so we don't immediately fire a second MEGA jump on release.
         _spaceHeld = 0; _tierGateHeld = 0;
         _jumpBufferFrames = 0;
+        // Burst sample was pre-fired SS_BURST_LEAD_MS ago so its climax
+        // lands here. Just make sure the charge hum is silenced.
+        _silenceSsCharge();
         // Going Super Saiyan unlocks Bababooey. Fire a second toast the
         // first time it happens so the player knows there's a new cat
         // waiting in Choose Your Cat.
@@ -3226,6 +3624,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       }
     } else {
       _ssFullChargeSinceTs = 0;
+      _ssBurstFiredForCurrentHold = false;
     }
 
     const active = isSuperSaiyanActive();
@@ -3250,6 +3649,15 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     _applySuperSaiyan(baseStrength, burst, ts);
     _ssEnvAnchor.set(fpPos.x, fpPos.y - EYE_H + 4.0, fpPos.z);
     _applySuperSaiyanEnvLight(_ssEnvAnchor, baseStrength, burst, ts, dtSec);
+
+    // Audio targets: charge hum tracks the post-full hold (silent once SS
+    // activates — the burst takes over); ambient pulse runs the whole SS
+    // window then fades out.
+    const chargeAudioP = (!active && atFullCharge)
+      ? Math.min(1, (ts - (_ssFullChargeSinceTs || ts)) / SS_HOLD_MS)
+      : 0;
+    _setSsChargeTarget(chargeAudioP);
+    _setSsAmbientTarget(active);
   }
 
   // ── Gravity (asymmetric: fall faster than rise) ───────────────────

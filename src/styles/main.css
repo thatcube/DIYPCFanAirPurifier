@@ -1788,6 +1788,16 @@ input[type=range]::-moz-range-thumb {
   left: 90%;
 }
 
+/* When already Super Saiyan, only two phases remain (normal → MEGA);
+   collapse the markers to a single tick at the 80% boundary. */
+#fpChargeBar.ss-active .fp-charge-track::before {
+  left: 80%;
+}
+
+#fpChargeBar.ss-active .fp-charge-track::after {
+  display: none;
+}
+
 #fpChargeFill {
   width: 0%;
   height: 100%;
@@ -2338,6 +2348,40 @@ line-height: 1;
 .pause-btn--secondary {
   padding: 13px 16px;
   font-size: 13px;
+}
+
+/* Small inline text link tucked next to the "Paused" heading. Used for
+   secondary entry points (e.g. Inspect air purifier) that we want
+   reachable but visually de-prioritized. */
+.pause-action-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pause-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: rgba(220, 240, 255, 0.45);
+  font-size: 11px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: underline;
+  text-decoration-color: rgba(220, 240, 255, 0.2);
+  text-underline-offset: 2px;
+}
+.pause-link:hover {
+  color: rgba(220, 240, 255, 0.85);
+  text-decoration-color: rgba(220, 240, 255, 0.5);
+}
+.pause-link--footer {
+  margin-top: 10px;
+  font-size: 10px;
+  color: rgba(220, 240, 255, 0.35);
 }
 
 .pause-sub {
@@ -4071,83 +4115,310 @@ input[type=range]:focus-visible {
 /* Each bolt gets its own irregular flicker pattern. Different cycle
    lengths + different on-times make the whole thing feel chaotic. */
 @keyframes hudBoltA {
-  0%, 11% { opacity: 0; }
-  12%, 16% { opacity: 1; }
-  17%, 38% { opacity: 0; }
-  39%, 41% { opacity: 0.85; }
-  42%, 73% { opacity: 0; }
-  74%, 77% { opacity: 0.95; }
-  78%, 100% { opacity: 0; }
+
+  0%,
+  11% {
+    opacity: 0;
+  }
+
+  12%,
+  16% {
+    opacity: 1;
+  }
+
+  17%,
+  38% {
+    opacity: 0;
+  }
+
+  39%,
+  41% {
+    opacity: 0.85;
+  }
+
+  42%,
+  73% {
+    opacity: 0;
+  }
+
+  74%,
+  77% {
+    opacity: 0.95;
+  }
+
+  78%,
+  100% {
+    opacity: 0;
+  }
 }
 
 @keyframes hudBoltB {
-  0%, 24% { opacity: 0; }
-  25%, 27% { opacity: 1; }
-  28%, 55% { opacity: 0; }
-  56%, 59% { opacity: 0.9; }
-  60%, 100% { opacity: 0; }
+
+  0%,
+  24% {
+    opacity: 0;
+  }
+
+  25%,
+  27% {
+    opacity: 1;
+  }
+
+  28%,
+  55% {
+    opacity: 0;
+  }
+
+  56%,
+  59% {
+    opacity: 0.9;
+  }
+
+  60%,
+  100% {
+    opacity: 0;
+  }
 }
 
 @keyframes hudBoltC {
-  0%, 7% { opacity: 0; }
-  8%, 13% { opacity: 1; }
-  14%, 47% { opacity: 0; }
-  48%, 51% { opacity: 0.8; }
-  52%, 82% { opacity: 0; }
-  83%, 86% { opacity: 1; }
-  87%, 100% { opacity: 0; }
+
+  0%,
+  7% {
+    opacity: 0;
+  }
+
+  8%,
+  13% {
+    opacity: 1;
+  }
+
+  14%,
+  47% {
+    opacity: 0;
+  }
+
+  48%,
+  51% {
+    opacity: 0.8;
+  }
+
+  52%,
+  82% {
+    opacity: 0;
+  }
+
+  83%,
+  86% {
+    opacity: 1;
+  }
+
+  87%,
+  100% {
+    opacity: 0;
+  }
 }
 
 @keyframes hudBoltD {
-  0%, 18% { opacity: 0; }
-  19%, 22% { opacity: 0.95; }
-  23%, 64% { opacity: 0; }
-  65%, 68% { opacity: 0.85; }
-  69%, 91% { opacity: 0; }
-  92%, 95% { opacity: 1; }
-  96%, 100% { opacity: 0; }
+
+  0%,
+  18% {
+    opacity: 0;
+  }
+
+  19%,
+  22% {
+    opacity: 0.95;
+  }
+
+  23%,
+  64% {
+    opacity: 0;
+  }
+
+  65%,
+  68% {
+    opacity: 0.85;
+  }
+
+  69%,
+  91% {
+    opacity: 0;
+  }
+
+  92%,
+  95% {
+    opacity: 1;
+  }
+
+  96%,
+  100% {
+    opacity: 0;
+  }
 }
 
 @keyframes hudBoltE {
-  0%, 33% { opacity: 0; }
-  34%, 37% { opacity: 1; }
-  38%, 70% { opacity: 0; }
-  71%, 74% { opacity: 0.9; }
-  75%, 100% { opacity: 0; }
+
+  0%,
+  33% {
+    opacity: 0;
+  }
+
+  34%,
+  37% {
+    opacity: 1;
+  }
+
+  38%,
+  70% {
+    opacity: 0;
+  }
+
+  71%,
+  74% {
+    opacity: 0.9;
+  }
+
+  75%,
+  100% {
+    opacity: 0;
+  }
 }
 
 @keyframes hudBoltF {
-  0%, 4% { opacity: 0; }
-  5%, 9% { opacity: 0.85; }
-  10%, 42% { opacity: 0; }
-  43%, 46% { opacity: 1; }
-  47%, 79% { opacity: 0; }
-  80%, 83% { opacity: 0.9; }
-  84%, 100% { opacity: 0; }
+
+  0%,
+  4% {
+    opacity: 0;
+  }
+
+  5%,
+  9% {
+    opacity: 0.85;
+  }
+
+  10%,
+  42% {
+    opacity: 0;
+  }
+
+  43%,
+  46% {
+    opacity: 1;
+  }
+
+  47%,
+  79% {
+    opacity: 0;
+  }
+
+  80%,
+  83% {
+    opacity: 0.9;
+  }
+
+  84%,
+  100% {
+    opacity: 0;
+  }
 }
 
 @keyframes hudSparkA {
-  0%, 28% { opacity: 0; transform: scale(0.6); }
-  29%, 33% { opacity: 1; transform: scale(1.3); }
-  34%, 67% { opacity: 0; transform: scale(0.8); }
-  68%, 71% { opacity: 0.85; transform: scale(1.1); }
-  72%, 100% { opacity: 0; transform: scale(0.6); }
+
+  0%,
+  28% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+
+  29%,
+  33% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
+
+  34%,
+  67% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+
+  68%,
+  71% {
+    opacity: 0.85;
+    transform: scale(1.1);
+  }
+
+  72%,
+  100% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
 }
 
 @keyframes hudSparkB {
-  0%, 41% { opacity: 0; transform: scale(0.5); }
-  42%, 46% { opacity: 1; transform: scale(1.4); }
-  47%, 88% { opacity: 0; transform: scale(0.7); }
-  89%, 92% { opacity: 0.9; transform: scale(1.2); }
-  93%, 100% { opacity: 0; transform: scale(0.6); }
+
+  0%,
+  41% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+
+  42%,
+  46% {
+    opacity: 1;
+    transform: scale(1.4);
+  }
+
+  47%,
+  88% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+
+  89%,
+  92% {
+    opacity: 0.9;
+    transform: scale(1.2);
+  }
+
+  93%,
+  100% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
 }
 
 @keyframes hudSparkC {
-  0%, 14% { opacity: 0; transform: scale(0.6); }
-  15%, 19% { opacity: 0.95; transform: scale(1.25); }
-  20%, 56% { opacity: 0; transform: scale(0.7); }
-  57%, 60% { opacity: 1; transform: scale(1.35); }
-  61%, 100% { opacity: 0; transform: scale(0.6); }
+
+  0%,
+  14% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+
+  15%,
+  19% {
+    opacity: 0.95;
+    transform: scale(1.25);
+  }
+
+  20%,
+  56% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+
+  57%,
+  60% {
+    opacity: 1;
+    transform: scale(1.35);
+  }
+
+  61%,
+  100% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
 }
 
 /* Subtle whole-bar gold shimmer on top of the existing SS glow. */
@@ -4167,11 +4438,39 @@ input[type=range]:focus-visible {
 }
 
 @keyframes hudCrackle {
-  0%, 19% { opacity: 0; }
-  20%, 23% { opacity: 1; }
-  24%, 47% { opacity: 0; }
-  48%, 50% { opacity: 0.7; }
-  51%, 81% { opacity: 0; }
-  82%, 85% { opacity: 0.9; }
-  86%, 100% { opacity: 0; }
+
+  0%,
+  19% {
+    opacity: 0;
+  }
+
+  20%,
+  23% {
+    opacity: 1;
+  }
+
+  24%,
+  47% {
+    opacity: 0;
+  }
+
+  48%,
+  50% {
+    opacity: 0.7;
+  }
+
+  51%,
+  81% {
+    opacity: 0;
+  }
+
+  82%,
+  85% {
+    opacity: 0.9;
+  }
+
+  86%,
+  100% {
+    opacity: 0;
+  }
 }
