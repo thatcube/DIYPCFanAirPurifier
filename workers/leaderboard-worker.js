@@ -60,6 +60,10 @@ const DEFAULTS = {
   MIN_COIN_INTERVAL_MS: 120,
   COIN_COUNT: 15,
   SPEED_EXTRA_COIN_COUNT: 12,
+  // Threshold for the "100% / all secret coins" virtual leaderboard
+  // tab. Any run with secret_coins >= ALL_SECRETS_GOAL qualifies for
+  // that view. Matches TOTAL_SECRETS in src/modules/constants.js.
+  ALL_SECRETS_GOAL: 10,
 };
 
 const VALID_MODES = ['normal', 'speed'];
@@ -242,6 +246,7 @@ function getConfig(env) {
     COIN_SET: coinSetByMode.normal,
     COIN_IDS_BY_MODE: coinIdsByMode,
     COIN_SET_BY_MODE: coinSetByMode,
+    ALL_SECRETS_GOAL: readNum(env, 'ALL_SECRETS_GOAL', DEFAULTS.ALL_SECRETS_GOAL),
   };
 }
 
@@ -252,16 +257,25 @@ async function handleGetLeaderboard(request, env, cfg) {
   if (!allowed) return apiError(429, 'rate_limited', 'Too many requests');
 
   const url = new URL(request.url);
-  const mode = sanitizeMode(url.searchParams.get('mode'));
-  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg, { mode });
+  // "100% / all secret coins" virtual view. When set, we don't filter
+  // by mode — any run (normal or speed) where the player found every
+  // secret coin qualifies, ranked together by time.
+  const onlyAllSecrets = url.searchParams.get('onlyAllSecrets') === '1';
+  const mode = onlyAllSecrets ? null : sanitizeMode(url.searchParams.get('mode'));
+  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg, {
+    mode,
+    onlyAllSecrets,
+  });
   return jsonResponse(200, {
     ok: true,
     shared: true,
     mode,
+    onlyAllSecrets,
+    allSecretsGoal: cfg.ALL_SECRETS_GOAL,
     leaderboard,
     maxEntries: cfg.LB_MAX,
     perPlayer: cfg.LB_PER_PLAYER,
-    requiredCoinCount: cfg.COIN_IDS_BY_MODE[mode].length,
+    requiredCoinCount: onlyAllSecrets ? null : cfg.COIN_IDS_BY_MODE[mode].length,
     minRunMs: cfg.MIN_RUN_MS,
   });
 }
@@ -630,17 +644,26 @@ async function getRunCoinCount(db, runId) {
 async function getNormalizedLeaderboard(db, cfg, options = {}) {
   const includeTests = options.includeTests === true;
   const mode = options.mode == null ? null : sanitizeMode(options.mode);
+  const onlyAllSecrets = options.onlyAllSecrets === true;
   const scanLimit = Math.max(cfg.LB_MAX * cfg.LB_PER_PLAYER * 6, 200);
 
   const where = [];
+  const params = [];
   if (!includeTests) where.push('is_test = 0');
-  if (mode != null) where.push('mode = ?');
+  if (mode != null) {
+    where.push('mode = ?');
+    params.push(mode);
+  }
+  if (onlyAllSecrets) {
+    where.push('secret_coins >= ?');
+    params.push(cfg.ALL_SECRETS_GOAL);
+  }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const sql = `SELECT id, name, time_ms, at_ms, cat_color, cat_hair, cat_model, player_id, is_test, secret_coins, mode
        FROM leaderboard_entries ${whereSql} ORDER BY time_ms ASC, at_ms ASC LIMIT ?`;
 
   const stmt = db.prepare(sql);
-  const bound = mode != null ? stmt.bind(mode, scanLimit) : stmt.bind(scanLimit);
+  const bound = stmt.bind(...params, scanLimit);
   const rows = await bound.all();
 
   return normalizeLeaderboard(rows.results || [], cfg.LB_MAX, cfg.LB_PER_PLAYER);

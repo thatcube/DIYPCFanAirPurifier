@@ -202,6 +202,16 @@
       box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2) inset;
     }
 
+    /* Parenthetical clarifier inside a mode tab label (e.g.
+       "100% (all secret coins)"). Reads as secondary at smaller sizes
+       and slightly de-emphasized so the primary label dominates. */
+    .modeTab__sub {
+      margin-left: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      opacity: 0.72;
+    }
+
     /* List rows — same surface + highlight pattern as #finishDialogList
        and #fpLeaderboardList: subtle white-tint resting state, gold-
        tinted background + left-edge gold bar for the player's row
@@ -406,6 +416,8 @@
           coins</button>
         <button type="button" class="modeTab" role="tab" aria-selected="false" data-lb-mode="speed">Speed · 32
           coins</button>
+        <button type="button" class="modeTab" role="tab" aria-selected="false" data-lb-mode="allsecrets">100% <span
+            class="modeTab__sub">(all secret coins)</span></button>
       </div>
       <ol id="rows" class="list" aria-live="polite"></ol>
       <div id="empty" class="empty" style="display:none">No runs yet — be the first.</div>
@@ -477,7 +489,11 @@
 
       const query = new URLSearchParams(location.search);
       const hitId = query.get('entry') || '';
-      const VALID_MODES = ['normal', 'speed'];
+      // 'allsecrets' is a virtual mode — it filters across both real
+      // modes (normal + speed) to runs that found every secret coin.
+      // The worker accepts it via ?onlyAllSecrets=1 rather than as a
+      // mode value, so the client maps it at fetch time.
+      const VALID_MODES = ['normal', 'speed', 'allsecrets'];
       function sanitizeMode(v) {
         const k = String(v || '').trim().toLowerCase();
         return VALID_MODES.includes(k) ? k : 'normal';
@@ -519,11 +535,24 @@
       async function loadLeaderboard() {
         let rows = [];
         try {
-          const res = await fetch(`/api/leaderboard?mode=${encodeURIComponent(currentMode)}`, { credentials: 'same-origin' });
+          // The 'allsecrets' virtual tab filters cross-mode for runs
+          // that grabbed every secret coin. Send onlyAllSecrets=1 and
+          // omit the mode param so the worker scans both normal +
+          // speed entries. Real modes (normal/speed) keep the mode
+          // filter as before.
+          const apiUrl = currentMode === 'allsecrets'
+            ? '/api/leaderboard?onlyAllSecrets=1'
+            : `/api/leaderboard?mode=${encodeURIComponent(currentMode)}`;
+          const res = await fetch(apiUrl, { credentials: 'same-origin' });
           const data = await res.json();
           if (!res.ok || data.ok === false) throw new Error((data && data.message) || `API ${res.status}`);
           rows = Array.isArray(data.leaderboard) ? data.leaderboard : [];
-          boardMeta.textContent = `Top ${data.maxEntries || 25} · max ${data.perPlayer || 3}/player`;
+          if (currentMode === 'allsecrets') {
+            const goal = Math.max(1, Math.floor(Number(data.allSecretsGoal) || BASE_TOTAL_SECRETS));
+            boardMeta.textContent = `Top ${data.maxEntries || 25} · all ${goal} secret coins found`;
+          } else {
+            boardMeta.textContent = `Top ${data.maxEntries || 25} · max ${data.perPlayer || 3}/player`;
+          }
         } catch (err) {
           rows = [];
           boardMeta.textContent = 'Connection issue';
