@@ -396,7 +396,15 @@ function _raycastBeam(origin, dir, maxDist) {
     let o = h.object;
     let skip = false;
     while (o) {
-      if (o.userData && o.userData._fireballSkip) { skip = true; break; }
+      // Skip our own FX, the caster, mid-air particles/sprites, and
+      // anything already opted out of clicks (soft visual FX, scorch
+      // decals, etc). Without this the beam ate floating air-flow
+      // particles and stamped burn marks mid-air.
+      if (o.isPoints || o.isSprite) { skip = true; break; }
+      if (o.userData) {
+        if (o.userData._fireballSkip) { skip = true; break; }
+        if (o.userData.clickPassthrough) { skip = true; break; }
+      }
       // Never let the player's own cat block the beam.
       if (_catGroup && o === _catGroup) { skip = true; break; }
       o = o.parent;

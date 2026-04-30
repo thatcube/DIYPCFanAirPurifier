@@ -12,8 +12,21 @@
        splash card and tab bar paint identically across home / about /
        leaderboard. -->
   <link rel="stylesheet" href="./src/styles/main.css" />
-  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
-  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css" />
+  <!-- Phosphor icon CSS is deferred via preload+onload so it never
+       render-blocks the splash card on first paint. The card doubles
+       as the loading indicator and MUST appear with the first frame —
+       a third-party CDN stylesheet sitting in the critical path used
+       to delay that paint by hundreds of ms (sometimes seconds on a
+       cold cache). The <noscript> fallback keeps icons working when
+       JS is disabled, in which case render-blocking is acceptable. -->
+  <link rel="preload" as="style" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css"
+    onload="this.onload=null;this.rel='stylesheet'" />
+  <link rel="preload" as="style" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css"
+    onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript>
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css" />
+  </noscript>
   <style>
     /* main.css locks html/body to overflow:hidden;height:100% for the 3D
        game; override here so the home menu can scroll if a small viewport
@@ -100,22 +113,74 @@
       -webkit-backdrop-filter: blur(2px) saturate(1.1);
     }
 
-    /* The splash card lives inside <main class="page"> and is centered
-       via flex on the wrapper. Force display so it doesn't depend on
-       the #titleSplash.open sibling combinator (which we no longer
-       use on this page). */
+    /* ── Boot-as-loading-indicator ────────────────────────────────
+       The splash card doubles as the loading indicator on first
+       paint. It paints OPAQUE on frame 1 (no entrance animation, no
+       waiting for the iframe scene), shows a spinner where Play
+       lives, and then morphs to the liquid-glass treatment in
+       place — same DOM element — once the iframe scene reports
+       ready. The morph is a single CSS transition on the card's
+       background-color, so there's no swap, no double-render, and
+       no perceptible seam between the two states.
+
+       Why override main.css's pageContentIn entrance: that keyframe
+       animates the card from opacity:0 + translateY(12px) +
+       blur(8px) to ready over 0.7s. On home that animation IS the
+       delay we're trying to eliminate — the boot→glass morph
+       replaces it. (SPA-nav into home loses the entrance too, but
+       <main>'s own is-entering choreography in main.css covers that
+       case with a softer fade.) */
     main.page>.title-splash-card {
       display: block;
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+      filter: none !important;
+      transition:
+        background-color 0.65s cubic-bezier(0.32, 0.72, 0, 1),
+        border-color 0.5s ease-out;
     }
 
-    /* The Play button's "ready" content row is hidden by default and
-       shown via `#titleSplash[data-state="ready"] + .title-splash-card`
-       in main.css. Home no longer renders #titleSplash at all (we use
-       a plain #bgScrim instead), so that sibling rule never matches.
-       Force the ready row visible here — home is always in the ready
-       state since the iframe handles its own boot. */
-    main.page>.title-splash-card .title-splash-play-content--ready {
+    /* Boot state — opaque dark fill replaces var(--glass). The
+       backdrop-filter and specular gradient stay set on the card
+       (they're invisible against an opaque bg-color), which means
+       removing .is-booting only animates background-color: no
+       composite-layer churn, no flash. The dark fill is tuned to
+       roughly match the body gradient under the card so the morph
+       reads as "the dark surface becomes glass" rather than "a
+       different rectangle replaces the dark one". */
+    body.is-booting main.page>.title-splash-card {
+      background-color: #0e2034;
+      border-color: rgba(255, 255, 255, 0.06);
+    }
+
+    /* Loading content (spinner + "Loading…") is shown only during
+       boot; the Play row takes over once the scene is ready. Both
+       use the existing .title-splash-play-content--loading /
+       --ready classes from main.css (which also defines the
+       spinner's keyframes), but main.css gates them behind
+       #titleSplash[data-state="…"] sibling selectors that don't
+       apply here (home has no #titleSplash). Re-gate them on
+       body.is-booting instead. */
+    main.page>.title-splash-card .title-splash-play-content {
+      display: none;
+    }
+
+    body.is-booting main.page>.title-splash-card .title-splash-play-content--loading {
       display: inline-flex;
+    }
+
+    body:not(.is-booting) main.page>.title-splash-card .title-splash-play-content--ready {
+      display: inline-flex;
+    }
+
+    /* During boot, the Play button can't actually start a run — the
+       iframe scene isn't up yet — so kill its hit-targeting and
+       show a progress cursor. pointer-events also blocks Tab+Enter
+       activation since a disabled <a> still receives keyboard focus. */
+    body.is-booting .title-splash-play {
+      cursor: progress;
+      pointer-events: none;
     }
 
     /* The splash treatment lives in main.css under #titleSplash and
@@ -195,7 +260,7 @@
   </style>
 </head>
 
-<body>
+<body class="is-booting">
   <!-- Persistent live-scene iframe — kept mounted across SPA swaps to
        /about and /leaderboard so the three.js scene never reboots when
        the user changes tabs. The router only replaces <main> + the
@@ -249,6 +314,14 @@
              a brief fade for continuity. We use an <a> (not a <button>)
              so middle-click / cmd-click open in a new tab as expected. -->
         <a class="title-splash-play glass-btn glass-btn--primary" href="/play" data-play-cta>
+          <!-- Boot/loading row — visible while body.is-booting (see
+               inline CSS above). Reuses the .title-splash-play-spinner
+               keyframes from main.css so the spinner here matches the
+               one on /play's title screen exactly. -->
+          <span class="title-splash-play-content title-splash-play-content--loading">
+            <span class="title-splash-play-spinner" aria-hidden="true"></span>
+            <span>Loading…</span>
+          </span>
           <span class="title-splash-play-content title-splash-play-content--ready">
             <span>Play</span>
           </span>
@@ -284,19 +357,38 @@
         document.body.classList.add('tabs-revealed');
       }
 
+      // End the boot/loading state. Removing .is-booting from <body>
+      // triggers the CSS transition on .title-splash-card's
+      // background-color (opaque → glass), and swaps the Play
+      // button's spinner row for its "Play" row. Same DOM element
+      // throughout — the morph is a pure CSS state change. */
+      let _bootEnded = false;
+      function endBoot() {
+        if (_bootEnded) return;
+        _bootEnded = true;
+        document.body.classList.remove('is-booting');
+      }
+
       function reveal() {
         if (bg) bg.classList.add('ready');
         // Mark the iframe as ready so a Play click that landed before
         // boot finished can now flush its queued enter-play message.
         bg && bg.setAttribute('data-scene-ready', '1');
         if (typeof window.__flushPendingPlay === 'function') window.__flushPendingPlay();
-        // Hold an extra beat after the scene paints so the splash card
-        // finishes its entrance before the tabs join in.
+        // End the boot state on the same frame the iframe is revealed
+        // — the iframe is sitting at opacity:0 → 1 (snap, no transition)
+        // BEHIND the still-opaque card, so the user can't see it pop.
+        // The card then morphs to glass over 0.65s and the now-visible
+        // live scene refracts through it. Tabs come in last.
+        endBoot();
         setTimeout(revealTabs, 520);
       }
       if (!bg || reduce) {
-        // No live scene to gate on — still wait long enough for the
-        // splash card's pageContentIn to play out.
+        // No live scene to gate on — end boot immediately so the
+        // user isn't stuck on the loading row, then reveal tabs after
+        // a beat. (With reduce-motion we skip the iframe entirely;
+        // the card stays opaque-styled but functional.)
+        endBoot();
         setTimeout(revealTabs, reduce ? 0 : 1100);
         return;
       }
@@ -669,8 +761,14 @@
         if (m) m.classList.remove('is-entering', 'is-leaving');
         // bfcache restore: the bg scene is already painted, so the
         // tabs should be back immediately rather than re-running the
-        // "wait for scene" delay.
-        if (e.persisted) document.body.classList.add('tabs-revealed');
+        // "wait for scene" delay. Also drop the boot/loading state
+        // — when we navigated away (typically Play → /play), boot had
+        // already ended; on restore the body should not be stuck back
+        // in the boot state if the browser snapshotted it mid-load.
+        if (e.persisted) {
+          document.body.classList.remove('is-booting');
+          document.body.classList.add('tabs-revealed');
+        }
       });
     })();
   </script>

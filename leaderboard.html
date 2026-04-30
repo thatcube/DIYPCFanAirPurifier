@@ -9,8 +9,22 @@
     content="Zoomies — a first-person coin-collecting speedrun in a tiny bedroom. Can you beat the time?" />
   <!-- Share the same stylesheet (and design tokens) the in-game UI uses -->
   <link rel="stylesheet" href="./src/styles/main.css" />
-  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
-  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css" />
+  <!-- Phosphor icon CSS is deferred via preload+onload so it never
+       render-blocks the board panel on first paint. The board doubles
+       as the loading indicator on direct-load (e.g. arriving from a
+       shared run link) and MUST appear with the first frame — a
+       third-party CDN stylesheet sitting in the critical path used to
+       delay that paint by hundreds of ms (sometimes seconds on a cold
+       cache). The <noscript> fallback keeps icons working when JS is
+       disabled, in which case render-blocking is acceptable. -->
+  <link rel="preload" as="style" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css"
+    onload="this.onload=null;this.rel='stylesheet'" />
+  <link rel="preload" as="style" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css"
+    onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript>
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css" />
+  </noscript>
   <style>
     /* Inherits the canonical liquid-glass design tokens from main.css
        (--glass, --glass-specular, --glass-blur, --glass-border,
@@ -106,6 +120,7 @@
       pointer-events: auto;
       z-index: 2;
     }
+
     /* Lift iframe above #bgScrim during play so the scrim's
        backdrop-filter no longer paints over the picker (which lives
        inside the iframe). The picker's iframe-side body::before takes
@@ -134,7 +149,10 @@
       background-color: var(--glass);
       background-image: var(--glass-specular);
       border: 1px solid var(--glass-border);
-      border-radius: 32px;
+      /* 24px lines up cleanly with the inner mode-tab + row
+       * radii (10px / 9px) — the visual offset between outer and
+       * inner corners reads as concentric instead of competing. */
+      border-radius: 24px;
       box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.4),
         inset 0 -1px 0 rgba(255, 255, 255, 0.06),
@@ -146,29 +164,197 @@
       overflow: hidden;
     }
 
-    .board__head {
-      padding: 14px 18px 10px;
-      display: flex;
-      align-items: baseline;
-      gap: 10px;
-      justify-content: space-between;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    /* ── Boot-as-loading-indicator ────────────────────────────────
+       Mirrors home.html: the board is the focal element on /leader-
+       board, and (especially when the user lands here from a shared
+       run link in chat) it must paint instantly. main.css applies the
+       pageContentIn keyframe to every direct child of main.page,
+       which would have the board fading in from opacity:0 +
+       translateY(12px) + blur(8px) over 0.7s — that's the delay
+       we're killing. We override the animation entirely on first
+       load and use a CSS background-color transition (opaque dark →
+       glass) as the entrance instead, kicked by JS once the iframe
+       scene reports ready. SPA-nav into /leaderboard still gets a
+       soft fade via <main>'s is-entering choreography. */
+    main.page>.board {
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+      filter: none !important;
+      transition:
+        background-color 0.65s cubic-bezier(0.32, 0.72, 0, 1),
+        border-color 0.5s ease-out;
     }
 
-    .board__head h2 {
-      margin: 0;
-      font-size: 13px;
-      font-weight: 800;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--lb-accent);
+    /* Boot state — opaque dark fill replaces var(--glass). The
+       backdrop-filter and specular gradient stay set (they're
+       invisible against an opaque bg-color), so the morph is a
+       single property transition: no composite-layer churn, no
+       flash. */
+    body.is-booting main.page>.board {
+      background-color: #0e2034;
+      border-color: rgba(255, 255, 255, 0.06);
     }
 
-    .board__meta {
-      font-size: 11px;
-      color: var(--muted);
-      letter-spacing: 0.04em;
+    /* While booting, the rows haven't loaded yet (the API fetch is
+       still in flight) AND the iframe scene isn't visible yet, so
+       the row container would otherwise be a transparent strip
+       between two opaque borders. Show a subtle skeleton shimmer
+       so the loading state is legible at a glance — the user knows
+       the page is alive and data is incoming, not that the board
+       is empty. The skeleton rows are removed (innerHTML overwrite)
+       the moment loadLeaderboard() returns. */
+    .row.row--skeleton {
+      grid-template-columns: 38px 1fr auto;
+      cursor: default;
     }
+
+    /* Each skel is a softly-filled rounded pill. The shimmer lives on
+     * a separate ::after layer carrying a diagonal cyan-tinted beam
+     * that sweeps across; overflow:hidden clips it to the pill shape.
+     *
+     * IMPORTANT: display:block. The .skel is a <span>, which is inline
+     * by default and IGNORES width/height. Without this declaration
+     * the pills collapse to zero size and the rows render visibly
+     * empty — which is exactly what the previous shimmer was doing
+     * (silently animating an invisible box). */
+    .row--skeleton .skel {
+      display: block;
+      position: relative;
+      height: 12px;
+      border-radius: 6px;
+      /* Base fill is bright enough to read clearly against the glass
+       * card on top of the live 3D scene. Was 0.07 — invisible. */
+      background: rgba(225, 240, 255, 0.16);
+      overflow: hidden;
+      isolation: isolate;
+      /* Slow ambient breathe — keeps the pill alive between beam
+       * passes. Different period than the beam (2.6s vs 1.8s) so
+       * the two animations interfere rather than syncing, which
+       * reads as organic rather than mechanical. */
+      animation: skelBreathe 2.6s ease-in-out infinite;
+    }
+
+    .row--skeleton .skel::after {
+      content: '';
+      position: absolute;
+      /* Negative inset lets the beam's bright edges extend past the
+       * pill bounds before overflow:hidden clips them — the
+       * highlight reads as a broad light source rather than a
+       * gradient painted inside the box. */
+      inset: -2px;
+      /* Asymmetric specular gradient — broad halo with a hot core.
+       * Real light reflections have head/tail asymmetry; symmetric
+       * gradients read as "skeleton shimmer cliché". White-hot
+       * peak, cyan halo, cool trail.
+       *
+       * Wider envelope (8% → 92%) than before (25% → 78%) so the
+       * highlight reads as a soft volumetric pass rather than a
+       * thin sliver — at 78px-wide time pills the previous beam
+       * crossed too fast to register as light. The hot core stays
+       * narrow (4% wide) so the moment of peak brightness still
+       * has snap. 105deg angle gives the beam a touch more lean. */
+      background: linear-gradient(105deg,
+          transparent 8%,
+          rgba(173, 230, 255, 0.18) 28%,
+          rgba(220, 245, 255, 0.55) 44%,
+          rgba(255, 255, 255, 0.95) 50%,
+          rgba(220, 245, 255, 0.55) 56%,
+          rgba(173, 230, 255, 0.22) 72%,
+          transparent 92%);
+      /* Soft blur on the beam itself — Emil's "blur is magic". The
+       * gradient stops stay crisp at the source but render as a
+       * glow with diffuse edges. ~0.5px is the sweet spot: too
+       * little and the gradient looks pasted; too much and the
+       * highlight smears into mush. */
+      filter: blur(0.5px);
+      transform: translateX(-100%);
+      will-change: transform;
+      animation: skelShimmer 1.8s cubic-bezier(0.7, 0, 0.3, 1) infinite;
+    }
+
+    /* Stagger per row so the wave travels DOWN the board as one
+     * pulse rather than every row firing in lockstep. Each <li>
+     * carries style="--i:N" (1..25). 25ms × 24 = 600ms total
+     * cascade — has to be fast enough that every row gets a beam
+     * pass BEFORE the API responds (locally ~200ms; on cold cache
+     * 1-2s). Earlier 60ms per row meant rows 5-25 never lit up on
+     * a fast connection because data overwrote the skeleton before
+     * the wave reached them. */
+    .row--skeleton .skel::after {
+      animation-delay: calc((var(--i, 1) - 1) * 60ms);
+    }
+
+    /* Breathe stagger uses HALF the beam stagger so the ambient
+     * pulse rolls slower than the beam — the two waves crossing at
+     * different speeds is what makes it feel like a living surface
+     * instead of a loop. */
+    .row--skeleton .skel {
+      animation-delay: calc((var(--i, 1) - 1) * 30ms);
+    }
+
+    .row--skeleton .skel--rank {
+      width: 22px;
+    }
+
+    .row--skeleton .skel--name {
+      width: 60%;
+      max-width: 180px;
+    }
+
+    /* margin-left:auto right-aligns the time pill inside its grid
+     * cell. (justify-self:end was a no-op here — the grid item is
+     * .time, not the skel span inside it.) */
+    .row--skeleton .skel--time {
+      width: 78px;
+      margin-left: auto;
+    }
+
+    @keyframes skelShimmer {
+      0% {
+        transform: translateX(-100%);
+      }
+
+      /* Beam crosses by 60% of the cycle, then dwells off-screen for
+       * the remaining 40%. The pause is the rhythm — without it the
+       * loop feels relentless; with it, it breathes. */
+      60% {
+        transform: translateX(100%);
+      }
+
+      100% {
+        transform: translateX(100%);
+      }
+    }
+
+    /* Ambient breathe — the pill gently inhales between beam passes.
+     * Ranges +/- 0.04 alpha around the resting 0.16; perceptible but
+     * never demanding. This is the layer that keeps the loading
+     * state from feeling dead during the off-cycle dwell. */
+    @keyframes skelBreathe {
+
+      0%,
+      100% {
+        background-color: rgba(225, 240, 255, 0.14);
+      }
+
+      50% {
+        background-color: rgba(225, 240, 255, 0.22);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+
+      .row--skeleton .skel,
+      .row--skeleton .skel::after {
+        animation: none;
+      }
+    }
+
+    /* (.board__head removed — the static "Top times" label was
+       redundant with the active "Leaderboard" tab, and the meta
+       string only carried decorative copy. Connection errors now
+       surface through #empty instead.) */
 
     /* Mode tabs — match the .lb-tabs/.lb-tab pattern in main.css used
        on the pause-menu leaderboard, scaled up slightly for the
@@ -176,7 +362,7 @@
     .modeTabs {
       display: flex;
       gap: 6px;
-      margin: 0 14px 8px;
+      margin: 14px 14px 8px;
       padding: 4px;
       background: var(--glass-soft);
       border: 1px solid var(--glass-stroke-soft, rgba(255, 255, 255, 0.08));
@@ -227,7 +413,7 @@
     .list {
       list-style: none;
       margin: 0;
-      padding: 8px;
+      padding: 6px 16px 16px 16px;
       display: grid;
       gap: 6px;
     }
@@ -237,10 +423,19 @@
       grid-template-columns: 38px 1fr auto auto auto;
       gap: 10px;
       align-items: center;
+      /* Lock rows to a clean 36px so skeleton rows and real rows match
+         exactly, and so the board height is a deterministic multiple
+         of (row + gap). Previously rows computed to 38.183px because
+         .catBadge / .secretBadge had font-size: 10.5px (× 1.35
+         line-height = 14.175px content) which pushed the row past
+         its 16px+2px chrome budget. Fixed height + padding kills the
+         dependency on child line-box rounding. align-items: center
+         vertically centers any child regardless of its own height. */
+      height: 36px;
+      padding: 0 11px;
       border: 1px solid rgba(255, 255, 255, 0.05);
       border-radius: 9px;
       background: rgba(255, 255, 255, 0.03);
-      padding: 8px 11px;
       font-size: 13px;
       line-height: 1.35;
       scroll-margin-top: 22px;
@@ -265,7 +460,9 @@
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      font-size: 10.5px;
+      /* Whole-pixel font-size; was 10.5 which produced subpixel
+         line-box heights that bled into the parent .row height. */
+      font-size: 11px;
       font-weight: var(--weight-semibold);
       letter-spacing: 0.02em;
       padding: 2px 8px 2px 6px;
@@ -301,7 +498,8 @@
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      font-size: 10.5px;
+      /* Whole-pixel font-size; was 10.5 — same reasoning as .catBadge. */
+      font-size: 11px;
       font-weight: 800;
       letter-spacing: 0.02em;
       padding: 2px 8px;
@@ -337,6 +535,10 @@
       color: var(--lb-accent);
       font-weight: 800;
       letter-spacing: 0.02em;
+      /* Nudge the mono digits down ~2px. The mono face's cap-height
+         sits higher in its em-box than the proportional body font,
+         so flex/grid centering visually skews top-heavy. */
+      padding-top: 2px;
     }
 
     .row.hit {
@@ -350,10 +552,102 @@
       color: var(--lb-gold);
     }
 
+    /* Empty / error state — occupies the whole list area when the
+     * board has no rows. Two variants: data success but zero entries
+     * (no runs yet) and fetch failure (connection issue). Same
+     * layout, different icon and copy. We render both options as
+     * markup via innerHTML in JS — the icon + headline + sub combo
+     * reads as a small illustration rather than a status line. */
     .empty {
-      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: 56px 24px 64px;
+      text-align: center;
       color: var(--muted);
+      /* Subtle entrance — the empty state appears AFTER the skeleton
+       * cascade resolves, so a brief fade+rise softens the swap and
+       * tells the eye "this is the answer, not still loading". */
+      animation: emptyIn 0.45s cubic-bezier(0.32, 0.72, 0, 1) both;
+    }
+
+    .empty__icon {
+      position: relative;
+      width: 72px;
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--lb-accent);
+      /* Soft cyan halo behind the glyph — tiny illustration trick.
+       * The drop-shadow filter renders a true circular glow that
+       * sits underneath the fill, no extra DOM node needed. */
+      filter:
+        drop-shadow(0 0 24px rgba(159, 227, 255, 0.35))
+        drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+    }
+
+    .empty__icon i {
+      font-size: 64px;
+      line-height: 1;
+    }
+
+    /* Error variant tints the icon warm-amber so the user reads
+     * "something went wrong" without us having to spell it out
+     * twice (icon + copy). */
+    .empty--error .empty__icon {
+      color: #ffb78a;
+      filter:
+        drop-shadow(0 0 24px rgba(255, 183, 138, 0.32))
+        drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+    }
+
+    .empty__headline {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      color: rgba(232, 244, 255, 0.92);
+    }
+
+    .empty__sub {
+      margin: 0;
       font-size: 13px;
+      line-height: 1.5;
+      max-width: 32ch;
+      color: var(--muted);
+    }
+
+    .empty__sub a {
+      color: var(--lb-accent);
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(159, 227, 255, 0.45);
+      transition: color 0.18s ease, border-color 0.18s ease;
+    }
+
+    .empty__sub a:hover {
+      color: #fff;
+      border-bottom-color: rgba(255, 255, 255, 0.7);
+    }
+
+    @keyframes emptyIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .empty {
+        animation: none;
+      }
     }
 
     .footnote {
@@ -395,29 +689,29 @@
   </style>
 </head>
 
-<body>
-  <iframe id="bgFrame" src="/play?bg=1" title="" aria-hidden="true" tabindex="-1"
-    referrerpolicy="same-origin"></iframe>
-  <div id="bgScrim" aria-hidden="true"><div class="bg-grid"></div></div>
+<body class="is-booting">
+  <iframe id="bgFrame" src="/play?bg=1" title="" aria-hidden="true" tabindex="-1" referrerpolicy="same-origin"></iframe>
+  <div id="bgScrim" aria-hidden="true">
+    <div class="bg-grid"></div>
+  </div>
 
   <nav class="site-tabs" aria-label="Primary">
     <a class="site-tab" href="/" data-tab="home">
-      <i class="site-tab__icon site-tab__icon--regular ph ph-house"></i><i class="site-tab__icon site-tab__icon--fill ph-fill ph-house"></i><span>Home</span>
+      <i class="site-tab__icon site-tab__icon--regular ph ph-house"></i><i
+        class="site-tab__icon site-tab__icon--fill ph-fill ph-house"></i><span>Home</span>
     </a>
     <a class="site-tab" href="/leaderboard" data-tab="leaderboard">
-      <i class="site-tab__icon site-tab__icon--regular ph ph-trophy"></i><i class="site-tab__icon site-tab__icon--fill ph-fill ph-trophy"></i><span>Leaderboard</span>
+      <i class="site-tab__icon site-tab__icon--regular ph ph-trophy"></i><i
+        class="site-tab__icon site-tab__icon--fill ph-fill ph-trophy"></i><span>Leaderboard</span>
     </a>
     <a class="site-tab" href="/about" data-tab="about">
-      <i class="site-tab__icon site-tab__icon--regular ph ph-info"></i><i class="site-tab__icon site-tab__icon--fill ph-fill ph-info"></i><span>About</span>
+      <i class="site-tab__icon site-tab__icon--regular ph ph-info"></i><i
+        class="site-tab__icon site-tab__icon--fill ph-fill ph-info"></i><span>About</span>
     </a>
   </nav>
 
   <main class="page">
-    <section class="board" aria-labelledby="boardHeadline">
-      <header class="board__head">
-        <h2 id="boardHeadline">Top times</h2>
-        <span id="boardMeta" class="board__meta"></span>
-      </header>
+    <section class="board">
       <div id="modeTabs" class="modeTabs" role="tablist" aria-label="Leaderboard mode">
         <button type="button" class="modeTab active" role="tab" aria-selected="true" data-lb-mode="normal">Normal · 20
           coins</button>
@@ -426,8 +720,147 @@
         <button type="button" class="modeTab" role="tab" aria-selected="false" data-lb-mode="allsecrets">100% <span
             class="modeTab__sub">(all secret coins)</span></button>
       </div>
-      <ol id="rows" class="list" aria-live="polite"></ol>
-      <div id="empty" class="empty" style="display:none">No runs yet — be the first.</div>
+      <!-- Skeleton rows render with the first paint so the board is
+           never visibly empty while the /api/leaderboard fetch is in
+           flight. loadLeaderboard() overwrites this innerHTML the
+           moment data arrives (typically <200ms on a warm cache); on
+           a cold cache or slow network the shimmer keeps the page
+           feeling alive. aria-hidden so screen readers don't announce
+           placeholder rows; aria-live="polite" on #rows handles real
+           data once it lands.
+
+           25 rows matches the API cap (LB_MAX = 25 in server.js) so
+           the skeleton always reserves the full board height — no
+           layout jump when fewer real rows come back. style="--i:N"
+           drives the staggered shimmer delay (see .skel::after). -->
+      <ol id="rows" class="list" aria-live="polite">
+        <li class="row row--skeleton" style="--i:1" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:2" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:3" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:4" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:5" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:6" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:7" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:8" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:9" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:10" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:11" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:12" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:13" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:14" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:15" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:16" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:17" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:18" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:19" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:20" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:21" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:22" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:23" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:24" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+        <li class="row row--skeleton" style="--i:25" aria-hidden="true">
+          <div class="rank"><span class="skel skel--rank"></span></div>
+          <div class="name"><span class="skel skel--name"></span></div>
+          <div class="time"><span class="skel skel--time"></span></div>
+        </li>
+      </ol>
+      <div id="empty" class="empty" style="display:none" hidden></div>
     </section>
 
     <p class="footnote">Created by <a href="https://brandonmoore.design" target="_blank" rel="noopener">Brandon</a>.</p>
@@ -454,10 +887,25 @@
         document.body.classList.add('tabs-revealed');
       }
 
+      // End the boot/loading state. Removing .is-booting from <body>
+      // triggers the CSS transition on .board's background-color
+      // (opaque → glass). Same DOM element throughout — the morph is
+      // a pure CSS state change, not a swap. Skeleton rows stay until
+      // loadLeaderboard() overwrites them with the real data; that
+      // fetch runs concurrently with iframe boot.
+      let _bootEnded = false;
+      function endBoot() {
+        if (_bootEnded) return;
+        _bootEnded = true;
+        document.body.classList.remove('is-booting');
+      }
+
       if (bgFrame && (_isCoarse || _isNarrow)) {
         bgFrame.remove();
-        // No live scene to wait on — reveal after the page card's
-        // own pageContentIn animation (~1s incl. stagger) settles.
+        // No live scene to wait on — end boot immediately so the
+        // board morphs to its glass-over-fallback-gradient look,
+        // then reveal tabs after a beat.
+        endBoot();
         setTimeout(revealTabs, 1100);
       } else if (bgFrame) {
         function _bgReady() {
@@ -467,8 +915,12 @@
           // (matches home.html's same-named hook).
           bgFrame.setAttribute('data-scene-ready', '1');
           if (typeof window.__flushPendingPlay === 'function') window.__flushPendingPlay();
-          // Hold an extra beat after the scene paints so the page
-          // card finishes its entrance before the tabs join in.
+          // End boot on the same frame the iframe is revealed — the
+          // iframe sits at opacity:0 → 1 (snap, no transition) BEHIND
+          // the still-opaque board, so the user can't see it pop.
+          // The board then morphs to glass over 0.65s and the now-
+          // visible live scene refracts through it. Tabs come in last.
+          endBoot();
           setTimeout(revealTabs, 520);
         }
         window.addEventListener('message', (e) => {
@@ -477,6 +929,7 @@
         });
         setTimeout(_bgReady, 4000);
       } else {
+        endBoot();
         setTimeout(revealTabs, 1100);
       }
     })();
@@ -491,7 +944,6 @@
     window.__initLeaderboard = function __initLeaderboard() {
       const rowsEl = document.getElementById('rows');
       const emptyEl = document.getElementById('empty');
-      const boardMeta = document.getElementById('boardMeta');
       if (!rowsEl) return; // not on the leaderboard view (defensive)
 
       const query = new URLSearchParams(location.search);
@@ -539,37 +991,74 @@
         return `<span class="secretBadge${cls}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><i class="ph-fill ph-key"></i>${n}/${goal}</span>`;
       }
 
-      async function loadLeaderboard() {
-        let rows = [];
-        try {
-          // The 'allsecrets' virtual tab filters cross-mode for runs
-          // that grabbed every secret coin. Send onlyAllSecrets=1 and
-          // omit the mode param so the worker scans both normal +
-          // speed entries. Real modes (normal/speed) keep the mode
-          // filter as before.
-          const apiUrl = currentMode === 'allsecrets'
-            ? '/api/leaderboard?onlyAllSecrets=1'
-            : `/api/leaderboard?mode=${encodeURIComponent(currentMode)}`;
-          const res = await fetch(apiUrl, { credentials: 'same-origin' });
-          const data = await res.json();
-          if (!res.ok || data.ok === false) throw new Error((data && data.message) || `API ${res.status}`);
-          rows = Array.isArray(data.leaderboard) ? data.leaderboard : [];
-          if (currentMode === 'allsecrets') {
-            const goal = Math.max(1, Math.floor(Number(data.allSecretsGoal) || BASE_TOTAL_SECRETS));
-            boardMeta.textContent = `Top ${data.maxEntries || 25} · all ${goal} secret coins found`;
-          } else {
-            boardMeta.textContent = `Top ${data.maxEntries || 25} · max ${data.perPlayer || 3}/player`;
-          }
-        } catch (err) {
-          rows = [];
-          boardMeta.textContent = 'Connection issue';
-        }
+      // ── Stale-while-revalidate cache ────────────────────────────
+      // Cache successful API responses per-mode in sessionStorage so
+      // the SECOND visit to /leaderboard within a tab session paints
+      // instantly (no shimmer flash) while a background fetch
+      // revalidates. Cache lives only for the tab's lifetime so it
+      // can never go stale across browser sessions; within a session
+      // we always revalidate, so even an "old" cache is just a
+      // sub-second visual head-start.
+      //
+      // Errors are NOT cached — a failed fetch shouldn't poison the
+      // next visit. If the previous visit failed, we fall back to
+      // the shimmer-then-data flow naturally.
+      const cacheKeyFor = (mode) => `lb-cache-v1:${mode}`;
+      // Track which run-id we've already auto-scrolled to so we
+      // don't yank the page twice when SWR paints cached then fresh.
+      let scrolledHitId = null;
 
-        if (!rows.length) {
-          rowsEl.innerHTML = '';
-          emptyEl.style.display = 'block';
-          return;
+      function readCache(mode) {
+        try {
+          const raw = sessionStorage.getItem(cacheKeyFor(mode));
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          if (!parsed || !Array.isArray(parsed.rows)) return null;
+          return parsed.rows;
+        } catch (_) {
+          return null;
         }
+      }
+
+      function writeCache(mode, rows) {
+        try {
+          sessionStorage.setItem(cacheKeyFor(mode), JSON.stringify({ rows }));
+        } catch (_) {
+          // Quota or disabled storage — silently skip; SWR is a
+          // perf nicety, not load-bearing.
+        }
+      }
+
+      function renderEmpty(errorMsg) {
+        rowsEl.innerHTML = '';
+        if (errorMsg === 'connection') {
+          emptyEl.classList.add('empty--error');
+          emptyEl.classList.remove('empty--noruns');
+          emptyEl.innerHTML =
+            '<div class="empty__icon" aria-hidden="true"><i class="ph-fill ph-cloud-slash"></i></div>' +
+            '<h2 class="empty__headline">Couldn\u2019t reach the leaderboard</h2>' +
+            '<p class="empty__sub">The network or the API is taking a nap. Try again in a moment \u2014 your runs are safe.</p>';
+        } else {
+          emptyEl.classList.remove('empty--error');
+          emptyEl.classList.add('empty--noruns');
+          const tabCopy = currentMode === 'allsecrets'
+            ? 'No 100% runs yet \u2014 grab every secret coin to claim this board.'
+            : currentMode === 'speed'
+              ? 'No speed-mode runs yet \u2014 be the first to clock in.'
+              : 'No runs on the board yet \u2014 be the first to clock in.';
+          emptyEl.innerHTML =
+            '<div class="empty__icon" aria-hidden="true"><i class="ph-fill ph-trophy"></i></div>' +
+            '<h2 class="empty__headline">An open podium</h2>' +
+            '<p class="empty__sub">' + tabCopy + ' <a href="/" data-spa-link>Play now \u2192</a></p>';
+        }
+        emptyEl.hidden = false;
+        emptyEl.style.display = 'flex';
+        // eslint-disable-next-line no-unused-expressions
+        emptyEl.offsetWidth;
+      }
+
+      function renderRows(rows) {
+        emptyEl.hidden = true;
         emptyEl.style.display = 'none';
 
         const secretGoal = rows.reduce((max, row) => {
@@ -589,9 +1078,88 @@
           </li>`;
         }).join('');
 
-        if (hitId) {
+        // Auto-scroll to the highlighted run only the first time we
+        // see it on screen — if SWR painted from cache and the fresh
+        // fetch also contains the same hit row, the second render
+        // shouldn't re-scroll the page.
+        if (hitId && scrolledHitId !== hitId) {
           const hitEl = rowsEl.querySelector(`[data-entry-id="${CSS.escape(hitId)}"]`);
-          if (hitEl) setTimeout(() => hitEl.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+          if (hitEl) {
+            scrolledHitId = hitId;
+            setTimeout(() => hitEl.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+          }
+        }
+      }
+
+      async function loadLeaderboard() {
+        // Snapshot the mode at call time — if the user switches tabs
+        // mid-fetch, we want to discard the in-flight result rather
+        // than stomp the new tab's data with it.
+        const mode = currentMode;
+
+        // 1. Stale paint from cache, if available. This skips the
+        //    shimmer entirely on revisits within the same tab.
+        const cached = readCache(mode);
+        let paintedFromCache = false;
+        if (cached && cached.length) {
+          renderRows(cached);
+          paintedFromCache = true;
+        }
+
+        // 2. Always revalidate against the server.
+        let rows = [];
+        let errorMsg = '';
+        try {
+          // The 'allsecrets' virtual tab filters cross-mode for runs
+          // that grabbed every secret coin. Send onlyAllSecrets=1 and
+          // omit the mode param so the worker scans both normal +
+          // speed entries. Real modes (normal/speed) keep the mode
+          // filter as before.
+          const apiUrl = mode === 'allsecrets'
+            ? '/api/leaderboard?onlyAllSecrets=1'
+            : `/api/leaderboard?mode=${encodeURIComponent(mode)}`;
+          const res = await fetch(apiUrl, { credentials: 'same-origin' });
+          const data = await res.json();
+          if (!res.ok || data.ok === false) throw new Error((data && data.message) || `API ${res.status}`);
+          rows = Array.isArray(data.leaderboard) ? data.leaderboard : [];
+        } catch (err) {
+          rows = [];
+          errorMsg = 'connection';
+        }
+
+        // 3. If the user switched modes while we were fetching, bail
+        //    — the newer loadLeaderboard() call owns the UI now.
+        if (mode !== currentMode) return;
+
+        // 4. On error, only show the error state if we have nothing
+        //    on screen. If cache already painted, leave it alone — a
+        //    one-off network blip shouldn't blow away good data.
+        if (errorMsg) {
+          if (!paintedFromCache) renderEmpty('connection');
+          return;
+        }
+
+        if (!rows.length) {
+          renderEmpty('');
+          // Cache the empty result too, so the empty state paints
+          // instantly next visit instead of flashing shimmer.
+          writeCache(mode, []);
+          return;
+        }
+
+        // 5. Diff against what's painted. If the rows are identical,
+        //    skip the DOM swap — saves a render and prevents the
+        //    .hit row's gold-edge from flickering on revalidate.
+        const fresh = JSON.stringify(rows);
+        const stale = cached ? JSON.stringify(cached) : '';
+        if (fresh !== stale) {
+          renderRows(rows);
+          writeCache(mode, rows);
+        } else if (!paintedFromCache) {
+          // Cache existed but was empty-array; we painted nothing
+          // and now have rows — render them.
+          renderRows(rows);
+          writeCache(mode, rows);
         }
       }
 
@@ -700,7 +1268,7 @@
       // Webfonts can resize the tab labels after first paint; re-measure
       // when they're ready so the pill snaps to the final width.
       if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(updatePill).catch(() => {});
+        document.fonts.ready.then(updatePill).catch(() => { });
       }
 
       function fullNav(href, opts) {
@@ -829,8 +1397,8 @@
       let _pendingPlay = false;
       function _sendEnterPlay() {
         if (!bgFrame || !bgFrame.contentWindow) return;
-        try { bgFrame.contentWindow.postMessage({ type: 'enter-play' }, location.origin); } catch (e) {}
-        try { bgFrame.contentWindow.focus(); } catch (e) {}
+        try { bgFrame.contentWindow.postMessage({ type: 'enter-play' }, location.origin); } catch (e) { }
+        try { bgFrame.contentWindow.focus(); } catch (e) { }
       }
       window.__flushPendingPlay = function () {
         if (!_pendingPlay) return;
@@ -920,7 +1488,7 @@
           // iframe to run its exit sequence (camera reset + fade).
           _demoteFromPopstate = true;
           if (bgFrame && bgFrame.contentWindow) {
-            try { bgFrame.contentWindow.postMessage({ type: 'exit-play' }, location.origin); } catch (err) {}
+            try { bgFrame.contentWindow.postMessage({ type: 'exit-play' }, location.origin); } catch (err) { }
           }
           return;
         }
@@ -933,8 +1501,12 @@
         if (m) m.classList.remove('is-entering', 'is-leaving');
         // bfcache restore: the bg scene is already painted, so the
         // tabs should be back immediately rather than re-running the
-        // "wait for scene" delay.
-        if (e.persisted) document.body.classList.add('tabs-revealed');
+        // "wait for scene" delay. Also drop the boot/loading state
+        // so the board doesn't re-morph from opaque on restore.
+        if (e.persisted) {
+          document.body.classList.remove('is-booting');
+          document.body.classList.add('tabs-revealed');
+        }
       });
     })();
   </script>

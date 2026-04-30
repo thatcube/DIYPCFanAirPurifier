@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -20,7 +21,11 @@
       --tracking-base: 0.01em;
       --tracking-wide: 0.045em;
     }
-    * { box-sizing: border-box; }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       min-height: 100vh;
@@ -31,12 +36,13 @@
       text-rendering: optimizeLegibility;
       /* Fallback gradient sits behind the iframe in case it fails to load */
       background: radial-gradient(1200px 700px at 18% -12%, #244868 0%, transparent 58%),
-                  radial-gradient(900px 560px at 110% 10%, #1f3e56 0%, transparent 65%),
-                  linear-gradient(180deg, var(--bg1), var(--bg0));
+        radial-gradient(900px 560px at 110% 10%, #1f3e56 0%, transparent 65%),
+        linear-gradient(180deg, var(--bg1), var(--bg0));
       padding: 18px;
       position: relative;
       overflow-x: hidden;
     }
+
     /* Live game scene rendered behind the leaderboard */
     #bgFrame {
       position: fixed;
@@ -49,7 +55,11 @@
       filter: saturate(1.05);
       opacity: 0;
     }
-    #bgFrame.ready { opacity: 1; }
+
+    #bgFrame.ready {
+      opacity: 1;
+    }
+
     /* Dark scrim so leaderboard text stays legible over the live scene */
     #bgScrim {
       position: fixed;
@@ -57,13 +67,17 @@
       z-index: -1;
       pointer-events: none;
       background:
-        radial-gradient(120% 80% at 50% 30%, rgba(7,18,29,0.35) 0%, rgba(7,18,29,0.7) 70%, rgba(7,18,29,0.88) 100%);
+        radial-gradient(120% 80% at 50% 30%, rgba(7, 18, 29, 0.35) 0%, rgba(7, 18, 29, 0.7) 70%, rgba(7, 18, 29, 0.88) 100%);
       backdrop-filter: blur(2px) saturate(1.05);
       -webkit-backdrop-filter: blur(2px) saturate(1.05);
     }
+
     @media (prefers-reduced-motion: reduce) {
-      #bgFrame { display: none; }
+      #bgFrame {
+        display: none;
+      }
     }
+
     .wrap {
       width: min(960px, 100%);
       margin: 0 auto;
@@ -74,6 +88,7 @@
       backdrop-filter: blur(12px);
       overflow: hidden;
     }
+
     .head {
       padding: 16px 16px 10px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -82,6 +97,7 @@
       gap: 10px;
       align-items: center;
     }
+
     h1 {
       margin: 0;
       font-size: clamp(20px, 2.4vw, 30px);
@@ -89,12 +105,14 @@
       letter-spacing: -0.01em;
       color: var(--accent);
     }
+
     .sub {
       margin: 0;
       color: var(--muted);
       font-size: 13px;
       line-height: 1.4;
     }
+
     .right {
       margin-left: auto;
       display: flex;
@@ -102,6 +120,7 @@
       gap: 8px;
       flex-wrap: wrap;
     }
+
     .btn {
       border: 1px solid var(--edge);
       background: rgba(13, 34, 48, 0.72);
@@ -119,6 +138,7 @@
       gap: 6px;
       transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
     }
+
     /* Big, obvious green Play CTA */
     .btn--play {
       padding: 12px 22px;
@@ -137,6 +157,7 @@
         0 0 36px rgba(120, 240, 170, 0.4);
       animation: playPulse 2.2s ease-in-out infinite;
     }
+
     .btn--play::before {
       content: "▶";
       font-size: 11px;
@@ -144,6 +165,7 @@
       display: inline-block;
       transform: translateY(-1px);
     }
+
     .btn--play:hover {
       transform: translateY(-1px);
       filter: brightness(1.05);
@@ -152,18 +174,26 @@
         0 14px 36px rgba(80, 220, 140, 0.55),
         0 0 48px rgba(120, 240, 170, 0.5);
     }
-    .btn--play:active { transform: translateY(0); }
+
+    .btn--play:active {
+      transform: translateY(0);
+    }
+
     .btn--play:focus-visible {
       outline: 2px solid rgba(220, 255, 235, 0.95);
       outline-offset: 3px;
     }
+
     @keyframes playPulse {
-      0%, 100% {
+
+      0%,
+      100% {
         box-shadow:
           0 0 0 1px rgba(180, 255, 210, 0.6) inset,
           0 10px 28px rgba(80, 220, 140, 0.45),
           0 0 36px rgba(120, 240, 170, 0.4);
       }
+
       50% {
         box-shadow:
           0 0 0 1px rgba(200, 255, 220, 0.8) inset,
@@ -171,15 +201,20 @@
           0 0 56px rgba(120, 240, 170, 0.6);
       }
     }
+
     @media (prefers-reduced-motion: reduce) {
-      .btn--play { animation: none; }
+      .btn--play {
+        animation: none;
+      }
     }
+
     .meta {
       padding: 11px 16px;
       color: var(--muted);
       font-size: 12px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     }
+
     .list {
       list-style: none;
       margin: 0;
@@ -187,6 +222,7 @@
       display: grid;
       gap: 7px;
     }
+
     .row {
       display: grid;
       grid-template-columns: 48px 1fr auto auto;
@@ -200,17 +236,23 @@
       line-height: 1.35;
       scroll-margin-top: 22px;
     }
-    .rank { color: var(--muted); font-weight: 600; }
+
+    .rank {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
     .name {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
+
     .catBadge {
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      font-size: 10.5px;
+      font-size: 11px;
       font-weight: 700;
       letter-spacing: 0.02em;
       padding: 2px 8px 2px 6px;
@@ -220,14 +262,28 @@
       color: #cdd7e5;
       white-space: nowrap;
     }
-    .catBadge .catEmoji { font-size: 13px; line-height: 1; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.35)); }
+
+    .catBadge .catEmoji {
+      font-size: 13px;
+      line-height: 1;
+      filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.35));
+    }
+
     .catBadge .catDot {
-      width: 8px; height: 8px; border-radius: 50%;
-      border: 1px solid rgba(0,0,0,0.45);
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.12);
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 0, 0, 0.45);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
       flex-shrink: 0;
     }
-    .row.hit .catBadge { background: rgba(255,216,115,0.1); border-color: rgba(255,216,115,0.3); color: #ffeab2; }
+
+    .row.hit .catBadge {
+      background: rgba(255, 216, 115, 0.1);
+      border-color: rgba(255, 216, 115, 0.3);
+      color: #ffeab2;
+    }
+
     .time {
       font-family: var(--font-mono);
       font-variant-numeric: tabular-nums;
@@ -235,38 +291,58 @@
       font-weight: 800;
       letter-spacing: 0.02em;
     }
+
     .row.hit {
       background: rgba(255, 216, 115, 0.14);
       border-color: var(--goldEdge);
       box-shadow: 0 0 0 2px rgba(255, 216, 115, 0.2) inset;
     }
+
     .row.hit .time,
-    .row.hit .name { color: var(--gold); }
+    .row.hit .name {
+      color: var(--gold);
+    }
+
     .empty {
       padding: 18px;
       color: var(--muted);
       font-size: 13px;
     }
+
     @media (max-width: 640px) {
-      body { padding: 12px; }
-      .head { padding: 13px 12px 9px; }
-      .meta { padding: 10px 12px; }
-      .list { padding: 8px; }
-      .row { grid-template-columns: 42px 1fr auto auto; padding: 8px 9px; }
-      .right { margin-left: 0; }
+      body {
+        padding: 12px;
+      }
+
+      .head {
+        padding: 13px 12px 9px;
+      }
+
+      .meta {
+        padding: 10px 12px;
+      }
+
+      .list {
+        padding: 8px;
+      }
+
+      .row {
+        grid-template-columns: 42px 1fr auto auto;
+        padding: 8px 9px;
+      }
+
+      .right {
+        margin-left: 0;
+      }
     }
   </style>
 </head>
+
 <body>
-  <iframe
-    id="bgFrame"
-    src="/play?bg=1"
-    title=""
-    aria-hidden="true"
-    tabindex="-1"
-    referrerpolicy="same-origin"
-  ></iframe>
-  <div id="bgScrim" aria-hidden="true"><div class="bg-grid"></div></div>
+  <iframe id="bgFrame" src="/play?bg=1" title="" aria-hidden="true" tabindex="-1" referrerpolicy="same-origin"></iframe>
+  <div id="bgScrim" aria-hidden="true">
+    <div class="bg-grid"></div>
+  </div>
   <main class="wrap">
     <div class="head">
       <div>
@@ -424,4 +500,5 @@
     loadLeaderboard();
   </script>
 </body>
+
 </html>

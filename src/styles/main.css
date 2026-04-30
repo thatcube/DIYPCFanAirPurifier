@@ -447,7 +447,7 @@ h4 {
   border-radius: var(--r-xs);
   color: rgba(255, 255, 255, 0.8);
   padding: 6px 10px;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: var(--weight-medium);
   cursor: pointer;
   position: relative;
@@ -540,7 +540,7 @@ h4 {
 }
 
 .slider-row label {
-  font-size: 10.5px;
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.9);
   min-width: 50px;
   font-weight: var(--weight-medium);
@@ -549,7 +549,7 @@ h4 {
 }
 
 .slider-row span {
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--text-dim);
   min-width: 42px;
   text-align: right;
@@ -800,7 +800,7 @@ input[type=range]::-moz-range-thumb {
 
 .run-pill__fps {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.03em;
@@ -1329,7 +1329,7 @@ input[type=range]::-moz-range-thumb {
   transform: translateX(-50%) translateY(0);
   z-index: 301;
   pointer-events: none;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.015em;
   color: rgba(225, 245, 255, 0.92);
@@ -1412,7 +1412,7 @@ input[type=range]::-moz-range-thumb {
   bottom: 128px;
   transform: translateX(-50%);
   color: rgba(225, 245, 255, 0.82);
-  font-size: 11.5px;
+  font-size: 12px;
   letter-spacing: 0.015em;
   background-color: var(--glass);
   background-image: var(--glass-specular);
@@ -1433,7 +1433,7 @@ input[type=range]::-moz-range-thumb {
   background: rgba(255, 255, 255, 0.13);
   border-radius: 4px;
   padding: 1px 6px;
-  font-size: 9.5px;
+  font-size: 10px;
   border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
@@ -2144,10 +2144,10 @@ line-height: 1;
   pointer-events: none;
 }
 
-#fpPauseOverlay[style*="display: flex"] + .pause-card-host,
-#fpPauseOverlay[style*="display:flex"] + .pause-card-host,
-#fpPauseOverlay[style*="display: block"] + .pause-card-host,
-#fpPauseOverlay[style*="display:block"] + .pause-card-host {
+#fpPauseOverlay[style*="display: flex"]+.pause-card-host,
+#fpPauseOverlay[style*="display:flex"]+.pause-card-host,
+#fpPauseOverlay[style*="display: block"]+.pause-card-host,
+#fpPauseOverlay[style*="display:block"]+.pause-card-host {
   display: flex;
 }
 
@@ -2670,7 +2670,7 @@ line-height: 1;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: var(--weight-semibold);
   letter-spacing: 0.02em;
   padding: 1px 7px 1px 5px;
@@ -3446,16 +3446,19 @@ body.play-mode #fps {
   filter: blur(1.5px);
   pointer-events: none;
 }
+
 .title-splash-title::before {
   width: 21.6%;
   top: 18%;
   left: -23%;
 }
+
 .title-splash-title::after {
   width: 16.8%;
   top: 82%;
   left: -21%;
 }
+
 .title-splash-speed-line {
   width: 12%;
   top: 48%;
@@ -3675,6 +3678,7 @@ body.is-leaving .site-tabs {
     pointer-events: auto;
     transition: none;
   }
+
   body.is-leaving .site-tabs {
     transform: translate(-50%, 0);
     opacity: 0;
@@ -3683,8 +3687,13 @@ body.is-leaving .site-tabs {
   }
 }
 
-html.is-bg .site-tabs { display: none !important; }
-html.is-bg .site-tabs-pill { display: none !important; }
+html.is-bg .site-tabs {
+  display: none !important;
+}
+
+html.is-bg .site-tabs-pill {
+  display: none !important;
+}
 
 .site-tab {
   position: relative;
@@ -3732,8 +3741,14 @@ html.is-bg .site-tabs-pill { display: none !important; }
    one that matches the active state. The fill glyph aligns optically
    slightly differently on some weights, so we stack them in the same
    inline slot rather than swapping classes via JS. */
-.site-tab .site-tab__icon--fill { display: none; }
-.site-tab.is-active .site-tab__icon--regular { display: none; }
+.site-tab .site-tab__icon--fill {
+  display: none;
+}
+
+.site-tab.is-active .site-tab__icon--regular {
+  display: none;
+}
+
 .site-tab.is-active .site-tab__icon--fill {
   display: inline-block;
   opacity: 1;
@@ -3801,14 +3816,31 @@ html.is-bg .site-tabs-pill { display: none !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .site-tabs.pill-ready .site-tabs-pill { transition: opacity 0.18s ease; }
+  .site-tabs.pill-ready .site-tabs-pill {
+    transition: opacity 0.18s ease;
+  }
 }
 
 @media (max-width: 480px) {
-  .site-tabs { top: 12px; gap: 2px; padding: 4px; }
-  .site-tab { padding: 8px 12px; font-size: 12px; }
-  .site-tab i { font-size: 14px; }
-  .site-tabs-pill { top: 4px; bottom: 4px; }
+  .site-tabs {
+    top: 12px;
+    gap: 2px;
+    padding: 4px;
+  }
+
+  .site-tab {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .site-tab i {
+    font-size: 14px;
+  }
+
+  .site-tabs-pill {
+    top: 4px;
+    bottom: 4px;
+  }
 }
 
 /* Shared dotted-grid texture for the page-level scrim (#bgScrim on
@@ -3863,6 +3895,7 @@ main.page {
        jarring pop on the way back from /play to /. */
     filter 0.4s cubic-bezier(0.32, 0.72, 0, 1);
 }
+
 main.page.is-leaving {
   opacity: 0;
   transform: translateY(-6px);
@@ -3924,38 +3957,61 @@ body.is-leaving main.page {
     transform: translateY(12px);
     filter: blur(8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
     filter: blur(0);
   }
 }
-main.page > *:not(#titleSplash):not(.title-splash-card) {
+
+main.page>*:not(#titleSplash):not(.title-splash-card) {
   animation: pageContentIn 0.7s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
-main.page > *:nth-child(1):not(#titleSplash):not(.title-splash-card) { animation-delay: 0ms; }
-main.page > *:nth-child(2):not(#titleSplash):not(.title-splash-card) { animation-delay: 70ms; }
-main.page > *:nth-child(3):not(#titleSplash):not(.title-splash-card) { animation-delay: 140ms; }
-main.page > *:nth-child(4):not(#titleSplash):not(.title-splash-card) { animation-delay: 210ms; }
-main.page > *:nth-child(5):not(#titleSplash):not(.title-splash-card) { animation-delay: 280ms; }
-main.page > *:nth-child(n+6):not(#titleSplash):not(.title-splash-card) { animation-delay: 320ms; }
+
+main.page>*:nth-child(1):not(#titleSplash):not(.title-splash-card) {
+  animation-delay: 0ms;
+}
+
+main.page>*:nth-child(2):not(#titleSplash):not(.title-splash-card) {
+  animation-delay: 70ms;
+}
+
+main.page>*:nth-child(3):not(#titleSplash):not(.title-splash-card) {
+  animation-delay: 140ms;
+}
+
+main.page>*:nth-child(4):not(#titleSplash):not(.title-splash-card) {
+  animation-delay: 210ms;
+}
+
+main.page>*:nth-child(5):not(#titleSplash):not(.title-splash-card) {
+  animation-delay: 280ms;
+}
+
+main.page>*:nth-child(n+6):not(#titleSplash):not(.title-splash-card) {
+  animation-delay: 320ms;
+}
 
 /* The home splash treatment (#titleSplash + .title-splash-card) keeps
    its own boot entrance — explicitly excluded above. */
 
 @media (prefers-reduced-motion: reduce) {
+
   main.page,
   main.page.is-leaving,
   main.page.is-entering {
     transition: none;
     transform: none;
   }
+
   body.is-leaving main.page {
     transition: opacity 0.16s ease;
     transform: none;
     filter: none;
   }
-  main.page > * {
+
+  main.page>* {
     animation: none;
   }
 }
@@ -4171,7 +4227,8 @@ body:has(#charSelect.open)::before {
 body.is-leaving #charSelect.open .char-select-inner {
   transform: scale(0.92) translateY(20px);
 }
-body.is-leaving #charSelect.open .char-select-inner > * {
+
+body.is-leaving #charSelect.open .char-select-inner>* {
   opacity: 0;
   transform: translateY(12px);
   filter: blur(8px);
@@ -4193,10 +4250,12 @@ body.is-leaving #charSelect.open .char-select-inner > * {
     opacity 0.08s var(--ease-out-expo),
     visibility 0s linear 0.08s !important;
 }
+
 #charSelect.is-starting .char-select-inner {
   transition: transform 0.08s var(--ease-out-expo) !important;
 }
-#charSelect.is-starting .char-select-inner > * {
+
+#charSelect.is-starting .char-select-inner>* {
   transition:
     opacity 0.08s var(--ease-out-expo),
     transform 0.08s var(--ease-out-expo),
@@ -4268,7 +4327,7 @@ body.is-leaving #charSelect.open .char-select-inner > * {
    place before its contents bloom. Each step is 70ms (matches
    pageContentIn). On close, the .open-scoped rules drop, delays revert
    to 0, and all children fade out together with the panel. */
-.char-select-inner > * {
+.char-select-inner>* {
   opacity: 0;
   transform: translateY(12px);
   filter: blur(8px);
@@ -4277,18 +4336,35 @@ body.is-leaving #charSelect.open .char-select-inner > * {
     transform 0.5s cubic-bezier(0.32, 0.72, 0, 1),
     filter 0.5s cubic-bezier(0.32, 0.72, 0, 1);
 }
-#charSelect.open .char-select-inner > * {
+
+#charSelect.open .char-select-inner>* {
   opacity: 1;
   transform: translateY(0);
   filter: blur(0);
 }
-#charSelect.open .char-select-inner > *:nth-child(1) { transition-delay: 120ms; }
-#charSelect.open .char-select-inner > *:nth-child(2) { transition-delay: 190ms; }
-#charSelect.open .char-select-inner > *:nth-child(3) { transition-delay: 260ms; }
-#charSelect.open .char-select-inner > *:nth-child(4) { transition-delay: 330ms; }
-#charSelect.open .char-select-inner > *:nth-child(n+5) { transition-delay: 400ms; }
+
+#charSelect.open .char-select-inner>*:nth-child(1) {
+  transition-delay: 120ms;
+}
+
+#charSelect.open .char-select-inner>*:nth-child(2) {
+  transition-delay: 190ms;
+}
+
+#charSelect.open .char-select-inner>*:nth-child(3) {
+  transition-delay: 260ms;
+}
+
+#charSelect.open .char-select-inner>*:nth-child(4) {
+  transition-delay: 330ms;
+}
+
+#charSelect.open .char-select-inner>*:nth-child(n+5) {
+  transition-delay: 400ms;
+}
 
 @media (prefers-reduced-motion: reduce) {
+
   #charSelect,
   #charSelect.open,
   .char-select-inner,
@@ -4296,8 +4372,9 @@ body.is-leaving #charSelect.open .char-select-inner > * {
     transition: opacity 0.18s ease, visibility 0s linear;
     transform: none;
   }
-  .char-select-inner > *,
-  #charSelect.open .char-select-inner > * {
+
+  .char-select-inner>*,
+  #charSelect.open .char-select-inner>* {
     transition: opacity 0.18s ease;
     transform: none;
     filter: none;
@@ -4311,6 +4388,7 @@ body.is-leaving #charSelect.open .char-select-inner > * {
     padding: 22px 20px 20px;
     border-radius: 26px;
   }
+
   .char-select-inner::before {
     border-radius: 26px 26px 0 0;
   }
@@ -4636,7 +4714,7 @@ body.is-leaving #charSelect.open .char-select-inner > * {
 
 .mode-pill__sub {
   display: block;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: var(--weight-med);
   letter-spacing: 0.02em;
   opacity: 0.7;
@@ -4769,31 +4847,38 @@ body.play-mode #fpChargeBar {
     transform: translate(-50%, -40px);
     filter: blur(14px);
   }
+
   to {
     opacity: 1;
     transform: translate(-50%, 0);
     filter: blur(0);
   }
 }
+
 @keyframes fpHudBottomIn {
   from {
     opacity: 0;
     transform: translate(-50%, 40px);
     filter: blur(14px);
   }
+
   to {
     opacity: 1;
     transform: translate(-50%, 0);
     filter: blur(0);
   }
 }
+
 body.play-mode .run-hud-center {
   animation: fpHudTopIn 1.4s 0ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
+
 body.play-mode #fpChargeBar {
   animation: fpHudBottomIn 1.4s 200ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
+
 @media (prefers-reduced-motion: reduce) {
+
   body.play-mode .run-hud-center,
   body.play-mode #fpChargeBar {
     animation: none;
@@ -5656,7 +5741,7 @@ input[type=range]:focus-visible {
 .death-sub {
   margin: 0 0 22px;
   color: rgba(255, 230, 220, 0.82);
-  font-size: 14.5px;
+  font-size: 15px;
   line-height: 1.45;
 }
 

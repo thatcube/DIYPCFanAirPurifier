@@ -59,7 +59,6 @@ const _segDir = new THREE.Vector3();
 // fireballs each frame so we don't allocate.
 const _raycaster = new THREE.Raycaster();
 const _rcResults = [];
-let _catMarked = false;
 
 // Scorch decals (ring buffer). Each is a small dark circle parented
 // to the hit point on the world, kept short-lived and capped.
@@ -306,12 +305,6 @@ function _arm(fb) {
   _getMuzzlePosition(_tmpOrigin);
   _getAimDirection(_tmpDir);
 
-  // Mark the cat group once so fireballs don't blow up on the caster.
-  if (!_catMarked && _catGroup) {
-    _catGroup.traverse(o => { if (o && o.userData) o.userData._fireballSkip = true; });
-    _catMarked = true;
-  }
-
   fb.active = true;
   fb.age = 0;
   fb.exploding = false;
@@ -427,9 +420,22 @@ function _segmentHit(from, to) {
   return null;
 }
 
+// Anything the fireball ray should ignore: our own FX, the player's
+// cat (so shots don't blow up on the caster — including any meshes
+// attached to the cat after the first shot), all soft visual FX that
+// already opt out of clicks, and pointcloud/sprite-only nodes that
+// represent floating particles or glints rather than solid surfaces.
+// Without these filters, fireballs detonated on mid-air air-flow
+// particles or unmarked cat children, leaving scorch decals hanging
+// in space.
 function _isOwnObject(o) {
   while (o) {
-    if (o.userData && o.userData._fireballSkip) return true;
+    if (o === _catGroup) return true;
+    if (o.isPoints || o.isSprite) return true;
+    if (o.userData) {
+      if (o.userData._fireballSkip) return true;
+      if (o.userData.clickPassthrough) return true;
+    }
     o = o.parent;
   }
   return false;
@@ -519,6 +525,10 @@ function _spawnScorch(hit, travelDir, fireballSize = 1, laser = false) {
     });
     const mesh = new THREE.Mesh(_scorchGeo, mat);
     mesh.userData._fireballSkip = true;
+    // Don't let scorch decals swallow user clicks or aim raycasts —
+    // they're cosmetic and the click handlers (purifier.js / game-fp.js)
+    // both honor this flag to look past them.
+    mesh.userData.clickPassthrough = true;
     _scene.add(mesh);
     entry = { mesh, mat, age: 0, alive: false };
     _scorches[_scorchIdx] = entry;
