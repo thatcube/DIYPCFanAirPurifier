@@ -120,156 +120,8 @@
       gap: 20px;
     }
 
-    /* ── Hero challenge card ──────────────────────────────────────
-       Same liquid-glass surface as .title-splash-card: white-edged
-       border, full inset highlight + dark seam stack, 32px radius. */
-    .hero {
-      position: relative;
-      background-color: var(--glass);
-      background-image: var(--glass-specular);
-      border: 1px solid var(--glass-border);
-      border-radius: 32px;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.4),
-        inset 0 -1px 0 rgba(255, 255, 255, 0.06),
-        inset 0 0 32px 0 rgba(255, 255, 255, 0.03),
-        0 30px 80px rgba(0, 0, 0, 0.5),
-        0 1px 0 rgba(0, 0, 0, 0.5);
-      backdrop-filter: var(--glass-blur);
-      -webkit-backdrop-filter: var(--glass-blur);
-      padding: 28px 26px 26px;
-      display: grid;
-      gap: 18px;
-      isolation: isolate;
-    }
-
-    /* Top sheen — slim refractive glaze across the very top of the card,
-       same trick as .title-splash-card::before. */
-    .hero::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 6%;
-      right: 6%;
-      height: 1px;
-      background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.7) 50%, transparent 100%);
-      border-radius: 32px 32px 0 0;
-      pointer-events: none;
-    }
-
-    .hero__eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--lb-accent);
-      opacity: 0.92;
-    }
-
-    .hero__eyebrow i {
-      font-size: 13px;
-    }
-
-    .hero__headline {
-      margin: 0;
-      font-size: clamp(22px, 3.4vw, 32px);
-      font-weight: 800;
-      line-height: 1.18;
-      letter-spacing: -0.01em;
-    }
-
-    .hero__headline .who {
-      color: var(--lb-gold);
-    }
-
-    .hero__headline .time {
-      font-family: var(--font-mono);
-      font-variant-numeric: tabular-nums;
-      color: var(--lb-gold);
-      letter-spacing: 0.01em;
-      white-space: nowrap;
-    }
-
-    .hero__pitch {
-      margin: 0;
-      color: var(--muted);
-      font-size: 14px;
-      line-height: 1.55;
-      max-width: 56ch;
-    }
-
-    .hero__pitch b {
-      color: #d9ebff;
-      font-weight: 700;
-    }
-
-    .hero__cta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      align-items: center;
-      margin-top: 4px;
-    }
-
-    .playBtn {
-      flex: 0 1 auto;
-      padding: 16px 32px;
-      font-size: 17px;
-      font-weight: 800;
-      letter-spacing: 0.02em;
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      text-decoration: none;
-    }
-
-    .playBtn i {
-      font-size: 1.15em;
-    }
-
-    /* Secondary share-page button — uses the same .glass-btn--secondary
-       material as the in-game cancel/close buttons but rendered at the
-       compact share-page sizing. */
-    .miniBtn {
-      padding: 11px 16px;
-      font-size: 13px;
-      font-weight: var(--weight-semibold);
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      text-decoration: none;
-      background-color: var(--glass-light, rgba(18, 24, 38, 0.28));
-      border: 1px solid var(--glass-border);
-      color: #d9ebff;
-      border-radius: var(--r-md);
-      cursor: pointer;
-      font-family: inherit;
-      backdrop-filter: var(--glass-blur);
-      -webkit-backdrop-filter: var(--glass-blur);
-      transition: border-color 0.2s, background-color 0.2s, transform 0.2s;
-    }
-
-    .miniBtn:hover {
-      border-color: var(--glass-border-strong);
-      background-color: rgba(255, 255, 255, 0.06);
-      transform: translateY(-1px);
-    }
-
-    .miniBtn:active {
-      transform: translateY(1px);
-    }
-
-    .miniBtn i {
-      font-size: 14px;
-    }
-
-    /* ── Leaderboard section (social proof) ─────────────────────
-       Secondary glass card — identical material to .hero so the page
-       reads as one continuous glass surface, just without the top sheen
-       pseudo so the eye locks on the hero first. */
+    /* ── Leaderboard section ─────────────────────────────────────
+       Liquid-glass surface matching the in-game pause/finish boards. */
     .board {
       position: relative;
       background-color: var(--glass);
@@ -509,23 +361,8 @@
         padding: 78px 12px 32px;
       }
 
-      .hero {
-        padding: 22px 18px 20px;
-        border-radius: 26px;
-      }
-
       .board {
         border-radius: 26px;
-      }
-
-      .playBtn {
-        width: 100%;
-        justify-content: center;
-      }
-
-      .miniBtn {
-        width: 100%;
-        justify-content: center;
       }
 
       .row {
@@ -559,19 +396,6 @@
   </nav>
 
   <main class="page">
-    <section class="hero" aria-labelledby="heroHeadline">
-      <span id="heroEyebrow" class="hero__eyebrow"><i class="ph-fill ph-trophy"></i> Speedrun Challenge</span>
-      <h1 id="heroHeadline" class="hero__headline">Loading challenge…</h1>
-      <p class="hero__pitch">
-        <b>DIY Air Purifier</b> is a first-person speedrun in Brandon's to-scale bedroom. Grab every coin
-        as fast as you can.
-      </p>
-      <div class="hero__cta">
-        <a class="playBtn glass-btn glass-btn--primary" href="/play" data-play-cta><i class="ph-fill ph-play"></i> Play now</a>
-        <button id="copyLinkBtn" class="miniBtn" type="button"><i class="ph ph-link"></i> Copy link</button>
-      </div>
-    </section>
-
     <section class="board" aria-labelledby="boardHeadline">
       <header class="board__head">
         <h2 id="boardHeadline">Top times</h2>
@@ -648,10 +472,7 @@
     window.__initLeaderboard = function __initLeaderboard() {
       const rowsEl = document.getElementById('rows');
       const emptyEl = document.getElementById('empty');
-      const heroHeadline = document.getElementById('heroHeadline');
-      const heroEyebrow = document.getElementById('heroEyebrow');
       const boardMeta = document.getElementById('boardMeta');
-      const copyBtn = document.getElementById('copyLinkBtn');
       if (!rowsEl) return; // not on the leaderboard view (defensive)
 
       const query = new URLSearchParams(location.search);
@@ -695,32 +516,6 @@
         return `<span class="secretBadge${cls}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><i class="ph-fill ph-key"></i>${n}/${goal}</span>`;
       }
 
-      async function copyText(text) {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-          return;
-        }
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.left = '-9999px';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        ta.remove();
-      }
-
-      function renderHero({ challenger, time, isTopTime }) {
-        if (challenger && time) {
-          const eyebrow = isTopTime ? 'Top time on the board' : 'A friend challenged you';
-          heroEyebrow.innerHTML = `<i class="ph-fill ph-trophy"></i> ${escapeHtml(eyebrow)}`;
-          heroHeadline.innerHTML = `Beat <span class="who">${escapeHtml(challenger)}</span>'s <span class="time">${escapeHtml(time)}</span>`;
-        } else {
-          heroEyebrow.innerHTML = `<i class="ph-fill ph-trophy"></i> Speedrun Challenge`;
-          heroHeadline.textContent = 'How fast can you grab every coin?';
-        }
-      }
-
       async function loadLeaderboard() {
         let rows = [];
         try {
@@ -732,20 +527,6 @@
         } catch (err) {
           rows = [];
           boardMeta.textContent = 'Connection issue';
-        }
-
-        // Resolve hero target: the shared entry, falling back to #1.
-        let hitRow = null;
-        if (hitId) hitRow = rows.find((r) => String(r.id || '') === hitId) || null;
-        const heroRow = hitRow || rows[0] || null;
-        if (heroRow) {
-          renderHero({
-            challenger: heroRow.name || 'Someone',
-            time: fmtRun(heroRow.timeMs),
-            isTopTime: !hitRow && heroRow === rows[0]
-          });
-        } else {
-          renderHero({});
         }
 
         if (!rows.length) {
@@ -777,17 +558,6 @@
           if (hitEl) setTimeout(() => hitEl.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
         }
       }
-
-      copyBtn.addEventListener('click', async () => {
-        const original = copyBtn.innerHTML;
-        try {
-          await copyText(location.href);
-          copyBtn.innerHTML = '<i class="ph ph-check"></i> Copied!';
-        } catch (err) {
-          copyBtn.innerHTML = '<i class="ph ph-warning"></i> Copy failed';
-        }
-        setTimeout(() => { copyBtn.innerHTML = original; }, 1400);
-      });
 
       function syncModeTabsUI() {
         const tabs = document.querySelectorAll('#modeTabs [data-lb-mode]');
