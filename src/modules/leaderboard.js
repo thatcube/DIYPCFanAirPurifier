@@ -11,7 +11,7 @@ import {
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { trapFocus, saveFocus } from './a11y.js';
-import { CAT_COLOR_PRESETS, CAT_MODEL_PRESETS } from './constants.js';
+import { CAT_COLOR_PRESETS, CAT_MODEL_PRESETS, TOTAL_SECRETS } from './constants.js';
 
 // ── Config ──────────────────────────────────────────────────────────
 
@@ -751,20 +751,25 @@ function _buildLeaderboardUrl(entryId /*, timeMs */) {
 
 function _buildShareText(data) {
   const row = data || {};
-  const rankTxt = row.rank && row.rank > 0 ? `#${row.rank}` : 'Unranked';
-  const who = _sanitizePlayerName(row.name) || (_playerName || 'Player');
   const catColor = sanitizeColorKey(row.catColor || catColorKey);
   const catModel = sanitizeModelKey(row.catModel || catModelKey);
   const modelEmoji = CAT_MODEL_EMOJI[catModel] || '🐱';
   const modelLabel = CAT_MODEL_LABELS_SHORT[catModel] || 'Cat';
+  // Models with baked-in coats don't surface a color chip elsewhere in the UI;
+  // mirror that here so the share text matches the leaderboard badge.
   const colorChip = (catModel !== 'bababooey' && catModel !== 'totodile' && catModel !== 'korra')
-    ? ` ${CAT_COLOR_EMOJI[catColor] || ''} ${catColor.charAt(0).toUpperCase() + catColor.slice(1)}`
+    ? ` · ${CAT_COLOR_EMOJI[catColor] || ''} ${catColor.charAt(0).toUpperCase() + catColor.slice(1)}`
     : '';
   const url = _buildLeaderboardUrl(row.entryId || '', row.timeMs || 0);
   const secretCount = Math.floor(Number(row.secretCoins) || 0);
-  const secretChip = secretCount > 0 ? ` · 🔵 ${secretCount} secret${secretCount > 1 ? 's' : ''}` : '';
+  const secretChip = ` · 🔵 ${secretCount}/${TOTAL_SECRETS} secrets`;
+  const rank = Math.floor(Number(row.rank) || 0);
+  const rankChip = rank > 0 ? ` · #${rank}` : '';
+  const runMode = _sanitizeMode(row.mode || _currentRunMode);
+  const modeChip = runMode === 'speed' ? ' ⚡' : '';
+  const time = formatRunTime(row.timeMs || 0, true);
   return [
-    `${who} · DIY Air Purifier · ${formatRunTime(row.timeMs || 0, true)} · ${rankTxt} · ${modelEmoji} ${modelLabel}${colorChip}${secretChip}`,
+    `Beat my time on Zoomies${modeChip} · ${time}${rankChip} · ${modelEmoji} ${modelLabel}${colorChip}${secretChip}`,
     url
   ].join('\n');
 }
@@ -1376,9 +1381,15 @@ function _renderFinishDialog() {
     if (pending) {
       summaryRank.innerHTML = '<span class="finishRankSkel" aria-hidden="true"></span>';
       summaryRank.setAttribute('aria-label', 'Saving rank');
-    } else {
-      summaryRank.textContent = rank > 0 ? `#${rank}` : 'Unranked';
+    } else if (rank > 0) {
+      summaryRank.textContent = `#${rank}`;
       summaryRank.removeAttribute('aria-label');
+    } else {
+      // Run isn't on the leaderboard (rejected, offline fallback, or didn't
+      // make the cap). Show a neutral em-dash instead of inventing a label
+      // the player has to decode.
+      summaryRank.textContent = '—';
+      summaryRank.setAttribute('aria-label', 'Not on leaderboard');
     }
   }
   if (summarySecret) {
