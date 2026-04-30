@@ -44,7 +44,6 @@ function _loadCatPreview() {
 }
 const initPreviews = (...args) => _loadCatPreview().then(m => m.initPreviews(...args));
 const flushPreviewsOnOpen = (...args) => _loadCatPreview().then(m => m.flushPreviewsOnOpen(...args));
-const recolorClassicPreview = (...args) => _loadCatPreview().then(m => m.recolorClassicPreview(...args));
 import { initToggleSwitches, initSegButtons, initDecorativeIcons, initClickableDivs, trapFocus, saveFocus } from './modules/a11y.js';
 import {
   SHADOW_UPDATE_INTERVAL_MS, IDLE_FRAME_MS,
@@ -584,7 +583,6 @@ if (roomRefs && typeof roomRefs.setMacbookMuted === 'function') {
 
 // Character select screen
 let _selectedModel = 'classic';
-let _selectedColor = 'charcoal';
 let _selectedMode = gameFp.isSpeedMode() ? 'speed' : (gameFp.isSkateMode() ? 'skate' : 'normal');
 
 // Refresh the speed-mode pill's locked/unlocked state + progress label every
@@ -791,9 +789,6 @@ window._openCharSelect = () => {
   document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
   const activeCard = document.querySelector(`.char-card[data-model="${_selectedModel}"]`);
   if (activeCard) activeCard.classList.add('selected');
-  // Show/hide color dots based on current selection
-  const colorSection = document.getElementById('classicColors');
-  if (colorSection) colorSection.style.visibility = _selectedModel === 'classic' ? 'visible' : 'hidden';
   document.querySelectorAll('.mode-pill').forEach(p => p.classList.toggle('on', p.dataset.mode === _selectedMode));
 };
 
@@ -1026,18 +1021,6 @@ window._selectCat = (model, el) => {
   _selectedModel = model;
   document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
   if (el) el.classList.add('selected');
-  // Show/hide color dots (only for colorable models) — use visibility to preserve layout
-  const colorSection = document.getElementById('classicColors');
-  if (colorSection) colorSection.style.visibility = model === 'classic' ? 'visible' : 'hidden';
-};
-
-window._selectColor = (color, el) => {
-  _selectedColor = color;
-  document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('on'));
-  if (el) el.classList.add('on');
-  // Update the 3D preview color
-  const colorMap = { charcoal: 0x0a0a12, cream: 0xB08030, midnight: 0x040818, snow: 0xd8d8d8 };
-  recolorClassicPreview(colorMap[color] || 0x0a0a12);
 };
 
 window._selectMode = (mode, el) => {
@@ -1088,9 +1071,6 @@ window._startGame = () => {
   if (_charSelectSavedFocus) { _charSelectSavedFocus.restore(); _charSelectSavedFocus = null; }
   // Apply cat selection
   catAppearance.setCatModelKeyRaw(_selectedModel);
-  if (catAppearance.isColorable(_selectedModel)) {
-    catAppearance.setCatColorKeyRaw(_selectedColor);
-  }
   // Apply movement / coin mode
   const speed = _selectedMode === 'speed';
   const skate = _selectedMode === 'skate';

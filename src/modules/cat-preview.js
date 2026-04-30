@@ -427,17 +427,3 @@ export function disposePreviews() {
   for (const p of previews) { p.renderer.dispose(); }
   previews.length = 0;
 }
-
-/** Recolor the classic cat preview model */
-export function recolorClassicPreview(coatHex) {
-  const p = previews.find(p => p.key === 'classic');
-  if (!p || !p.model) return;
-  const color = new THREE.Color(coatHex);
-  p.model.traverse(child => {
-    if (child.isMesh && child.material && child.material.map) {
-      // Tint the base color to approximate the coat
-      child.material.color.copy(color).lerp(new THREE.Color(0xffffff), 0.3);
-      child.material.needsUpdate = true;
-    }
-  });
-}

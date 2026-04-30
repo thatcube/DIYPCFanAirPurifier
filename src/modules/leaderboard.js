@@ -5,7 +5,7 @@
 
 import {
   catModelKey, catColorKey, catHairKey,
-  sanitizeColorKey, sanitizeModelKey, sanitizeHairKey,
+  sanitizeColorKey, sanitizeModelKey, sanitizeHairKey, isColorable,
   CAT_COLOR_EMOJI, CAT_MODEL_EMOJI, CAT_MODEL_LABELS_SHORT
 } from './cat-appearance.js';
 import * as THREE from 'three';
@@ -755,9 +755,9 @@ function _buildShareText(data) {
   const catModel = sanitizeModelKey(row.catModel || catModelKey);
   const modelEmoji = CAT_MODEL_EMOJI[catModel] || '🐱';
   const modelLabel = CAT_MODEL_LABELS_SHORT[catModel] || 'Cat';
-  // Models with baked-in coats don't surface a color chip elsewhere in the UI;
-  // mirror that here so the share text matches the leaderboard badge.
-  const colorChip = (catModel !== 'bababooey' && catModel !== 'totodile' && catModel !== 'korra')
+  // Only models with a coat picker surface a color chip — everything else
+  // (classic, bababooey, totodile, korra) ships with baked-in colors.
+  const colorChip = isColorable(catModel)
     ? ` · ${CAT_COLOR_EMOJI[catColor] || ''} ${catColor.charAt(0).toUpperCase() + catColor.slice(1)}`
     : '';
   const url = _buildLeaderboardUrl(row.entryId || '', row.timeMs || 0);
@@ -1022,7 +1022,7 @@ function _ensureFinishPreviewRenderer() {
 }
 
 function _tintFinishPreviewModel(model, modelKey, colorKey) {
-  if (!model || modelKey !== 'classic') return;
+  if (!model || !isColorable(modelKey)) return;
   const coat = new THREE.Color((CAT_COLOR_PRESETS[colorKey] || CAT_COLOR_PRESETS.charcoal).coat);
   const skip = /(eye|pupil|nose|mouth|tongue|tooth|teeth|whisker|inner|ear)/i;
   model.traverse(o => {
