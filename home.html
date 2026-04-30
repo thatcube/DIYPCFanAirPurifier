@@ -4,9 +4,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Bedroom Floor</title>
+  <title>Zoomies</title>
   <meta name="description"
-    content="Bedroom Floor — a 3D replica of my room. Play as a cat, collect every coin." />
+    content="Zoomies — a first-person speedrun through a 3D replica of my room. Play as a cat, collect every coin." />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <!-- Same stylesheet (and design tokens) the in-game UI uses, so the
        splash card and tab bar paint identically across home / about /
@@ -61,7 +61,10 @@
          the iframe is mid-transition, since backdrop-filter is
          sampling a half-transparent iframe over a flat body color. */
     }
-    #bgFrame.ready { opacity: 1; }
+
+    #bgFrame.ready {
+      opacity: 1;
+    }
 
     /* When the iframe is "promoted" out of bg mode into play (the
        big Play CTA), input needs to flow into it. The scrim and the
@@ -76,13 +79,20 @@
       z-index: 2;
     }
 
-    @media (prefers-reduced-motion: reduce) { #bgFrame { display: none; } }
+    @media (prefers-reduced-motion: reduce) {
+      #bgFrame {
+        display: none;
+      }
+    }
 
     /* Same scrim definition as about.html / leaderboard.html so all
        three pages render the live three.js scene through the same
        piece of glass. */
     #bgScrim {
-      position: fixed; inset: 0; z-index: 1; pointer-events: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
       background:
         radial-gradient(120% 80% at 50% 0%, rgba(8, 10, 16, 0.55) 0%, rgba(8, 10, 16, 0) 55%),
         radial-gradient(120% 80% at 50% 100%, rgba(8, 10, 16, 0.6) 0%, rgba(8, 10, 16, 0) 55%);
@@ -94,7 +104,9 @@
        via flex on the wrapper. Force display so it doesn't depend on
        the #titleSplash.open sibling combinator (which we no longer
        use on this page). */
-    main.page > .title-splash-card { display: block; }
+    main.page>.title-splash-card {
+      display: block;
+    }
 
     /* The Play button's "ready" content row is hidden by default and
        shown via `#titleSplash[data-state="ready"] + .title-splash-card`
@@ -102,7 +114,7 @@
        a plain #bgScrim instead), so that sibling rule never matches.
        Force the ready row visible here — home is always in the ready
        state since the iframe handles its own boot. */
-    main.page > .title-splash-card .title-splash-play-content--ready {
+    main.page>.title-splash-card .title-splash-play-content--ready {
       display: inline-flex;
     }
 
@@ -132,18 +144,20 @@
        The `allow` attribute is required for pointer-lock to work
        once the iframe is "promoted" out of bg mode into play. -->
   <iframe id="bgFrame" src="/play?bg=1" title="" aria-hidden="true" tabindex="-1"
-    allow="pointer-lock; fullscreen; autoplay; gamepad"
-    referrerpolicy="same-origin"></iframe>
+    allow="pointer-lock; fullscreen; autoplay; gamepad" referrerpolicy="same-origin"></iframe>
 
   <nav class="site-tabs" aria-label="Primary">
     <a class="site-tab" href="/" data-tab="home">
-      <i class="site-tab__icon site-tab__icon--regular ph ph-house"></i><i class="site-tab__icon site-tab__icon--fill ph-fill ph-house"></i><span>Home</span>
+      <i class="site-tab__icon site-tab__icon--regular ph ph-house"></i><i
+        class="site-tab__icon site-tab__icon--fill ph-fill ph-house"></i><span>Home</span>
     </a>
     <a class="site-tab" href="/leaderboard" data-tab="leaderboard">
-      <i class="site-tab__icon site-tab__icon--regular ph ph-trophy"></i><i class="site-tab__icon site-tab__icon--fill ph-fill ph-trophy"></i><span>Leaderboard</span>
+      <i class="site-tab__icon site-tab__icon--regular ph ph-trophy"></i><i
+        class="site-tab__icon site-tab__icon--fill ph-fill ph-trophy"></i><span>Leaderboard</span>
     </a>
     <a class="site-tab" href="/about" data-tab="about">
-      <i class="site-tab__icon site-tab__icon--regular ph ph-info"></i><i class="site-tab__icon site-tab__icon--fill ph-fill ph-info"></i><span>About</span>
+      <i class="site-tab__icon site-tab__icon--regular ph ph-info"></i><i
+        class="site-tab__icon site-tab__icon--fill ph-fill ph-info"></i><span>About</span>
     </a>
   </nav>
 
@@ -153,18 +167,22 @@
        this, which had its own padding / overflow / animation rules
        and lived inside <main>, producing a subtly darker, slightly
        different look than the other pages. -->
-  <div id="bgScrim" aria-hidden="true"><div class="bg-grid"></div></div>
+  <div id="bgScrim" aria-hidden="true">
+    <div class="bg-grid"></div>
+  </div>
 
   <main class="page">
     <!-- Splash card — same markup as /play used to have, minus the
          button-state spans (no loading state on home) and minus the
          secondary nav (replaced by the top-level .site-tabs). -->
-    <div class="title-splash-card" role="dialog" aria-modal="true" aria-label="Bedroom Floor — title screen">
+    <div class="title-splash-card" role="dialog" aria-modal="true" aria-label="Zoomies — title screen">
       <h1 class="title-splash-title">
-        <span class="title-splash-title-main">Bedroom Floor</span>
+        <span class="title-splash-speed-line" aria-hidden="true"></span>
+        <span class="title-splash-title-main">Zoomies</span>
       </h1>
       <p class="title-splash-tagline">
-        A 3D replica of my room. Play as a cat, collect every coin.
+        A first-person speedrun through a 3D replica of my room. Pick a cat (or a Totodile), find secret coins, try to
+        top the leaderboard.
       </p>
       <div class="title-splash-cta">
         <!-- Plain anchor — the SPA router intercepts site-tab clicks
@@ -315,7 +333,7 @@
       // Webfonts can resize the tab labels after first paint; re-measure
       // when they're ready so the pill snaps to the final width.
       if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(updatePill).catch(() => {});
+        document.fonts.ready.then(updatePill).catch(() => { });
       }
 
       function fullNav(href, opts) {
@@ -450,8 +468,8 @@
       let _pendingPlay = false;
       function _sendEnterPlay() {
         if (!bgFrame || !bgFrame.contentWindow) return;
-        try { bgFrame.contentWindow.postMessage({ type: 'enter-play' }, location.origin); } catch (e) {}
-        try { bgFrame.contentWindow.focus(); } catch (e) {}
+        try { bgFrame.contentWindow.postMessage({ type: 'enter-play' }, location.origin); } catch (e) { }
+        try { bgFrame.contentWindow.focus(); } catch (e) { }
       }
       window.__flushPendingPlay = function () {
         if (!_pendingPlay) return;
@@ -560,7 +578,7 @@
           // to run its exit sequence (camera reset + black fade).
           _demoteFromPopstate = true;
           if (bgFrame && bgFrame.contentWindow) {
-            try { bgFrame.contentWindow.postMessage({ type: 'exit-play' }, location.origin); } catch (err) {}
+            try { bgFrame.contentWindow.postMessage({ type: 'exit-play' }, location.origin); } catch (err) { }
           }
           return;
         }

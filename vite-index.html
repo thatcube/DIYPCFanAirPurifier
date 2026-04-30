@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DIY PC Fan Air Purifier</title>
+  <title>Zoomies</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
@@ -69,13 +69,17 @@
     #sceneFade {
       position: fixed;
       inset: 0;
-      z-index: 2147483646; /* one below the max — leave headroom */
+      z-index: 2147483646;
+      /* one below the max — leave headroom */
       background: #000;
       opacity: 0;
       pointer-events: none;
       will-change: opacity;
     }
-    #sceneFade.is-active { pointer-events: auto; }
+
+    #sceneFade.is-active {
+      pointer-events: auto;
+    }
   </style>
   <script>
     // Run before <body> so the chrome never paints in iframe-bg mode.
@@ -140,7 +144,7 @@
     <div id="charSelect" role="dialog" aria-modal="true" aria-label="Character select">
       <div class="char-select-inner">
         <div class="char-select-header">
-          <h2>Choose Your Cat</h2>
+          <h2>Select a character</h2>
           <button class="char-back" aria-label="Back" onclick="window._closeCharSelect&&window._closeCharSelect()"><i
               class="ph ph-x"></i></button>
         </div>
@@ -186,13 +190,13 @@
             onclick="window._selectMode&&window._selectMode('speed',this)">
             <i class="ph ph-lightning"></i>
             <span class="mode-pill__label">Speed</span>
-            <span class="mode-pill__sub">3× top speed · +12 coins</span>
+            <span class="mode-pill__sub">3× top speed with even more coins</span>
           </button>
           <button type="button" class="mode-pill" data-mode="skate"
             onclick="window._selectMode&&window._selectMode('skate',this)">
             <i class="ph ph-sneaker-move"></i>
-            <span class="mode-pill__label">Skate</span>
-            <span class="mode-pill__sub">Ride on a skateboard</span>
+            <span class="mode-pill__label">Skateboard</span>
+            <span class="mode-pill__sub">Do tricks</span>
           </button>
         </div>
         <button class="char-start glass-btn glass-btn--primary" onclick="window._startGame&&window._startGame()">Start
@@ -393,103 +397,102 @@
         <!-- Body: settings -->
         <div class="pause-body">
 
-            <!-- Audio -->
-            <section class="pause-section">
-              <h3 class="pause-section-title"><i class="ph ph-speaker-high"></i> Audio</h3>
-              <div class="pause-toggles">
-                <div class="pause-toggle-row">
-                  <span class="pause-toggle-label"><i class="ph-fill ph-speaker-high"></i> SFX</span>
-                  <div class="toggle-sw on" id="fpPauseMuteSfx" role="switch" aria-checked="true"
-                    onclick="this.classList.toggle('on');window._toggleMuteSfx&&window._toggleMuteSfx(!this.classList.contains('on'))">
-                  </div>
-                  <span class="pause-toggle-state" id="fpPauseMuteSfxState">On</span>
+          <!-- Audio -->
+          <section class="pause-section">
+            <h3 class="pause-section-title"><i class="ph ph-speaker-high"></i> Audio</h3>
+            <div class="pause-toggles">
+              <div class="pause-toggle-row">
+                <span class="pause-toggle-label"><i class="ph-fill ph-speaker-high"></i> SFX</span>
+                <div class="toggle-sw on" id="fpPauseMuteSfx" role="switch" aria-checked="true"
+                  onclick="this.classList.toggle('on');window._toggleMuteSfx&&window._toggleMuteSfx(!this.classList.contains('on'))">
                 </div>
-                <div class="pause-toggle-row">
-                  <span class="pause-toggle-label"><i class="ph-fill ph-music-notes"></i> Music</span>
-                  <div class="toggle-sw on" id="fpPauseMuteMusic" role="switch" aria-checked="true"
-                    onclick="this.classList.toggle('on');window._toggleMuteMusic&&window._toggleMuteMusic(!this.classList.contains('on'))">
-                  </div>
-                  <span class="pause-toggle-state" id="fpPauseMuteMusicState">On</span>
-                </div>
+                <span class="pause-toggle-state" id="fpPauseMuteSfxState">On</span>
               </div>
-            </section>
+              <div class="pause-toggle-row">
+                <span class="pause-toggle-label"><i class="ph-fill ph-music-notes"></i> Music</span>
+                <div class="toggle-sw on" id="fpPauseMuteMusic" role="switch" aria-checked="true"
+                  onclick="this.classList.toggle('on');window._toggleMuteMusic&&window._toggleMuteMusic(!this.classList.contains('on'))">
+                </div>
+                <span class="pause-toggle-state" id="fpPauseMuteMusicState">On</span>
+              </div>
+            </div>
+          </section>
 
-            <!-- Display -->
-            <section class="pause-section">
-              <h3 class="pause-section-title"><i class="ph ph-monitor"></i> Display</h3>
-              <div class="pause-toggles">
-                <div class="pause-toggle-row">
-                  <span class="pause-toggle-label"><i class="ph ph-camera-rotate"></i> Camera</span>
-                  <button type="button" class="pause-inline-btn"
-                    onclick="window._switchCamFP&&window._switchCamFP()"><span id="fpPauseCamLabel">Third person</span>
-                    <kbd>V</kbd></button>
-                </div>
-                <div class="pause-toggle-row">
-                  <span class="pause-toggle-label"><i class="ph ph-gauge"></i> Show FPS</span>
-                  <div class="toggle-sw" id="fpPauseShowFps" role="switch" aria-checked="false"
-                    onclick="window._toggleFps&&window._toggleFps()"></div>
-                  <span class="pause-toggle-state off" id="fpPauseShowFpsState">Off</span>
-                </div>
-                <div class="pause-toggle-row" id="fpPauseShowMphRow" style="display:none">
-                  <span class="pause-toggle-label"><i class="ph ph-speedometer"></i> Show MPH</span>
-                  <div class="toggle-sw on" id="fpPauseShowMph" role="switch" aria-checked="true"
-                    onclick="window._toggleMph&&window._toggleMph()"></div>
-                  <span class="pause-toggle-state" id="fpPauseShowMphState">On</span>
-                </div>
-                <div class="pause-toggle-row" id="fpPauseDebugWallsRow" style="display:none">
-                  <span class="pause-toggle-label"><i class="ph ph-walls"></i> Wall labels</span>
-                  <div class="toggle-sw" id="fpPauseDebugWalls" role="switch" aria-checked="false"
-                    onclick="window._toggleDebugWallLabels&&window._toggleDebugWallLabels()"></div>
-                  <span class="pause-toggle-state off" id="fpPauseDebugWallsState">Off</span>
-                </div>
+          <!-- Display -->
+          <section class="pause-section">
+            <h3 class="pause-section-title"><i class="ph ph-monitor"></i> Display</h3>
+            <div class="pause-toggles">
+              <div class="pause-toggle-row">
+                <span class="pause-toggle-label"><i class="ph ph-camera-rotate"></i> Camera</span>
+                <button type="button" class="pause-inline-btn"
+                  onclick="window._switchCamFP&&window._switchCamFP()"><span id="fpPauseCamLabel">Third person</span>
+                  <kbd>V</kbd></button>
               </div>
-            </section>
+              <div class="pause-toggle-row">
+                <span class="pause-toggle-label"><i class="ph ph-gauge"></i> Show FPS</span>
+                <div class="toggle-sw" id="fpPauseShowFps" role="switch" aria-checked="false"
+                  onclick="window._toggleFps&&window._toggleFps()"></div>
+                <span class="pause-toggle-state off" id="fpPauseShowFpsState">Off</span>
+              </div>
+              <div class="pause-toggle-row" id="fpPauseShowMphRow" style="display:none">
+                <span class="pause-toggle-label"><i class="ph ph-speedometer"></i> Show MPH</span>
+                <div class="toggle-sw on" id="fpPauseShowMph" role="switch" aria-checked="true"
+                  onclick="window._toggleMph&&window._toggleMph()"></div>
+                <span class="pause-toggle-state" id="fpPauseShowMphState">On</span>
+              </div>
+              <div class="pause-toggle-row" id="fpPauseDebugWallsRow" style="display:none">
+                <span class="pause-toggle-label"><i class="ph ph-walls"></i> Wall labels</span>
+                <div class="toggle-sw" id="fpPauseDebugWalls" role="switch" aria-checked="false"
+                  onclick="window._toggleDebugWallLabels&&window._toggleDebugWallLabels()"></div>
+                <span class="pause-toggle-state off" id="fpPauseDebugWallsState">Off</span>
+              </div>
+            </div>
+          </section>
 
-            <!-- Controls -->
-            <section class="pause-section">
-              <h3 class="pause-section-title"><i class="ph ph-mouse"></i> Controls</h3>
-              <div class="pause-toggles">
-                <div class="pause-toggle-row pause-toggle-row--slider">
-                  <span class="pause-toggle-label"><i class="ph ph-arrows-out-cardinal"></i> Mouse sensitivity</span>
-                  <input type="range" id="fpPauseMouseSens" class="pause-range" min="0.25" max="2.5" step="0.05"
-                    value="1" aria-label="Mouse sensitivity"
-                    oninput="window._setMouseSens&&window._setMouseSens(this.value)">
-                  <span class="pause-toggle-state" id="fpPauseMouseSensVal">1.00×</span>
-                </div>
-                <div class="pause-toggle-row pause-toggle-row--slider">
-                  <span class="pause-toggle-label"><i class="ph ph-binoculars"></i> Field of view</span>
-                  <input type="range" id="fpPauseFov" class="pause-range" min="55" max="130" step="1" value="85"
-                    aria-label="Field of view" oninput="window._setFov&&window._setFov(this.value)">
-                  <span class="pause-toggle-state" id="fpPauseFovVal">85°</span>
-                </div>
-                <div class="pause-toggle-row">
-                  <span class="pause-toggle-label"><i class="ph ph-sneaker-move"></i> Skate mode</span>
-                  <div class="toggle-sw" id="fpPauseSkateMode" role="switch" aria-checked="false"
-                    onclick="window._toggleSkateMode&&window._toggleSkateMode()"></div>
-                  <span class="pause-toggle-state off" id="fpPauseSkateModeState">Off</span>
-                </div>
+          <!-- Controls -->
+          <section class="pause-section">
+            <h3 class="pause-section-title"><i class="ph ph-mouse"></i> Controls</h3>
+            <div class="pause-toggles">
+              <div class="pause-toggle-row pause-toggle-row--slider">
+                <span class="pause-toggle-label"><i class="ph ph-arrows-out-cardinal"></i> Mouse sensitivity</span>
+                <input type="range" id="fpPauseMouseSens" class="pause-range" min="0.25" max="2.5" step="0.05" value="1"
+                  aria-label="Mouse sensitivity" oninput="window._setMouseSens&&window._setMouseSens(this.value)">
+                <span class="pause-toggle-state" id="fpPauseMouseSensVal">1.00×</span>
               </div>
-            </section>
+              <div class="pause-toggle-row pause-toggle-row--slider">
+                <span class="pause-toggle-label"><i class="ph ph-binoculars"></i> Field of view</span>
+                <input type="range" id="fpPauseFov" class="pause-range" min="55" max="130" step="1" value="85"
+                  aria-label="Field of view" oninput="window._setFov&&window._setFov(this.value)">
+                <span class="pause-toggle-state" id="fpPauseFovVal">85°</span>
+              </div>
+              <div class="pause-toggle-row">
+                <span class="pause-toggle-label"><i class="ph ph-sneaker-move"></i> Skate mode</span>
+                <div class="toggle-sw" id="fpPauseSkateMode" role="switch" aria-checked="false"
+                  onclick="window._toggleSkateMode&&window._toggleSkateMode()"></div>
+                <span class="pause-toggle-state off" id="fpPauseSkateModeState">Off</span>
+              </div>
+            </div>
+          </section>
 
-            <!-- Keyboard shortcuts -->
-            <section class="pause-section pause-section--kbd">
-              <h3 class="pause-section-title"><i class="ph ph-keyboard"></i> Keyboard</h3>
-              <div class="pause-controls">
-                <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
-                <div><kbd>Space</kbd> Jump (hold)</div>
-                <div><kbd>Shift</kbd> Sprint</div>
-                <div><kbd>V</kbd> Camera</div>
-                <div><kbd>K</kbd> Skate mode</div>
-                <div><kbd>Q</kbd> Kickflip (skate)</div>
-                <div><kbd>E</kbd> Manual (skate)</div>
-                <div><kbd>F</kbd> Helicopter (skate)</div>
-                <div><kbd>R</kbd> Reset run</div>
-                <div><kbd>Esc</kbd> Resume</div>
-              </div>
-              <button class="pause-link pause-link--footer" type="button"
-                onclick="window._enterInspector&&window._enterInspector()"><i class="ph ph-magnifying-glass"></i>
-                Inspect air purifier</button>
-            </section>
+          <!-- Keyboard shortcuts -->
+          <section class="pause-section pause-section--kbd">
+            <h3 class="pause-section-title"><i class="ph ph-keyboard"></i> Keyboard</h3>
+            <div class="pause-controls">
+              <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
+              <div><kbd>Space</kbd> Jump (hold)</div>
+              <div><kbd>Shift</kbd> Sprint</div>
+              <div><kbd>V</kbd> Camera</div>
+              <div><kbd>K</kbd> Skate mode</div>
+              <div><kbd>Q</kbd> Kickflip (skate)</div>
+              <div><kbd>E</kbd> Manual (skate)</div>
+              <div><kbd>F</kbd> Helicopter (skate)</div>
+              <div><kbd>R</kbd> Reset run</div>
+              <div><kbd>Esc</kbd> Resume</div>
+            </div>
+            <button class="pause-link pause-link--footer" type="button"
+              onclick="window._enterInspector&&window._enterInspector()"><i class="ph ph-magnifying-glass"></i>
+              Inspect air purifier</button>
+          </section>
         </div>
       </div>
     </div>

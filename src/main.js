@@ -1585,7 +1585,7 @@ function animate(ts) {
       // celebration toast the very first time it triggers so the player
       // knows there's a new cat waiting in the character select.
       if (catAppearance.tryUnlockKorra(finalTime)) {
-        showToast('🐈 Cursed Korra unlocked! Pick her in Choose Your Cat.');
+        showToast('🐈 Cursed Korra unlocked! Pick her from Select a character.');
       }
       // Open finish screen immediately and let player edit name inline
       // before saving this run.

@@ -4,9 +4,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>About — Bedroom Floor</title>
+  <title>About — Zoomies</title>
   <meta name="description"
-    content="Why a DIY PC fan air purifier became a tiny three.js side-quest where you play as a cat." />
+    content="Why a DIY PC fan air purifier became Zoomies — a tiny three.js speedrun where you play as a cat." />
   <!-- Share the same stylesheet (and design tokens) the in-game UI uses -->
   <link rel="stylesheet" href="./src/styles/main.css" />
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
@@ -164,13 +164,81 @@
       font-size: 13px;
     }
 
+    /* Mirror of the home splash wordmark, scaled down for the about
+       hero. Same architecture: a wrapper that holds 3 absolute-
+       positioned horizontal speed lines (2 pseudos + 1 real span,
+       since each element only gets ::before + ::after), and an inner
+       .hero__title-main that owns the gradient text-fill, skew, and
+       motion-trail text-shadow. See main.css .title-splash-title for
+       the canonical version + reasoning. */
     .hero__title {
       margin: 0;
       font-size: clamp(28px, 4.4vw, 42px);
       font-weight: 800;
       line-height: 1.1;
-      letter-spacing: -0.02em;
-      color: #fff;
+      letter-spacing: -0.04em;
+      display: inline-block;
+      position: relative;
+      /* Push the title rightward so the leftward trail has room to
+         breathe inside the card padding instead of clipping at the
+         card edge. Same trick the home splash uses to visually center
+         the trail+word unit. */
+      transform: translateX(clamp(20px, 3vw, 36px));
+    }
+    .hero__title::before,
+    .hero__title::after,
+    .hero__title-speed-line {
+      content: "";
+      position: absolute;
+      height: 1px;
+      border-radius: 999px;
+      background: linear-gradient(90deg,
+          transparent 0%,
+          rgba(159, 227, 255, 0.0) 0%,
+          rgba(159, 227, 255, 0.7) 60%,
+          rgba(255, 255, 255, 0.85) 100%);
+      filter: blur(0.6px);
+      pointer-events: none;
+    }
+    .hero__title::before {
+      width: 7%;
+      top: 25%;
+      left: -8%;
+    }
+    .hero__title::after {
+      width: 5.5%;
+      top: 75%;
+      left: -7%;
+    }
+    .hero__title-speed-line {
+      width: 5%;
+      top: 48%;
+      left: -5%;
+    }
+    .hero__title-main {
+      position: relative;
+      background: linear-gradient(180deg, #ffffff 0%, #f4faff 55%, #d8e8f5 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      /* See main.css for why this padding lives on the gradient-owning
+         element — background-clip:text otherwise cuts off ink that
+         overshoots the trailing glyph's advance box. */
+      padding-right: 0.32em;
+      /* Trail magnitudes are ~0.4× the home splash version since this
+         title is ~42px vs ~104px. Color stops match. */
+      text-shadow:
+        -1px 0 0 rgba(220, 240, 255, 0.55),
+        -4px 0 6px rgba(159, 227, 255, 0.55),
+        -9px 0 11px rgba(120, 200, 240, 0.4),
+        -17px 0 18px rgba(80, 170, 220, 0.3),
+        -27px 0 26px rgba(60, 140, 200, 0.22),
+        -40px 0 36px rgba(50, 120, 180, 0.16),
+        -56px 0 48px rgba(40, 100, 160, 0.1),
+        0 2px 0 rgba(0, 0, 0, 0.3);
+      transform: skewX(-7deg);
+      transform-origin: left center;
+      display: inline-block;
     }
 
     .hero__lede {
@@ -179,6 +247,20 @@
       font-size: 15px;
       line-height: 1.6;
       max-width: 60ch;
+    }
+
+    .hero__lede a {
+      color: var(--pg-accent);
+      text-decoration: underline;
+      text-decoration-color: rgba(159, 227, 255, 0.45);
+      text-underline-offset: 3px;
+      transition: color 160ms ease, text-decoration-color 160ms ease;
+    }
+
+    .hero__lede a:hover,
+    .hero__lede a:focus-visible {
+      color: #fff;
+      text-decoration-color: rgba(255, 255, 255, 0.7);
     }
 
     .hero__lede b {
@@ -412,12 +494,16 @@
         <i class="ph-fill ph-sparkle"></i>
         <span>About this thing</span>
       </div>
-      <h1 class="hero__title">Bedroom Floor</h1>
+      <h1 class="hero__title">
+        <span class="hero__title-speed-line" aria-hidden="true"></span>
+        <span class="hero__title-main">Zoomies</span>
+      </h1>
       <p class="hero__lede">
-        A 3D replica of <b>my actual bedroom</b>, rendered live in your browser with
+        A first-person speedrun through a 3D replica of <b>my actual bedroom</b>, rendered live in your browser with
         <a href="https://threejs.org/" target="_blank" rel="noopener noreferrer">three.js</a>.
-        Every wall, lamp, dresser, and very-cursed cat is hand-modeled in code — no
-        Blender files, no GLTFs. You play as a cat. You collect coins. There are secrets.
+        Most of the room — walls, lamps, dresser, posters, the DIY purifier that started this whole thing —
+        is built from primitives. A few guests are imported: the cats, a Totodile, a MacBook, a skateboard.
+        Pick a runner, find every coin (including the hidden ones), beat the timer.
       </p>
       <div class="hero__cta">
         <a class="playBtn glass-btn glass-btn--primary" href="/play" data-play-cta>
@@ -441,6 +527,11 @@
         nobody asked for. The repo is still called <code>DIYPCFanAirPurifier</code> because
         renaming it now would feel like lying about how it got here.
       </p>
+      <p>
+        If you want to actually build one — or just see what other people have come up with —
+        <a href="https://www.reddit.com/r/crboxes/" target="_blank" rel="noopener noreferrer">r/crboxes</a>
+        is a good place to start. Cheap, effective air filtration is a worthwhile rabbit hole.
+      </p>
     </section>
 
     <section class="card">
@@ -449,15 +540,15 @@
         <li>
           <i class="ph-fill ph-cube"></i>
           <div>
-            <b>Hand-modeled in code</b>
-            <span>Every prop is built from primitives — no imported meshes.</span>
+            <b>Built in three.js</b>
+            <span>Most of the bedroom is built from three.js primitives, plus a few imported guests.</span>
           </div>
         </li>
         <li>
           <i class="ph-fill ph-cat"></i>
           <div>
-            <b>Pick your cat</b>
-            <span>Five cats including Korra — my real cat, professionally cursed.</span>
+            <b>Pick your runner</b>
+            <span>Four cats (including Cursed Korra — my real cat, but the model came out so jank she earned the name) and a Totodile.</span>
           </div>
         </li>
         <li>
@@ -781,8 +872,8 @@
       let _pendingPlay = false;
       function _sendEnterPlay() {
         if (!bgFrameForPromote || !bgFrameForPromote.contentWindow) return;
-        try { bgFrameForPromote.contentWindow.postMessage({ type: 'enter-play' }, location.origin); } catch (e) {}
-        try { bgFrameForPromote.contentWindow.focus(); } catch (e) {}
+        try { bgFrameForPromote.contentWindow.postMessage({ type: 'enter-play' }, location.origin); } catch (e) { }
+        try { bgFrameForPromote.contentWindow.focus(); } catch (e) { }
       }
       window.__flushPendingPlay = function () {
         if (!_pendingPlay) return;
@@ -873,7 +964,7 @@
           // to run its exit sequence (camera reset + fade).
           _demoteFromPopstate = true;
           if (bgFrameForPromote && bgFrameForPromote.contentWindow) {
-            try { bgFrameForPromote.contentWindow.postMessage({ type: 'exit-play' }, location.origin); } catch (err) {}
+            try { bgFrameForPromote.contentWindow.postMessage({ type: 'exit-play' }, location.origin); } catch (err) { }
           }
           return;
         }

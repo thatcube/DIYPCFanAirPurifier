@@ -3794,10 +3794,10 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
         // lands here. Just make sure the charge hum is silenced.
         _silenceSsCharge();
         // Going Super Saiyan unlocks Bababooey. Fire a second toast the
-        // first time it happens so the player knows there's a new cat
-        // waiting in Choose Your Cat.
+        // first time it happens so the player knows there's a new
+        // character waiting in Select a character.
         if (catAppearance.tryUnlockBababooey() && _showToast) {
-          _showToast('🐸 Bababooey unlocked! Pick him in Choose Your Cat.');
+          _showToast('🐸 Bababooey unlocked! Pick him from Select a character.');
         }
         if (_showToast) _showToast('⚡ SUPER SAIYAN ⚡');
       }

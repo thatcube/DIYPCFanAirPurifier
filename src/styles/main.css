@@ -3409,17 +3409,93 @@ body.play-mode #fps {
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 0.92;
-  margin: 0 0 22px;
+  /* Extra top/bottom margin so the wordmark gets real breathing room
+     inside the card (the eyebrow above and the tagline below were
+     crowding the trail's vertical glow). */
+  margin: 28px 0 60px;
   display: inline-block;
+  /* The motion trail (speed lines + text-shadow haze) only extends
+     left of the wordmark, so the visual mass sits left of the
+     element's geometric center. Nudge the whole inline-block rightward
+     so the perceived center of "trail + word" lands on the card's
+     center axis. Transform is used (not margin/padding) because the
+     speed-line pseudos are positioned relative to this box \u2014 changing
+     the box width would drag them along; translate moves everything
+     as a rigid unit. */
+  transform: translateX(clamp(18px, 3vw, 44px));
+}
+
+/* Decorative speed lines streaking past the wordmark — abstract
+   horizontal blue dashes layered on the left, fading rightward. The
+   wordmark stays clean and bright; these lines do the visual work of
+   "this thing is screaming past you." Three lines total: two via
+   pseudo-elements (cap of 2 per element), and a third via a real
+   <span class="title-splash-speed-line"> in the markup. */
+.title-splash-title::before,
+.title-splash-title::after,
+.title-splash-speed-line {
+  content: "";
+  position: absolute;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(159, 227, 255, 0.0) 0%,
+      rgba(159, 227, 255, 0.7) 60%,
+      rgba(255, 255, 255, 0.85) 100%);
+  filter: blur(1.5px);
+  pointer-events: none;
+}
+.title-splash-title::before {
+  width: 21.6%;
+  top: 18%;
+  left: -23%;
+}
+.title-splash-title::after {
+  width: 16.8%;
+  top: 82%;
+  left: -21%;
+}
+.title-splash-speed-line {
+  width: 12%;
+  top: 48%;
+  left: -10.58%;
 }
 
 .title-splash-title-main {
   position: relative;
-  background: linear-gradient(180deg, #ffffff 0%, #ffe4c8 45%, #ffb066 100%);
+  /* Near-white wordmark with the faintest cool tint, so it reads as
+     bright/clean against the dark card. The bottom stop is cool but
+     still light \u2014 a deeper blue stop here pulls the whole word toward
+     icy-blue, which is what we don't want. */
+  background: linear-gradient(180deg, #ffffff 0%, #f4faff 55%, #d8e8f5 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.15);
+  /* background-clip:text only paints the gradient inside this element's
+     box, clipped to glyphs. With letter-spacing: -0.04em + heavy
+     weight, the rightmost glyph's ink overshoots its advance box on
+     the right \u2014 those pixels render as color:transparent (= invisible)
+     against the dark card. Padding-right on the same element that owns
+     the gradient extends the paint region just past the trailing glyph
+     so its full shape gets filled. */
+  padding-right: 0.32em;
+  /* Speed-line trail \u2014 lots of layers, lots of blur, long reach. The
+     wordmark itself stays nearly white; the trail does the motion
+     work. Layers progress from a near-solid cyan close to the letters
+     to a soft deep-blue haze 140px out, mimicking how motion blur
+     fades from sharp to diffuse with distance. */
+  text-shadow:
+    -3px 0 0 rgba(220, 240, 255, 0.55),
+    -10px 0 14px rgba(159, 227, 255, 0.55),
+    -22px 0 26px rgba(120, 200, 240, 0.4),
+    -42px 0 44px rgba(80, 170, 220, 0.3),
+    -68px 0 64px rgba(60, 140, 200, 0.22),
+    -100px 0 90px rgba(50, 120, 180, 0.16),
+    -140px 0 120px rgba(40, 100, 160, 0.1),
+    0 3px 0 rgba(0, 0, 0, 0.3);
+  transform: skewX(-7deg);
+  transform-origin: left center;
   display: inline-block;
 }
 
