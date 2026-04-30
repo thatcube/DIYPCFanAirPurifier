@@ -15,7 +15,13 @@ const SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_lb_time ON leaderboard_entries(time_ms ASC, at_ms ASC)`,
   `CREATE INDEX IF NOT EXISTS idx_lb_name ON leaderboard_entries(name, time_ms ASC, at_ms ASC)`,
   `CREATE INDEX IF NOT EXISTS idx_lb_player ON leaderboard_entries(player_id, time_ms ASC, at_ms ASC)`,
-  `CREATE INDEX IF NOT EXISTS idx_lb_mode ON leaderboard_entries(mode, time_ms ASC, at_ms ASC)`,
+  // Note: idx_lb_mode (the index over the `mode` column) is intentionally
+  // NOT defined here. On databases created before the `mode` column was
+  // introduced, this batch runs BEFORE ensureLeaderboardAppearanceColumns
+  // adds the column \u2014 so creating the index here would throw
+  // "no such column: mode" and poison the whole init. The same index is
+  // created (idempotently, with IF NOT EXISTS) inside
+  // ensureLeaderboardAppearanceColumns after the column is added.
   `CREATE TABLE IF NOT EXISTS run_sessions (
     run_id TEXT PRIMARY KEY,
     ip_hash TEXT NOT NULL,
