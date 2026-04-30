@@ -67,6 +67,23 @@ let nodStartTs = -1e9;
 let castStartTs = -1e9;
 let castHoldActive = false;
 const CAST_DUR_MS = 480;
+// Knockover (overcharge death). 0 = upright, 1 = fully collapsed onto
+// side. Updated by triggerKnockover/triggerRevive via timestamps and
+// applied per-frame in applyKnockoverDeath().
+let knockoverState = 'idle'; // 'idle' | 'falling' | 'down' | 'rising'
+let knockoverStartTs = 0;
+let knockoverProgress = 0;   // current 0..1 collapse blend
+let knockoverFromProgress = 0; // start-of-transition value
+const KNOCKOVER_FALL_MS = 600;
+const KNOCKOVER_RISE_MS = 700;
+const KNOCKOVER_PEAK_ROLL = Math.PI * 0.5; // 90° flop onto side
+// Half the model's X extent (after auto-scale, in parent-local units),
+// cached at load. The roll pivots around the feet at local Y=0, so when
+// we tip 90° the body's side ends up at Y = -halfWidth and clips through
+// the floor. Lifting by halfWidth·sin(roll) keeps the side flush with
+// the ground throughout the fall. Quadrupeds (Korra) need this most —
+// without it she swings down and disappears under the floor entirely.
+let _knockoverHalfWidth = 0;
 let _babaRunPhase = 0;
 let _babaRunLastTs = -1;
 let _totoRunPhase = 0;
@@ -182,6 +199,101 @@ export function endCastCharge() {
   castStartTs = now - CAST_DUR_MS * 0.28;
 }
 
+// ── Knockover / revive (overcharge death) ──────────────────────────
+// Tip the cat onto its side over ~0.6s. From whatever current
+// progress, eases to fully-down. The pose is held until triggerRevive.
+export function triggerKnockover() {
+  knockoverState = 'falling';
+  knockoverFromProgress = knockoverProgress;
+  knockoverStartTs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+}
+
+// Animate back to upright over ~0.7s.
+export function triggerRevive() {
+  if (knockoverState === 'idle') return;
+  knockoverState = 'rising';
+  knockoverFromProgress = knockoverProgress;
+  knockoverStartTs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+}
+
+// True while the cat is anywhere along the knockover/revive timeline.
+export function isKnockedOver() {
+  return knockoverState !== 'idle';
+}
+
+// Hard reset (used by run reset) — immediately drops the knockover
+// pose without playing the rise animation.
+export function clearKnockover() {
+  knockoverState = 'idle';
+  knockoverProgress = 0;
+  knockoverFromProgress = 0;
+}
+
+// Apply the knockover roll on top of any other procedural pose. Runs
+// LAST in the per-frame cat tick so it wins over cast/skate/idle.
+export function applyKnockoverDeath(ts) {
+  if (!catModel) return;
+  if (knockoverState === 'idle' && knockoverProgress <= 0) return;
+
+  if (knockoverState === 'falling') {
+    const k = Math.min(1, (ts - knockoverStartTs) / KNOCKOVER_FALL_MS);
+    // Ease-in-quad for the fall — slow start, accelerate as gravity
+    // takes over, so it reads as "wobble then thud".
+    const eased = k * k;
+    knockoverProgress = knockoverFromProgress + (1 - knockoverFromProgress) * eased;
+    if (k >= 1) {
+      knockoverProgress = 1;
+      knockoverState = 'down';
+    }
+  } else if (knockoverState === 'rising') {
+    const k = Math.min(1, (ts - knockoverStartTs) / KNOCKOVER_RISE_MS);
+    // Ease-out cubic so the cat pushes up quickly then settles.
+    const eased = 1 - Math.pow(1 - k, 3);
+    knockoverProgress = knockoverFromProgress * (1 - eased);
+    if (k >= 1) {
+      knockoverProgress = 0;
+      knockoverState = 'idle';
+      knockoverFromProgress = 0;
+    }
+  }
+
+  if (knockoverProgress <= 0.0001) return;
+
+  // Roll around the model's local Z axis (forward axis in most rigs)
+  // so the cat tips sideways onto its flank. Layered onto whatever
+  // baseLocalQuat the previous animation pass produced, then written
+  // back to the model.
+  const roll = KNOCKOVER_PEAK_ROLL * knockoverProgress;
+  tmpEuler.set(0, 0, roll);
+  tmpQuat.setFromEuler(tmpEuler);
+  // Multiply on the right of the current quaternion so the roll is
+  // local to the cat's already-yaw-rotated frame, not world-space.
+  catModel.quaternion.multiply(tmpQuat);
+
+  // Lift the model so the now-sideways body sits flat on the floor
+  // instead of sinking through it. Pivot is at the feet (local Y=0),
+  // so a 90° roll swings the X half-extent down to -halfWidth in
+  // world Y. sin(roll) eases the lift in alongside the fall so it
+  // doesn't pop. Position has been reset to baseLocalPos by an earlier
+  // animation pass this frame, so a simple += is safe.
+  if (_knockoverHalfWidth > 0) {
+    catModel.position.y += _knockoverHalfWidth * Math.sin(roll);
+  }
+}
+
+// Measure the model's X half-extent post-scale. Called once at load
+// (after _centerAndGround so the box is in its final grounded pose).
+// Used by applyKnockoverDeath to keep the body above the floor as it
+// rolls onto its side.
+function _cacheKnockoverLift(model) {
+  _knockoverHalfWidth = 0;
+  if (!model) return;
+  model.updateMatrixWorld(true);
+  boxTmp.setFromObject(model);
+  if (!Number.isFinite(boxTmp.min.x) || !Number.isFinite(boxTmp.max.x)) return;
+  _knockoverHalfWidth = (boxTmp.max.x - boxTmp.min.x) * 0.5;
+}
+
 /**
  * Load the gameplay cat from current model selection.
  * @param {object} refs - { applyCatColorToModel, playLauncherOpen, setLauncherCatPreview }
@@ -239,11 +351,15 @@ function _initGameplayCatFromScene(scene, animations, src, refs, nonce) {
   baseLocalPos.copy(catModel.position);
   baseLocalQuat.copy(catModel.quaternion);
   _cacheBababooeyRollAnchor(catModel, src);
+  _cacheKnockoverLift(catModel);
 
   // Shadows + material cleanup
   catModel.traverse(o => {
     if (o.isMesh) {
       o.castShadow = false; o.receiveShadow = true;
+      // Let click rays pass through the player character so you can
+      // interact with stuff your own body is standing in front of.
+      o.userData.clickPassthrough = true;
       if (o.isSkinnedMesh) o.frustumCulled = false;
       if (o.material && o.material.map) o.material.map.colorSpace = THREE.SRGBColorSpace;
       const mats = Array.isArray(o.material) ? o.material : [o.material];
@@ -308,6 +424,7 @@ export function clearGameplayCat() {
   _korraRunPhase = 0;
   _korraRunLastTs = -1;
   _resetBababooeyRollAnchor();
+  _knockoverHalfWidth = 0;
   _resetIdleBones();
 }
 

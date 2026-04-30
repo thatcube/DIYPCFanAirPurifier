@@ -31,6 +31,11 @@ export let fpYaw = 0;
 export let fpPitch = 0;
 export let fpVy = 0;
 export let fpPaused = false;
+// Hard input lock used by the overcharge-death overlay. While true the
+// physics tick exits early and all key/look events are dropped so the
+// cat truly can't move/jump/turn — pause overlay's Esc-toggle is also
+// suppressed so the only way out is the overlay's Revive/Reset buttons.
+let _deathLocked = false;
 
 export const fpKeys = { w: false, a: false, s: false, d: false, space: false, shift: false };
 export let fpLookDX = 0;
@@ -47,6 +52,7 @@ export let musicMuted = false;
 const SFX_MUTE_KEY = 'diy_air_purifier_muted_v2';
 const MUSIC_MUTE_KEY = 'diy_air_purifier_music_muted_v2';
 const MOUSE_SENS_KEY = 'diy_air_purifier_mouse_sens_v1';
+const FOV_KEY = 'diy_air_purifier_fov_v1';
 const SPEED_MODE_KEY = 'diy_air_purifier_speed_mode_v1';
 const SKATE_MODE_KEY = 'diy_air_purifier_skate_mode_v1';
 const SKATEBOARD_FOUND_KEY = 'diy_air_purifier_skateboard_found_v1';
@@ -148,6 +154,44 @@ export function setMouseSens(v) {
 
 export function syncMouseSensUi() {
   _syncMouseSensUi();
+}
+
+// ── FOV (camera vertical field of view) ────────────────────────────
+// Pause-menu slider; persists across sessions. Applied live while in
+// FP mode so dragging the slider reshapes the view immediately.
+const FOV_MIN = 55;
+const FOV_MAX = 130;
+const FOV_DEFAULT = 85;
+export let fpFov = FOV_DEFAULT;
+try {
+  const raw = localStorage.getItem(FOV_KEY);
+  if (raw != null) {
+    const v = parseFloat(raw);
+    if (isFinite(v)) fpFov = Math.max(FOV_MIN, Math.min(FOV_MAX, v));
+  }
+} catch (e) { }
+
+function _syncFovUi() {
+  const slider = document.getElementById('fpPauseFov');
+  const label = document.getElementById('fpPauseFovVal');
+  if (slider && slider.value !== String(fpFov)) slider.value = String(fpFov);
+  if (label) label.textContent = `${Math.round(fpFov)}°`;
+}
+
+export function setFov(v) {
+  const n = parseFloat(v);
+  if (!isFinite(n)) return;
+  fpFov = Math.max(FOV_MIN, Math.min(FOV_MAX, n));
+  try { localStorage.setItem(FOV_KEY, String(fpFov)); } catch (e) { }
+  if (fpMode && _camera) {
+    _camera.fov = fpFov;
+    _camera.updateProjectionMatrix();
+  }
+  _syncFovUi();
+}
+
+export function syncFovUi() {
+  _syncFovUi();
 }
 
 // ── MPH HUD visibility ─────────────────────────────────────────────
@@ -363,6 +407,25 @@ function _ensureChargeLight() {
 // While active (20s): cat gets 2x speed and keeps the gold aura on.
 // Yellow emissive boost on every cat material + a flickering additive
 // sphere/halo around the cat.
+//
+// CURRENT LOOK IS THE KEEPER (Apr 2026):
+// - Pre-activation charge phase: NO flame body or spikes (gated on
+//   isSuperSaiyanActive() in _applySuperSaiyan).
+// - Activation burst (b ≈ 1): full tall silhouette pops in.
+// - Burst decay: body + spikes shrink uniformly and fade together (no
+//   width squash). Once `b` drops below 0.18 they're hidden entirely
+//   so the flame never ends on a small dense fat-and-wide spiky knot.
+// - Spike tips wobble along their own outward dirs (volumetric flicker)
+//   while inner valley verts stay roughly stable.
+//
+// Alt looks that were tried and are fine swap-ins if you want to revisit:
+// 1) flame visible during pre-charge, no decay shrink (always tall),
+//    _ssSpikes yawed each frame to face the camera so the silhouette
+//    reads from any angle. Slightly more anime-card, less 3D-volume.
+// 2) sustain "fat-and-wide" decay — flame got shorter/wider as it
+//    faded. Read as a small dense pile at the tail; we cut it.
+// Keep the current uniform-shrink-then-cut version unless you
+// specifically miss one of those.
 let _ssAura = null;          // additive yellow sphere child of _catGroup
 let _ssHalo = null;          // additive yellow ring/sprite child of _catGroup
 let _ssFlameBody = null;     // additive gold "body" sphere that connects spike bases into one silhouette
@@ -379,7 +442,7 @@ const _ssEnvAnchor = new THREE.Vector3();
 
 // Activation gate + active-window timers.
 const SS_HOLD_MS = 5000;  // how long full charge must be held to activate
-const SS_ACTIVE_MS = 20000; // duration of super saiyan mode once activated
+const SS_ACTIVE_MS = 25000; // duration of super saiyan mode once activated
 const SS_HUD_ENTER_FLASH_MS = 1200;
 let _ssFullChargeSinceTs = 0; // ts when chargePct first hit 100% (0 = not holding)
 let _ssActiveUntilTs = 0;     // ts at which the active window ends (0 = not active)
@@ -409,7 +472,8 @@ function _ensureSuperSaiyanAura() {
     side: THREE.BackSide, // glow is brighter on the silhouette edge
   });
   _ssAura = new THREE.Mesh(geom, mat);
-  _ssAura.position.set(0, 4, 0);
+  // Lowered ~2" from y=4 so the orb sits centered around the body, not the head.
+  _ssAura.position.set(0, 2, 0);
   _ssAura.renderOrder = 999;
   _ssAura.frustumCulled = false;
   _ssAura.userData.clickPassthrough = true;
@@ -424,7 +488,8 @@ function _ensureSuperSaiyanAura() {
     blending: THREE.AdditiveBlending,
   });
   _ssHalo = new THREE.Mesh(new THREE.SphereGeometry(6, 20, 12), haloMat);
-  _ssHalo.position.set(0, 4, 0);
+  // Lowered ~2" to match _ssAura.
+  _ssHalo.position.set(0, 2, 0);
   _ssHalo.renderOrder = 999;
   _ssHalo.frustumCulled = false;
   _ssHalo.userData.clickPassthrough = true;
@@ -441,7 +506,8 @@ function _ensureSuperSaiyanAura() {
     blending: THREE.AdditiveBlending,
   });
   _ssFlameBody = new THREE.Mesh(new THREE.SphereGeometry(3.6, 20, 14), bodyMat);
-  _ssFlameBody.position.set(0, 2.5, 0);
+  // Lowered ~2" from y=2.5 to keep the flame silhouette aligned with the lowered aura.
+  _ssFlameBody.position.set(0, 0.5, 0);
   _ssFlameBody.renderOrder = 999;
   _ssFlameBody.frustumCulled = false;
   _ssFlameBody.userData.clickPassthrough = true;
@@ -515,7 +581,8 @@ function _ensureSuperSaiyanAura() {
   posAttrInit.needsUpdate = true;
   flameGeo.computeVertexNormals();
   _ssSpikes = new THREE.Mesh(flameGeo, _ssSpikesMat);
-  _ssSpikes.position.set(0, 2.5, 0);
+  // Lowered ~2" to match _ssFlameBody so the spike base sits with the aura.
+  _ssSpikes.position.set(0, 0.5, 0);
   _ssSpikes.renderOrder = 998;
   _ssSpikes.frustumCulled = false;
   _ssSpikes.userData.clickPassthrough = true;
@@ -608,40 +675,39 @@ function _applySuperSaiyan(strength /* 0..1 sustained */, burst /* 0..1 transien
   // tips dance like the show's aura instead of sitting static.
   // Gate body+spikes on active SS only — no pre-activation flame hint.
   const ssActive = isSuperSaiyanActive();
+  // Burst-tail cutoff: as `b` decays, body+spikes shrink uniformly AND
+  // fade in step. Once `b` drops below 0.18 they're hidden entirely so
+  // the flame doesn't end on a small, dense, fat-and-wide spiky knot.
+  // Mapping: bGate = 1 at b=1, hits 0 at b=0.18.
+  const bGate = Math.max(0, (b - 0.18) / 0.82);
   if (_ssFlameBody) {
     // Body matches spike opacity so the rim reads as one continuous flame.
     const bodyOpacity = ssActive
-      ? Math.min(1, b * 0.36) * flicker
+      ? Math.min(1, bGate * 0.45) * flicker
       : 0;
     _ssFlameBody.material.opacity = bodyOpacity;
     _ssFlameBody.visible = bodyOpacity > 0.005;
-    // During sustain, shrink overall and squash to be wider/shorter; the
-    // burst flash temporarily restores the taller original silhouette.
-    const sustain = 1 - b;
-    const bodyOverall = baseScale * (1 - sustain * 0.35);
-    const bodyWide = 1 + sustain * 0.45;
-    const bodyShort = 1 - sustain * 0.40;
+    // Uniform shrink — same proportions throughout, no width squash.
+    // Goes from full size at peak burst down to ~0.55× before cutoff.
+    const bodyOverall = baseScale * (0.55 + 0.45 * bGate);
     _ssFlameBody.scale.set(
-      bodyOverall * 0.85 * bodyWide,
-      bodyOverall * (1.15 + 0.05 * Math.sin(ts * 0.014)) * bodyShort,
-      bodyOverall * 0.85 * bodyWide,
+      bodyOverall * 0.85,
+      bodyOverall * (1.15 + 0.05 * Math.sin(ts * 0.014)),
+      bodyOverall * 0.85,
     );
   }
   if (_ssSpikes && _ssSpikesMat) {
     const spikeOpacity = ssActive
-      ? Math.min(1, b * 0.55) * flicker
+      ? Math.min(1, bGate * 0.65) * flicker
       : 0;
     _ssSpikesMat.opacity = spikeOpacity;
     _ssSpikes.visible = spikeOpacity > 0.005;
     const breathe = 0.92 + 0.12 * Math.sin(ts * 0.012);
-    const sustain = 1 - b;
-    const spikeOverall = baseScale * (1 - sustain * 0.35);
-    const spikeWide = 1 + sustain * 0.45;
-    const spikeShort = 1 - sustain * 0.40;
+    const spikeOverall = baseScale * (0.55 + 0.45 * bGate);
     _ssSpikes.scale.set(
-      spikeOverall * breathe * spikeWide,
-      spikeOverall * breathe * spikeShort,
-      spikeOverall * breathe * spikeWide,
+      spikeOverall * breathe,
+      spikeOverall * breathe,
+      spikeOverall * breathe,
     );
 
     // Volumetric flicker — wobble each vertex along its own outward direction
@@ -880,7 +946,7 @@ function _findInteractiveAncestor(obj) {
       p._isCornerDoorHandle || p._isCornerDoor ||
       p._isGuestDoor || p._isGuestDoorHandle ||
       p._isMacbook || p._isWindow || p._isWindowPane || p._isTV || p._isFoodBowl ||
-      p._isPickupSkateboard || p._isPokemonBinder || p._isStandingDesk) return p;
+      p._isPickupSkateboard || p._isPokemonBinder || p._isStandingDesk || p._isMiniSplit) return p;
   }
   return null;
 }
@@ -931,6 +997,10 @@ function _labelForInteractable(target) {
     }
     if (p._isLamp) return { verb: 'Toggle', noun: 'Lamp' };
     if (p._isCeilLight) return { verb: 'Toggle', noun: 'Ceiling Light' };
+    if (p._isMiniSplit) {
+      const on = _roomRefs && _roomRefs.isMiniSplitOn && _roomRefs.isMiniSplitOn();
+      return { verb: on ? 'Turn off' : 'Turn on', noun: 'A/C' };
+    }
     if (p._isFan) return { verb: 'Toggle', noun: 'Fan' };
     if (p._isFilterL || p._isFilterR) return { verb: 'Slide', noun: 'Filter' };
     if (p._isWindowPane) return { verb: _roomRefs && _roomRefs.isOfficeWindowOpen() ? 'Close' : 'Open', noun: 'Window' };
@@ -1815,7 +1885,7 @@ export function init(refs) {
     if (obj._isLamp || obj._isCeilLight || obj._isFan || obj._isFilterL || obj._isFilterR ||
       obj._isDrawer || obj._isBifoldLeaf || obj._isBypassPanel || obj._isCornerDoorHandle || obj._isCornerDoor || obj._isWindow || obj._isWindowPane ||
       obj._isMacbook || obj._isTV || obj._isFoodBowl ||
-      obj._isGuestDoor || obj._isGuestDoorHandle || obj._isPickupSkateboard || obj._isPokemonBinder) {
+      obj._isGuestDoor || obj._isGuestDoorHandle || obj._isPickupSkateboard || obj._isPokemonBinder || obj._isMiniSplit) {
       _interactiveObjects.push(obj);
     }
   });
@@ -1911,6 +1981,58 @@ function _requestPointerLockWithRetry(retries = 2, delayMs = 0) {
 function _buildStaticBoxes() {
   const fy = getFloorY();
   _staticBoxes = [];
+
+  // House roof — zero-thickness platforms at ceiling height (fy + 80) over
+  // each indoor volume so a player who climbs up can walk on the roof
+  // instead of falling through into the room below. Indoor players pass
+  // freely beneath via the box's yBottom check (newHeadTop < yBottom).
+  // World-coord AABBs match the inBedroom/inOffice/inHallway zone tests.
+  const _roofY = fy + 80;
+  // Bedroom roof
+  _staticBoxes.push({
+    xMin: -51, xMax: 81, zMin: -78, zMax: 49,
+    yTop: _roofY, yBottom: _roofY, room: true
+  });
+  // Office roof
+  _staticBoxes.push({
+    xMin: -183, xMax: -51, zMin: -78, zMax: 69,
+    yTop: _roofY, yBottom: _roofY, room: true
+  });
+  // Hallway roof
+  _staticBoxes.push({
+    xMin: -51, xMax: -11, zMin: 49, zMax: 289,
+    yTop: _roofY, yBottom: _roofY, room: true
+  });
+
+  // Roof easter-egg sign — collision so the player can bump into it.
+  // Constants come from coins.js so the visuals + AABBs stay in sync.
+  // Board AABB accounts for the group's CCW yaw around Y.
+  {
+    const sx = coins.ROOF_SIGN_X;
+    const sz = coins.ROOF_SIGN_Z;
+    const sy0 = _roofY + 0.2; // matches `_ceilY + 0.2` in spawnRoomCoins
+    const yaw = coins.ROOF_SIGN_YAW;
+    const W = coins.ROOF_SIGN_BOARD_W;
+    const H = coins.ROOF_SIGN_BOARD_H;
+    const T = coins.ROOF_SIGN_BOARD_T;
+    const cosY = Math.abs(Math.cos(yaw));
+    const sinY = Math.abs(Math.sin(yaw));
+    const halfX = (W / 2) * cosY + (T / 2) * sinY;
+    const halfZ = (W / 2) * sinY + (T / 2) * cosY;
+    const boardCY = sy0 + coins.ROOF_SIGN_BOARD_CY;
+    // Sign post (skinny cylinder, world-axis AABB)
+    _staticBoxes.push({
+      xMin: sx - 0.4, xMax: sx + 0.4,
+      zMin: sz - 0.4, zMax: sz + 0.4,
+      yBottom: sy0, yTop: sy0 + coins.ROOF_SIGN_POST_H, room: true
+    });
+    // Sign board
+    _staticBoxes.push({
+      xMin: sx - halfX, xMax: sx + halfX,
+      zMin: sz - halfZ, zMax: sz + halfZ,
+      yBottom: boardCY - H / 2, yTop: boardCY + H / 2, room: true
+    });
+  }
 
   // Bed — sleeping surface is mattress + duvet top
   // mattY = floorY + bedSlatsFromFloor + 1 + mattH/2 = fy + 10 + 1 + 5 = fy + 16
@@ -2461,40 +2583,18 @@ function _buildPurifierBoxes() {
   return boxes;
 }
 
-// ── Smooth outdoor terrain ground sampling ─────────────────────────
-// Returns the world-space Y of the lawn/road surface at the given world X/Z.
-// The slope/incline/road shaping only exists in front of the office window
-// (negative world X, within the front-yard Z extent). Everywhere else
-// around the house the lawn is flat at flatY so the player can walk freely
-// in any direction.
+// ── Outdoor terrain ground sampling ────────────────────────────────
+// Returns the world-space Y of the visible lawn TOP at the given X/Z.
+// The terrain slabs in room.js are BoxGeometry of height 2 centered at
+// flatY, so the top surface (where the player's feet should land) is
+// flatY + 1. Returning flatY directly leaves the player floating ~1"
+// above the grass.
 function _sampleOutdoorGroundY(worldX, worldZ) {
-  const px = -worldX; // pre-mirror X (positive)
   const fy = getFloorY();
   const gwB = (_roomRefs && typeof _roomRefs.grWinBottom === 'number') ? _roomRefs.grWinBottom : (fy + 23);
-  const gwL = (_roomRefs && typeof _roomRefs.grWinLeft === 'number') ? _roomRefs.grWinLeft : -22;
-  const gwR = (_roomRefs && typeof _roomRefs.grWinRight === 'number') ? _roomRefs.grWinRight : 14;
   const sillY = gwB - 36;
-  const dropStartX = 183.5, dropEndX = 255, flatEndX = 375, incEndX = 411;
-  const dropDY = -18, incDY = 12;
-  const flatY = sillY + dropDY;
-  const roadY = flatY + incDY;
-  // If we're not in front of the office window (negative world X past the
-  // front wall) OR not within the front-yard Z extent, the ground is just
-  // the flat lawn at flatY.
-  const frontYardZmin = (gwL + gwR) / 2 - 300;
-  const frontYardZmax = (gwL + gwR) / 2 + 300;
-  const inFrontYardZ = (worldZ === undefined) ? true : (worldZ >= frontYardZmin && worldZ <= frontYardZmax);
-  if (px <= dropStartX || !inFrontYardZ) return flatY;
-  if (px <= dropEndX) {
-    const t = (px - dropStartX) / (dropEndX - dropStartX);
-    return sillY + t * dropDY;
-  }
-  if (px <= flatEndX) return flatY;
-  if (px <= incEndX) {
-    const t = (px - flatEndX) / (incEndX - flatEndX);
-    return flatY + t * incDY;
-  }
-  return roadY;
+  const flatY = sillY - 18;
+  return flatY + 1;      // top of the 2"-tall grass/road slabs
 }
 
 function _getBoxes() {
@@ -2681,18 +2781,33 @@ function _getBoxes() {
     }
   }
 
-  // Office window — when closed, block the window opening so the player can't pass through.
-  if (_roomRefs && !_roomRefs.isOfficeWindowOpen()) {
+  // Office window — the upper (fixed) sash and the ~1" overhang of the
+  // lower sash always block flight, even when the window is "open". When
+  // closed, the lower half of the opening is blocked too.
+  if (_roomRefs && _roomRefs.grWinTop !== undefined) {
     const gwB = _roomRefs.grWinBottom;
     const gwT = _roomRefs.grWinTop;
     const gwL = _roomRefs.grWinLeft;
     const gwR = _roomRefs.grWinRight;
+    const gwCenter = (gwB + gwT) / 2;
+    const OPEN_OVERHANG = 1; // matches lower-sash slide stop in purifier.js
+    const isOpen = _roomRefs.isOfficeWindowOpen && _roomRefs.isOfficeWindowOpen();
+    // Upper sash + lower-sash overhang: always solid.
     result.push({
       xMin: -183.5, xMax: -183,
       zMin: gwL, zMax: gwR,
-      yTop: gwT, yBottom: gwB,
+      yTop: gwT, yBottom: gwCenter - OPEN_OVERHANG,
       room: true
     });
+    // Lower opening: only solid while the window is closed.
+    if (!isOpen) {
+      result.push({
+        xMin: -183.5, xMax: -183,
+        zMin: gwL, zMax: gwR,
+        yTop: gwCenter - OPEN_OVERHANG, yBottom: gwB,
+        room: true
+      });
+    }
   }
 
   // MacBook open lid — thin wall matching the screen overlay mesh exactly
@@ -2916,7 +3031,7 @@ export function toggleFirstPerson() {
 
     // Enter FP
     _savedFov = _camera.fov;
-    _camera.fov = 75;
+    _camera.fov = fpFov;
     _camera.updateProjectionMatrix();
 
     // Request pointer lock
@@ -3074,6 +3189,9 @@ function _resetWorldState() {
 // In-place run reset: respawn, clear coins, restart timer. Stays in FP.
 export function resetRun() { _resetRun(); }
 function _resetRun() {
+  // Clear any active death lock first so the respawn sticks and the
+  // pointer can re-engage normally.
+  if (_deathLocked) setDeathLock(false);
   _respawn();
   _resetWorldState();
   coins.fullReset();
@@ -3102,6 +3220,10 @@ export function clearPauseState() {
 
 export function setPaused(paused) {
   if (!fpMode) return;
+  // While the death flow is active, refuse to pause. The death overlay
+  // takes the screen instead, and we want the cat-tip animation + free
+  // camera to read uninterrupted until the dialog appears.
+  if (paused && _deathLocked) return;
   fpPaused = !!paused;
   _playPauseCue(fpPaused);
 
@@ -3118,22 +3240,29 @@ export function setPaused(paused) {
     _lastPhysicsTs = 0;
     _silenceSkateRoll(true);
     _silenceSsAudio();
+    // Pause the run timer too — physics/animation freeze on pause, so
+    // letting the timer keep counting would penalize the player for
+    // opening the menu. Resumed below when fpPaused flips back to false.
+    leaderboard.pauseTimer();
 
     // Show pause overlay (unless finish is showing)
     if (overlay && !finishOpen) {
       overlay.style.display = 'flex';
-      leaderboard.renderLeaderboardPanel();
-      void leaderboard.refreshSharedLeaderboard();
-      // Focus trap
+      // Focus trap — the .pause-card now lives OUTSIDE #fpPauseOverlay
+      // (it's a sibling so its backdrop-filter samples the live canvas
+      // directly, mirroring .title-splash-card on /home). Trap focus on
+      // the card itself, not the now-empty scrim element.
+      const card = document.querySelector('.pause-card');
       _pauseSavedFocus = saveFocus();
-      _pauseFocusTrap = trapFocus(overlay);
-      const resumeBtn = overlay.querySelector('#fpPauseResume');
+      _pauseFocusTrap = trapFocus(card || overlay);
+      const resumeBtn = document.getElementById('fpPauseResume');
       if (resumeBtn) resumeBtn.focus();
     }
     if (crosshair) crosshair.style.opacity = '0.25';
 
     _syncAudioToggleUi();
     _syncMouseSensUi();
+    _syncFovUi();
 
     // Release pointer lock
     _clearPointerLockRetry();
@@ -3144,6 +3273,8 @@ export function setPaused(paused) {
     // Hide overlays
     if (overlay) overlay.style.display = 'none';
     if (crosshair) crosshair.style.opacity = '';
+    // Resume the run timer (mirrors the pauseTimer call above).
+    leaderboard.resumeTimer();
     // Release focus trap
     if (_pauseFocusTrap) { _pauseFocusTrap.release(); _pauseFocusTrap = null; }
     if (_pauseSavedFocus) { _pauseSavedFocus.restore(); _pauseSavedFocus = null; }
@@ -3158,6 +3289,67 @@ export function setPaused(paused) {
     }
   }
 }
+
+// ── Death lock (overcharge overlay) ─────────────────────────────────
+// Freeze player input WITHOUT showing the pause overlay. The death
+// overlay shows in its place; only that overlay's buttons can release
+// the lock. While locked: physics tick early-outs, look events drop,
+// keys are swallowed, held movement clears, audio loops silence.
+export function setDeathLock(enabled) {
+  if (!fpMode && enabled) return;
+  _deathLocked = !!enabled;
+  if (_deathLocked) {
+    // Drop held movement keys and any pending look smoothing burst.
+    // Pointer lock is intentionally KEPT so the camera keeps tracking
+    // the mouse while the death animation plays — the death overlay's
+    // own show step (in main.js) calls exitPointerLock() right before
+    // it appears so the cursor can reach Revive / Reset Run.
+    for (const k in fpKeys) fpKeys[k] = false;
+    fpLookDX = 0;
+    fpLookDY = 0;
+    _lastPhysicsTs = 0;
+    _silenceSkateRoll(true);
+    _silenceSsAudio(true);
+    // Force-cancel Super Saiyan so the gold aura/flame/halo don't keep
+    // playing over the death animation. Mirrors what _respawn() clears.
+    _ssFullChargeSinceTs = 0;
+    _ssActiveUntilTs = 0;
+    _ssBurstStartTs = 0;
+    _ssHudFlashUntilTs = 0;
+    _ssChargeShake = 0;
+    _ssBurstFiredForCurrentHold = false;
+    _ssShakeOffset.set(0, 0, 0);
+    _setSuperSaiyanEnvLightOff();
+    // Force-unpause and hide the pause overlay if anything left them
+    // up before death triggered — the death animation needs the
+    // physics tick (look pass) running, and only the death scene
+    // should be on screen during the dramatic beat.
+    fpPaused = false;
+    const pauseOverlay = document.getElementById('fpPauseOverlay');
+    if (pauseOverlay) pauseOverlay.style.display = 'none';
+    if (_pauseFocusTrap) { _pauseFocusTrap.release(); _pauseFocusTrap = null; }
+    if (_pauseSavedFocus) { _pauseSavedFocus.restore(); _pauseSavedFocus = null; }
+    // Re-acquire pointer lock if anything dropped it during the
+    // overcharge sequence (browser quirks, focus changes). The death
+    // window needs an active lock for mouse-look to register.
+    if (_canvas && !state.isMobile && !document.pointerLockElement) {
+      _fpIgnorePointerUnlock = true;
+      _requestPointerLockWithRetry(4, 0);
+      setTimeout(() => { _fpIgnorePointerUnlock = false; }, 300);
+    }
+  } else {
+    // Re-lock pointer on revive (desktop only).
+    if (_canvas && !state.isMobile && !document.pointerLockElement) {
+      _fpIgnorePointerUnlock = true;
+      setTimeout(() => {
+        _requestPointerLockWithRetry(4, 0);
+        setTimeout(() => { _fpIgnorePointerUnlock = false; }, 300);
+      }, 200);
+    }
+  }
+}
+
+export function isDeathLocked() { return _deathLocked; }
 
 // ── Help panel toggle ───────────────────────────────────────────────
 
@@ -3198,13 +3390,18 @@ export function getJumpHoldFrames() {
 // ── Physics tick ────────────────────────────────────────────────────
 
 export function updatePhysics(ts, dtSec, animFrameScale) {
-  if (!fpMode || fpPaused) return;
+  if (!fpMode) return;
+  // While death-locked we still run the look pass below so the camera
+  // can pan during the death animation. Pause is the normal stop.
+  if (fpPaused && !_deathLocked) return;
 
   const fpDtMs = _lastPhysicsTs ? Math.min(80, Math.max(1, ts - _lastPhysicsTs)) : (1000 / 60);
   _lastPhysicsTs = ts;
   const frameScale = fpDtMs / (1000 / 60);
 
   // ── Look (smoothed) ────────────────────────────────────────────────
+  // Look is processed even while death-locked so the player can watch
+  // the cat tip over in style. Movement (below) is gated by the lock.
   const maxLookStep = 32;
   const stepX = Math.max(-maxLookStep, Math.min(maxLookStep, fpLookDX));
   const stepY = Math.max(-maxLookStep, Math.min(maxLookStep, fpLookDY));
@@ -3214,6 +3411,42 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   if (Math.abs(fpLookDY) > maxLookStep * 4) fpLookDY *= 0.5;
   fpYaw -= stepX * 0.0022 * mouseSens;
   fpPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, fpPitch - stepY * 0.0022 * mouseSens));
+
+  // Death lock: skip movement/physics from here on. The look pass above
+  // already updated yaw/pitch; do a minimal camera write here so the
+  // view actually rotates during the overcharge death animation. The
+  // full camera pipeline below requires movement state we're skipping,
+  // so we run a simplified orbit/first-person update around the
+  // player's frozen position.
+  if (_deathLocked) {
+    const dLook = _viewDir.set(
+      -Math.sin(fpYaw) * Math.cos(fpPitch),
+      Math.sin(fpPitch),
+      -Math.cos(fpYaw) * Math.cos(fpPitch)
+    );
+    if (fpCamMode === 'first') {
+      _camera.position.set(fpPos.x, fpPos.y, fpPos.z);
+      _camera.lookAt(
+        fpPos.x + dLook.x * 10,
+        fpPos.y + dLook.y * 10,
+        fpPos.z + dLook.z * 10
+      );
+    } else {
+      // Simple orbit around the cat's body anchor: place the camera
+      // opposite the look direction so panning the mouse spins the
+      // view around the fallen cat.
+      const focalY = fpPos.y - EYE_H + 0.7;
+      const camDist = 9.0;
+      const camLift = 2.2;
+      _camera.position.set(
+        fpPos.x - dLook.x * camDist,
+        focalY - dLook.y * camDist + camLift,
+        fpPos.z - dLook.z * camDist
+      );
+      _camera.lookAt(fpPos.x, focalY, fpPos.z);
+    }
+    return;
+  }
 
   // ── Movement ──────────────────────────────────────────────────────
   // Speed mode triples top speed but uses a lower accel rate so you must
@@ -3636,15 +3869,20 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   let groundY = getPlayerFloorY(); // eye-height floor (floorY + EYE_H)
   // Outdoor when player is outside all three house volumes (bedroom,
   // office, hallway). World coords; bounding boxes are slightly inflated
-  // so doorway transitions don't flicker between in/out.
-  const inBedroom = (nx >= -51 && nx <= 81 && nz >= -78 && nz <= 49);
-  const inOffice = (nx >= -183 && nx <= -51 && nz >= -78 && nz <= 69);
-  const inHallway = (nx >= -51 && nx <= -11 && nz >= 49 && nz <= 289);
+  // so doorway transitions don't flicker between in/out. Y-bounded too:
+  // a player standing on top of the house counts as outdoors so the
+  // indoor floor + ceiling don't yank them back into the room.
+  const _roofY = getFloorY() + 80;
+  const inBedroom = (nx >= -51 && nx <= 81 && nz >= -78 && nz <= 49 && newY < _roofY);
+  const inOffice = (nx >= -183 && nx <= -51 && nz >= -78 && nz <= 69 && newY < _roofY);
+  const inHallway = (nx >= -51 && nx <= -11 && nz >= 49 && nz <= 289 && newY < _roofY);
   const outdoorZone = !(inBedroom || inOffice || inHallway);
-  // When outdoors, sample the smooth terrain height at the player's X/Z so
-  // the ground curves with the visible grass slopes instead of stepping.
+  // When outdoors, the lawn sits well below the indoor floor, so use
+  // the terrain height directly instead of max'ing against the indoor
+  // floor (which would leave the player hovering at indoor-floor height
+  // out on the grass).
   if (outdoorZone) {
-    groundY = Math.max(groundY, _sampleOutdoorGroundY(nx, nz) + EYE_H);
+    groundY = _sampleOutdoorGroundY(nx, nz) + EYE_H;
   }
   const boxes = _getBoxes();
 
@@ -3824,9 +4062,25 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     const pitchN = (fpPitch - PITCH_MIN) / (PITCH_MAX - PITCH_MIN);
     const camDist = 9.0;
     const camLift = 2.2;
-    let dxC = -lookDir.x * camDist + right.x * camShoulder;
-    let dyC = -lookDir.y * camDist + camLift;
-    let dzC = -lookDir.z * camDist + right.z * camShoulder;
+    // When looking up, the raw lookDir-based offset drops the camera
+    // BELOW the cat (so the cat fills the upper screen and blocks the
+    // ceiling view). To fix that without ditching third-person rotation,
+    // we blend the camera's positioning direction toward the yaw-only
+    // (horizontal) direction as pitch rises, and add extra lift + a bit
+    // of pull-back. Result: looking down still orbits around the cat
+    // (great for that close-up rotate-and-admire view), but looking up
+    // keeps the camera behind/above the cat so the ceiling stays clear.
+    const pitchUpT = Math.max(0, Math.min(1, (pitchN - 0.5) / 0.5));
+    const upEase = pitchUpT * pitchUpT * (3 - 2 * pitchUpT); // smoothstep
+    // fwd is yaw-only (horizontal); blend lookDir → fwd as we look up.
+    const camDirX = lookDir.x * (1 - upEase) + fwd.x * upEase;
+    const camDirY = lookDir.y * (1 - upEase);
+    const camDirZ = lookDir.z * (1 - upEase) + fwd.z * upEase;
+    const camDistEff = camDist * (1 + upEase * 0.35);
+    const camLiftEff = camLift + upEase * 3.0;
+    let dxC = -camDirX * camDistEff + right.x * camShoulder;
+    let dyC = -camDirY * camDistEff + camLiftEff;
+    let dzC = -camDirZ * camDistEff + right.z * camShoulder;
 
     // Camera wall clamp — include closet area so player can walk in
     // Guest doorway transition zone: when the focal point is near the
@@ -3836,10 +4090,14 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       && focal.z > 34 - 2 && focal.z < 66 + 2;
     const inGuestRoom = focal.x < -51 - 1 && focal.z > -78 && focal.z < 69;
     // Match physics outdoorZone — true whenever the focal point is outside
-    // all three house volumes (bedroom, office, hallway).
-    const fInBedroom = (focal.x >= -51 && focal.x <= 81 && focal.z >= -78 && focal.z <= 49);
-    const fInOffice = (focal.x >= -183 && focal.x <= -51 && focal.z >= -78 && focal.z <= 69);
-    const fInHallwayVol = (focal.x >= -51 && focal.x <= -11 && focal.z >= 49 && focal.z <= 289);
+    // all three house volumes (bedroom, office, hallway). Y-bounded so the
+    // camera follows the player onto the roof instead of dropping inside.
+    // Threshold sits a touch above the ceiling (focal.y = fpPos.y + 0.7;
+    // indoor max ≈ fy+80.2) to avoid flicker at the indoor jump apex.
+    const _roofYf = getFloorY() + 82;
+    const fInBedroom = (focal.x >= -51 && focal.x <= 81 && focal.z >= -78 && focal.z <= 49 && focal.y < _roofYf);
+    const fInOffice = (focal.x >= -183 && focal.x <= -51 && focal.z >= -78 && focal.z <= 69 && focal.y < _roofYf);
+    const fInHallwayVol = (focal.x >= -51 && focal.x <= -11 && focal.z >= 49 && focal.z <= 289 && focal.y < _roofYf);
     const inOutdoor = !(fInBedroom || fInOffice || fInHallwayVol);
     const inHallway = focal.z > 49 - 1 && !inGuestDoorway && !inGuestRoom && !inOutdoor;
     let camWallXMin, camWallXMax;
@@ -3975,18 +4233,29 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
         spinExtra = _trickSpinAngle;
       }
       // Apply per-press upward impulse (deferred from keydown).
-      // Only kicks in the air — on the ground F is a flat pivot.
+      // Air taps give a clean fixed kick. Grounded taps still lift,
+      // but only once spin has built up — below ~40% of max spin the
+      // floor wins, above that each tap delivers a partial kick that
+      // ramps up. Combined with ground-friction decay, this means a
+      // couple of seconds of fast X-spamming is the cost of lifting
+      // off from a dead stop, where in the air a single tap is enough.
       // Dampened near ceiling so you can't get stuck up there.
       if (_trickSpinBoost) {
+        const _flY = getFloorY();
+        const _ceilY = outdoorZone ? (_flY + 200) : (_flY + 80) - 0.5;
+        const headroom = _ceilY - fpPos.y;
+        const HOVER_MARGIN = 10;
+        const ceilDamp = headroom < HOVER_MARGIN ? Math.max(0, headroom / HOVER_MARGIN) : 1;
+        let kick;
         if (!grounded) {
-          const _flY = getFloorY();
-          const _ceilY = outdoorZone ? (_flY + 200) : (_flY + 80) - 0.5;
-          const headroom = _ceilY - fpPos.y;
-          const HOVER_MARGIN = 10;
-          const ceilDamp = headroom < HOVER_MARGIN ? Math.max(0, headroom / HOVER_MARGIN) : 1;
-          const kick = 0.22 * ceilDamp;
-          fpVy = Math.max(fpVy, kick);
+          kick = 0.22 * ceilDamp;
+        } else {
+          const SPIN_CAP_LOCAL = Math.PI * 20;
+          const ratio = Math.min(1, Math.abs(_trickSpinSpeed) / SPIN_CAP_LOCAL);
+          const lift = Math.max(0, (ratio - 0.4) / 0.6);
+          kick = 0.22 * 0.6 * lift * ceilDamp;
         }
+        if (kick > 0) fpVy = Math.max(fpVy, kick);
         _trickSpinBoost = false;
       }
 
@@ -4020,19 +4289,26 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
       if (_skateboardAnchor) {
         _skateboardAnchor.rotation.y = _skateboardBaseYaw + (sidewaysSkatePose ? -(Math.PI * 0.5) : 0);
-        // Don't add extra manual pitch here — the anchor inherits it from catGroup
-        _skateboardAnchor.rotation.x = 0;
 
-        // ── Kickflip trick (Q) — board rolls 360° ──────────────────
+        // ── Kickflip trick (Q) — board rolls 360° around its long axis.
+        // After the yaw above, the board's nose→tail axis is parent ±Z
+        // in the forward pose and parent ±X in the sideways pose, so
+        // the kickflip has to spin around different anchor axes for
+        // each — otherwise sideways-pose models get an end-over-end
+        // (transverse) flip instead of a real kickflip roll.
         if (_trickKickflipActive) {
           _trickKickflip += dtSec / 0.55;
           if (_trickKickflip >= 1) { _trickKickflip = 0; _trickKickflipActive = false; }
         }
-        if (_trickKickflipActive) {
-          const t = _trickKickflip;
-          _skateboardAnchor.rotation.z = t * t * (3 - 2 * t) * Math.PI * 2;
-        } else {
+        const flipAngle = _trickKickflipActive
+          ? (_trickKickflip * _trickKickflip * (3 - 2 * _trickKickflip)) * Math.PI * 2
+          : 0;
+        if (sidewaysSkatePose) {
+          _skateboardAnchor.rotation.x = flipAngle;
           _skateboardAnchor.rotation.z = 0;
+        } else {
+          _skateboardAnchor.rotation.x = 0;
+          _skateboardAnchor.rotation.z = flipAngle;
         }
       }
 
@@ -4045,7 +4321,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       // parented under catGroup) so the spinning board doesn't clip through
       // the model and doesn't dip into the floor mid-rotation.
       if (_trickKickflipActive) {
-        _catGroup.position.y += Math.sin(_trickKickflip * Math.PI) * 7.2;
+        _catGroup.position.y += Math.sin(_trickKickflip * Math.PI) * 3.2;
       }
       _syncSkateboardVisualState();
     }
@@ -4125,19 +4401,50 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 // ── Input binding ───────────────────────────────────────────────────
 
 function _bindInputs() {
-  // Mouse look (pointer lock)
+  // Mouse look (pointer lock). During the death window we also accept
+  // unlocked mouse motion as a fallback, so the camera keeps panning
+  // even if the browser dropped pointer lock at the moment of overcharge.
+  let _deathLastClientX = null;
+  let _deathLastClientY = null;
   document.addEventListener('mousemove', e => {
-    if (!fpMode || !document.pointerLockElement) return;
-    const rawX = e.movementX || 0;
-    const rawY = e.movementY || 0;
+    if (!fpMode) return;
+    // Note: deliberately NOT gated on _deathLocked — the camera should
+    // keep tracking the mouse while the cat tips over so the death
+    // animation reads. Movement keys are cleared in setDeathLock().
+    if (document.pointerLockElement) {
+      _deathLastClientX = null;
+      _deathLastClientY = null;
+      const rawX = e.movementX || 0;
+      const rawY = e.movementY || 0;
+      const maxDelta = 120;
+      fpLookDX += Math.max(-maxDelta, Math.min(maxDelta, rawX));
+      fpLookDY += Math.max(-maxDelta, Math.min(maxDelta, rawY));
+      return;
+    }
+    // Unlocked fallback — only active during the death window so we
+    // don't accidentally double-handle look in normal play.
+    if (!_deathLocked) return;
+    if (_deathLastClientX === null) {
+      _deathLastClientX = e.clientX;
+      _deathLastClientY = e.clientY;
+      return;
+    }
+    const dx = e.clientX - _deathLastClientX;
+    const dy = e.clientY - _deathLastClientY;
+    _deathLastClientX = e.clientX;
+    _deathLastClientY = e.clientY;
     const maxDelta = 120;
-    fpLookDX += Math.max(-maxDelta, Math.min(maxDelta, rawX));
-    fpLookDY += Math.max(-maxDelta, Math.min(maxDelta, rawY));
+    fpLookDX += Math.max(-maxDelta, Math.min(maxDelta, dx));
+    fpLookDY += Math.max(-maxDelta, Math.min(maxDelta, dy));
   });
 
   // Keyboard
   document.addEventListener('keydown', e => {
     if (!fpMode) return;
+    // While the death overlay is up, swallow every gameplay key — even
+    // Escape — so accidental Esc/R/G can't bail out of the death state
+    // before the player commits to Revive or Reset Run.
+    if (_deathLocked) return;
     if (fpPaused && e.code !== 'Escape' && e.code !== 'Tab') return;
 
     switch (e.code) {
@@ -4190,14 +4497,26 @@ function _bindInputs() {
         // X = skateboard spin (Tony-Hawk-style). Tap to stack aerial
         // 360s with diminishing returns + small upward kick; on the
         // ground it acts as a flat pivot. Cap ~30 rev/s. Skate-only.
-        if (e.repeat) break;
+        // Holding X (autorepeat) also spins, but it caps at half of
+        // the spam-tap ceiling so spammers still go faster.
         if (skateMode) {
           const SPIN_BASE = Math.PI * 2.66; // ~1.33 rev/s base add
-          const SPIN_CAP = Math.PI * 15;    // ~30 rev/s
-          const ratio = Math.min(1, _trickSpinSpeed / SPIN_CAP);
+          const SPIN_CAP = Math.PI * 20;    // ~40 rev/s spam-tap cap
+          const SPIN_HOLD_CAP = SPIN_CAP * 0.6; // ~24 rev/s hold cap
+          const cap = e.repeat ? SPIN_HOLD_CAP : SPIN_CAP;
+          if (_trickSpinSpeed >= cap) {
+            // Already at this input's ceiling — still queue a lift
+            // impulse so holding X mid-air keeps you up.
+            _trickSpinBoost = true;
+            break;
+          }
+          const ratio = Math.min(1, _trickSpinSpeed / cap);
           const falloff = (1 - ratio) * (1 - ratio) * 0.8 + 0.2;
-          _trickSpinSpeed = Math.min(_trickSpinSpeed + SPIN_BASE * falloff, SPIN_CAP);
-          if (!_wasGroundedLast) _trickSpinBoost = true;
+          _trickSpinSpeed = Math.min(_trickSpinSpeed + SPIN_BASE * falloff, cap);
+          // Always queue a lift impulse; the apply-side decides how
+          // much (full kick in the air, partial-and-spin-gated on the
+          // ground) so a sustained ground spin can eventually lift off.
+          _trickSpinBoost = true;
         }
         break;
     }
@@ -4233,9 +4552,13 @@ function _bindInputs() {
   // Pointer lock change → auto-pause
   document.addEventListener('pointerlockchange', () => {
     if (_fpIgnorePointerUnlock) return;
+    // During the death sequence the player is allowed to pan their camera
+    // (we explicitly DO NOT re-lock on Esc) but they must not see the
+    // pause overlay — only the death animation, then later the dialog.
+    if (_deathLocked) return;
     if (fpMode && !fpPaused && !document.pointerLockElement) {
       setTimeout(() => {
-        if (fpMode && !document.pointerLockElement && !fpPaused) setPaused(true);
+        if (fpMode && !document.pointerLockElement && !fpPaused && !_deathLocked) setPaused(true);
       }, 100);
     }
   });

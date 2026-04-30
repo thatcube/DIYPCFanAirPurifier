@@ -1,0 +1,896 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>About — Bedroom Floor</title>
+  <meta name="description"
+    content="Why a DIY PC fan air purifier became a tiny three.js side-quest where you play as a cat." />
+  <!-- Share the same stylesheet (and design tokens) the in-game UI uses -->
+  <link rel="stylesheet" href="./src/styles/main.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css" />
+  <style>
+    /* Inherits the canonical liquid-glass design tokens from main.css.
+       The same page-local cyan/gold accents the share-page leaderboard
+       uses are mirrored here so all three glass surfaces (splash, share
+       leaderboard, about) refract the same way. */
+    :root {
+      --bg0: #07121d;
+      --bg1: #122637;
+      --muted: #a8c0d6;
+      --pg-accent: #9fe3ff;
+      --pg-warm: #ffd9b8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    /* main.css locks html/body { overflow: hidden; height: 100% } for the 3D
+       game; override here so the about page scrolls when content overflows. */
+    html,
+    body {
+      height: auto;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font-ui);
+      color: var(--text);
+      font-weight: var(--weight-regular);
+      line-height: 1.55;
+      text-rendering: optimizeLegibility;
+      background: radial-gradient(1200px 700px at 18% -12%, #244868 0%, transparent 58%),
+        radial-gradient(900px 560px at 110% 10%, #1f3e56 0%, transparent 65%),
+        linear-gradient(180deg, var(--bg1), var(--bg0));
+      padding: 92px 18px 48px;
+      position: relative;
+      z-index: 0;
+    }
+
+    /* Live game scene rendered behind the page (same pattern as the
+       share-page leaderboard). Skipped on coarse / narrow viewports
+       to save battery; see the script at the bottom. */
+    #bgFrame {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      border: 0;
+      z-index: 0;
+      pointer-events: none;
+      filter: saturate(1.05);
+      opacity: 0;
+    }
+
+    #bgFrame.ready {
+      opacity: 1;
+    }
+
+    /* Same scrim the splash uses (#titleSplash bg) so the live room
+       scene shows through behind the glass card the way it does on /. */
+    #bgScrim {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        radial-gradient(120% 80% at 50% 0%, rgba(8, 10, 16, 0.55) 0%, rgba(8, 10, 16, 0) 55%),
+        radial-gradient(120% 80% at 50% 100%, rgba(8, 10, 16, 0.6) 0%, rgba(8, 10, 16, 0) 55%);
+      backdrop-filter: blur(2px) saturate(1.1);
+      -webkit-backdrop-filter: blur(2px) saturate(1.1);
+    }
+
+    /* Iframe-promotion mode — set by promoteToPlay() in the router
+       below. Lets clicks land on the iframe canvas (so the user can
+       interact with char-select / play) and lifts the iframe above
+       #bgScrim so the scrim's backdrop-filter doesn't sit between
+       the user and the picker. Mirrors home.html / leaderboard.html. */
+    body.is-playing #bgFrame {
+      pointer-events: auto;
+      z-index: 2;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #bgFrame {
+        display: none;
+      }
+    }
+
+    .page {
+      position: relative;
+      z-index: 2;
+      width: min(720px, 100%);
+      margin: 0 auto;
+      display: grid;
+      gap: 20px;
+    }
+
+    /* ── Hero card ──────────────────────────────────────────────
+       Same liquid-glass surface as .title-splash-card: white-edged
+       border, full inset highlight + dark seam stack, 32px radius. */
+    .hero {
+      position: relative;
+      background-color: var(--glass);
+      background-image: var(--glass-specular);
+      border: 1px solid var(--glass-border);
+      border-radius: 32px;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.4),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+        inset 0 0 32px 0 rgba(255, 255, 255, 0.03),
+        0 30px 80px rgba(0, 0, 0, 0.5),
+        0 1px 0 rgba(0, 0, 0, 0.5);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      padding: 30px 28px 26px;
+      display: grid;
+      gap: 16px;
+      isolation: isolate;
+    }
+
+    /* Top sheen — slim refractive glaze across the very top of the card,
+       same trick as .title-splash-card::before. */
+    .hero::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 6%;
+      right: 6%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.7) 50%, transparent 100%);
+      border-radius: 32px 32px 0 0;
+      pointer-events: none;
+    }
+
+    .hero__eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--pg-accent);
+      opacity: 0.92;
+    }
+
+    .hero__eyebrow i {
+      font-size: 13px;
+    }
+
+    .hero__title {
+      margin: 0;
+      font-size: clamp(28px, 4.4vw, 42px);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+
+    .hero__lede {
+      margin: 0;
+      color: rgba(232, 244, 255, 0.88);
+      font-size: 15px;
+      line-height: 1.6;
+      max-width: 60ch;
+    }
+
+    .hero__lede b {
+      color: var(--pg-warm);
+      font-weight: 700;
+    }
+
+    .hero__cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .playBtn {
+      flex: 0 1 auto;
+      padding: 14px 26px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .playBtn i {
+      font-size: 1.15em;
+    }
+
+    /* Matches .miniBtn on the share-page leaderboard so the secondary
+       buttons across the project feel like the same control. */
+    .miniBtn {
+      padding: 11px 16px;
+      font-size: 13px;
+      font-weight: var(--weight-semibold);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      background-color: var(--glass-light, rgba(18, 24, 38, 0.28));
+      border: 1px solid var(--glass-border);
+      color: #d9ebff;
+      border-radius: var(--r-md);
+      cursor: pointer;
+      font-family: inherit;
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      transition: border-color 0.2s, background-color 0.2s, transform 0.2s;
+    }
+
+    .miniBtn:hover {
+      border-color: var(--glass-border-strong);
+      background-color: rgba(255, 255, 255, 0.06);
+      transform: translateY(-1px);
+    }
+
+    .miniBtn:active {
+      transform: translateY(1px);
+    }
+
+    .miniBtn i {
+      font-size: 14px;
+    }
+
+    /* ── Section card — identical material to .hero so the whole page
+         reads as one continuous glass surface; no top sheen so the eye
+         still locks on the hero first. */
+    .card {
+      position: relative;
+      background-color: var(--glass);
+      background-image: var(--glass-specular);
+      border: 1px solid var(--glass-border);
+      border-radius: 32px;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.4),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+        inset 0 0 32px 0 rgba(255, 255, 255, 0.03),
+        0 30px 80px rgba(0, 0, 0, 0.5),
+        0 1px 0 rgba(0, 0, 0, 0.5);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      padding: 26px 28px 26px;
+    }
+
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--pg-accent);
+    }
+
+    .card p {
+      margin: 0 0 12px;
+      color: rgba(232, 244, 255, 0.85);
+      font-size: 14.5px;
+      line-height: 1.65;
+    }
+
+    .card p:last-child {
+      margin-bottom: 0;
+    }
+
+    .card a {
+      color: var(--pg-warm);
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(255, 217, 184, 0.45);
+      transition: color 0.18s ease, border-color 0.18s ease;
+    }
+
+    .card a:hover {
+      color: #fff;
+      border-bottom-color: rgba(255, 255, 255, 0.7);
+    }
+
+    /* ── Feature list — small glass tiles, same vocabulary as the
+         splash chips used to be. */
+    .features {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .features li {
+      display: grid;
+      grid-template-columns: 32px 1fr;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+    }
+
+    .features li i {
+      font-size: 22px;
+      color: var(--pg-accent);
+      justify-self: center;
+    }
+
+    .features li b {
+      display: block;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #f0f8ff;
+      margin-bottom: 1px;
+      letter-spacing: 0.01em;
+    }
+
+    .features li span {
+      font-size: 12.5px;
+      color: rgba(220, 235, 250, 0.72);
+      line-height: 1.4;
+    }
+
+    /* ── Tiny credit footer ────────────────────────────────────── */
+    .footnote {
+      text-align: center;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      opacity: 0.85;
+    }
+
+    .footnote a {
+      color: var(--pg-accent);
+      text-decoration: none;
+    }
+
+    .footnote a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 78px 12px 36px;
+      }
+
+      .hero {
+        padding: 24px 20px 22px;
+        border-radius: 26px;
+      }
+
+      .card {
+        padding: 22px 20px;
+        border-radius: 26px;
+      }
+
+      .features {
+        grid-template-columns: 1fr;
+      }
+
+      .playBtn,
+      .miniBtn {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <iframe id="bgFrame" src="/play?bg=1" title="" aria-hidden="true" tabindex="-1" referrerpolicy="same-origin"></iframe>
+  <div id="bgScrim" aria-hidden="true">
+    <div class="bg-grid"></div>
+  </div>
+
+  <nav class="site-tabs" aria-label="Primary">
+    <a class="site-tab" href="/" data-tab="home">
+      <i class="site-tab__icon site-tab__icon--regular ph ph-house"></i><i
+        class="site-tab__icon site-tab__icon--fill ph-fill ph-house"></i><span>Home</span>
+    </a>
+    <a class="site-tab" href="/leaderboard" data-tab="leaderboard">
+      <i class="site-tab__icon site-tab__icon--regular ph ph-trophy"></i><i
+        class="site-tab__icon site-tab__icon--fill ph-fill ph-trophy"></i><span>Leaderboard</span>
+    </a>
+    <a class="site-tab" href="/about" data-tab="about">
+      <i class="site-tab__icon site-tab__icon--regular ph ph-info"></i><i
+        class="site-tab__icon site-tab__icon--fill ph-fill ph-info"></i><span>About</span>
+    </a>
+  </nav>
+
+  <main class="page">
+    <section class="hero">
+      <div class="hero__eyebrow">
+        <i class="ph-fill ph-sparkle"></i>
+        <span>About this thing</span>
+      </div>
+      <h1 class="hero__title">Bedroom Floor</h1>
+      <p class="hero__lede">
+        A 3D replica of <b>my actual bedroom</b>, rendered live in your browser with
+        <a href="https://threejs.org/" target="_blank" rel="noopener noreferrer">three.js</a>.
+        Every wall, lamp, dresser, and very-cursed cat is hand-modeled in code — no
+        Blender files, no GLTFs. You play as a cat. You collect coins. There are secrets.
+      </p>
+      <div class="hero__cta">
+        <a class="playBtn glass-btn glass-btn--primary" href="/play" data-play-cta>
+          <i class="ph-fill ph-play"></i>
+          <span>Play</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Why does this exist?</h2>
+      <p>
+        It started as something completely different — a 3D visualization of a
+        <b>DIY PC-fan air purifier</b> I built out of plywood, eight Arctic P12 fans, and a
+        couple of MERV-13 furnace filters. I wanted a way to mess with stain colors and
+        fan layouts before cutting wood, so I started modeling it in three.js.
+      </p>
+      <p>
+        Then I added the room around it. Then a cat to run around the room. Then coins for
+        the cat to collect. Then a leaderboard, then fireballs, then a few abilities that
+        nobody asked for. The repo is still called <code>DIYPCFanAirPurifier</code> because
+        renaming it now would feel like lying about how it got here.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>What's in here</h2>
+      <ul class="features">
+        <li>
+          <i class="ph-fill ph-cube"></i>
+          <div>
+            <b>Hand-modeled in code</b>
+            <span>Every prop is built from primitives — no imported meshes.</span>
+          </div>
+        </li>
+        <li>
+          <i class="ph-fill ph-cat"></i>
+          <div>
+            <b>Pick your cat</b>
+            <span>Five cats including Korra — my real cat, professionally cursed.</span>
+          </div>
+        </li>
+        <li>
+          <i class="ph-fill ph-lightning"></i>
+          <div>
+            <b>Two run modes</b>
+            <span>Normal for the tour, Speed for a 3× sprint with extra coins.</span>
+          </div>
+        </li>
+        <li>
+          <i class="ph-fill ph-coin"></i>
+          <div>
+            <b>Hidden secrets</b>
+            <span>A handful of secret coins tucked into corners of the room.</span>
+          </div>
+        </li>
+        <li>
+          <i class="ph-fill ph-trophy"></i>
+          <div>
+            <b>Public leaderboard</b>
+            <span>Speedrun times persisted on Cloudflare D1 + Workers.</span>
+          </div>
+        </li>
+        <li>
+          <i class="ph-fill ph-fire"></i>
+          <div>
+            <b>…and a few surprises</b>
+            <span>Find them. Or don't. The cat doesn't care either way.</span>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Built with</h2>
+      <p>
+        <a href="https://threejs.org/" target="_blank" rel="noopener noreferrer">three.js</a>
+        on the front end, <a href="https://workers.cloudflare.com/" target="_blank" rel="noopener noreferrer">Cloudflare
+          Workers</a>
+        + <a href="https://developers.cloudflare.com/d1/" target="_blank" rel="noopener noreferrer">D1</a> for the
+        leaderboard,
+        <a href="https://vite.dev/" target="_blank" rel="noopener noreferrer">Vite</a> to ship it, and
+        <a href="https://www.netlify.com/" target="_blank" rel="noopener noreferrer">Netlify</a> for hosting.
+        Things will break. Animations are jank. The cat is fine with this.
+      </p>
+    </section>
+
+    <p class="footnote">
+      made by <a href="https://brandonmoore.design" target="_blank" rel="noopener noreferrer">Brandon Moore</a>
+    </p>
+  </main>
+
+  <script>
+    // Skip the live-scene iframe on touch / narrow devices to save battery.
+    const bgFrame = document.getElementById('bgFrame');
+    const _isCoarse = matchMedia('(pointer: coarse)').matches;
+    const _isNarrow = window.innerWidth < 720;
+
+    // Tabs start hidden (CSS) and slide down once the scene is up
+    // AND the page card has had time to settle. The chrome lands last
+    // so the eye reads the room first.
+    let _tabsRevealed = false;
+    function _revealTabs() {
+      if (_tabsRevealed) return;
+      _tabsRevealed = true;
+      document.body.classList.add('tabs-revealed');
+    }
+
+    if (bgFrame && (_isCoarse || _isNarrow)) {
+      bgFrame.remove();
+      setTimeout(_revealTabs, 1100);
+    } else if (bgFrame) {
+      // Wait for the iframe to postMessage that its first scene frame
+      // actually composited — not just iframe.load (which fires while
+      // three.js is still booting and the canvas is empty, leaving
+      // glass cards blurring a flat body color = no visible blur).
+      function _bgReady() {
+        bgFrame.classList.add('ready');
+        // Mark the iframe as ready so a Play click that landed before
+        // boot finished can now flush its queued enter-play message
+        // (matches home.html / leaderboard.html).
+        bgFrame.setAttribute('data-scene-ready', '1');
+        if (typeof window.__flushPendingPlay === 'function') window.__flushPendingPlay();
+        // Hold an extra beat after the scene paints so the page card
+        // finishes its entrance before the tabs join in.
+        setTimeout(_revealTabs, 520);
+      }
+      window.addEventListener('message', (e) => {
+        if (e.origin !== location.origin) return;
+        if (e.data && e.data.type === 'bg-scene-ready') _bgReady();
+      });
+      setTimeout(_bgReady, 4000);
+    } else {
+      setTimeout(_revealTabs, 1100);
+    }
+  </script>
+  <script>
+    // Shared SPA router for the iframe-backed views.
+    //
+    // The trick: about.html and leaderboard.html both mount the live
+    // 3D scene as a persistent <iframe id="bgFrame" src="/?bg=1">. If
+    // we navigate via location.href the browser tears that iframe down
+    // and remounts it on the next page, which means the whole three.js
+    // scene reboots — wasted CPU/GPU and a visible flash.
+    //
+    // Instead, when the user clicks a top-tab link that points at
+    // another iframe-backed view, we fetch the target HTML, swap just
+    // <title>, page-local <style data-view> blocks, and <main class="page">
+    // into the current document. The iframe (which is a sibling of
+    // <main>, NOT inside it) is left completely alone, so the scene
+    // keeps running.
+    //
+    // Going to/from /play is always a full nav — Play renders into the
+    // page's own canvas, not an iframe, so there's no shared element
+    // to preserve.
+    (function () {
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function viewFor(path) {
+        path = path.replace(/\/+$/, '') || '/';
+        if (path === '/' || path === '/home' || path === '/home.html') return 'home';
+        if (path === '/about' || path === '/about.html') return 'about';
+        if (path === '/leaderboard' || path === '/leaderboard.html' || path.startsWith('/leaderboard')) return 'leaderboard';
+        if (path === '/play' || path === '/vite-index.html' || path === '/index.html') return 'play';
+        return null;
+      }
+
+      function setActiveTab(view) {
+        document.querySelectorAll('.site-tabs .site-tab').forEach(t => {
+          const id = t.getAttribute('data-tab');
+          const active = id === view;
+          t.classList.toggle('is-active', active);
+          if (active) t.setAttribute('aria-current', 'page');
+          else t.removeAttribute('aria-current');
+        });
+        updatePill();
+      }
+
+      // Active-tab pill — a single absolutely-positioned div behind
+      // the tabs that slides + resizes to match the active one. Same
+      // pattern Stripe uses on its blog category nav. We animate
+      // transform (GPU) and width together so the rounded ends don't
+      // distort the way scaleX would.
+      function buildPill() {
+        const nav = document.querySelector('.site-tabs');
+        if (!nav || nav.querySelector('.site-tabs-pill')) return;
+        const pill = document.createElement('div');
+        pill.className = 'site-tabs-pill';
+        pill.setAttribute('aria-hidden', 'true');
+        nav.insertBefore(pill, nav.firstChild);
+        nav.classList.add('has-pill');
+      }
+
+      function updatePill() {
+        const nav = document.querySelector('.site-tabs');
+        const pill = nav && nav.querySelector('.site-tabs-pill');
+        const active = nav && nav.querySelector('.site-tab.is-active');
+        if (!nav || !pill || !active) return;
+        const navRect = nav.getBoundingClientRect();
+        const tabRect = active.getBoundingClientRect();
+        const left = tabRect.left - navRect.left;
+        pill.style.transform = `translateX(${left}px)`;
+        pill.style.width = `${tabRect.width}px`;
+      }
+
+      // Tag the initial view's <main> and any page-local <style> blocks
+      // so we can cleanly remove the previous view's styles on swap.
+      // Without this, .hero rules from one view would persist into the
+      // other and clobber its layout.
+      (function tagInitial() {
+        const v = viewFor(location.pathname);
+        if (!v || v === 'play') return;
+        document.querySelectorAll('head > style').forEach(s => {
+          if (!s.dataset.view) s.dataset.view = v;
+        });
+        const main = document.querySelector('main.page');
+        if (main && !main.dataset.view) main.dataset.view = v;
+      })();
+      buildPill();
+      setActiveTab(viewFor(location.pathname));
+      // Enable the pill's clip-path transition on the next frame so
+      // the initial position doesn't slide in from the left on load.
+      requestAnimationFrame(() => {
+        const nav = document.querySelector('.site-tabs');
+        if (nav) nav.classList.add('pill-ready');
+      });
+      window.addEventListener('resize', updatePill);
+      // Webfonts can resize the tab labels after first paint; re-measure
+      // when they're ready so the pill snaps to the final width.
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(updatePill).catch(() => { });
+      }
+
+      function fullNav(href) {
+        if (reduced) { location.href = href; return; }
+        document.body.classList.add('page-fade', 'is-leaving');
+        setTimeout(() => { location.href = href; }, 160);
+      }
+
+      async function swap(href) {
+        const targetView = viewFor(href);
+        if (!targetView || targetView === 'play') { fullNav(href); return; }
+
+        const oldMain = document.querySelector('main.page');
+
+        // Start the fetch immediately so it overlaps with the exit
+        // animation (saves a noticeable amount of perceived latency
+        // on slower connections).
+        const fetchPromise = fetch(href, { credentials: 'same-origin' }).then(r => {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.text();
+        });
+
+        // Exit: animate the OLD <main> out via .is-leaving on the
+        // element itself. Each direction owning its own class is what
+        // makes the entrance work cleanly — see CSS comment.
+        if (oldMain && !reduced) oldMain.classList.add('is-leaving');
+        const exitWait = reduced ? 0 : 200;
+
+        let html;
+        try {
+          html = await fetchPromise;
+        } catch (e) {
+          // Network or 404 — fall back to a full nav so the user isn't
+          // stranded.
+          location.href = href;
+          return;
+        }
+        if (exitWait) await new Promise(r => setTimeout(r, exitWait));
+
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        document.title = doc.title || document.title;
+
+        // Replace page-local styles. The shared stylesheet (main.css)
+        // is loaded via <link> with the same href in both pages, so we
+        // leave <link> elements alone — only swap <style> blocks that
+        // we tagged with data-view.
+        document.querySelectorAll('head > style[data-view]').forEach(s => s.remove());
+        doc.querySelectorAll('head > style').forEach(s => {
+          const clone = s.cloneNode(true);
+          clone.dataset.view = targetView;
+          document.head.appendChild(clone);
+        });
+
+        const newMain = doc.querySelector('main.page');
+        const currentOldMain = document.querySelector('main.page');
+        if (newMain && currentOldMain) {
+          newMain.dataset.view = targetView;
+          // Mark this main as SPA-inserted so CSS can suppress any
+          // inner keyframe animations (see the data-spa rule in
+          // main.css) that would otherwise blink on top of our outer
+          // page transition.
+          newMain.dataset.spa = '1';
+          if (!reduced) newMain.classList.add('is-entering');
+          currentOldMain.replaceWith(newMain);
+          // Force a layout read so the entering state is committed to
+          // the style cache before we remove the class. Without this
+          // the browser folds the from/to into one paint and the
+          // entrance is skipped (the stuttery "blink in" we're fixing).
+          if (!reduced) {
+            void newMain.offsetWidth;
+            requestAnimationFrame(() => newMain.classList.remove('is-entering'));
+          }
+        }
+
+        history.pushState({ view: targetView }, '', href);
+        setActiveTab(targetView);
+
+        // Re-run the leaderboard's init logic now that its DOM is back.
+        // (about has no init function — its <main> is fully static.)
+        if (targetView === 'leaderboard' && typeof window.__initLeaderboard === 'function') {
+          window.__initLeaderboard();
+        }
+
+        window.scrollTo(0, 0);
+      }
+
+      document.addEventListener('click', (e) => {
+        const a = e.target.closest && e.target.closest('a[href]');
+        if (!a) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+        if (a.target && a.target !== '_self') return;
+
+        let url;
+        try { url = new URL(a.href, location.href); }
+        catch { return; }
+        if (url.origin !== location.origin) return;
+
+        // Top tabs: SPA-swap when staying within iframe-backed views.
+        if (a.classList.contains('site-tab')) {
+          const targetView = viewFor(url.pathname);
+          const currentView = viewFor(location.pathname);
+          if (a.classList.contains('is-active')) { e.preventDefault(); return; }
+          if (targetView && targetView !== 'play' && currentView && currentView !== 'play') {
+            // about ↔ leaderboard ↔ home: SPA swap, iframe persists.
+            e.preventDefault();
+            swap(url.pathname + url.search + url.hash);
+          } else {
+            // Anything involving Play crosses an iframe boundary, so
+            // it has to be a real navigation. Fade for continuity.
+            e.preventDefault();
+            fullNav(a.href);
+          }
+          return;
+        }
+
+        // The big Play CTA — promote the existing bg iframe in place
+        // instead of doing a top-level navigation. Same path home /
+        // leaderboard use: skips the three.js scene rebuild that
+        // fullNav('/play') would cause, so the room flows seamlessly
+        // into the char-select picker.
+        if (a.hasAttribute('data-play-cta')) {
+          e.preventDefault();
+          promoteToPlay(a.href);
+        }
+      });
+
+      // ── Iframe promotion (mirrors home.html / leaderboard.html) ──
+      const bgFrameForPromote = document.getElementById('bgFrame');
+
+      let _pendingPlay = false;
+      function _sendEnterPlay() {
+        if (!bgFrameForPromote || !bgFrameForPromote.contentWindow) return;
+        try { bgFrameForPromote.contentWindow.postMessage({ type: 'enter-play' }, location.origin); } catch (e) {}
+        try { bgFrameForPromote.contentWindow.focus(); } catch (e) {}
+      }
+      window.__flushPendingPlay = function () {
+        if (!_pendingPlay) return;
+        _pendingPlay = false;
+        _sendEnterPlay();
+      };
+      function _enterPlayWhenReady() {
+        if (bgFrameForPromote && bgFrameForPromote.getAttribute('data-scene-ready') === '1') {
+          _sendEnterPlay();
+        } else {
+          _pendingPlay = true;
+        }
+      }
+
+      function promoteToPlay(href) {
+        // Capture the path the user is returning to. Stored on a
+        // shared global so whichever page's IIFE happens to be the
+        // active one (only the FIRST loaded page's script runs —
+        // SPA swap doesn't re-execute) returns to the right URL.
+        window.__playReturnPath = location.pathname + location.search + location.hash;
+        if (reduced) {
+          history.pushState({ view: 'play' }, '', href || '/play');
+          document.body.classList.add('is-playing');
+          _enterPlayWhenReady();
+          setActiveTab('play');
+          return;
+        }
+        // Animate about chrome out (tabs lift, main fades).
+        document.body.classList.add('page-fade', 'is-leaving');
+        history.pushState({ view: 'play' }, '', href || '/play');
+        setActiveTab('play');
+        // Three-beat promotion (matches home.html / leaderboard.html):
+        //   1. 0–700ms   chrome exits
+        //   2. 700–850ms clean bedroom beat
+        //   3. 850ms+    picker fades in
+        setTimeout(() => {
+          document.body.classList.add('is-playing');
+          _enterPlayWhenReady();
+        }, 850);
+      }
+
+      function demoteFromPlay({ updateHistory = true } = {}) {
+        // Triggered by the iframe's { type: 'play-exited' } message
+        // after it has reset its camera and re-applied is-bg under
+        // its black overlay. Bring the chrome back in and route to
+        // wherever the user came FROM (which may not be /about if
+        // they SPA-swapped to /home or /leaderboard before clicking
+        // Play).
+        const ret = window.__playReturnPath || '/about';
+        const retView = viewFor(ret) || 'about';
+        if (updateHistory) {
+          history.pushState({ view: retView }, '', ret);
+        }
+        setActiveTab(retView);
+        document.body.classList.remove('is-playing');
+        document.body.classList.remove('is-leaving');
+        setTimeout(() => document.body.classList.remove('page-fade'), 700);
+      }
+
+      let _demoteFromPopstate = false;
+      window.addEventListener('message', (e) => {
+        if (e.origin !== location.origin) return;
+        const data = e.data;
+        if (!data || typeof data !== 'object') return;
+        if (data.type === 'play-exited') {
+          demoteFromPlay({ updateHistory: !_demoteFromPopstate });
+          _demoteFromPopstate = false;
+        }
+      });
+
+      window.addEventListener('popstate', () => {
+        const v = viewFor(location.pathname);
+        const isPlaying = document.body.classList.contains('is-playing');
+        // Cross-promotion-boundary cases: between /play and the menu
+        // we drive promotion via postMessage rather than reload.
+        if (v === 'play' && !isPlaying) {
+          // Forward to /play while currently on the about view.
+          document.body.classList.add('page-fade', 'is-leaving');
+          setTimeout(() => {
+            document.body.classList.add('is-playing');
+            setActiveTab('play');
+            _enterPlayWhenReady();
+          }, 850);
+          return;
+        }
+        if (v !== 'play' && isPlaying) {
+          // Back to about while currently in play — ask the iframe
+          // to run its exit sequence (camera reset + fade).
+          _demoteFromPopstate = true;
+          if (bgFrameForPromote && bgFrameForPromote.contentWindow) {
+            try { bgFrameForPromote.contentWindow.postMessage({ type: 'exit-play' }, location.origin); } catch (err) {}
+          }
+          return;
+        }
+        if (!v || v === 'play') { location.reload(); return; }
+        swap(location.pathname + location.search + location.hash);
+      });
+      window.addEventListener('pageshow', (e) => {
+        document.body.classList.remove('is-leaving', 'page-fade');
+        const m = document.querySelector('main.page');
+        if (m) m.classList.remove('is-entering', 'is-leaving');
+        // bfcache restore: the bg scene is already painted, so the
+        // tabs should be back immediately rather than re-running the
+        // "wait for scene" delay.
+        if (e.persisted) document.body.classList.add('tabs-revealed');
+      });
+    })();
+  </script>
+</body>
+
+</html>

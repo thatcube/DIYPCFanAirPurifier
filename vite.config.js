@@ -2,9 +2,24 @@ import { defineConfig } from 'vite';
 
 function routeToViteIndex() {
   const rewrite = (req, _res, next) => {
-    const url = String(req.url || '').split('?')[0];
-    if (url === '/' || url === '/index.html' || url === '/play' || url === '/play/') {
-      req.url = '/vite-index.html';
+    const raw = String(req.url || '');
+    const qIdx = raw.indexOf('?');
+    const path = qIdx === -1 ? raw : raw.slice(0, qIdx);
+    const query = qIdx === -1 ? '' : raw.slice(qIdx);
+    // Preserve the query string when rewriting — the splash page reads
+    // `?bg=1` to switch into iframe-background mode, and stripping it
+    // (which split('?')[0] used to do) breaks the live scene that the
+    // home / leaderboard / about pages embed behind their glass cards.
+    if (path === '/' || path === '/home' || path === '/home/' || path === '/home.html') {
+      req.url = '/home.html' + query;
+    } else if (path === '/index.html') {
+      req.url = '/home.html' + query;
+    } else if (path === '/play' || path === '/play/') {
+      req.url = '/vite-index.html' + query;
+    } else if (path === '/leaderboard' || path === '/leaderboard/') {
+      req.url = '/leaderboard.html' + query;
+    } else if (path === '/about' || path === '/about/') {
+      req.url = '/about.html' + query;
     }
     next();
   };
@@ -41,8 +56,10 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'vite-index.html',
+        home: 'home.html',
         admin: 'admin.html',
         leaderboard: 'leaderboard.html',
+        about: 'about.html',
         old: 'index.html'
       },
       output: {
@@ -67,7 +84,7 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    open: '/vite-index.html',
+    open: '/',
     proxy: {
       '/api': {
         target: 'https://diy-air-purifier-leaderboard.essays-loges0y.workers.dev',

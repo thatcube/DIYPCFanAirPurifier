@@ -48,7 +48,6 @@
       pointer-events: none;
       filter: saturate(1.05);
       opacity: 0;
-      transition: opacity 0.6s ease;
     }
     #bgFrame.ready { opacity: 1; }
     /* Dark scrim so leaderboard text stays legible over the live scene */
@@ -261,14 +260,13 @@
 <body>
   <iframe
     id="bgFrame"
-    src="/?bg=1"
+    src="/play?bg=1"
     title=""
     aria-hidden="true"
     tabindex="-1"
-    loading="lazy"
     referrerpolicy="same-origin"
   ></iframe>
-  <div id="bgScrim" aria-hidden="true"></div>
+  <div id="bgScrim" aria-hidden="true"><div class="bg-grid"></div></div>
   <main class="wrap">
     <div class="head">
       <div>
@@ -315,18 +313,13 @@
     }
 
     // Cat model → emoji/label. Kept in sync with index.html's _CAT_MODEL_EMOJI.
-    const CAT_MODEL_EMOJI = { classic: '🐱', toon: '🦁', bababooey: '🐿️', totodile: '🐊' };
-    const CAT_MODEL_LABEL = { classic: 'Classic', toon: 'Toon', bababooey: 'Bababooey', totodile: 'Totodile' };
-    const CAT_COLOR_HEX = { charcoal: '#3a3a42', cream: '#e8d9b3', midnight: '#1a2030', snow: '#e8e8e8', ginger: '#d97a2a', tuxedo: '#151a22' };
+    const CAT_MODEL_EMOJI = { classic: '🐱', toon: '🦁', bababooey: '🐿️', totodile: '🐊', korra: '🐈' };
+    const CAT_MODEL_LABEL = { classic: 'Classic', toon: 'Toon', bababooey: 'Bababooey', totodile: 'Totodile', korra: 'Cursed Korra' };
     function catBadgeHtml(row) {
       const model = String((row && row.catModel) || 'classic').toLowerCase();
       const emoji = CAT_MODEL_EMOJI[model] || CAT_MODEL_EMOJI.classic;
       const label = CAT_MODEL_LABEL[model] || 'Cat';
-      const colorable = model !== 'bababooey' && model !== 'totodile';
-      const color = CAT_COLOR_HEX[String((row && row.catColor) || 'ginger').toLowerCase()] || CAT_COLOR_HEX.ginger;
-      const dot = colorable ? `<span class="catDot" style="background:${color}"></span>` : '';
-      const title = colorable ? `${label} · ${(row && row.catColor) || 'ginger'}` : label;
-      return `<span class="catBadge" title="${escapeHtml(title)}"><span class="catEmoji">${emoji}</span>${dot}<span>${label}</span></span>`;
+      return `<span class="catBadge" title="${escapeHtml(label)}"><span class="catEmoji">${emoji}</span><span>${label}</span></span>`;
     }
 
     async function copyText(text) {
@@ -415,9 +408,17 @@
     if (bgFrame && (_isCoarse || _isNarrow)) {
       bgFrame.remove();
     } else if (bgFrame) {
-      bgFrame.addEventListener('load', () => bgFrame.classList.add('ready'), { once: true });
-      // Safety fade-in if load event never fires
-      setTimeout(() => bgFrame.classList.add('ready'), 4000);
+      // Wait for the iframe to postMessage that its first scene frame
+      // actually composited — not just iframe.load (which fires while
+      // three.js is still booting and the canvas is empty, leaving
+      // glass cards blurring a flat body color = no visible blur).
+      function _bgReady() { bgFrame.classList.add('ready'); }
+      window.addEventListener('message', (e) => {
+        if (e.origin !== location.origin) return;
+        if (e.data && e.data.type === 'bg-scene-ready') _bgReady();
+      });
+      // Safety fade-in if the message never arrives
+      setTimeout(_bgReady, 4000);
     }
 
     loadLeaderboard();

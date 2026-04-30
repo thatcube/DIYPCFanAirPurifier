@@ -11,8 +11,9 @@ import { fpMode as _fpMode, sfxMuted as _sfxMuted, fpPos as _fpPos } from './gam
 import {
   spawnSecretBinderCoin,
   spawnSecretLampCoin,
-  spawnSecretCeilingLightCoins,
+  spawnSecretMiniSplitCoin,
   spawnSecretWindowCoin,
+  spawnSecretWindowOpenCoin,
   spawnSecretDrawerCoin,
   spawnSecretMacbookCoin,
   spawnSecretTvCoin,
@@ -50,6 +51,9 @@ export function createPurifier(scene) {
   let _toggleGuestDoor = null;
   let _toggleFoodBowl = null;
   let _getFoodBowlMesh = null;
+  let _setMiniSplitOn = null;
+  let _isMiniSplitOn = null;
+  let _resetMiniSplit = null;
   let _uiSfxAC = null;
 
   function _ensureUiSfxAC() {
@@ -62,6 +66,25 @@ export function createPurifier(scene) {
     if (ac && ac.state === 'suspended' && ac.resume) ac.resume();
     _uiSfxAC = ac;
     return ac;
+  }
+
+  // Returns true when the FP player is standing inside an open drawer's
+  // tray volume. Used to block the close action so the closing slide
+  // doesn't shove the player through the back (door) wall.
+  function _isPlayerInDrawerTray(grp) {
+    if (!_fpMode || !_fpPos) return false;
+    if (!grp || !grp._drawerOpen || !grp._drawerW) return false;
+    const wx = grp.position.x, wy = grp.position.y, wz = grp.position.z;
+    const hw = grp._drawerW / 2;
+    const hh = grp._drawerH / 2;
+    const trayD = grp._drawerTrayD || 10;
+    const inX = _fpPos.x > wx - hw - 0.25 && _fpPos.x < wx + hw + 0.25;
+    const inZ = _fpPos.z > wz - 0.25 && _fpPos.z < wz + trayD + 0.25;
+    // Player feet ≈ fpPos.y - eyeH (4). Tray floor sits at wy - hh; allow
+    // standing on top of the drawer too (a small extra Y slack above).
+    const feetY = _fpPos.y - 4;
+    const inY = feetY > wy - hh - 1 && feetY < wy + hh + 2;
+    return inX && inZ && inY;
   }
 
   function _playDrawerCue(opening) {
@@ -1980,7 +2003,7 @@ export function createPurifier(scene) {
   function getInteractiveTarget(obj){
     let p=obj;
     while(p){
-      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isBypassPanel||p._isCornerDoorHandle||p._isCornerDoor||p._isGuestDoor||p._isGuestDoorHandle||p._isMacbook||p._isWindow||p._isWindowPane||p._isTV||p._isFoodBowl||p._isPickupSkateboard||p._isPokemonBinder||p._isStandingDesk) return p;
+      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isBypassPanel||p._isCornerDoorHandle||p._isCornerDoor||p._isGuestDoor||p._isGuestDoorHandle||p._isMacbook||p._isWindow||p._isWindowPane||p._isTV||p._isFoodBowl||p._isPickupSkateboard||p._isPokemonBinder||p._isStandingDesk||p._isMiniSplit) return p;
       p=p.parent;
     }
     return null;
@@ -2276,7 +2299,15 @@ export function createPurifier(scene) {
         if(_roomCeilGlow) _roomCeilGlow.intensity=0;
       }
       _markShadowsDirty();
-      if(_fpMode) spawnSecretCeilingLightCoins();
+      return;
+    }
+    // Clicked mini-split (A/C unit) → toggle on/off; first turn-on
+    // unlocks a secret coin out in the airflow.
+    if(obj._isMiniSplit){
+      if(!_setMiniSplitOn) return;
+      const nextOn = !(_isMiniSplitOn && _isMiniSplitOn());
+      _setMiniSplitOn(nextOn);
+      if(nextOn && _fpMode) spawnSecretMiniSplitCoin();
       return;
     }
     // Clicked window pane → slide open/close
@@ -2289,11 +2320,20 @@ export function createPurifier(scene) {
       // Toggle open state (stored on userData so it persists with the group)
       wm._isOpen = !wm._isOpen;
       const open = wm._isOpen;
-      wm._slideTarget = open ? wm.lowerPane._baseY + wm.height / 2 : wm.lowerPane._baseY;
+      // Open almost all the way but leave ~1" of the lower sash hanging
+      // below the upper sash as a visible overhang (so it doesn't look
+      // like the sash vanished into the wall).
+      const OPEN_OVERHANG = 1;
+      wm._slideTarget = open
+        ? wm.lowerPane._baseY + wm.height / 2 - OPEN_OVERHANG
+        : wm.lowerPane._baseY;
       _windowLerps.push({ group: winGroup });
       // Sync room-level state for collision gating in game-fp
       if (typeof window !== 'undefined' && window._roomRefs && window._roomRefs.setOfficeWindowOpen) {
         window._roomRefs.setOfficeWindowOpen(open);
+      // First time the player slides it open, drop a secret coin just
+      // outside the opening to reward exploring the yard.
+      if (open && _fpMode) spawnSecretWindowOpenCoin();
       }
       return;
     }
@@ -2349,6 +2389,9 @@ export function createPurifier(scene) {
       while(grp && !(grp.isGroup && grp._drawerSlideMax !== undefined)) grp = grp.parent;
       if(!grp) return;
       if(_drawerLerps.some(dl=>dl.obj===grp)) return;
+      // Don't close the drawer while the player is standing inside the tray —
+      // the closing slide would shove them through the back (door) wall.
+      if (grp._drawerOpen && _isPlayerInDrawerTray(grp)) return;
       grp._drawerOpen=!grp._drawerOpen;
       _playDrawerCue(grp._drawerOpen);
       // slide=0 closed, slide=slideMax fully out (-Z direction).
@@ -3945,6 +3988,9 @@ export function createPurifier(scene) {
     if (refs.toggleGuestDoor) _toggleGuestDoor = refs.toggleGuestDoor;
     if (refs.toggleFoodBowl) _toggleFoodBowl = refs.toggleFoodBowl;
     if (refs.getFoodBowlMesh) _getFoodBowlMesh = refs.getFoodBowlMesh;
+    if (refs.setMiniSplitOn) _setMiniSplitOn = refs.setMiniSplitOn;
+    if (refs.isMiniSplitOn) _isMiniSplitOn = refs.isMiniSplitOn;
+    if (refs.resetMiniSplit) _resetMiniSplit = refs.resetMiniSplit;
   }
 
   // Apply initial wood species (ash) so panels start with correct texture
@@ -4056,6 +4102,38 @@ export function createPurifier(scene) {
           wd._isOpen = false;
           wd.lowerPane.position.y = wd.lowerPane._baseY;
           wd._slideTarget = wd.lowerPane._baseY;
+        }
+      }
+
+      // Mini-split: turn off + hide air-stream particles.
+      if (roomRefs && typeof roomRefs.resetMiniSplit === 'function') {
+        roomRefs.resetMiniSplit();
+      } else if (_resetMiniSplit) {
+        _resetMiniSplit();
+      }
+
+      // Standing desk: snap back to lowered pose. Cancels any in-flight
+      // raise/lower lerp, silences its motor, and restores all rise parts
+      // and telescoping legs to their rise=0 baseline.
+      const sd = roomRefs && roomRefs.standingDesk;
+      if (sd) {
+        // Silence any in-flight motor so it doesn't keep humming after reset.
+        for (const entry of _standingDeskLerps) {
+          if (entry && entry.motorGain) entry.motorGain.gain.value = 0;
+        }
+        _standingDeskLerps.length = 0;
+        // Pull any onStandingDesk-tagged coins back down with the desk so
+        // static coins (e.g. monitor-top) don't end up floating after reset.
+        if (sd.rise) nudgeStandingDeskCoins(-sd.rise);
+        sd.rise = 0;
+        sd.target = 0;
+        sd.raised = false;
+        for (const p of sd.riseParts) {
+          p.mesh.position.y = p.baseY;
+        }
+        for (const lp of sd.legPosts) {
+          lp.mesh.scale.y = 1;
+          if (lp.baseY !== undefined) lp.mesh.position.y = lp.baseY;
         }
       }
     },

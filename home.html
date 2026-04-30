@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Bedroom Floor</title>
+  <meta name="description"
+    content="Bedroom Floor — a 3D replica of my room. Play as a cat, collect every coin." />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <!-- Same stylesheet (and design tokens) the in-game UI uses, so the
+       splash card and tab bar paint identically across home / about /
+       leaderboard. -->
+  <link rel="stylesheet" href="./src/styles/main.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css" />
+  <style>
+    /* main.css locks html/body to overflow:hidden;height:100% for the 3D
+       game; override here so the home menu can scroll if a small viewport
+       ever needs it. The splash card itself is fixed-positioned, so this
+       is just a safety net. */
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--font-ui);
+      color: var(--text);
+      font-weight: var(--weight-regular);
+      line-height: 1.55;
+      text-rendering: optimizeLegibility;
+      /* Same dark fallback the about page uses so the page never flashes
+         white before the iframe scene comes in. */
+      background: radial-gradient(1200px 700px at 18% -12%, #244868 0%, transparent 58%),
+        radial-gradient(900px 560px at 110% 10%, #1f3e56 0%, transparent 65%),
+        linear-gradient(180deg, #122637, #07121d);
+      position: relative;
+      z-index: 0;
+    }
+
+    /* Live game scene rendered behind the menu — same iframe pattern as
+       about / leaderboard, so all three pages share one persistent
+       three.js scene. The src points directly at /play?bg=1 (not /)
+       since this page IS the menu over /play's bg; an iframe inside
+       another iframe would defeat the purpose. */
+    #bgFrame {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      border: 0;
+      z-index: 0;
+      pointer-events: none;
+      filter: saturate(1.05);
+      opacity: 0;
+      /* No transition: snap from 0 → 1 the moment the scene is ready.
+         A fade here makes glass cards on top look weakly blurred while
+         the iframe is mid-transition, since backdrop-filter is
+         sampling a half-transparent iframe over a flat body color. */
+    }
+    #bgFrame.ready { opacity: 1; }
+
+    /* When the iframe is "promoted" out of bg mode into play (the
+       big Play CTA), input needs to flow into it. The scrim and the
+       (now-hidden) tabs/main go pointer-events:none so clicks land
+       on the iframe canvas underneath. We also lift the iframe ABOVE
+       #bgScrim so the scrim's backdrop-filter no longer paints over
+       the picker (which lives inside the iframe). The bedroom stays
+       blurred during the transition because the iframe-side picker
+       runs its own constant-strength blur layer on body::before. */
+    body.is-playing #bgFrame {
+      pointer-events: auto;
+      z-index: 2;
+    }
+
+    @media (prefers-reduced-motion: reduce) { #bgFrame { display: none; } }
+
+    /* Same scrim definition as about.html / leaderboard.html so all
+       three pages render the live three.js scene through the same
+       piece of glass. */
+    #bgScrim {
+      position: fixed; inset: 0; z-index: 1; pointer-events: none;
+      background:
+        radial-gradient(120% 80% at 50% 0%, rgba(8, 10, 16, 0.55) 0%, rgba(8, 10, 16, 0) 55%),
+        radial-gradient(120% 80% at 50% 100%, rgba(8, 10, 16, 0.6) 0%, rgba(8, 10, 16, 0) 55%);
+      backdrop-filter: blur(2px) saturate(1.1);
+      -webkit-backdrop-filter: blur(2px) saturate(1.1);
+    }
+
+    /* The splash card lives inside <main class="page"> and is centered
+       via flex on the wrapper. Force display so it doesn't depend on
+       the #titleSplash.open sibling combinator (which we no longer
+       use on this page). */
+    main.page > .title-splash-card { display: block; }
+
+    /* The Play button's "ready" content row is hidden by default and
+       shown via `#titleSplash[data-state="ready"] + .title-splash-card`
+       in main.css. Home no longer renders #titleSplash at all (we use
+       a plain #bgScrim instead), so that sibling rule never matches.
+       Force the ready row visible here — home is always in the ready
+       state since the iframe handles its own boot. */
+    main.page > .title-splash-card .title-splash-play-content--ready {
+      display: inline-flex;
+    }
+
+    /* The splash treatment lives in main.css under #titleSplash and
+       .title-splash-card. We center the card via flexbox here so the
+       card itself doesn't need a `transform: translate(-50%, -50%)`
+       compound-transform centering trick — that conflicts with the
+       shared pageContentIn keyframe used on every page. */
+    main.page {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Persistent live-scene iframe — kept mounted across SPA swaps to
+       /about and /leaderboard so the three.js scene never reboots when
+       the user changes tabs. The router only replaces <main> + the
+       page-local <style data-view> blocks; this iframe is left alone.
+       The `allow` attribute is required for pointer-lock to work
+       once the iframe is "promoted" out of bg mode into play. -->
+  <iframe id="bgFrame" src="/play?bg=1" title="" aria-hidden="true" tabindex="-1"
+    allow="pointer-lock; fullscreen; autoplay; gamepad"
+    referrerpolicy="same-origin"></iframe>
+
+  <nav class="site-tabs" aria-label="Primary">
+    <a class="site-tab" href="/" data-tab="home">
+      <i class="site-tab__icon site-tab__icon--regular ph ph-house"></i><i class="site-tab__icon site-tab__icon--fill ph-fill ph-house"></i><span>Home</span>
+    </a>
+    <a class="site-tab" href="/leaderboard" data-tab="leaderboard">
+      <i class="site-tab__icon site-tab__icon--regular ph ph-trophy"></i><i class="site-tab__icon site-tab__icon--fill ph-fill ph-trophy"></i><span>Leaderboard</span>
+    </a>
+    <a class="site-tab" href="/about" data-tab="about">
+      <i class="site-tab__icon site-tab__icon--regular ph ph-info"></i><i class="site-tab__icon site-tab__icon--fill ph-fill ph-info"></i><span>About</span>
+    </a>
+  </nav>
+
+  <!-- Page scrim — same div pattern as about / leaderboard so all
+       three pages share the EXACT same scrim treatment over the live
+       three.js scene. Previously home was reusing #titleSplash for
+       this, which had its own padding / overflow / animation rules
+       and lived inside <main>, producing a subtly darker, slightly
+       different look than the other pages. -->
+  <div id="bgScrim" aria-hidden="true"><div class="bg-grid"></div></div>
+
+  <main class="page">
+    <!-- Splash card — same markup as /play used to have, minus the
+         button-state spans (no loading state on home) and minus the
+         secondary nav (replaced by the top-level .site-tabs). -->
+    <div class="title-splash-card" role="dialog" aria-modal="true" aria-label="Bedroom Floor — title screen">
+      <h1 class="title-splash-title">
+        <span class="title-splash-title-main">Bedroom Floor</span>
+      </h1>
+      <p class="title-splash-tagline">
+        A 3D replica of my room. Play as a cat, collect every coin.
+      </p>
+      <div class="title-splash-cta">
+        <!-- Plain anchor — the SPA router intercepts site-tab clicks
+             only; this Play button is a real navigation to /play with
+             a brief fade for continuity. We use an <a> (not a <button>)
+             so middle-click / cmd-click open in a new tab as expected. -->
+        <a class="title-splash-play glass-btn glass-btn--primary" href="/play" data-play-cta>
+          <span class="title-splash-play-content title-splash-play-content--ready">
+            <span>Play</span>
+          </span>
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Reveal the bg iframe once the live scene's first frame paints.
+    // The iframe (vite-index.html in is-bg mode) posts a
+    // `bg-scene-ready` message after its first composited frame; we
+    // gate the fade-in on that message so the glass cards on this
+    // page never end up briefly blurring an empty canvas (an empty
+    // canvas reveals the iframe body's flat color, and blurring a
+    // flat color looks identical to no blur at all).
+    (function () {
+      const bg = document.getElementById('bgFrame');
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      // Tabs start hidden (CSS) and slide down once the scene is up
+      // AND the splash card has had time to settle. The chrome lands
+      // last so the eye reads the room first.
+      let _tabsRevealed = false;
+      function revealTabs() {
+        if (_tabsRevealed) return;
+        _tabsRevealed = true;
+        document.body.classList.add('tabs-revealed');
+      }
+
+      function reveal() {
+        if (bg) bg.classList.add('ready');
+        // Mark the iframe as ready so a Play click that landed before
+        // boot finished can now flush its queued enter-play message.
+        bg && bg.setAttribute('data-scene-ready', '1');
+        if (typeof window.__flushPendingPlay === 'function') window.__flushPendingPlay();
+        // Hold an extra beat after the scene paints so the splash card
+        // finishes its entrance before the tabs join in.
+        setTimeout(revealTabs, 520);
+      }
+      if (!bg || reduce) {
+        // No live scene to gate on — still wait long enough for the
+        // splash card's pageContentIn to play out.
+        setTimeout(revealTabs, reduce ? 0 : 1100);
+        return;
+      }
+      window.addEventListener('message', (e) => {
+        if (e.origin !== location.origin) return;
+        if (e.data && e.data.type === 'bg-scene-ready') reveal();
+      });
+      // Fallback: if the message never arrives (older cached iframe,
+      // postMessage blocked, etc.) reveal anyway after 4s.
+      setTimeout(reveal, 4000);
+    })();
+  </script>
+
+  <script>
+    // Shared SPA router — same code as about.html / leaderboard.html.
+    // Intercepts top-tab clicks and swaps just the <main> contents +
+    // page-local <style data-view> blocks, so the persistent #bgFrame
+    // stays mounted and the three.js scene never reboots when you
+    // change tabs.
+    //
+    // The big "Play" button is NOT a site-tab, so it falls through to
+    // a normal navigation (with fade) — that's the deliberate "you're
+    // entering the game now" transition.
+    (function () {
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function viewFor(path) {
+        path = path.replace(/\/+$/, '') || '/';
+        if (path === '/' || path === '/home' || path === '/home.html') return 'home';
+        if (path === '/about' || path === '/about.html') return 'about';
+        if (path === '/leaderboard' || path === '/leaderboard.html' || path.startsWith('/leaderboard')) return 'leaderboard';
+        if (path === '/play' || path === '/vite-index.html' || path === '/index.html') return 'play';
+        return null;
+      }
+
+      function setActiveTab(view) {
+        document.querySelectorAll('.site-tabs .site-tab').forEach(t => {
+          const id = t.getAttribute('data-tab');
+          const active = id === view;
+          t.classList.toggle('is-active', active);
+          if (active) t.setAttribute('aria-current', 'page');
+          else t.removeAttribute('aria-current');
+        });
+        updatePill();
+      }
+
+      // Active-tab pill — a single absolutely-positioned div behind
+      // the tabs that slides + resizes to match the active one. Same
+      // pattern Stripe uses on its blog category nav. We animate
+      // transform (GPU) and width together so the rounded ends don't
+      // distort the way scaleX would.
+      function buildPill() {
+        const nav = document.querySelector('.site-tabs');
+        if (!nav || nav.querySelector('.site-tabs-pill')) return;
+        const pill = document.createElement('div');
+        pill.className = 'site-tabs-pill';
+        pill.setAttribute('aria-hidden', 'true');
+        // Insert before the tabs so it's the first child; CSS z-index
+        // (not DOM order) governs stacking, but this also helps any
+        // future hover-only tab styling read more naturally.
+        nav.insertBefore(pill, nav.firstChild);
+        nav.classList.add('has-pill');
+      }
+
+      function updatePill() {
+        const nav = document.querySelector('.site-tabs');
+        const pill = nav && nav.querySelector('.site-tabs-pill');
+        const active = nav && nav.querySelector('.site-tab.is-active');
+        if (!nav || !pill || !active) return;
+        const navRect = nav.getBoundingClientRect();
+        const tabRect = active.getBoundingClientRect();
+        const left = tabRect.left - navRect.left;
+        pill.style.transform = `translateX(${left}px)`;
+        pill.style.width = `${tabRect.width}px`;
+      }
+
+      // Tag the initial view's <main> and any page-local <style> blocks
+      // so we can cleanly remove this view's styles on swap to another
+      // view (otherwise rules would bleed across pages).
+      (function tagInitial() {
+        const v = viewFor(location.pathname);
+        if (!v || v === 'play') return;
+        document.querySelectorAll('head > style').forEach(s => {
+          if (!s.dataset.view) s.dataset.view = v;
+        });
+        const main = document.querySelector('main.page');
+        if (main && !main.dataset.view) main.dataset.view = v;
+      })();
+      buildPill();
+      setActiveTab(viewFor(location.pathname));
+      // Enable the pill's clip-path transition on the next frame so
+      // the initial position doesn't slide in from the left on load.
+      requestAnimationFrame(() => {
+        const nav = document.querySelector('.site-tabs');
+        if (nav) nav.classList.add('pill-ready');
+      });
+      window.addEventListener('resize', updatePill);
+      // Webfonts can resize the tab labels after first paint; re-measure
+      // when they're ready so the pill snaps to the final width.
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(updatePill).catch(() => {});
+      }
+
+      function fullNav(href, opts) {
+        if (reduced) { location.href = href; return; }
+        document.body.classList.add('page-fade', 'is-leaving');
+        // Play CTA gets a longer hold so the tabs visibly lift away
+        // before the next document loads — the entire transition reads
+        // as one motion (chrome clears, char-select bounces in over
+        // the same room scene). Other full-navs keep the snappy 160ms.
+        const wait = (opts && opts.slow) ? 360 : 160;
+        setTimeout(() => { location.href = href; }, wait);
+      }
+
+      async function swap(href) {
+        const targetView = viewFor(href);
+        if (!targetView || targetView === 'play') { fullNav(href); return; }
+
+        const oldMain = document.querySelector('main.page');
+
+        // Start the fetch immediately so it overlaps with the exit
+        // animation (saves a noticeable amount of perceived latency
+        // on slower connections).
+        const fetchPromise = fetch(href, { credentials: 'same-origin' }).then(r => {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.text();
+        });
+
+        // Exit: animate the OLD <main> out via .is-leaving on the
+        // element itself. Each direction owning its own class is what
+        // makes the entrance work cleanly — see CSS comment.
+        if (oldMain && !reduced) oldMain.classList.add('is-leaving');
+        const exitWait = reduced ? 0 : 200;
+
+        let html;
+        try {
+          html = await fetchPromise;
+        } catch (e) {
+          location.href = href;
+          return;
+        }
+        if (exitWait) await new Promise(r => setTimeout(r, exitWait));
+
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        document.title = doc.title || document.title;
+
+        document.querySelectorAll('head > style[data-view]').forEach(s => s.remove());
+        doc.querySelectorAll('head > style').forEach(s => {
+          const clone = s.cloneNode(true);
+          clone.dataset.view = targetView;
+          document.head.appendChild(clone);
+        });
+
+        const newMain = doc.querySelector('main.page');
+        const currentOldMain = document.querySelector('main.page');
+        if (newMain && currentOldMain) {
+          newMain.dataset.view = targetView;
+          // Mark this main as SPA-inserted so CSS can suppress any
+          // inner keyframe animations (see the data-spa rule in
+          // main.css) that would otherwise blink on top of our outer
+          // page transition.
+          newMain.dataset.spa = '1';
+          if (!reduced) newMain.classList.add('is-entering');
+          currentOldMain.replaceWith(newMain);
+          // Force a layout read so the entering state is committed to
+          // the style cache before we remove the class. Without this
+          // the browser folds the from/to into one paint and the
+          // entrance is skipped (the stuttery "blink in" we're fixing).
+          if (!reduced) {
+            void newMain.offsetWidth;
+            requestAnimationFrame(() => newMain.classList.remove('is-entering'));
+          }
+        }
+
+        history.pushState({ view: targetView }, '', href);
+        setActiveTab(targetView);
+
+        if (targetView === 'leaderboard' && typeof window.__initLeaderboard === 'function') {
+          window.__initLeaderboard();
+        }
+
+        window.scrollTo(0, 0);
+      }
+
+      document.addEventListener('click', (e) => {
+        const a = e.target.closest && e.target.closest('a[href]');
+        if (!a) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+        if (a.target && a.target !== '_self') return;
+
+        let url;
+        try { url = new URL(a.href, location.href); }
+        catch { return; }
+        if (url.origin !== location.origin) return;
+
+        // Top tabs: SPA-swap when staying within iframe-backed views.
+        if (a.classList.contains('site-tab')) {
+          const targetView = viewFor(url.pathname);
+          const currentView = viewFor(location.pathname);
+          if (a.classList.contains('is-active')) { e.preventDefault(); return; }
+          if (targetView && targetView !== 'play' && currentView && currentView !== 'play') {
+            e.preventDefault();
+            swap(url.pathname + url.search + url.hash);
+          } else {
+            e.preventDefault();
+            fullNav(a.href);
+          }
+          return;
+        }
+
+        // The big Play CTA: instead of navigating to /play (which
+        // would tear down the bg iframe and rebuild the entire three.js
+        // scene from scratch — the source of the old stutter), we
+        // PROMOTE the bg iframe in place. The home chrome animates out
+        // via body.is-leaving, and the iframe drops its is-bg class
+        // and opens char-select. URL is updated via pushState so the
+        // back button still works. The iframe's three.js scene flows
+        // seamlessly from "menu backdrop" into "active game" with no
+        // rebuild and no scene seam.
+        if (a.hasAttribute('data-play-cta')) {
+          e.preventDefault();
+          promoteToPlay(a.href);
+        }
+      });
+
+      // ── Iframe promotion ────────────────────────────────────────
+      const bgFrame = document.getElementById('bgFrame');
+
+      // Send enter-play once the iframe's three.js scene has signaled
+      // bg-scene-ready. If the user clicks Play before that fires
+      // (very rare on warm cache, possible on cold load), queue the
+      // send and let the boot-script flush it via __flushPendingPlay.
+      let _pendingPlay = false;
+      function _sendEnterPlay() {
+        if (!bgFrame || !bgFrame.contentWindow) return;
+        try { bgFrame.contentWindow.postMessage({ type: 'enter-play' }, location.origin); } catch (e) {}
+        try { bgFrame.contentWindow.focus(); } catch (e) {}
+      }
+      window.__flushPendingPlay = function () {
+        if (!_pendingPlay) return;
+        _pendingPlay = false;
+        _sendEnterPlay();
+      };
+      function _enterPlayWhenReady() {
+        if (bgFrame && bgFrame.getAttribute('data-scene-ready') === '1') {
+          _sendEnterPlay();
+        } else {
+          _pendingPlay = true;
+        }
+      }
+
+      function promoteToPlay(href) {
+        // Capture the path the user is returning to. Stored on a
+        // shared global so whichever page's IIFE happens to be the
+        // active one (only the FIRST loaded page's script runs —
+        // SPA swap doesn't re-execute) returns to the right URL.
+        // Without this, going leaderboard → (SPA swap to about) →
+        // play → close would push leaderboard's hardcoded path back.
+        window.__playReturnPath = location.pathname + location.search + location.hash;
+        // Reduced motion: skip the choreography. We still avoid the
+        // top-level navigation (and its scene rebuild) — just snap.
+        if (reduced) {
+          history.pushState({ view: 'play' }, '', href || '/play');
+          document.body.classList.add('is-playing');
+          _enterPlayWhenReady();
+          setActiveTab('play');
+          return;
+        }
+        // Animate home chrome out.
+        document.body.classList.add('page-fade', 'is-leaving');
+        // Update URL immediately so history is consistent if the user
+        // hits back mid-transition.
+        history.pushState({ view: 'play' }, '', href || '/play');
+        setActiveTab('play');
+        // Choreographed three-beat promotion:
+        //   1. 0–700ms   chrome exits (ease-in: holds, then accelerates)
+        //   2. 700–850ms just the bedroom — a clean visual breath
+        //   3. 850ms+    picker fades in over the live scene
+        // Earlier we overlapped the exit and entry at 120ms which read
+        // as one rushed motion; sequencing them gives each beat room
+        // to land and makes the live three.js scene visibly the
+        // "shared backdrop" between the two screens.
+        setTimeout(() => {
+          document.body.classList.add('is-playing');
+          _enterPlayWhenReady();
+        }, 850);
+      }
+
+      function demoteFromPlay({ updateHistory = true } = {}) {
+        // Called when the iframe posts { type: 'play-exited' } after
+        // it has reset its camera and re-applied is-bg under its black
+        // overlay. Our job: bring the chrome back in and route to
+        // wherever the user came FROM (which may not be /home if they
+        // SPA-swapped to /about or /leaderboard before clicking Play).
+        const ret = window.__playReturnPath || '/';
+        const retView = viewFor(ret) || 'home';
+        if (updateHistory) {
+          history.pushState({ view: retView }, '', ret);
+        }
+        setActiveTab(retView);
+        document.body.classList.remove('is-playing');
+        document.body.classList.remove('is-leaving');
+        // Keep page-fade for the duration of the transition; remove
+        // after the chrome has re-entered so it doesn't block future
+        // animations.
+        setTimeout(() => document.body.classList.remove('page-fade'), 700);
+      }
+
+      // Track whether the most recent demote was triggered by the
+      // back button (popstate) — in that case the URL is already
+      // correct and demoteFromPlay shouldn't pushState again.
+      let _demoteFromPopstate = false;
+
+      // Listen for the iframe's exit handshake.
+      window.addEventListener('message', (e) => {
+        if (e.origin !== location.origin) return;
+        const data = e.data;
+        if (!data || typeof data !== 'object') return;
+        if (data.type === 'play-exited') {
+          demoteFromPlay({ updateHistory: !_demoteFromPopstate });
+          _demoteFromPopstate = false;
+        }
+      });
+
+      window.addEventListener('popstate', (e) => {
+        const v = viewFor(location.pathname);
+        // Cross-promotion-boundary cases: between /play and the menu
+        // pages we drive promotion via postMessage rather than reload.
+        const isPlaying = document.body.classList.contains('is-playing');
+        if (v === 'play' && !isPlaying) {
+          // Forward to /play while currently on a menu — promote.
+          // No pushState here either: popstate already moved the URL.
+          document.body.classList.add('page-fade', 'is-leaving');
+          setTimeout(() => {
+            document.body.classList.add('is-playing');
+            setActiveTab('play');
+            _enterPlayWhenReady();
+          }, 850);
+          return;
+        }
+        if (v !== 'play' && isPlaying) {
+          // Back to a menu while currently in play — ask the iframe
+          // to run its exit sequence (camera reset + black fade).
+          _demoteFromPopstate = true;
+          if (bgFrame && bgFrame.contentWindow) {
+            try { bgFrame.contentWindow.postMessage({ type: 'exit-play' }, location.origin); } catch (err) {}
+          }
+          return;
+        }
+        // Within-menu navigation (home ↔ about ↔ leaderboard).
+        if (!v || v === 'play') { location.reload(); return; }
+        swap(location.pathname + location.search + location.hash);
+      });
+      window.addEventListener('pageshow', (e) => {
+        document.body.classList.remove('is-leaving', 'page-fade');
+        const m = document.querySelector('main.page');
+        if (m) m.classList.remove('is-entering', 'is-leaving');
+        // bfcache restore: the bg scene is already painted, so the
+        // tabs should be back immediately rather than re-running the
+        // "wait for scene" delay.
+        if (e.persisted) document.body.classList.add('tabs-revealed');
+      });
+    })();
+  </script>
+</body>
+
+</html>

@@ -26,12 +26,22 @@
        main.css (loaded as a render-blocking <link> above), so the splash
        paints fully styled on the very first frame as the loading screen. -->
   <style>
+    /* In bg-mode (this doc is mounted as the home/about/leaderboard
+       iframe), most of these elements are already hidden via their
+       own state classes. We deliberately DO NOT include #charSelect
+       in this `display: none` list: charSelect uses
+       opacity:0 + visibility:hidden as its closed state, so it stays
+       in the layout tree continuously. That way, when the parent
+       'promotes' the iframe and we drop is-bg, opening the picker
+       is a cheap visibility flip — no layout thrash from
+       suddenly inserting 5 char-cards + 5 canvas previews into the
+       layout tree on the same frame the entrance animation starts. */
     html.is-bg .panel,
     html.is-bg .panel-fab,
     html.is-bg .part-tooltip,
     html.is-bg #playDockBtn,
-    html.is-bg #charSelect,
     html.is-bg #titleSplash,
+    html.is-bg .title-splash-card,
     html.is-bg #fpHud,
     html.is-bg #fpCrosshair,
     html.is-bg #fpCrosshairTooltip,
@@ -49,12 +59,40 @@
     html.is-bg body {
       cursor: default !important;
     }
+
+    /* Scene fade — full-viewport black overlay used to mask the
+       camera reset when the embedded /play "promotes" back to /home.
+       Lives at the very top of the stack so it covers char-select,
+       HUD, pause overlays, toasts, etc. Uses a real <div> (not
+       backdrop-filter) so it composites cheaply and works inside
+       iframes regardless of the parent document's stacking context. */
+    #sceneFade {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483646; /* one below the max — leave headroom */
+      background: #000;
+      opacity: 0;
+      pointer-events: none;
+      will-change: opacity;
+    }
+    #sceneFade.is-active { pointer-events: auto; }
   </style>
   <script>
     // Run before <body> so the chrome never paints in iframe-bg mode.
+    // Two flags:
+    //   is-bg       — currently in background-of-menu-page mode
+    //                 (chrome hidden, scene paints in iframe).
+    //   is-embedded — this document is mounted inside the home page's
+    //                 #bgFrame. Stays set even after we "promote" the
+    //                 iframe into play mode (is-bg removed). Used by
+    //                 the exit-to-home flow to choose postMessage vs.
+    //                 a real top-level navigation.
     try {
       if (new URLSearchParams(location.search).get('bg') === '1') {
         document.documentElement.classList.add('is-bg');
+      }
+      if (window.parent !== window) {
+        document.documentElement.classList.add('is-embedded');
       }
     } catch (e) { }
   </script>
@@ -69,59 +107,24 @@
          boot background paints instantly (matching the inline critical CSS
          above). After the first scene frame paints, main.js flips it to
          `data-state="ready"` and the liquid-glass treatment fades in over
-         the live room canvas. -->
-    <div id="titleSplash" class="open" data-state="loading" role="dialog" aria-modal="true" aria-label="My Room, The Game — title screen">
-      <div class="title-splash-bg" aria-hidden="true">
+         the live room canvas.
+
+         IMPORTANT: `.title-splash-card` is a SIBLING of #titleSplash (not
+         a child) so its backdrop-filter samples the canvas directly.
+         Putting the card inside the full-viewport overlay made Chromium
+         clip the backdrop sample to the overlay's own paint output — the
+         card ended up blurring nothing instead of the live scene.
+         #titleSplash now only carries the scrim background, dotted grid,
+         and click-blocking; the card paints directly above the canvas. -->
+    <!-- Boot loading screen. Starts with `class="open" data-state="loading"`
+         so the dark gradient paints instantly via the inline critical CSS
+         above. After the first scene frame paints, main.js flips this
+         element off (.open is removed) and auto-opens the character
+         picker, since the user explicitly navigated to /play to play.
+         The full menu / "Play" button is on /home now. -->
+    <div id="titleSplash" class="open" data-state="loading" aria-hidden="true">
+      <div class="title-splash-bg">
         <div class="title-splash-grid"></div>
-      </div>
-      <div class="title-splash-card">
-        <div class="title-splash-eyebrow">
-          <span class="title-splash-dot" aria-hidden="true"></span>
-          <span>A tiny three.js side-quest</span>
-        </div>
-        <h1 class="title-splash-title">
-          <span class="title-splash-title-shadow" aria-hidden="true">My Room,<br />The Game</span>
-          <span class="title-splash-title-main">My Room,<br />The Game</span>
-        </h1>
-        <p class="title-splash-tagline">
-          A 3D replica of my room. Run around as <strong>Korra</strong> (my cat, professionally cursed-looking),
-          collect every coin, and snoop out a few hidden secret coins tucked around the place.
-        </p>
-        <div class="title-splash-cta">
-          <button class="title-splash-play glass-btn glass-btn--primary" type="button"
-            onclick="window._startFromSplash&&window._startFromSplash()">
-            <span class="title-splash-play-content title-splash-play-content--ready">
-              <span>Play</span>
-            </span>
-            <span class="title-splash-play-content title-splash-play-content--loading" aria-hidden="true">
-              <span class="title-splash-play-spinner"></span>
-              <span>Loading…</span>
-            </span>
-            <span class="title-splash-play-content title-splash-play-content--waiting" aria-hidden="true">
-              <span class="title-splash-play-spinner"></span>
-              <span>Hang tight…</span>
-            </span>
-          </button>
-          <div class="title-splash-cta-meta">
-            <span class="title-splash-kbd">No install · runs in your browser</span>
-          </div>
-        </div>
-        <div class="title-splash-chips" aria-label="What’s in the game">
-          <span class="title-splash-chip"><i class="ph ph-cat"></i> Pick your cat</span>
-          <span class="title-splash-chip"><i class="ph ph-fire"></i> Throw fireballs</span>
-          <span class="title-splash-chip"><i class="ph ph-lightning"></i> Power up</span>
-          <span class="title-splash-chip"><i class="ph ph-coin"></i> Hidden secrets</span>
-          <span class="title-splash-chip"><i class="ph ph-shooting-star"></i> …and a few surprises</span>
-        </div>
-        <p class="title-splash-disclaimer">
-          For-fun side project — every wall, lamp, and very-cursed cat hand-modeled in code.
-          Rooms are missing, things will break, animations are jank.
-          Built with <a href="https://threejs.org/" target="_blank" rel="noopener noreferrer">three.js</a>,
-          a sprinkle of WebGL, and way too many evenings.
-        </p>
-        <p class="title-splash-credit">
-          made by <a href="https://brandonmoore.design" target="_blank" rel="noopener noreferrer">Brandon Moore</a>
-        </p>
       </div>
     </div>
 
@@ -146,16 +149,7 @@
             onclick="window._selectCat&&window._selectCat('classic',this)">
             <canvas class="char-preview" id="previewClassic"></canvas>
             <div class="char-name">Classic</div>
-            <div class="char-colors" id="classicColors">
-              <button class="color-dot on" data-color="charcoal" style="background:#0a0a12" aria-label="Charcoal"
-                onclick="event.stopPropagation();window._selectColor&&window._selectColor('charcoal',this)"></button>
-              <button class="color-dot" data-color="cream" style="background:#B08030" aria-label="Cream"
-                onclick="event.stopPropagation();window._selectColor&&window._selectColor('cream',this)"></button>
-              <button class="color-dot" data-color="midnight" style="background:#040818" aria-label="Midnight"
-                onclick="event.stopPropagation();window._selectColor&&window._selectColor('midnight',this)"></button>
-              <button class="color-dot" data-color="snow" style="background:#d8d8d8" aria-label="Snow"
-                onclick="event.stopPropagation();window._selectColor&&window._selectColor('snow',this)"></button>
-            </div>
+            <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
           </div>
           <div class="char-card" data-model="toon" role="button" tabindex="0" aria-label="Toon cat"
             onclick="window._selectCat&&window._selectCat('toon',this)">
@@ -347,9 +341,38 @@
       </div>
     </div>
 
-    <!-- Pause overlay -->
-    <div id="fpPauseOverlay" role="dialog" aria-modal="true" aria-label="Pause menu">
-      <div class="pause-card">
+    <!-- Overcharge death overlay (hold red kamehameha too long → boom) -->
+    <div id="fpDeathOverlay" role="dialog" aria-modal="true" aria-label="You went even further beyond">
+      <div class="death-card">
+        <div class="death-eyebrow">Overcharge</div>
+        <h2 class="death-title">You went even further beyond</h2>
+        <p class="death-sub">The cannon was too much. Your cat detonated.</p>
+        <div class="death-btns">
+          <button class="death-btn death-btn--primary glass-btn glass-btn--primary" id="fpDeathRevive"
+            onclick="window._reviveDeath&&window._reviveDeath()">
+            <i class="ph-fill ph-heart"></i> Revive
+          </button>
+          <button class="death-btn glass-btn" onclick="window._resetFromDeath&&window._resetFromDeath()">
+            <i class="ph ph-arrow-counter-clockwise"></i> Reset run
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pause overlay — viewport-wide scrim (gradient + soft blur).
+         The actual modal card lives OUTSIDE this element, as a sibling
+         (.pause-card), mirroring the proven #titleSplash + .title-splash-card
+         pattern on /home: putting the card inside a full-viewport overlay
+         caused Chromium to clip the card's backdrop-filter to the overlay's
+         own paint output, killing the blur. As siblings, both elements
+         independently sample the live canvas behind. -->
+    <div id="fpPauseOverlay" aria-hidden="true"></div>
+    <!-- Centering wrapper for the pause card. Sibling of #fpPauseOverlay
+         so the card's strong --glass-blur samples the canvas directly.
+         Visibility is driven from CSS by the overlay's inline display
+         style (see #fpPauseOverlay[style*="display"] + .pause-card-host). -->
+    <div class="pause-card-host">
+      <div class="pause-card" role="dialog" aria-modal="true" aria-label="Pause menu">
 
         <!-- Action zone: Resume / Reset / Exit — prominent top band -->
         <div class="pause-action-zone">
@@ -367,10 +390,8 @@
           </div>
         </div>
 
-        <!-- Body: settings + leaderboard -->
-        <div class="pause-layout">
-          <!-- Left: settings -->
-          <div class="pause-left">
+        <!-- Body: settings -->
+        <div class="pause-body">
 
             <!-- Audio -->
             <section class="pause-section">
@@ -435,6 +456,12 @@
                     oninput="window._setMouseSens&&window._setMouseSens(this.value)">
                   <span class="pause-toggle-state" id="fpPauseMouseSensVal">1.00×</span>
                 </div>
+                <div class="pause-toggle-row pause-toggle-row--slider">
+                  <span class="pause-toggle-label"><i class="ph ph-binoculars"></i> Field of view</span>
+                  <input type="range" id="fpPauseFov" class="pause-range" min="55" max="130" step="1" value="85"
+                    aria-label="Field of view" oninput="window._setFov&&window._setFov(this.value)">
+                  <span class="pause-toggle-state" id="fpPauseFovVal">85°</span>
+                </div>
                 <div class="pause-toggle-row">
                   <span class="pause-toggle-label"><i class="ph ph-sneaker-move"></i> Skate mode</span>
                   <div class="toggle-sw" id="fpPauseSkateMode" role="switch" aria-checked="false"
@@ -460,21 +487,9 @@
                 <div><kbd>Esc</kbd> Resume</div>
               </div>
               <button class="pause-link pause-link--footer" type="button"
-                onclick="window._enterInspector&&window._enterInspector()"><i class="ph ph-magnifying-glass"></i> Inspect air purifier</button>
+                onclick="window._enterInspector&&window._enterInspector()"><i class="ph ph-magnifying-glass"></i>
+                Inspect air purifier</button>
             </section>
-          </div>
-
-          <!-- Right: leaderboard -->
-          <div class="pause-right">
-            <h4 class="pause-lb-title"><i class="ph-fill ph-trophy"></i> Leaderboard</h4>
-            <div id="fpLeaderboardTabs" class="lb-tabs" role="tablist" aria-label="Leaderboard mode">
-              <button type="button" class="lb-tab active" role="tab" aria-selected="true"
-                data-lb-mode="normal">Normal</button>
-              <button type="button" class="lb-tab" role="tab" aria-selected="false" data-lb-mode="speed">Speed</button>
-            </div>
-            <ol id="fpLeaderboardList"></ol>
-            <div id="fpLeaderboardEmpty" class="pause-lb-empty">No runs yet. Collect all coins to post a time!</div>
-          </div>
         </div>
       </div>
     </div>
@@ -491,6 +506,13 @@
     <button id="mobileExitBtn" aria-label="Exit game" onclick="window._exitFP&&window._exitFP()"><i class="ph ph-x"
         aria-hidden="true"></i></button>
   </main>
+
+  <!-- Scene fade — black overlay used to mask the camera reset when
+       the embedded iframe transitions back to /home. Lives outside
+       <main> so it's a sibling of every other UI layer and isn't
+       affected by main's stacking context. main.js drives opacity
+       via inline style during the exit sequence. -->
+  <div id="sceneFade" aria-hidden="true"></div>
 
   <script>
     // Show debug wall-label toggle only on localhost

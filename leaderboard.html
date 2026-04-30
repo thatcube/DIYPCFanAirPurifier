@@ -1,71 +1,115 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>DIY Air Purifier — Speedrun Challenge</title>
-  <meta name="description" content="A first-person coin-collecting speedrun in a tiny bedroom. Can you beat the time?" />
+  <meta name="description"
+    content="A first-person coin-collecting speedrun in a tiny bedroom. Can you beat the time?" />
   <!-- Share the same stylesheet (and design tokens) the in-game UI uses -->
   <link rel="stylesheet" href="./src/styles/main.css" />
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css" />
   <style>
+    /* Inherits the canonical liquid-glass design tokens from main.css
+       (--glass, --glass-specular, --glass-blur, --glass-border,
+       --glass-border-strong, --font-ui, --font-mono, --text). The few
+       page-local tokens below are the cyan/gold accents that the
+       in-game pause + finish-dialog leaderboards use as hardcoded hex,
+       so the share page reads as the same surface treatment. */
     :root {
       --bg0: #07121d;
       --bg1: #122637;
-      /* Liquid-glass tokens — mirror the splash + in-game panels so every
-         glass surface in the project refracts the world identically.
-         Cool dark tint keeps white text legible over the busy live scene. */
-      --card: rgba(18, 24, 38, 0.38);
-      --card-specular:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 18%),
-        radial-gradient(ellipse at 30% 0%, rgba(255, 210, 165, 0.06) 0%, transparent 55%),
-        radial-gradient(ellipse at 70% 100%, rgba(160, 200, 255, 0.05) 0%, transparent 60%);
-      --card-blur: blur(40px) saturate(1.8) brightness(1.1);
-      --edge: rgba(255, 255, 255, 0.14);
-      --edge-strong: rgba(255, 255, 255, 0.24);
-      --text: #e6f3ff;
       --muted: #a8c0d6;
-      --accent: #9fe3ff;
-      --gold: #ffd873;
-      --goldEdge: rgba(255, 216, 115, 0.45);
-      --font-ui: "Nunito Sans Variable", "Nunito Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-      --font-mono: "SF Mono", "IBM Plex Mono", Menlo, Consolas, monospace;
+      --lb-accent: #9fe3ff;
+      /* matches #fpLeaderboardList .tm + finish-dialog accent */
+      --lb-gold: #ffd700;
+      /* matches --gold in main.css */
+      --lb-gold-edge: rgba(255, 216, 115, 0.46);
+      /* matches finish-dialog .own-current border */
     }
-    * { box-sizing: border-box; }
+
+    * {
+      box-sizing: border-box;
+    }
+
     /* main.css locks html/body { overflow: hidden; height: 100% } for the 3D
        game; override here so the share page scrolls when content overflows. */
-    html, body { height: auto; overflow-x: hidden; overflow-y: auto; }
+    html,
+    body {
+      height: auto;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
     body {
       margin: 0;
       min-height: 100vh;
       font-family: var(--font-ui);
       color: var(--text);
+      font-weight: var(--weight-regular);
       line-height: 1.45;
       text-rendering: optimizeLegibility;
       /* Fallback gradient in case the iframe fails to load */
       background: radial-gradient(1200px 700px at 18% -12%, #244868 0%, transparent 58%),
-                  radial-gradient(900px 560px at 110% 10%, #1f3e56 0%, transparent 65%),
-                  linear-gradient(180deg, var(--bg1), var(--bg0));
-      padding: 24px 18px 40px;
+        radial-gradient(900px 560px at 110% 10%, #1f3e56 0%, transparent 65%),
+        linear-gradient(180deg, var(--bg1), var(--bg0));
+      padding: 92px 18px 40px;
       position: relative;
       z-index: 0;
     }
+
     /* Live game scene rendered behind the page */
     #bgFrame {
-      position: fixed; inset: 0; width: 100vw; height: 100vh;
-      border: 0; z-index: 0; pointer-events: none;
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      border: 0;
+      z-index: 0;
+      pointer-events: none;
       filter: saturate(1.05);
-      opacity: 0; transition: opacity 0.6s ease;
+      opacity: 0;
     }
-    #bgFrame.ready { opacity: 1; }
+
+    #bgFrame.ready {
+      opacity: 1;
+    }
+
+    /* Same scrim the splash uses (#titleSplash bg) so the live room
+       scene shows through behind the glass card the way it does on /. */
     #bgScrim {
-      position: fixed; inset: 0; z-index: 1; pointer-events: none;
-      background: radial-gradient(120% 80% at 50% 30%, rgba(7,18,29,0.4) 0%, rgba(7,18,29,0.78) 70%, rgba(7,18,29,0.92) 100%);
-      backdrop-filter: blur(2px) saturate(1.05);
-      -webkit-backdrop-filter: blur(2px) saturate(1.05);
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        radial-gradient(120% 80% at 50% 0%, rgba(8, 10, 16, 0.55) 0%, rgba(8, 10, 16, 0) 55%),
+        radial-gradient(120% 80% at 50% 100%, rgba(8, 10, 16, 0.6) 0%, rgba(8, 10, 16, 0) 55%);
+      backdrop-filter: blur(2px) saturate(1.1);
+      -webkit-backdrop-filter: blur(2px) saturate(1.1);
     }
-    @media (prefers-reduced-motion: reduce) { #bgFrame { display: none; } }
+
+    /* Iframe-promotion mode — set by promoteToPlay() in the router
+       below. Lets clicks land on the iframe canvas (so the user can
+       interact with char-select / play) and fades the scrim out so
+       it doesn't sit between them and the picker. Mirrors home.html. */
+    body.is-playing #bgFrame {
+      pointer-events: auto;
+      z-index: 2;
+    }
+    /* Lift iframe above #bgScrim during play so the scrim's
+       backdrop-filter no longer paints over the picker (which lives
+       inside the iframe). The picker's iframe-side body::before takes
+       over providing constant-strength bedroom blur during the
+       transition. */
+
+    @media (prefers-reduced-motion: reduce) {
+      #bgFrame {
+        display: none;
+      }
+    }
 
     .page {
       position: relative;
@@ -76,33 +120,59 @@
       gap: 20px;
     }
 
-    /* ── Hero challenge card ──────────────────────────────────── */
+    /* ── Hero challenge card ──────────────────────────────────────
+       Same liquid-glass surface as .title-splash-card: white-edged
+       border, full inset highlight + dark seam stack, 32px radius. */
     .hero {
       position: relative;
-      background-color: var(--card);
-      background-image: var(--card-specular);
-      border: 1px solid var(--edge);
-      border-radius: 24px;
+      background-color: var(--glass);
+      background-image: var(--glass-specular);
+      border: 1px solid var(--glass-border);
+      border-radius: 32px;
       box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.4),
         inset 0 -1px 0 rgba(255, 255, 255, 0.06),
         inset 0 0 32px 0 rgba(255, 255, 255, 0.03),
-        0 24px 64px rgba(0, 0, 0, 0.5);
-      backdrop-filter: var(--card-blur);
-      -webkit-backdrop-filter: var(--card-blur);
+        0 30px 80px rgba(0, 0, 0, 0.5),
+        0 1px 0 rgba(0, 0, 0, 0.5);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
       padding: 28px 26px 26px;
       display: grid;
       gap: 18px;
       isolation: isolate;
     }
+
+    /* Top sheen — slim refractive glaze across the very top of the card,
+       same trick as .title-splash-card::before. */
+    .hero::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 6%;
+      right: 6%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.7) 50%, transparent 100%);
+      border-radius: 32px 32px 0 0;
+      pointer-events: none;
+    }
+
     .hero__eyebrow {
-      display: inline-flex; align-items: center; gap: 6px;
-      font-size: 11px; font-weight: 800;
-      letter-spacing: 0.18em; text-transform: uppercase;
-      color: var(--accent);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--lb-accent);
       opacity: 0.92;
     }
-    .hero__eyebrow i { font-size: 13px; }
+
+    .hero__eyebrow i {
+      font-size: 13px;
+    }
+
     .hero__headline {
       margin: 0;
       font-size: clamp(22px, 3.4vw, 32px);
@@ -110,14 +180,19 @@
       line-height: 1.18;
       letter-spacing: -0.01em;
     }
-    .hero__headline .who { color: var(--gold); }
+
+    .hero__headline .who {
+      color: var(--lb-gold);
+    }
+
     .hero__headline .time {
       font-family: var(--font-mono);
       font-variant-numeric: tabular-nums;
-      color: var(--gold);
+      color: var(--lb-gold);
       letter-spacing: 0.01em;
       white-space: nowrap;
     }
+
     .hero__pitch {
       margin: 0;
       color: var(--muted);
@@ -125,82 +200,130 @@
       line-height: 1.55;
       max-width: 56ch;
     }
-    .hero__pitch b { color: #d9ebff; font-weight: 700; }
+
+    .hero__pitch b {
+      color: #d9ebff;
+      font-weight: 700;
+    }
+
     .hero__cta {
-      display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
       margin-top: 4px;
     }
+
     .playBtn {
       flex: 0 1 auto;
       padding: 16px 32px;
       font-size: 17px;
       font-weight: 800;
       letter-spacing: 0.02em;
-      display: inline-flex; align-items: center; gap: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
       text-decoration: none;
     }
-    .playBtn i { font-size: 1.15em; }
+
+    .playBtn i {
+      font-size: 1.15em;
+    }
+
+    /* Secondary share-page button — uses the same .glass-btn--secondary
+       material as the in-game cancel/close buttons but rendered at the
+       compact share-page sizing. */
     .miniBtn {
       padding: 11px 16px;
       font-size: 13px;
-      font-weight: 700;
-      display: inline-flex; align-items: center; gap: 8px;
+      font-weight: var(--weight-semibold);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       text-decoration: none;
-      background: transparent;
-      border: 1px solid rgba(255,255,255,0.16);
+      background-color: var(--glass-light, rgba(18, 24, 38, 0.28));
+      border: 1px solid var(--glass-border);
       color: #d9ebff;
-      border-radius: var(--r-md, 12px);
+      border-radius: var(--r-md);
       cursor: pointer;
       font-family: inherit;
-      transition: border-color 0.2s, background 0.2s;
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      transition: border-color 0.2s, background-color 0.2s, transform 0.2s;
     }
-    .miniBtn:hover { border-color: rgba(255,255,255,0.36); background: rgba(255,255,255,0.04); }
-    .miniBtn i { font-size: 14px; }
 
-    /* ── Leaderboard section (social proof) ───────────────────── */
+    .miniBtn:hover {
+      border-color: var(--glass-border-strong);
+      background-color: rgba(255, 255, 255, 0.06);
+      transform: translateY(-1px);
+    }
+
+    .miniBtn:active {
+      transform: translateY(1px);
+    }
+
+    .miniBtn i {
+      font-size: 14px;
+    }
+
+    /* ── Leaderboard section (social proof) ─────────────────────
+       Secondary glass card — identical material to .hero so the page
+       reads as one continuous glass surface, just without the top sheen
+       pseudo so the eye locks on the hero first. */
     .board {
       position: relative;
-      background-color: var(--card);
-      background-image: var(--card-specular);
-      border: 1px solid var(--edge);
-      border-radius: 20px;
+      background-color: var(--glass);
+      background-image: var(--glass-specular);
+      border: 1px solid var(--glass-border);
+      border-radius: 32px;
       box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.32),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4),
         inset 0 -1px 0 rgba(255, 255, 255, 0.06),
         inset 0 0 32px 0 rgba(255, 255, 255, 0.03),
-        0 18px 44px rgba(0, 0, 0, 0.42);
-      backdrop-filter: var(--card-blur);
-      -webkit-backdrop-filter: var(--card-blur);
+        0 30px 80px rgba(0, 0, 0, 0.5),
+        0 1px 0 rgba(0, 0, 0, 0.5);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
       overflow: hidden;
     }
+
     .board__head {
       padding: 14px 18px 10px;
-      display: flex; align-items: baseline; gap: 10px; justify-content: space-between;
-      border-bottom: 1px solid rgba(255,255,255,0.07);
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
     }
+
     .board__head h2 {
       margin: 0;
       font-size: 13px;
       font-weight: 800;
       letter-spacing: 0.14em;
       text-transform: uppercase;
-      color: var(--accent);
+      color: var(--lb-accent);
     }
+
     .board__meta {
       font-size: 11px;
       color: var(--muted);
       letter-spacing: 0.04em;
     }
 
+    /* Mode tabs — match the .lb-tabs/.lb-tab pattern in main.css used
+       on the pause-menu leaderboard, scaled up slightly for the
+       standalone share page. */
     .modeTabs {
       display: flex;
       gap: 6px;
       margin: 0 14px 8px;
       padding: 4px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: var(--glass-soft);
+      border: 1px solid var(--glass-stroke-soft, rgba(255, 255, 255, 0.08));
       border-radius: 10px;
     }
+
     .modeTab {
       flex: 1;
       appearance: none;
@@ -216,82 +339,153 @@
       cursor: pointer;
       transition: background 0.15s, color 0.15s;
     }
-    .modeTab:hover { color: rgba(255, 255, 255, 0.9); }
+
+    .modeTab:hover {
+      color: rgba(255, 255, 255, 0.9);
+    }
+
     .modeTab.active {
       background: rgba(255, 255, 255, 0.12);
       color: #fff;
       box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2) inset;
     }
-    .list { list-style: none; margin: 0; padding: 8px; display: grid; gap: 6px; }
+
+    /* List rows — same surface + highlight pattern as #finishDialogList
+       and #fpLeaderboardList: subtle white-tint resting state, gold-
+       tinted background + left-edge gold bar for the player's row
+       (.row.hit). Padding is slightly larger here since this is a
+       standalone page rather than a side panel. */
+    .list {
+      list-style: none;
+      margin: 0;
+      padding: 8px;
+      display: grid;
+      gap: 6px;
+    }
+
     .row {
       display: grid;
       grid-template-columns: 38px 1fr auto auto auto;
-      gap: 10px; align-items: center;
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      border-radius: 10px;
-      background: rgba(255, 255, 255, 0.025);
+      gap: 10px;
+      align-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 9px;
+      background: rgba(255, 255, 255, 0.03);
       padding: 8px 11px;
       font-size: 13px;
       line-height: 1.35;
       scroll-margin-top: 22px;
     }
-    .rank { color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
-    .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .rank {
+      color: var(--muted);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Cat badge — tracks the global .catBadge in main.css (used inside
+       the in-game leaderboards). Slightly larger here for the
+       standalone page; same material, dot, and gold-row override. */
     .catBadge {
-      display: inline-flex; align-items: center; gap: 5px;
-      font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10.5px;
+      font-weight: var(--weight-semibold);
+      letter-spacing: 0.02em;
       padding: 2px 8px 2px 6px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.09);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
       color: #cdd7e5;
       white-space: nowrap;
     }
-    .catBadge .catEmoji { font-size: 13px; line-height: 1; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.35)); }
+
+    .catBadge .catEmoji {
+      font-size: 13px;
+      line-height: 1;
+      filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.35));
+    }
+
     .catBadge .catDot {
-      width: 8px; height: 8px; border-radius: 50%;
-      border: 1px solid rgba(0,0,0,0.45);
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.12);
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 0, 0, 0.45);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
       flex-shrink: 0;
     }
-    .row.hit .catBadge { background: rgba(255,216,115,0.1); border-color: rgba(255,216,115,0.3); color: #ffeab2; }
+
+    .row.hit .catBadge {
+      background: rgba(255, 216, 115, 0.1);
+      border-color: rgba(255, 216, 115, 0.3);
+      color: #ffeab2;
+    }
+
     .secretBadge {
-      display: inline-flex; align-items: center; gap: 4px;
-      font-size: 10.5px; font-weight: 800; letter-spacing: 0.02em;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10.5px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
       padding: 2px 8px;
       border-radius: 999px;
       background: rgba(255, 216, 115, 0.10);
       border: 1px solid rgba(255, 216, 115, 0.32);
-      color: var(--gold);
+      color: var(--lb-gold);
       white-space: nowrap;
       font-variant-numeric: tabular-nums;
     }
-    .secretBadge i { font-size: 12px; line-height: 1; }
+
+    .secretBadge i {
+      font-size: 12px;
+      line-height: 1;
+    }
+
     .secretBadge.is-zero {
       background: rgba(255, 255, 255, 0.03);
       border-color: rgba(255, 255, 255, 0.08);
       color: var(--muted);
       opacity: 0.6;
     }
+
     .secretBadge.is-max {
       background: rgba(255, 216, 115, 0.18);
       border-color: rgba(255, 216, 115, 0.55);
       box-shadow: 0 0 0 1px rgba(255, 216, 115, 0.18) inset;
     }
+
     .time {
       font-family: var(--font-mono);
       font-variant-numeric: tabular-nums;
-      color: var(--accent);
+      color: var(--lb-accent);
       font-weight: 800;
       letter-spacing: 0.02em;
     }
+
     .row.hit {
-      background: rgba(255, 216, 115, 0.13);
-      border-color: var(--goldEdge);
-      box-shadow: 0 0 0 1px rgba(255, 216, 115, 0.18) inset;
+      background: rgba(255, 216, 115, 0.16);
+      border-color: var(--lb-gold-edge);
+      box-shadow: 0 0 0 1px rgba(255, 216, 115, 0.15), inset 3px 0 0 rgba(255, 226, 140, 0.65);
     }
-    .row.hit .time, .row.hit .name { color: var(--gold); }
-    .empty { padding: 18px; color: var(--muted); font-size: 13px; }
+
+    .row.hit .time,
+    .row.hit .name {
+      color: var(--lb-gold);
+    }
+
+    .empty {
+      padding: 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
 
     .footnote {
       text-align: center;
@@ -300,30 +494,69 @@
       letter-spacing: 0.04em;
       opacity: 0.85;
     }
-    .footnote a { color: var(--accent); text-decoration: none; }
-    .footnote a:hover { text-decoration: underline; }
+
+    .footnote a {
+      color: var(--lb-accent);
+      text-decoration: none;
+    }
+
+    .footnote a:hover {
+      text-decoration: underline;
+    }
 
     @media (max-width: 640px) {
-      body { padding: 16px 12px 32px; }
-      .hero { padding: 22px 18px 20px; border-radius: 18px; }
-      .playBtn { width: 100%; justify-content: center; }
-      .miniBtn { width: 100%; justify-content: center; }
-      .row { grid-template-columns: 32px 1fr auto auto auto; padding: 7px 9px; gap: 6px; }
-      .catBadge span:last-child { display: none; }
+      body {
+        padding: 78px 12px 32px;
+      }
+
+      .hero {
+        padding: 22px 18px 20px;
+        border-radius: 26px;
+      }
+
+      .board {
+        border-radius: 26px;
+      }
+
+      .playBtn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .miniBtn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .row {
+        grid-template-columns: 32px 1fr auto auto auto;
+        padding: 7px 9px;
+        gap: 6px;
+      }
+
+      .catBadge span:last-child {
+        display: none;
+      }
     }
   </style>
 </head>
+
 <body>
-  <iframe
-    id="bgFrame"
-    src="/?bg=1"
-    title=""
-    aria-hidden="true"
-    tabindex="-1"
-    loading="lazy"
-    referrerpolicy="same-origin"
-  ></iframe>
-  <div id="bgScrim" aria-hidden="true"></div>
+  <iframe id="bgFrame" src="/play?bg=1" title="" aria-hidden="true" tabindex="-1"
+    referrerpolicy="same-origin"></iframe>
+  <div id="bgScrim" aria-hidden="true"><div class="bg-grid"></div></div>
+
+  <nav class="site-tabs" aria-label="Primary">
+    <a class="site-tab" href="/" data-tab="home">
+      <i class="site-tab__icon site-tab__icon--regular ph ph-house"></i><i class="site-tab__icon site-tab__icon--fill ph-fill ph-house"></i><span>Home</span>
+    </a>
+    <a class="site-tab" href="/leaderboard" data-tab="leaderboard">
+      <i class="site-tab__icon site-tab__icon--regular ph ph-trophy"></i><i class="site-tab__icon site-tab__icon--fill ph-fill ph-trophy"></i><span>Leaderboard</span>
+    </a>
+    <a class="site-tab" href="/about" data-tab="about">
+      <i class="site-tab__icon site-tab__icon--regular ph ph-info"></i><i class="site-tab__icon site-tab__icon--fill ph-fill ph-info"></i><span>About</span>
+    </a>
+  </nav>
 
   <main class="page">
     <section class="hero" aria-labelledby="heroHeadline">
@@ -334,7 +567,7 @@
         as fast as you can.
       </p>
       <div class="hero__cta">
-        <a class="playBtn glass-btn glass-btn--primary" href="/play"><i class="ph-fill ph-play"></i> Play now</a>
+        <a class="playBtn glass-btn glass-btn--primary" href="/play" data-play-cta><i class="ph-fill ph-play"></i> Play now</a>
         <button id="copyLinkBtn" class="miniBtn" type="button"><i class="ph ph-link"></i> Copy link</button>
       </div>
     </section>
@@ -345,8 +578,10 @@
         <span id="boardMeta" class="board__meta"></span>
       </header>
       <div id="modeTabs" class="modeTabs" role="tablist" aria-label="Leaderboard mode">
-        <button type="button" class="modeTab active" role="tab" aria-selected="true" data-lb-mode="normal">Normal · 20 coins</button>
-        <button type="button" class="modeTab" role="tab" aria-selected="false" data-lb-mode="speed">Speed · 32 coins</button>
+        <button type="button" class="modeTab active" role="tab" aria-selected="true" data-lb-mode="normal">Normal · 20
+          coins</button>
+        <button type="button" class="modeTab" role="tab" aria-selected="false" data-lb-mode="speed">Speed · 32
+          coins</button>
       </div>
       <ol id="rows" class="list" aria-live="polite"></ol>
       <div id="empty" class="empty" style="display:none">No runs yet — be the first.</div>
@@ -356,189 +591,547 @@
   </main>
 
   <script>
-    const rowsEl = document.getElementById('rows');
-    const emptyEl = document.getElementById('empty');
-    const heroHeadline = document.getElementById('heroHeadline');
-    const heroEyebrow = document.getElementById('heroEyebrow');
-    const boardMeta = document.getElementById('boardMeta');
-    const copyBtn = document.getElementById('copyLinkBtn');
+    // One-shot: skip the live-scene iframe on touch / narrow devices to
+    // save battery. Runs only on the initial document load — once we
+    // start SPA-swapping <main> via the router, the iframe persists, so
+    // this never needs to re-run.
+    (function () {
+      const bgFrame = document.getElementById('bgFrame');
+      const _isCoarse = matchMedia('(pointer: coarse)').matches;
+      const _isNarrow = window.innerWidth < 720;
 
-    const query = new URLSearchParams(location.search);
-    const hitId = query.get('entry') || '';
-    const VALID_MODES = ['normal', 'speed'];
-    function sanitizeMode(v) {
-      const k = String(v || '').trim().toLowerCase();
-      return VALID_MODES.includes(k) ? k : 'normal';
-    }
-    let currentMode = sanitizeMode(query.get('mode'));
-
-    function escapeHtml(v) {
-      return String(v || '').replace(/[&<>"']/g, (ch) => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-      }[ch]));
-    }
-
-    function fmtRun(ms) {
-      const total = Math.max(0, Math.floor(Number(ms) || 0));
-      const m = Math.floor(total / 60000);
-      const s = Math.floor((total % 60000) / 1000);
-      const z = total % 1000;
-      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(z).padStart(3, '0')}`;
-    }
-
-    const CAT_MODEL_EMOJI = { classic: '🐱', toon: '🦁', bababooey: '🐿️', totodile: '🐊' };
-    const CAT_MODEL_LABEL = { classic: 'Classic', toon: 'Toon', bababooey: 'Bababooey', totodile: 'Totodile' };
-    const CAT_COLOR_HEX = { charcoal: '#3a3a42', cream: '#e8d9b3', midnight: '#1a2030', snow: '#e8e8e8', ginger: '#d97a2a', tuxedo: '#151a22' };
-    const BASE_TOTAL_SECRETS = 10;
-    function catBadgeHtml(row) {
-      const model = String((row && row.catModel) || 'classic').toLowerCase();
-      const emoji = CAT_MODEL_EMOJI[model] || CAT_MODEL_EMOJI.classic;
-      const label = CAT_MODEL_LABEL[model] || 'Cat';
-      const colorable = model !== 'bababooey' && model !== 'totodile';
-      const color = CAT_COLOR_HEX[String((row && row.catColor) || 'ginger').toLowerCase()] || CAT_COLOR_HEX.ginger;
-      const dot = colorable ? `<span class="catDot" style="background:${color}"></span>` : '';
-      const title = colorable ? `${label} · ${(row && row.catColor) || 'ginger'}` : label;
-      return `<span class="catBadge" title="${escapeHtml(title)}"><span class="catEmoji">${emoji}</span>${dot}<span>${label}</span></span>`;
-    }
-
-    function secretBadgeHtml(row, totalSecrets) {
-      const n = Math.max(0, Math.floor(Number(row && row.secretCoins) || 0));
-      const goal = Math.max(1, Math.floor(Number(totalSecrets) || BASE_TOTAL_SECRETS));
-      const cls = n === 0 ? ' is-zero' : (n >= goal ? ' is-max' : '');
-      const title = `${n} of ${goal} secret coin${n === 1 ? '' : 's'} found`;
-      return `<span class="secretBadge${cls}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><i class="ph-fill ph-key"></i>${n}/${goal}</span>`;
-    }
-
-    async function copyText(text) {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(text);
-        return;
-      }
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.left = '-9999px';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      ta.remove();
-    }
-
-    function renderHero({ challenger, time, isTopTime }) {
-      if (challenger && time) {
-        const eyebrow = isTopTime ? 'Top time on the board' : 'A friend challenged you';
-        heroEyebrow.innerHTML = `<i class="ph-fill ph-trophy"></i> ${escapeHtml(eyebrow)}`;
-        heroHeadline.innerHTML = `Beat <span class="who">${escapeHtml(challenger)}</span>'s <span class="time">${escapeHtml(time)}</span>`;
-      } else {
-        heroEyebrow.innerHTML = `<i class="ph-fill ph-trophy"></i> Speedrun Challenge`;
-        heroHeadline.textContent = 'How fast can you grab every coin?';
-      }
-    }
-
-    async function loadLeaderboard() {
-      let rows = [];
-      try {
-        const res = await fetch(`/api/leaderboard?mode=${encodeURIComponent(currentMode)}`, { credentials: 'same-origin' });
-        const data = await res.json();
-        if (!res.ok || data.ok === false) throw new Error((data && data.message) || `API ${res.status}`);
-        rows = Array.isArray(data.leaderboard) ? data.leaderboard : [];
-        boardMeta.textContent = `Top ${data.maxEntries || 25} · max ${data.perPlayer || 3}/player`;
-      } catch (err) {
-        rows = [];
-        boardMeta.textContent = 'Connection issue';
+      // Tabs start hidden (CSS) and slide down from above once the
+      // scene is up AND the page card has had time to settle. This
+      // keeps the entrance from racing the rest of the page — the
+      // user reads the room first, the chrome arrives last.
+      let _tabsRevealed = false;
+      function revealTabs() {
+        if (_tabsRevealed) return;
+        _tabsRevealed = true;
+        document.body.classList.add('tabs-revealed');
       }
 
-      // Resolve hero target: the shared entry, falling back to #1.
-      let hitRow = null;
-      if (hitId) hitRow = rows.find((r) => String(r.id || '') === hitId) || null;
-      const heroRow = hitRow || rows[0] || null;
-      if (heroRow) {
-        renderHero({
-          challenger: heroRow.name || 'Someone',
-          time: fmtRun(heroRow.timeMs),
-          isTopTime: !hitRow && heroRow === rows[0]
+      if (bgFrame && (_isCoarse || _isNarrow)) {
+        bgFrame.remove();
+        // No live scene to wait on — reveal after the page card's
+        // own pageContentIn animation (~1s incl. stagger) settles.
+        setTimeout(revealTabs, 1100);
+      } else if (bgFrame) {
+        function _bgReady() {
+          bgFrame.classList.add('ready');
+          // Mark the iframe as scene-ready so a Play click that landed
+          // before boot finished can now flush its queued enter-play
+          // (matches home.html's same-named hook).
+          bgFrame.setAttribute('data-scene-ready', '1');
+          if (typeof window.__flushPendingPlay === 'function') window.__flushPendingPlay();
+          // Hold an extra beat after the scene paints so the page
+          // card finishes its entrance before the tabs join in.
+          setTimeout(revealTabs, 520);
+        }
+        window.addEventListener('message', (e) => {
+          if (e.origin !== location.origin) return;
+          if (e.data && e.data.type === 'bg-scene-ready') _bgReady();
         });
+        setTimeout(_bgReady, 4000);
       } else {
-        renderHero({});
+        setTimeout(revealTabs, 1100);
+      }
+    })();
+  </script>
+  <script>
+    // ── Leaderboard view init ────────────────────────────────────────
+    // Wrapped as a single re-entrant function so the cross-page SPA
+    // router can call it again after swapping <main class="page"> in
+    // place. Each call re-grabs fresh DOM nodes, re-binds listeners,
+    // and re-loads from the API based on the current URL — no
+    // top-level `const` declarations that would clash on re-execution.
+    window.__initLeaderboard = function __initLeaderboard() {
+      const rowsEl = document.getElementById('rows');
+      const emptyEl = document.getElementById('empty');
+      const heroHeadline = document.getElementById('heroHeadline');
+      const heroEyebrow = document.getElementById('heroEyebrow');
+      const boardMeta = document.getElementById('boardMeta');
+      const copyBtn = document.getElementById('copyLinkBtn');
+      if (!rowsEl) return; // not on the leaderboard view (defensive)
+
+      const query = new URLSearchParams(location.search);
+      const hitId = query.get('entry') || '';
+      const VALID_MODES = ['normal', 'speed'];
+      function sanitizeMode(v) {
+        const k = String(v || '').trim().toLowerCase();
+        return VALID_MODES.includes(k) ? k : 'normal';
+      }
+      let currentMode = sanitizeMode(query.get('mode'));
+
+      function escapeHtml(v) {
+        return String(v || '').replace(/[&<>"']/g, (ch) => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
       }
 
-      if (!rows.length) {
-        rowsEl.innerHTML = '';
-        emptyEl.style.display = 'block';
-        return;
+      function fmtRun(ms) {
+        const total = Math.max(0, Math.floor(Number(ms) || 0));
+        const m = Math.floor(total / 60000);
+        const s = Math.floor((total % 60000) / 1000);
+        const z = total % 1000;
+        return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(z).padStart(3, '0')}`;
       }
-      emptyEl.style.display = 'none';
 
-      const secretGoal = rows.reduce((max, row) => {
+      const CAT_MODEL_EMOJI = { classic: '🐱', toon: '🦁', bababooey: '🐿️', totodile: '🐊', korra: '🐈' };
+      const CAT_MODEL_LABEL = { classic: 'Classic', toon: 'Toon', bababooey: 'Bababooey', totodile: 'Totodile', korra: 'Cursed Korra' };
+      const BASE_TOTAL_SECRETS = 10;
+      function catBadgeHtml(row) {
+        const model = String((row && row.catModel) || 'classic').toLowerCase();
+        const emoji = CAT_MODEL_EMOJI[model] || CAT_MODEL_EMOJI.classic;
+        const label = CAT_MODEL_LABEL[model] || 'Cat';
+        return `<span class="catBadge" title="${escapeHtml(label)}"><span class="catEmoji">${emoji}</span><span>${label}</span></span>`;
+      }
+
+      function secretBadgeHtml(row, totalSecrets) {
         const n = Math.max(0, Math.floor(Number(row && row.secretCoins) || 0));
-        return Math.max(max, n);
-      }, BASE_TOTAL_SECRETS);
-
-      rowsEl.innerHTML = rows.map((r, i) => {
-        const rowId = String(r.id || '');
-        const hit = hitId && rowId === hitId;
-        return `<li class="row${hit ? ' hit' : ''}" data-entry-id="${escapeHtml(rowId)}">
-          <div class="rank">#${i + 1}</div>
-          <div class="name">${escapeHtml(r.name)}</div>
-          ${catBadgeHtml(r)}
-          ${secretBadgeHtml(r, secretGoal)}
-          <div class="time">${fmtRun(r.timeMs)}</div>
-        </li>`;
-      }).join('');
-
-      if (hitId) {
-        const hitEl = rowsEl.querySelector(`[data-entry-id="${CSS.escape(hitId)}"]`);
-        if (hitEl) setTimeout(() => hitEl.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+        const goal = Math.max(1, Math.floor(Number(totalSecrets) || BASE_TOTAL_SECRETS));
+        const cls = n === 0 ? ' is-zero' : (n >= goal ? ' is-max' : '');
+        const title = `${n} of ${goal} secret coin${n === 1 ? '' : 's'} found`;
+        return `<span class="secretBadge${cls}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><i class="ph-fill ph-key"></i>${n}/${goal}</span>`;
       }
-    }
 
-    copyBtn.addEventListener('click', async () => {
-      const original = copyBtn.innerHTML;
-      try {
-        await copyText(location.href);
-        copyBtn.innerHTML = '<i class="ph ph-check"></i> Copied!';
-      } catch (err) {
-        copyBtn.innerHTML = '<i class="ph ph-warning"></i> Copy failed';
+      async function copyText(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          return;
+        }
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
       }
-      setTimeout(() => { copyBtn.innerHTML = original; }, 1400);
-    });
 
-    // Skip the live-scene iframe on touch / narrow devices to save battery.
-    const bgFrame = document.getElementById('bgFrame');
-    const _isCoarse = matchMedia('(pointer: coarse)').matches;
-    const _isNarrow = window.innerWidth < 720;
-    if (bgFrame && (_isCoarse || _isNarrow)) {
-      bgFrame.remove();
-    } else if (bgFrame) {
-      bgFrame.addEventListener('load', () => bgFrame.classList.add('ready'), { once: true });
-      setTimeout(() => bgFrame.classList.add('ready'), 4000);
-    }
+      function renderHero({ challenger, time, isTopTime }) {
+        if (challenger && time) {
+          const eyebrow = isTopTime ? 'Top time on the board' : 'A friend challenged you';
+          heroEyebrow.innerHTML = `<i class="ph-fill ph-trophy"></i> ${escapeHtml(eyebrow)}`;
+          heroHeadline.innerHTML = `Beat <span class="who">${escapeHtml(challenger)}</span>'s <span class="time">${escapeHtml(time)}</span>`;
+        } else {
+          heroEyebrow.innerHTML = `<i class="ph-fill ph-trophy"></i> Speedrun Challenge`;
+          heroHeadline.textContent = 'How fast can you grab every coin?';
+        }
+      }
 
-    function syncModeTabsUI() {
-      const tabs = document.querySelectorAll('#modeTabs [data-lb-mode]');
-      tabs.forEach((btn) => {
-        const active = btn.getAttribute('data-lb-mode') === currentMode;
-        btn.classList.toggle('active', active);
-        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      async function loadLeaderboard() {
+        let rows = [];
+        try {
+          const res = await fetch(`/api/leaderboard?mode=${encodeURIComponent(currentMode)}`, { credentials: 'same-origin' });
+          const data = await res.json();
+          if (!res.ok || data.ok === false) throw new Error((data && data.message) || `API ${res.status}`);
+          rows = Array.isArray(data.leaderboard) ? data.leaderboard : [];
+          boardMeta.textContent = `Top ${data.maxEntries || 25} · max ${data.perPlayer || 3}/player`;
+        } catch (err) {
+          rows = [];
+          boardMeta.textContent = 'Connection issue';
+        }
+
+        // Resolve hero target: the shared entry, falling back to #1.
+        let hitRow = null;
+        if (hitId) hitRow = rows.find((r) => String(r.id || '') === hitId) || null;
+        const heroRow = hitRow || rows[0] || null;
+        if (heroRow) {
+          renderHero({
+            challenger: heroRow.name || 'Someone',
+            time: fmtRun(heroRow.timeMs),
+            isTopTime: !hitRow && heroRow === rows[0]
+          });
+        } else {
+          renderHero({});
+        }
+
+        if (!rows.length) {
+          rowsEl.innerHTML = '';
+          emptyEl.style.display = 'block';
+          return;
+        }
+        emptyEl.style.display = 'none';
+
+        const secretGoal = rows.reduce((max, row) => {
+          const n = Math.max(0, Math.floor(Number(row && row.secretCoins) || 0));
+          return Math.max(max, n);
+        }, BASE_TOTAL_SECRETS);
+
+        rowsEl.innerHTML = rows.map((r, i) => {
+          const rowId = String(r.id || '');
+          const hit = hitId && rowId === hitId;
+          return `<li class="row${hit ? ' hit' : ''}" data-entry-id="${escapeHtml(rowId)}">
+            <div class="rank">#${i + 1}</div>
+            <div class="name">${escapeHtml(r.name)}</div>
+            ${catBadgeHtml(r)}
+            ${secretBadgeHtml(r, secretGoal)}
+            <div class="time">${fmtRun(r.timeMs)}</div>
+          </li>`;
+        }).join('');
+
+        if (hitId) {
+          const hitEl = rowsEl.querySelector(`[data-entry-id="${CSS.escape(hitId)}"]`);
+          if (hitEl) setTimeout(() => hitEl.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+        }
+      }
+
+      copyBtn.addEventListener('click', async () => {
+        const original = copyBtn.innerHTML;
+        try {
+          await copyText(location.href);
+          copyBtn.innerHTML = '<i class="ph ph-check"></i> Copied!';
+        } catch (err) {
+          copyBtn.innerHTML = '<i class="ph ph-warning"></i> Copy failed';
+        }
+        setTimeout(() => { copyBtn.innerHTML = original; }, 1400);
       });
-    }
 
-    document.getElementById('modeTabs').addEventListener('click', (ev) => {
-      const btn = ev.target && ev.target.closest && ev.target.closest('[data-lb-mode]');
-      if (!btn) return;
-      const next = sanitizeMode(btn.getAttribute('data-lb-mode'));
-      if (next === currentMode) return;
-      currentMode = next;
-      const url = new URL(location.href);
-      if (currentMode === 'normal') url.searchParams.delete('mode');
-      else url.searchParams.set('mode', currentMode);
-      history.replaceState(null, '', url.toString());
+      function syncModeTabsUI() {
+        const tabs = document.querySelectorAll('#modeTabs [data-lb-mode]');
+        tabs.forEach((btn) => {
+          const active = btn.getAttribute('data-lb-mode') === currentMode;
+          btn.classList.toggle('active', active);
+          btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+      }
+
+      document.getElementById('modeTabs').addEventListener('click', (ev) => {
+        const btn = ev.target && ev.target.closest && ev.target.closest('[data-lb-mode]');
+        if (!btn) return;
+        const next = sanitizeMode(btn.getAttribute('data-lb-mode'));
+        if (next === currentMode) return;
+        currentMode = next;
+        const url = new URL(location.href);
+        if (currentMode === 'normal') url.searchParams.delete('mode');
+        else url.searchParams.set('mode', currentMode);
+        history.replaceState(null, '', url.toString());
+        syncModeTabsUI();
+        loadLeaderboard();
+      });
+
       syncModeTabsUI();
       loadLeaderboard();
-    });
+    };
+    window.__initLeaderboard();
+  </script>
 
-    syncModeTabsUI();
-    loadLeaderboard();
+  <script>
+    // Shared SPA router for the iframe-backed views. Identical to the
+    // copy in about.html — kept duplicated rather than shared so each
+    // page is fully self-contained (and so a fetch failure on one
+    // doesn't break the other). See about.html for the design rationale.
+    (function () {
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function viewFor(path) {
+        path = path.replace(/\/+$/, '') || '/';
+        if (path === '/' || path === '/home' || path === '/home.html') return 'home';
+        if (path === '/about' || path === '/about.html') return 'about';
+        if (path === '/leaderboard' || path === '/leaderboard.html' || path.startsWith('/leaderboard')) return 'leaderboard';
+        if (path === '/play' || path === '/vite-index.html' || path === '/index.html') return 'play';
+        return null;
+      }
+
+      function setActiveTab(view) {
+        document.querySelectorAll('.site-tabs .site-tab').forEach(t => {
+          const id = t.getAttribute('data-tab');
+          const active = id === view;
+          t.classList.toggle('is-active', active);
+          if (active) t.setAttribute('aria-current', 'page');
+          else t.removeAttribute('aria-current');
+        });
+        updatePill();
+      }
+
+      // Active-tab pill — a single absolutely-positioned div behind
+      // the tabs that slides + resizes to match the active one. Same
+      // pattern Stripe uses on its blog category nav. We animate
+      // transform (GPU) and width together so the rounded ends don't
+      // distort the way scaleX would.
+      function buildPill() {
+        const nav = document.querySelector('.site-tabs');
+        if (!nav || nav.querySelector('.site-tabs-pill')) return;
+        const pill = document.createElement('div');
+        pill.className = 'site-tabs-pill';
+        pill.setAttribute('aria-hidden', 'true');
+        nav.insertBefore(pill, nav.firstChild);
+        nav.classList.add('has-pill');
+      }
+
+      function updatePill() {
+        const nav = document.querySelector('.site-tabs');
+        const pill = nav && nav.querySelector('.site-tabs-pill');
+        const active = nav && nav.querySelector('.site-tab.is-active');
+        if (!nav || !pill || !active) return;
+        const navRect = nav.getBoundingClientRect();
+        const tabRect = active.getBoundingClientRect();
+        const left = tabRect.left - navRect.left;
+        pill.style.transform = `translateX(${left}px)`;
+        pill.style.width = `${tabRect.width}px`;
+      }
+
+      (function tagInitial() {
+        const v = viewFor(location.pathname);
+        if (!v || v === 'play') return;
+        document.querySelectorAll('head > style').forEach(s => {
+          if (!s.dataset.view) s.dataset.view = v;
+        });
+        const main = document.querySelector('main.page');
+        if (main && !main.dataset.view) main.dataset.view = v;
+      })();
+      buildPill();
+      setActiveTab(viewFor(location.pathname));
+      // Enable the pill's clip-path transition on the next frame so
+      // the initial position doesn't slide in from the left on load.
+      requestAnimationFrame(() => {
+        const nav = document.querySelector('.site-tabs');
+        if (nav) nav.classList.add('pill-ready');
+      });
+      window.addEventListener('resize', updatePill);
+      // Webfonts can resize the tab labels after first paint; re-measure
+      // when they're ready so the pill snaps to the final width.
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(updatePill).catch(() => {});
+      }
+
+      function fullNav(href, opts) {
+        if (reduced) { location.href = href; return; }
+        document.body.classList.add('page-fade', 'is-leaving');
+        // Play CTA gets a longer hold so the tabs visibly lift away
+        // before the next document loads — the entire transition reads
+        // as one motion (chrome clears, char-select bounces in over
+        // the same room scene). Other full-navs keep the snappy 160ms.
+        // The 480ms hold roughly matches the .site-tabs exit transition
+        // (0.55s transform / 0.5s filter) so most of the lift-and-blur
+        // motion plays before the document is torn down.
+        const wait = (opts && opts.slow) ? 480 : 160;
+        setTimeout(() => { location.href = href; }, wait);
+      }
+
+      async function swap(href) {
+        const targetView = viewFor(href);
+        if (!targetView || targetView === 'play') { fullNav(href); return; }
+
+        const oldMain = document.querySelector('main.page');
+
+        // Start the fetch immediately so it overlaps with the exit
+        // animation (saves a noticeable amount of perceived latency
+        // on slower connections).
+        const fetchPromise = fetch(href, { credentials: 'same-origin' }).then(r => {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.text();
+        });
+
+        // Exit: animate the OLD <main> out via .is-leaving on the
+        // element itself. Each direction owning its own class is what
+        // makes the entrance work cleanly — see CSS comment.
+        if (oldMain && !reduced) oldMain.classList.add('is-leaving');
+        const exitWait = reduced ? 0 : 200;
+
+        let html;
+        try {
+          html = await fetchPromise;
+        } catch (e) {
+          location.href = href;
+          return;
+        }
+        if (exitWait) await new Promise(r => setTimeout(r, exitWait));
+
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        document.title = doc.title || document.title;
+
+        document.querySelectorAll('head > style[data-view]').forEach(s => s.remove());
+        doc.querySelectorAll('head > style').forEach(s => {
+          const clone = s.cloneNode(true);
+          clone.dataset.view = targetView;
+          document.head.appendChild(clone);
+        });
+
+        const newMain = doc.querySelector('main.page');
+        const currentOldMain = document.querySelector('main.page');
+        if (newMain && currentOldMain) {
+          newMain.dataset.view = targetView;
+          // Mark this main as SPA-inserted so CSS can suppress any
+          // inner keyframe animations (see the data-spa rule in
+          // main.css) that would otherwise blink on top of our outer
+          // page transition.
+          newMain.dataset.spa = '1';
+          if (!reduced) newMain.classList.add('is-entering');
+          currentOldMain.replaceWith(newMain);
+          // Force a layout read so the entering state is committed to
+          // the style cache before we remove the class. Without this
+          // the browser folds the from/to into one paint and the
+          // entrance is skipped (the stuttery "blink in" we're fixing).
+          if (!reduced) {
+            void newMain.offsetWidth;
+            requestAnimationFrame(() => newMain.classList.remove('is-entering'));
+          }
+        }
+
+        history.pushState({ view: targetView }, '', href);
+        setActiveTab(targetView);
+
+        if (targetView === 'leaderboard' && typeof window.__initLeaderboard === 'function') {
+          window.__initLeaderboard();
+        }
+
+        window.scrollTo(0, 0);
+      }
+
+      document.addEventListener('click', (e) => {
+        const a = e.target.closest && e.target.closest('a[href]');
+        if (!a) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+        if (a.target && a.target !== '_self') return;
+
+        let url;
+        try { url = new URL(a.href, location.href); }
+        catch { return; }
+        if (url.origin !== location.origin) return;
+
+        // Top tabs: SPA-swap when staying within iframe-backed views.
+        if (a.classList.contains('site-tab')) {
+          const targetView = viewFor(url.pathname);
+          const currentView = viewFor(location.pathname);
+          if (a.classList.contains('is-active')) { e.preventDefault(); return; }
+          if (targetView && targetView !== 'play' && currentView && currentView !== 'play') {
+            e.preventDefault();
+            swap(url.pathname + url.search + url.hash);
+          } else {
+            e.preventDefault();
+            fullNav(a.href);
+          }
+          return;
+        }
+
+        // The big Play CTA — promote the existing bg iframe in place
+        // instead of doing a top-level navigation. Same path home uses:
+        // skips the three.js scene rebuild that fullNav('/play') would
+        // cause, so the room flows seamlessly into the picker.
+        if (a.hasAttribute('data-play-cta')) {
+          e.preventDefault();
+          promoteToPlay(a.href);
+        }
+      });
+
+      // ── Iframe promotion (mirrors home.html) ──────────────────
+      const bgFrame = document.getElementById('bgFrame');
+
+      let _pendingPlay = false;
+      function _sendEnterPlay() {
+        if (!bgFrame || !bgFrame.contentWindow) return;
+        try { bgFrame.contentWindow.postMessage({ type: 'enter-play' }, location.origin); } catch (e) {}
+        try { bgFrame.contentWindow.focus(); } catch (e) {}
+      }
+      window.__flushPendingPlay = function () {
+        if (!_pendingPlay) return;
+        _pendingPlay = false;
+        _sendEnterPlay();
+      };
+      function _enterPlayWhenReady() {
+        if (bgFrame && bgFrame.getAttribute('data-scene-ready') === '1') {
+          _sendEnterPlay();
+        } else {
+          _pendingPlay = true;
+        }
+      }
+
+      function promoteToPlay(href) {
+        // Capture the path the user is returning to. Stored on a
+        // shared global so whichever page's IIFE happens to be the
+        // active one (only the FIRST loaded page's script runs —
+        // SPA swap doesn't re-execute) returns to the right URL.
+        window.__playReturnPath = location.pathname + location.search + location.hash;
+        if (reduced) {
+          history.pushState({ view: 'play' }, '', href || '/play');
+          document.body.classList.add('is-playing');
+          _enterPlayWhenReady();
+          setActiveTab('play');
+          return;
+        }
+        // Animate leaderboard chrome out (tabs lift, main fades).
+        document.body.classList.add('page-fade', 'is-leaving');
+        history.pushState({ view: 'play' }, '', href || '/play');
+        setActiveTab('play');
+        // Three-beat promotion (matches home.html):
+        //   1. 0–700ms   chrome exits
+        //   2. 700–850ms clean bedroom beat
+        //   3. 850ms+    picker fades in
+        setTimeout(() => {
+          document.body.classList.add('is-playing');
+          _enterPlayWhenReady();
+        }, 850);
+      }
+
+      function demoteFromPlay({ updateHistory = true } = {}) {
+        // Triggered by the iframe's { type: 'play-exited' } message
+        // after it has reset its camera and re-applied is-bg under
+        // its black overlay. Bring the chrome back in and route to
+        // wherever the user came FROM (which may not be /leaderboard
+        // if they SPA-swapped to /about or /home before clicking Play).
+        const ret = window.__playReturnPath || '/leaderboard' + location.search + location.hash;
+        const retView = viewFor(ret) || 'leaderboard';
+        if (updateHistory) {
+          history.pushState({ view: retView }, '', ret);
+        }
+        setActiveTab(retView);
+        document.body.classList.remove('is-playing');
+        document.body.classList.remove('is-leaving');
+        setTimeout(() => document.body.classList.remove('page-fade'), 700);
+      }
+
+      let _demoteFromPopstate = false;
+      window.addEventListener('message', (e) => {
+        if (e.origin !== location.origin) return;
+        const data = e.data;
+        if (!data || typeof data !== 'object') return;
+        if (data.type === 'play-exited') {
+          demoteFromPlay({ updateHistory: !_demoteFromPopstate });
+          _demoteFromPopstate = false;
+        }
+      });
+
+      window.addEventListener('popstate', () => {
+        const v = viewFor(location.pathname);
+        const isPlaying = document.body.classList.contains('is-playing');
+        // Cross-promotion-boundary cases: between /play and the menu
+        // we drive promotion via postMessage rather than reload.
+        if (v === 'play' && !isPlaying) {
+          // Forward to /play while currently on the leaderboard view.
+          document.body.classList.add('page-fade', 'is-leaving');
+          setTimeout(() => {
+            document.body.classList.add('is-playing');
+            setActiveTab('play');
+            _enterPlayWhenReady();
+          }, 850);
+          return;
+        }
+        if (v !== 'play' && isPlaying) {
+          // Back to leaderboard while currently in play — ask the
+          // iframe to run its exit sequence (camera reset + fade).
+          _demoteFromPopstate = true;
+          if (bgFrame && bgFrame.contentWindow) {
+            try { bgFrame.contentWindow.postMessage({ type: 'exit-play' }, location.origin); } catch (err) {}
+          }
+          return;
+        }
+        if (!v || v === 'play') { location.reload(); return; }
+        swap(location.pathname + location.search + location.hash);
+      });
+      window.addEventListener('pageshow', (e) => {
+        document.body.classList.remove('is-leaving', 'page-fade');
+        const m = document.querySelector('main.page');
+        if (m) m.classList.remove('is-entering', 'is-leaving');
+        // bfcache restore: the bg scene is already painted, so the
+        // tabs should be back immediately rather than re-running the
+        // "wait for scene" delay.
+        if (e.persisted) document.body.classList.add('tabs-revealed');
+      });
+    })();
   </script>
 </body>
+
 </html>

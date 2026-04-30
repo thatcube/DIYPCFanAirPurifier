@@ -218,28 +218,39 @@ function _loadInspector() {
 // Lights
 lighting.createLights(state.isMobile);
 
-// The title splash is also the loading screen. It's open from page load
-// (HTML markup has `class="open" data-state="loading"`) so the dark boot
-// gradient paints instantly via the inline critical CSS in index.html.
-// Once the first scene frame paints, `_markSplashReady()` flips the state
-// to `ready` and the liquid-glass treatment fades in over the live scene.
+// /play is now the immersive game route — the home menu (with the big
+// Play button) lives at / instead. #titleSplash on this page is only
+// the boot LOADING screen now: dark scrim while three.js mounts, then
+// dismissed once the first frame paints. The user explicitly navigated
+// to /play, so as soon as we're ready we open the character picker
+// directly; there's no menu step in between.
+//
+// Exception: when we're mounted as the home page's bgFrame (?bg=1 +
+// inside an iframe), DON'T auto-open the picker on boot. The home
+// page's Play CTA "promotes" this iframe out of background mode via
+// a postMessage; at that point we drop is-bg AND open the picker as
+// one motion. Auto-opening here would mean the picker is technically
+// "open" the whole time the user is browsing /home, /about, /leader-
+// board — it'd just be invisible (chrome hidden by html.is-bg CSS).
+// Cleaner to wait until promotion.
+const _isEmbedded = document.documentElement.classList.contains('is-embedded');
 const splashEl = document.getElementById('titleSplash');
 function _markSplashReady() {
+  window._appReady = true;
   if (!splashEl) return;
   if (splashEl.dataset.state === 'ready') return;
   splashEl.dataset.state = 'ready';
-  window._appReady = true;
-  // If the player clicked Play before we were ready, drop them straight
-  // into char select now. The button has been showing a "Hang tight…"
-  // spinner the whole time.
-  if (window._pendingStart) {
-    window._pendingStart = false;
-    // Defer one frame so the data-state CSS transition starts visibly
-    // before we yank the splash away.
-    requestAnimationFrame(() => {
-      window._startFromSplash?.();
-    });
-  }
+  // Hide the loading scrim and jump straight into character select. We
+  // defer one frame so the state-flip CSS has a chance to start before
+  // the picker animates in over it.
+  requestAnimationFrame(() => {
+    splashEl.classList.remove('open');
+    // Skip the picker auto-open when we're embedded as the home bg —
+    // the parent's enter-play message will trigger it at the right
+    // moment.
+    if (_isEmbedded && document.documentElement.classList.contains('is-bg')) return;
+    window._openCharSelect?.();
+  });
 }
 ensureGlassBlurCompat();
 
@@ -283,8 +294,10 @@ purifierRefs.showWallBracket(false);
 // the room from a high corner. Absolute coords (not purifier-relative)
 // because this framing is about the room, not the purifier — the
 // inspector retarget below handles purifier focus.
-camera.position.set(-47, 53, -61);
-camera.lookAt(-11, 34, -43);
+const SPLASH_CAM_POS = new THREE.Vector3(-47, 53, -61);
+const SPLASH_CAM_LOOK = new THREE.Vector3(-11, 34, -43);
+camera.position.copy(SPLASH_CAM_POS);
+camera.lookAt(SPLASH_CAM_LOOK);
 
 // ── Wire time-of-day lighting ───────────────────────────────────────
 
@@ -431,7 +444,10 @@ purifierRefs.setRoomRefs({
   toggleCornerDoor: roomRefs.toggleCornerDoor,
   toggleGuestDoor: roomRefs.toggleGuestDoor,
   toggleFoodBowl: roomRefs.toggleFoodBowl,
-  getFoodBowlMesh: roomRefs.getFoodBowlMesh
+  getFoodBowlMesh: roomRefs.getFoodBowlMesh,
+  setMiniSplitOn: roomRefs.setMiniSplitOn,
+  isMiniSplitOn: roomRefs.isMiniSplitOn,
+  resetMiniSplit: roomRefs.resetMiniSplit
 });
 
 // ── Wire module cross-references ────────────────────────────────────
@@ -500,7 +516,8 @@ kamehameha.init({
   scene,
   camera,
   catGroup: catAnimation.catGroup,
-  isFpMode: () => gameFp.fpMode
+  isFpMode: () => gameFp.fpMode,
+  onOvercharge: () => _handleOvercharge()
 });
 // Surface persisted unlock immediately so the HUD/button reflect it
 // on a fresh page load, without waiting for fans to be turned off.
@@ -799,61 +816,164 @@ document.getElementById('charSelect')?.addEventListener('keydown', e => {
   }
 });
 
-// ── Title splash ────────────────────────────────────────────────────
-// Shown on first boot (where it doubles as the loading screen — see
-// _markSplashReady above) and any time the player exits a run, so they
-// always have a clear "Play" entry point instead of staring at an empty
-// room canvas.
-window._openSplash = () => {
+// ── Exit-to-menu handler ────────────────────────────────────────────
+// /play is the immersive game route; the menu (title card + Play
+// button + tabs) lives at /. Anywhere we used to "reopen the splash"
+// after a run, we now navigate the user back to /home so the iframe
+// architecture stays consistent: the home page brings up the same live
+// scene through its persistent <iframe>, and the player gets the full
+// tab nav back.
+//
+// Two paths:
+//   1. STANDALONE (window.parent === window) — direct entry to /play
+//      in its own tab. Fade out, then top-level navigate to /. The
+//      home page boots fresh and remounts its bg-iframe.
+//   2. EMBEDDED (this document is mounted inside home's #bgFrame) —
+//      no navigation. Fade through black, snap the camera to splash
+//      framing, re-apply is-bg (chrome hides), then postMessage the
+//      parent to swap its URL back to / and re-show its chrome. The
+//      three.js scene never reboots; the eye reads it as one cut.
+//
+// We keep the legacy global names (_openSplash / _closeSplash /
+// _startFromSplash) so the call sites in this file and in pause/quit
+// flows don't have to change. They all funnel through one helper.
+
+// Scene-fade overlay — full-viewport black div used to mask the camera
+// snap during embedded exit. See vite-index.html for the markup.
+const _sceneFadeEl = document.getElementById('sceneFade');
+function _sceneFadeTo(opacity, ms) {
+  if (!_sceneFadeEl) return Promise.resolve();
+  return new Promise(resolve => {
+    _sceneFadeEl.style.transition = `opacity ${ms}ms cubic-bezier(0.32, 0.72, 0, 1)`;
+    if (opacity > 0) _sceneFadeEl.classList.add('is-active');
+    // Force a layout read so the new transition is committed before
+    // we change opacity (otherwise the browser folds from/to into one
+    // paint and the fade is skipped).
+    void _sceneFadeEl.offsetWidth;
+    _sceneFadeEl.style.opacity = String(opacity);
+    let done = false;
+    const finish = () => {
+      if (done) return; done = true;
+      if (opacity === 0) _sceneFadeEl.classList.remove('is-active');
+      resolve();
+    };
+    _sceneFadeEl.addEventListener('transitionend', finish, { once: true });
+    // Belt-and-suspenders fallback in case the transitionend never
+    // fires (e.g. tab backgrounded mid-fade).
+    setTimeout(finish, ms + 80);
+  });
+}
+
+// Snap the camera back to the splash framing. Used during embedded
+// exit while the screen is masked by the black scene fade.
+function _resetSceneToHomeFraming() {
+  camera.position.copy(SPLASH_CAM_POS);
+  camera.lookAt(SPLASH_CAM_LOOK);
+  markShadowsDirty();
+}
+
+function _exitToHome() {
   if (gameFp.fpMode) return;
   if (document.pointerLockElement) document.exitPointerLock();
-  // If the char select is still open, close it first so they don't stack.
+  // Release focus trap up front (it would error on navigation if it
+  // tried to restore focus to a stale element). We deliberately leave
+  // the .open class on #charSelect so the body.is-leaving fade rule
+  // in main.css matches and the picker visibly fades out — removing
+  // .open here would break that selector.
   const cs = document.getElementById('charSelect');
   if (cs && cs.classList.contains('open')) {
-    cs.classList.remove('open');
     if (_charSelectFocusTrap) { _charSelectFocusTrap.release(); _charSelectFocusTrap = null; }
     if (_charSelectSavedFocus) { _charSelectSavedFocus.restore(); _charSelectSavedFocus = null; }
   }
-  const sp = document.getElementById('titleSplash');
-  if (!sp) return;
-  sp.classList.add('open');
-  // If we're re-entering the splash after a run, the scene is already
-  // ready — make sure we don't accidentally show the loading appearance.
-  if (window._appReady && sp.dataset.state !== 'ready') {
-    sp.dataset.state = 'ready';
-  }
-  // Clear any stale "waiting for ready" button state from a previous
-  // early-click attempt.
-  const btn = sp.querySelector('.title-splash-play');
-  btn?.classList.remove('is-waiting');
-  window._pendingStart = false;
-  requestAnimationFrame(() => {
-    btn?.focus();
-  });
-};
-window._closeSplash = () => {
-  const sp = document.getElementById('titleSplash');
-  if (sp) sp.classList.remove('open');
-};
-window._startFromSplash = () => {
-  // If the player tapped Play before the scene finished loading, leave
-  // the splash up and morph the button into a spinner. _markSplashReady
-  // will pick up the pending intent and complete the transition.
-  if (!window._appReady) {
-    const sp = document.getElementById('titleSplash');
-    const btn = sp?.querySelector('.title-splash-play');
-    btn?.classList.add('is-waiting');
-    window._pendingStart = true;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Only fade through black when the camera has actually drifted from
+  // the splash pose — i.e. we're exiting a run. Coming back from
+  // char-select the camera never moved, so the black flash is just
+  // pointless noise. 1 unit² ≈ visually identical.
+  const cameraDrifted = camera.position.distanceToSquared(SPLASH_CAM_POS) > 1;
+
+  // Embedded path — no navigation, postMessage the parent and let it
+  // animate its chrome back in over the same live scene.
+  if (_isEmbedded) {
+    if (reduced) {
+      // Reduced motion: skip animations, just snap state and notify.
+      if (cs) cs.classList.remove('open');
+      _resetSceneToHomeFraming();
+      document.documentElement.classList.add('is-bg');
+      document.body.classList.remove('is-leaving', 'page-fade');
+      try { window.parent.postMessage({ type: 'play-exited' }, location.origin); } catch (e) {}
+      return;
+    }
+    // Tell char-select to fade out via the existing body.is-leaving
+    // CSS rule. We DON'T set page-fade — that one's for full-document
+    // navs and we're not doing one.
+    document.body.classList.add('is-leaving');
+
+    if (!cameraDrifted) {
+      // Camera is already at splash pose — skip the black fade entirely
+      // and just animate the picker out, THEN tell the parent to bring
+      // its chrome back. The picker close is 500ms (see
+      // body.is-leaving #charSelect.open .char-select-inner > * — opacity
+      // and transform are both 0.5s). If we post play-exited too early,
+      // the parent removes is-playing (iframe drops to z:0) and removes
+      // is-leaving (home main.page starts fading IN over 700ms) while
+      // the picker is still mid-fade, so the home title-splash card
+      // appears on top of a still-visible picker. Wait the full 500ms
+      // + a small buffer so the picker is gone before the menu chrome
+      // comes back.
+      setTimeout(() => {
+        if (cs) cs.classList.remove('open');
+        document.documentElement.classList.add('is-bg');
+        document.body.classList.remove('is-leaving');
+        try { window.parent.postMessage({ type: 'play-exited' }, location.origin); } catch (e) {}
+      }, 540);
+      return;
+    }
+
+    // Camera moved (exiting a run) — fade through black to mask the
+    // snap back to splash framing.
+    _sceneFadeTo(1, 320).then(() => {
+      // Black overlay is fully opaque now. Reset the scene under it.
+      if (cs) cs.classList.remove('open');
+      _resetSceneToHomeFraming();
+      document.documentElement.classList.add('is-bg');
+      document.body.classList.remove('is-leaving');
+      // Tell the parent to bring its chrome back. The parent will
+      // pushState back to '/' and remove its own is-leaving class —
+      // that animates the home menu back in BEHIND our still-opaque
+      // black overlay (the iframe is z-index 0, the home chrome
+      // paints over it, but the iframe's overlay covers everything
+      // INSIDE the iframe).
+      try { window.parent.postMessage({ type: 'play-exited' }, location.origin); } catch (e) {}
+      // Hold black another 80ms to give the parent a chance to start
+      // its chrome entrance, then fade out. Total exit = ~720ms.
+      setTimeout(() => _sceneFadeTo(0, 320), 80);
+    });
     return;
   }
-  window._closeSplash();
-  window._openCharSelect();
+
+  // Standalone path — top-level nav to /. body.is-leaving fades out
+  // the char-select picker; the 320ms wait fits the picker's 280ms
+  // opacity transition with a small buffer for the navigation kick.
+  if (reduced) { location.href = '/'; return; }
+  document.body.classList.add('page-fade', 'is-leaving');
+  // Only fade through black if the camera moved — keeps the
+  // char-select-back path light while still masking run exits.
+  if (cameraDrifted) _sceneFadeTo(1, 280);
+  setTimeout(() => { location.href = '/'; }, 320);
+}
+window._openSplash = _exitToHome;
+window._closeSplash = () => { /* legacy no-op — splash markup is gone */ };
+window._startFromSplash = () => {
+  // Legacy entry point. Now just opens char select directly — the
+  // landing-page "Play" button on / is what brings the user here, so
+  // by the time this fires they've already committed to playing.
+  if (!window._appReady) { window._pendingStart = true; return; }
+  window._openCharSelect?.();
 };
 
-// The splash is in the HTML markup with class="open" data-state="loading"
-// already, so it's visible from the very first paint as the loading
-// screen. _markSplashReady (called after the first scene frame paints)
-// flips it to data-state="ready" and reveals the liquid-glass treatment.
+// On first boot, _markSplashReady (called after the first scene frame
+// paints) hides the loading scrim and auto-opens char select.
 
 // Eagerly warm the character-select previews in the background so the 3D cats
 // are already fetched, parsed, and rendered by the time the user opens the
@@ -952,7 +1072,17 @@ window._selectMode = (mode, el) => {
 
 window._startGame = () => {
   const cs = document.getElementById('charSelect');
-  if (cs) cs.classList.remove('open');
+  // Fast-close the picker when actually starting a run — the normal
+  // .open removal triggers a 500ms close fade (so the X-button close
+  // visually mirrors the open). On game-start that's just dead time
+  // before the player sees the room and the HUD slides in, so we
+  // collapse the fade to ~140ms via the .is-starting override in
+  // main.css. Cleared after 220ms once visibility:hidden has snapped.
+  if (cs) {
+    cs.classList.add('is-starting');
+    cs.classList.remove('open');
+    setTimeout(() => cs.classList.remove('is-starting'), 140);
+  }
   // Release focus trap
   if (_charSelectFocusTrap) { _charSelectFocusTrap.release(); _charSelectFocusTrap = null; }
   if (_charSelectSavedFocus) { _charSelectSavedFocus.restore(); _charSelectSavedFocus = null; }
@@ -1047,7 +1177,72 @@ window._toggleMuteMusic = (checked) => {
 window._syncAudioUi = () => gameFp.syncAudioToggleUi();
 window._switchCamFP = () => gameFp.setCamMode();
 window._setMouseSens = (v) => gameFp.setMouseSens(v);
+window._setFov = (v) => gameFp.setFov(v);
 window._toggleSkateMode = () => gameFp.setSkateMode(!gameFp.isSkateMode());
+
+// ── Overcharge death flow ───────────────────────────────────────────
+// Triggered by kamehameha when the player holds past DEATH_THRESHOLD.
+// Dismounts skateboard, locks all input, tips the cat onto its side,
+// and shows the "even further beyond" overlay. The overlay's two
+// buttons call _reviveDeath (stand back up, regain control) or
+// _resetFromDeath (full run reset).
+//
+// Sequence:
+//   1. Lock movement, dismount skate, trigger knockover (cat falls).
+//   2. Hold for ~5s so the player sees the cat tip over and lie there
+//      — camera/look stays live so they can pan around in shock.
+//   3. Release pointer lock + show the death overlay.
+const _DEATH_OVERLAY_DELAY_MS = 5000;
+let _deathOverlayTimer = null;
+function _handleOvercharge() {
+  if (!gameFp.fpMode) return;
+  if (gameFp.isDeathLocked && gameFp.isDeathLocked()) return; // already dead
+  // Eject from the skateboard so the cat falls clean off, not perched
+  // on a deck. Silent so it doesn't play the dismount toast.
+  if (typeof gameFp.isSkateMode === 'function' && gameFp.isSkateMode()) {
+    gameFp.setSkateMode(false, { silent: true });
+  }
+  gameFp.setDeathLock(true);
+  catAnimation.endCastCharge();
+  catAnimation.triggerKnockover();
+  // Delay the overlay so the death animation reads. Movement is already
+  // locked; the camera stays free during this beat for dramatic effect.
+  if (_deathOverlayTimer) clearTimeout(_deathOverlayTimer);
+  _deathOverlayTimer = setTimeout(() => {
+    _deathOverlayTimer = null;
+    // Bail if the player was already revived/reset during the delay.
+    if (!gameFp.isDeathLocked || !gameFp.isDeathLocked()) return;
+    // Release pointer lock now so the cursor can reach the overlay buttons.
+    if (document.pointerLockElement) document.exitPointerLock();
+    const overlay = document.getElementById('fpDeathOverlay');
+    if (overlay) {
+      overlay.style.display = 'flex';
+      // Focus the revive button so keyboard users can hit Enter to come back.
+      setTimeout(() => {
+        const btn = document.getElementById('fpDeathRevive');
+        if (btn) btn.focus();
+      }, 50);
+    }
+  }, _DEATH_OVERLAY_DELAY_MS);
+}
+
+window._reviveDeath = () => {
+  if (_deathOverlayTimer) { clearTimeout(_deathOverlayTimer); _deathOverlayTimer = null; }
+  const overlay = document.getElementById('fpDeathOverlay');
+  if (overlay) overlay.style.display = 'none';
+  catAnimation.triggerRevive();
+  // setDeathLock(false) re-acquires pointer lock on desktop.
+  gameFp.setDeathLock(false);
+};
+
+window._resetFromDeath = () => {
+  if (_deathOverlayTimer) { clearTimeout(_deathOverlayTimer); _deathOverlayTimer = null; }
+  const overlay = document.getElementById('fpDeathOverlay');
+  if (overlay) overlay.style.display = 'none';
+  catAnimation.clearKnockover();
+  // _resetRun internally drops the death lock and fully respawns.
+  window._resetFP();
+};
 
 // Suppresses the post-FP title splash for one transition. Set true
 // just before any flow that exits FP and then immediately takes over
@@ -1366,7 +1561,20 @@ function animate(ts) {
         if (_elMphValue.dataset.heat !== heat) _elMphValue.dataset.heat = heat;
       }
     }
-    // Check for run completion (all regular coins collected)
+    // Check for run completion (all regular coins collected).
+    //
+    // ⚠ Coin count INVARIANT: the leaderboard's stored coin count and
+    // the live coin HUD must always agree. We rely on two things:
+    //   1. A run only finishes when coinScore >= coinTotal — so at the
+    //      moment we hand the row to the leaderboard, the player's
+    //      score is exactly coinTotal. That's why we pass coinTotal
+    //      below (not coinScore); they're equal here by construction.
+    //   2. coins.coinTotal is set at coin spawn time and not mutated
+    //      mid-run, so the HUD denominator and this saved value come
+    //      from the same source of truth.
+    // If we ever allow finishing with partial completion (timer end,
+    // forfeit, etc.), switch this to pass coins.coinScore so the saved
+    // value reflects what the player actually collected.
     if (coins.coinScore >= coins.coinTotal && coins.coinTotal > 0 && !leaderboard.isFinished()) {
       leaderboard.stopTimer();
       const finalTime = leaderboard.getElapsed();
@@ -1612,11 +1820,19 @@ function animate(ts) {
       );
       // Cast runs LAST so it wins over idle/skate arm poses.
       catAnimation.applyCastAnimation(ts, catAppearance.catModelKey);
+      // Knockover runs AFTER cast so the death tip-over rolls on top
+      // of every other procedural pose. No-op when not knocked over.
+      catAnimation.applyKnockoverDeath(ts);
     }
   }
 
   // Purifier animations (fan spin, explode lerp, filter/drawer/bifold)
   purifierRefs.update(dtSec, animFrameScale, gameFp.fpMode);
+
+  // Mini-split air-stream particles (no-op when unit is off)
+  if (roomRefs && typeof roomRefs.updateMiniSplit === 'function') {
+    roomRefs.updateMiniSplit(dtSec, camera);
+  }
 
   // Particles + wall auto-fade are inspector-only; the inspector chunk
   // ticks them via _inspectorTick above when active.
@@ -1680,8 +1896,87 @@ animate(performance.now());
 // createPurifier, renderer.compile, first render) instead of revealing the
 // liquid-glass treatment over a still-empty canvas.
 requestAnimationFrame(() => {
-  requestAnimationFrame(_markSplashReady);
+  requestAnimationFrame(() => {
+    _markSplashReady();
+    // When this page is mounted as a background iframe (?bg=1) on the
+    // home / about / leaderboard pages, signal the parent that the
+    // first scene frame has actually composited. The parent gates the
+    // iframe fade-in on this so the glass cards don't briefly blur an
+    // empty canvas (which looks like no blur at all because the body
+    // bg is a flat color).
+    try {
+      if (window.parent !== window && document.documentElement.classList.contains('is-bg')) {
+        window.parent.postMessage({ type: 'bg-scene-ready' }, location.origin);
+      }
+    } catch (e) {}
+
+    // Pre-warm character-select previews during idle time. Without
+    // this, the first time the user clicks Play we pay for 5 WebGL
+    // context creations + 5 GLB loads on the same frame the picker's
+    // bounce-in transition starts — which jacks up the main thread
+    // and causes a visible stutter at the worst possible moment.
+    // By kicking it off here (after the room's first frame is up,
+    // during idle time), the picker's open path takes the warm
+    // flushPreviewsOnOpen branch and the entrance plays cleanly.
+    const _warmPreviews = () => {
+      if (_previewsInited) return;
+      _previewsInited = true;
+      initPreviews();
+    };
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(_warmPreviews, { timeout: 2000 });
+    } else {
+      setTimeout(_warmPreviews, 800);
+    }
+  });
 });
+
+// ── Embedded play promotion / demotion ──────────────────────────────
+// When this document is mounted inside the home page's #bgFrame, the
+// home Play CTA "promotes" the iframe out of background mode (drops
+// is-bg, opens char-select) via a postMessage instead of doing a
+// top-level navigation to /play. This skips the costly three.js
+// scene rebuild that a real navigation would cause — the same warm
+// scene flows seamlessly into the picker, into a run, and back out.
+//
+// Protocol:
+//   parent → iframe : { type: 'enter-play' }   take focus, drop is-bg, open char-select
+//   parent → iframe : { type: 'exit-play' }    same as user-triggered exit (defensive — popstate, etc.)
+//   iframe → parent : { type: 'play-exited' }  fired from _exitToHome after camera reset
+if (_isEmbedded) {
+  window.addEventListener('message', (e) => {
+    if (e.origin !== location.origin) return;
+    const data = e.data;
+    if (!data || typeof data !== 'object') return;
+    if (data.type === 'enter-play') {
+      // Drop bg mode, focus the document so keyboard input lands here,
+      // open the picker. The fade-from-black overlay belongs to the
+      // PARENT in this direction (its chrome animates out), so we
+      // don't drive _sceneFadeEl from this side.
+      document.documentElement.classList.remove('is-bg');
+      // Make sure body.is-leaving (left over from a prior exit) is
+      // cleared so char-select isn't immediately faded out by the
+      // body.is-leaving #charSelect.open rule.
+      document.body.classList.remove('is-leaving');
+      try { window.focus(); } catch (err) {}
+      // Split style recalc across two frames: removing is-bg drops
+      // `display: none` on .panel / .panel-fab / #titleSplash / etc.,
+      // forcing a style+layout pass on its own. Adding `charSelect.open`
+      // in the same microtask piles a second style+layout on top —
+      // visible as a single 25-35ms long frame right when the picker's
+      // entrance is supposed to be smooth. Deferring _openCharSelect
+      // by one frame lets the is-bg recalc settle first; the user
+      // never notices the extra ~16ms because the parent's chrome-out
+      // animation is still running.
+      requestAnimationFrame(() => window._openCharSelect?.());
+    } else if (data.type === 'exit-play') {
+      // Defensive — used by parent's popstate handler. Same code path
+      // as a user-driven exit so all the cleanup (pointer lock, focus
+      // trap, FP mode, etc.) runs.
+      _exitToHome();
+    }
+  });
+}
 
 // Init UI micro-interactions (bouncy buttons, press effects)
 initInteractions();

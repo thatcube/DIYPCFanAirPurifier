@@ -103,6 +103,29 @@ export function stopTimer() {
   return _elapsed;
 }
 
+// Pause the active run timer without finishing it. Snapshots elapsed
+// so the next resumeTimer() can re-anchor _startTs and the run keeps
+// counting from where it left off. Safe no-op if not running or
+// already finished.
+export function pauseTimer() {
+  if (!_running || _finished) return _elapsed;
+  _elapsed = performance.now() - _startTs;
+  _running = false;
+  return _elapsed;
+}
+
+// Resume a paused run timer. Re-anchors _startTs so (now - _startTs)
+// equals the saved _elapsed. No-op if the timer is finished or never
+// started.
+export function resumeTimer() {
+  if (_finished || _running) return _elapsed;
+  if (!_startTs) return _elapsed;
+  _startTs = performance.now() - _elapsed;
+  _running = true;
+  _setTimerHudState('Running', 'running');
+  return _elapsed;
+}
+
 export function tickTimer(ts) {
   if (!_running) return _elapsed;
   _elapsed = ts - _startTs;
@@ -227,20 +250,11 @@ function _makeEntryId(name, timeMs, at) {
   return `${h.toString(16).padStart(8, '0')}${rnd}`;
 }
 
-function _catColorHex(key) {
-  const p = CAT_COLOR_PRESETS[String(key || '').toLowerCase()];
-  if (!p) return '#9aa4b4';
-  return '#' + (p.coat >>> 0).toString(16).padStart(6, '0');
-}
-
 function _catBadgeHtml(entry) {
   const model = String((entry && entry.catModel) || 'classic').toLowerCase();
   const emoji = CAT_MODEL_EMOJI[model] || CAT_MODEL_EMOJI.classic;
   const label = CAT_MODEL_LABELS_SHORT[model] || 'Cat';
-  const colorable = (model !== 'bababooey' && model !== 'totodile' && model !== 'korra');
-  const colorKey = (entry && entry.catColor) || 'charcoal';
-  const dot = colorable ? `<span class="catDot" style="background:${_catColorHex(colorKey)}"></span>` : '';
-  return `<span class="catBadge" title="${_escapeHtml(colorable ? label + ' · ' + colorKey : label)}"><span class="catEmoji">${emoji}</span>${dot}<span class="catLabel">${label}</span></span>`;
+  return `<span class="catBadge" title="${_escapeHtml(label)}"><span class="catEmoji">${emoji}</span><span class="catLabel">${label}</span></span>`;
 }
 
 function _normalizeLeaderboard(rows) {
@@ -1197,6 +1211,13 @@ export function openFinishDialog(data) {
 }
 
 export function openFinishDialogForRun(timeMs, coinTotal, secretCoins) {
+  // ⚠ Coin count INVARIANT (see src/main.js run-completion check):
+  // `coinTotal` here is the player's final coin score AND the run's
+  // total available coins — they're equal by construction because we
+  // only call this when coinScore >= coinTotal. The HUD `score/total`
+  // and the saved leaderboard row must stay in sync; both ultimately
+  // come from coins.coinTotal. Don't pass anything else without also
+  // updating the call site in main.js.
   const safeTime = Math.max(1, Math.floor(Number(timeMs) || 0));
   const safeCoins = Math.max(0, Math.floor(Number(coinTotal) || 0));
   const safeSecret = Math.max(0, Math.floor(Number(secretCoins) || 0));

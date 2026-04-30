@@ -17,6 +17,8 @@ import {
   getFloorY, getCeilingY, getWinCenterY
 } from './spatial.js';
 import { state } from './state.js';
+import { getAudioCtx } from './coins.js';
+import { sfxMuted } from './game-fp.js';
 
 // ─── Shared door asset ──────────────────────────────────────────────
 // 6-panel colonial-style leaf used for the bedroom door and the two
@@ -208,7 +210,7 @@ function buildBypassPanel({ width, height, thickness = 1.0,
 // ─── Shared window model ───────────────────────────────────────────
 // Double-hung style: upper pane (fixed) + lower pane (slides up to open).
 // Origin at the center of the opening. X = depth, Y = up, Z = width.
-function buildWindowModel({ width, height, frameThickness = 0.8, frameDepth = 0.6 }) {
+function buildWindowModel({ width, height, frameThickness = 1.2, frameDepth = 1.2 }) {
   // Double-hung window: two sash units at different depths.
   // The lower sash (closer to room interior) slides up in front of the upper sash.
   const group = new THREE.Group();
@@ -1723,7 +1725,7 @@ export function createRoom(scene) {
     const matteW = photoW + matteMarginX * 2;
     const matteH = photoH + matteMarginY * 2;
     const frameBorder = 1.25;       // wood lip thickness on each side
-    const lipDepth = 0.6;           // how far the lip protrudes off the wall
+    const lipDepth = 1.1;           // how far the lip protrudes off the wall
     const centerX = _grCenterX;
     const centerY = floorY + 50;    // natural hang height
     const wallFaceZ = _grZmax;      // interior face of the LEFT wall
@@ -1876,11 +1878,12 @@ export function createRoom(scene) {
   // Uses the same outdoor material as the bedroom window so clicking either
   // one toggles day/night for both.
   {
-    // Window sill
-    roomBox(0.8, 0.5, winW + 2, 0xc8c4be,
-      _grXmax - 0.4, grWinBottom - 0.25, grWinCenterZ, 0, 0, 0);
+    // Window sill — deeper than the frame so it reads as a real ledge
+    // sitting beneath the trim.
+    roomBox(1.6, 0.5, winW + 2, 0xc8c4be,
+      _grXmax - 0.8, grWinBottom - 0.25, grWinCenterZ, 0, 0, 0);
     // Window frame + glass — shared model (office window IS openable).
-    const grFrameD = 0.6;
+    const grFrameD = 1.2;
     const grWallInnerX = _grXmax;       // inner face of front wall
     const grTrimX = grWallInnerX - grFrameD / 2 - 0.04;  // proud toward room interior
     _officeWindowModel = buildWindowModel({ width: winW, height: winH });
@@ -1905,43 +1908,29 @@ export function createRoom(scene) {
   }
 
   // ─── Outdoor terrain (beyond office front wall) ──────────────────
-  // Accessible when the office window is open. Pre-mirror +X extends
-  // beyond the front wall at X=183.
-  //   Drop slope:  183.5 → 255  (6 ft, gentle 18" drop)
-  //   Flat grass:  255   → 375  (10 ft flat)
-  //   Incline:     375   → 411  (3 ft up 12")
-  //   Road:        411   → 543  (11 ft flat)
-  // Z extent: 200" centered on grWinCenterZ.
+  // Accessible when the office window is open. Flat lawn at flatY
+  // (~3 ft below the office window sill) wraps around the whole house;
+  // a flat asphalt road runs along the far edge of the front yard with
+  // dashed center lines for character. No slopes / no incline — the
+  // box-collision system can't represent tilted ground cleanly, and
+  // earlier rotated slabs left the player floating above the visible
+  // grass. Keeping everything flat lets feet sit flush on the lawn.
+  // Z extent spans the whole front-of-house run plus overrun.
   {
-    // Z extent spans the whole front-of-house run (office window through
-    // hallway end) plus generous overrun so grass reads as a real yard.
     const terrainZhalf = 300;
     const terrainZmin = grWinCenterZ - terrainZhalf;
     const terrainZmax = grWinCenterZ + terrainZhalf;
     const terrainZw = terrainZmax - terrainZmin;
     const terrainZcenter = grWinCenterZ;
 
-    // Y reference: window sill = grWinBottom = floorY + 23.
-    // Gentle slopes — earlier the drop was 48" / 71.5" (~34°) and the incline
-    // was 36" / 36" (45°), which read as obvious tilted blocks from inside.
-    // Reduced to ~14° drop and ~18° incline for a more natural yard.
-    // Yard sits ~3 ft below the window sill so the view out the office
-    // window looks down onto the lawn rather than straight across it.
-    const sillY = grWinBottom - 36;    // (floorY + 23) - 36
-    const dropStartX = _grXmax + 0.5;  // 183.5
-    const dropEndX = 255;
-    const dropStartY = sillY;
-    const dropEndY = sillY - 18;
-    const flatStartX = dropEndX;
-    const flatEndX = 375;
-    const flatY = dropEndY;
-    const incStartX = flatEndX;
-    const incEndX = 411;
-    const incStartY = flatY;
-    const incEndY = flatY + 12;
-    const roadStartX = incEndX;
+    // Y reference: window sill = grWinBottom = floorY + 23. Yard sits
+    // 3 ft below the sill so looking out the office window angles down
+    // onto the lawn rather than straight across.
+    const sillY = grWinBottom - 36;     // (floorY + 23) - 36
+    const flatY = sillY - 18;
+    const lawnStartX = _grXmax + 0.5;   // 183.5
+    const roadStartX = 411;
     const roadEndX = 543;
-    const roadY = incEndY;
 
     // Procedural grass texture — base green with stippled shades and short
     // blade strokes. Tiled per-slab so each terrain piece reads as grass
@@ -1986,74 +1975,34 @@ export function createRoom(scene) {
     }
 
     const roadMat = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.85, metalness: 0 });
-    const curbMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.7, metalness: 0 });
 
-    // ── Drop slope (rotated slab) ─────────────────────────────────
+    // ── Front-yard grass between house and road (flat) ────────────
     {
-      const dx = dropEndX - dropStartX;                    // 71.5
-      const dy = dropEndY - dropStartY;                    // -18
-      const len = Math.sqrt(dx * dx + dy * dy);
-      const angle = Math.atan2(dy, dx);                    // negative (downhill)
-      const cx = (dropStartX + dropEndX) / 2;
-      const cy = (dropStartY + dropEndY) / 2;
-      const slab = new THREE.Mesh(
-        new THREE.BoxGeometry(len, 2, terrainZw), _makeGrassMat(len, terrainZw));
-      slab.position.set(cx, cy, terrainZcenter);
-      slab.rotation.z = -angle; // negate: X-mirror flips position but not rotation.z
-      slab.castShadow = true; slab.receiveShadow = true;
-      slab._isRoom = true; slab._isGuestRoom = true;
-      addRoom(slab);
-    }
-
-    // ── Flat grass ────────────────────────────────────────────────
-    {
-      const w = flatEndX - flatStartX;
+      const w = roadStartX - lawnStartX;
       const slab = new THREE.Mesh(
         new THREE.BoxGeometry(w, 2, terrainZw), _makeGrassMat(w, terrainZw));
-      slab.position.set((flatStartX + flatEndX) / 2, flatY, terrainZcenter);
+      slab.position.set((lawnStartX + roadStartX) / 2, flatY, terrainZcenter);
       slab.castShadow = true; slab.receiveShadow = true;
       slab._isRoom = true; slab._isGuestRoom = true;
       addRoom(slab);
     }
 
-    // ── Incline to road (rotated slab) ────────────────────────────
-    {
-      const dx = incEndX - incStartX;                      // 36
-      const dy = incEndY - incStartY;                      // 12
-      const len = Math.sqrt(dx * dx + dy * dy);
-      const angle = Math.atan2(dy, dx);
-      const cx = (incStartX + incEndX) / 2;
-      const cy = (incStartY + incEndY) / 2;
-      const slab = new THREE.Mesh(
-        new THREE.BoxGeometry(len, 2, terrainZw), _makeGrassMat(len, terrainZw));
-      slab.position.set(cx, cy, terrainZcenter);
-      slab.rotation.z = -angle; // negate: X-mirror flips position but not rotation.z
-      slab.castShadow = true; slab.receiveShadow = true;
-      slab._isRoom = true; slab._isGuestRoom = true;
-      addRoom(slab);
-    }
-
-    // ── Road surface ──────────────────────────────────────────────
+    // ── Road surface (flat, level with lawn) ──────────────────────
+    // Nudged up 0.2 so the road top sits just above the surrounding grass
+    // slab top (both are 2 tall, centered at flatY) and doesn't z-fight.
     {
       const w = roadEndX - roadStartX;
       const slab = new THREE.Mesh(
-        new THREE.BoxGeometry(w, 1.5, terrainZw), roadMat);
-      slab.position.set((roadStartX + roadEndX) / 2, roadY, terrainZcenter);
+        new THREE.BoxGeometry(w, 2, terrainZw), roadMat);
+      slab.position.set((roadStartX + roadEndX) / 2, flatY + 0.2, terrainZcenter);
       slab.castShadow = true; slab.receiveShadow = true;
       slab._isRoom = true; slab._isGuestRoom = true;
       addRoom(slab);
-      // Road curb (raised edge between grass incline and road)
-      const curb = new THREE.Mesh(
-        new THREE.BoxGeometry(2, 4, terrainZw), curbMat);
-      curb.position.set(roadStartX, roadY + 2, terrainZcenter);
-      curb.castShadow = true; curb.receiveShadow = true;
-      curb._isRoom = true; curb._isGuestRoom = true;
-      addRoom(curb);
     }
 
     // ── Dashed center line on road ────────────────────────────────
     {
-      const lineY = roadY + 0.8;
+      const lineY = flatY + 1.25;       // just above road slab top (road raised by 0.2)
       const lineMat = new THREE.MeshStandardMaterial({ color: 0xdddd44, roughness: 0.6 });
       const roadMidX = (roadStartX + roadEndX) / 2;
       const dashLen = 12, gapLen = 8, dashW = 1.5;
@@ -2066,25 +2015,12 @@ export function createRoom(scene) {
       }
     }
 
-    // ── Fill terrain underneath slopes to prevent seeing underside ──
-    // Large box filling the volume below the terrain surface
-    {
-      const fillW = roadEndX - dropStartX;
-      const fillH = 60; // deep enough to cover all gaps
-      const fillY = Math.min(dropEndY, flatY) - fillH / 2 - 1;
-      const fill = new THREE.Mesh(
-        new THREE.BoxGeometry(fillW, fillH, terrainZw),
-        new THREE.MeshStandardMaterial({ color: 0x3a6a2a, roughness: 1.0 }));
-      fill.position.set((dropStartX + roadEndX) / 2, fillY, terrainZcenter);
-      fill.receiveShadow = true;
-      fill._isRoom = true; fill._isGuestRoom = true;
-      addRoom(fill);
-    }
-
     // ── Massive grass field surrounding the entire house ──────────
     // ~10× the original ±300 lawn, wrapping the house on all sides so the
-    // player can roam freely. Sits 1" below the existing flat-yard top so
-    // it tucks under the slope/incline/road pieces without z-fighting.
+    // player can roam freely. Sits at the same Y as the front-yard lawn
+    // slab so the visible grass top is one consistent height (flatY + 1)
+    // everywhere outdoors — that exact Y is what _sampleOutdoorGroundY
+    // in game-fp.js returns, so the player's feet land flush on grass.
     {
       const fieldSize = 6000;
       const fieldCenterX = 51;     // pre-mirror house center X (≈ midpoint of -81..183)
@@ -2092,7 +2028,7 @@ export function createRoom(scene) {
       const field = new THREE.Mesh(
         new THREE.BoxGeometry(fieldSize, 2, fieldSize),
         _makeGrassMat(fieldSize, fieldSize));
-      field.position.set(fieldCenterX, flatY - 1, fieldCenterZ);
+      field.position.set(fieldCenterX, flatY, fieldCenterZ);
       field.receiveShadow = true;
       field._isRoom = true; field._isGuestRoom = true;
       addRoom(field);
@@ -2631,34 +2567,260 @@ export function createRoom(scene) {
   const msX = 51 - 18 - msW / 2; // 1.5 feet gap from closet wall to edge of unit (before flip)
   const msY = floorY + 80 - 12 - msH / 2; // 1 foot from ceiling
   const msZ = oppWallZ + 0.5 + msD / 2; // flush against TV wall
+  // Mini-split state — toggled via the click handler in purifier.js.
+  // The unit starts OFF; turning it on spawns a cheap horizontal air
+  // stream (Points cloud) and unlocks the secret coin out front. The
+  // run-reset path (purifier.resetWorld) calls resetMiniSplit() to
+  // bring it back to the off state for the next run.
+  let _miniSplitOn = false;
+  let _miniSplitLedMat = null;
+  // World-space (post-mirror) anchors for the air-stream emitter.
+  // Computed once below so the particle tick doesn't redo this each frame.
+  const _msVentWorldX = -msX;                      // X-mirror flips msX
+  const _msVentWorldY = msY - msH / 2 + 1.7;       // mid of louver stack
+  const _msVentWorldZ = msZ + msD / 2 + 0.16;      // just in front of vent face
+  const _msVentWidth  = msW - 8;                   // emit across vent width
+  let _miniSplitAirPoints = null;
+  let _miniSplitAirData = null;
+  let _msAirSpriteTex = null;
+  // Tight proximity-based fan loop. Built lazily on first turn-on so
+  // an unused unit costs no audio. Gain is driven per-frame from the
+  // camera→vent distance in updateMiniSplit() — falls off fast so you
+  // barely hear it across the room and not at all in the hallway.
+  let _msFanSrc = null;
+  let _msFanGain = null;
+  let _msFanFilter = null;
+  let _msFanNoiseBuf = null;
+  const _tmpCamPos = new THREE.Vector3();
   {
     const msMat = new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.3, metalness: 0.05 });
     // Main body — rounded rectangle
     const msBody = roomRoundBox(msW, msH, msD, 2, 0xf0f0f0, msX, msY, msZ, 0, 0, 0);
     msBody.material.roughness = 0.3;
     msBody.material.metalness = 0.05;
+    msBody._isMiniSplit = true;
     // Bottom air vent — darker slit
     const ventMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5 });
     const vent = new THREE.Mesh(new THREE.BoxGeometry(msW - 4, 1.5, 0.3), ventMat);
     vent.position.set(msX, msY - msH / 2 + 2, msZ + msD / 2 + 0.16);
-    vent._isRoom = true; addRoom(vent);
+    vent._isRoom = true; vent._isMiniSplit = true; addRoom(vent);
     // Horizontal louver lines on the vent
     for (let i = 0; i < 3; i++) {
       const louver = new THREE.Mesh(new THREE.BoxGeometry(msW - 6, 0.15, 0.4), msMat);
       louver.position.set(msX, msY - msH / 2 + 1.2 + i * 0.5, msZ + msD / 2 + 0.2);
-      louver._isRoom = true; addRoom(louver);
+      louver._isRoom = true; louver._isMiniSplit = true; addRoom(louver);
     }
-    // Small LED indicator dot
-    const ledMat = new THREE.MeshStandardMaterial({ color: 0x00cc44, emissive: 0x00cc44, emissiveIntensity: 0.5 });
+    // Small LED indicator dot — starts dim/red-ish; setMiniSplitOn() recolors it.
+    const ledMat = new THREE.MeshStandardMaterial({
+      color: 0x551111, emissive: 0x330000, emissiveIntensity: 0.25,
+      roughness: 0.4, metalness: 0.1
+    });
+    _miniSplitLedMat = ledMat;
     const led = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 6), ledMat);
     led.position.set(msX + msW / 2 - 3, msY - msH / 2 + 3, msZ + msD / 2 + 0.16);
-    led._isRoom = true; addRoom(led);
+    led._isRoom = true; led._isMiniSplit = true; addRoom(led);
     // Brand logo area (subtle lighter rectangle)
     const logoArea = new THREE.Mesh(new THREE.BoxGeometry(8, 2, 0.1),
       new THREE.MeshStandardMaterial({ color: 0xfafafa, roughness: 0.2 }));
     logoArea.position.set(msX, msY + msH / 2 - 3, msZ + msD / 2 + 0.06);
-    logoArea._isRoom = true; addRoom(logoArea);
+    logoArea._isRoom = true; logoArea._isMiniSplit = true; addRoom(logoArea);
   }
+
+  // ── Mini-split air stream (cheap horizontal Points cloud) ──────────
+  // Built lazily on first turn-on so an unused unit costs nothing. The
+  // Points object is added directly to the scene (not _isRoom) so its
+  // positions are in post-mirror world coords and the X-mirror pass
+  // doesn't double-flip them.
+  function _ensureMiniSplitAir() {
+    if (_miniSplitAirPoints) return;
+    // More, smaller, softer dots reads as drifting air rather than
+    // tracer pellets. Square sprites look digital — a tiny radial
+    // alpha texture rounds them off and gives a gentle haze.
+    const N = 80;
+    const positions = new Float32Array(N * 3);
+    for (let i = 0; i < N * 3; i++) positions[i] = 1e6; // park offscreen until first tick
+    const data = new Array(N);
+    for (let i = 0; i < N; i++) {
+      // age >= life forces a respawn on the first updateMiniSplit() tick.
+      data[i] = { age: 1, life: 0, vx: 0, vy: 0, vz: 0 };
+    }
+    if (!_msAirSpriteTex) {
+      const s = 64;
+      const c = document.createElement('canvas');
+      c.width = c.height = s;
+      const cx = c.getContext('2d');
+      const g = cx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+      g.addColorStop(0.0, 'rgba(255,255,255,1)');
+      g.addColorStop(0.45, 'rgba(255,255,255,0.55)');
+      g.addColorStop(1.0, 'rgba(255,255,255,0)');
+      cx.fillStyle = g;
+      cx.fillRect(0, 0, s, s);
+      _msAirSpriteTex = new THREE.CanvasTexture(c);
+      _msAirSpriteTex.colorSpace = THREE.SRGBColorSpace;
+      _msAirSpriteTex.needsUpdate = true;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const mat = new THREE.PointsMaterial({
+      size: 0.7,
+      map: _msAirSpriteTex,
+      color: 0xeaf2ff,
+      transparent: true,
+      opacity: 0.32,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      sizeAttenuation: true
+    });
+    const pts = new THREE.Points(geo, mat);
+    pts.frustumCulled = false;
+    pts.visible = false;
+    scene.add(pts);
+    _miniSplitAirPoints = pts;
+    _miniSplitAirData = data;
+  }
+
+  // ── Fan loop SFX (proximity-driven) ────────────────────────────────
+  // Looping low-passed noise → "low fan hum". Volume is driven each
+  // frame from camera→vent distance, so it's noticeable up close,
+  // barely audible at the far side of the room, and inaudible outside.
+  function _startMsFanLoop() {
+    const ac = getAudioCtx();
+    if (!ac || _msFanSrc) return;
+    if (!_msFanNoiseBuf) {
+      // ~2s of white noise looped is plenty — at heavy lowpass nobody
+      // can hear the seam.
+      const len = Math.floor(ac.sampleRate * 2);
+      _msFanNoiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+      const d = _msFanNoiseBuf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const src = ac.createBufferSource();
+    src.buffer = _msFanNoiseBuf;
+    src.loop = true;
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 520;   // muffled, "behind a vent" character
+    lp.Q.value = 0.6;
+    const g = ac.createGain();
+    g.gain.value = 0.0001;       // ramped up by updateMiniSplit()
+    src.connect(lp).connect(g).connect(ac.destination);
+    src.start();
+    _msFanSrc = src;
+    _msFanFilter = lp;
+    _msFanGain = g;
+  }
+
+  function _stopMsFanLoop() {
+    const ac = getAudioCtx();
+    if (!ac || !_msFanSrc) return;
+    const now = ac.currentTime;
+    try {
+      _msFanGain.gain.cancelScheduledValues(now);
+      _msFanGain.gain.setValueAtTime(_msFanGain.gain.value, now);
+      _msFanGain.gain.linearRampToValueAtTime(0.0001, now + 0.25);
+    } catch (e) { }
+    const src = _msFanSrc;
+    setTimeout(() => { try { src.stop(); src.disconnect(); } catch (e) { } }, 320);
+    _msFanSrc = null;
+    _msFanFilter = null;
+    _msFanGain = null;
+  }
+
+  // Turn unit on/off. Returns the new state.
+  function setMiniSplitOn(on) {
+    _miniSplitOn = !!on;
+    if (_miniSplitLedMat) {
+      if (_miniSplitOn) {
+        _miniSplitLedMat.color.setHex(0x33ff66);
+        _miniSplitLedMat.emissive.setHex(0x33ff66);
+        _miniSplitLedMat.emissiveIntensity = 1.6;
+      } else {
+        _miniSplitLedMat.color.setHex(0x551111);
+        _miniSplitLedMat.emissive.setHex(0x330000);
+        _miniSplitLedMat.emissiveIntensity = 0.25;
+      }
+    }
+    if (_miniSplitOn) {
+      _ensureMiniSplitAir();
+      if (_miniSplitAirPoints) _miniSplitAirPoints.visible = true;
+      _startMsFanLoop();
+    } else if (_miniSplitAirPoints) {
+      _miniSplitAirPoints.visible = false;
+      _stopMsFanLoop();
+    } else {
+      _stopMsFanLoop();
+    }
+    return _miniSplitOn;
+  }
+
+  function isMiniSplitOn() { return _miniSplitOn; }
+
+  // Per-frame particle tick. No-op when off or never-built.
+  function updateMiniSplit(dt, camera) {
+    // Drive fan-loop volume from camera→vent distance, even after
+    // setMiniSplitOn(false) ramped down (so a cleanup tick can finish
+    // the fade if it's still alive).
+    if (_msFanGain && camera) {
+      const ac = getAudioCtx();
+      if (ac) {
+        // Distance from camera to vent face in inches (room units).
+        const dx = camera.position.x - _msVentWorldX;
+        const dy = camera.position.y - _msVentWorldY;
+        const dz = camera.position.z - _msVentWorldZ;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        // Sharp falloff but still audible across the room: full at
+        // ~24" from the vent, ~half at 60", quiet but present down at
+        // floor level (~70" away when standing under it), inaudible
+        // past ~220" (out of the room).
+        const NEAR = 24;
+        const FAR = 220;
+        let vol = 0;
+        if (_miniSplitOn && !sfxMuted && dist < FAR) {
+          const k = NEAR / Math.max(NEAR, dist);
+          // Linear-ish (k instead of k*k) keeps it from collapsing to
+          // nothing once you're more than a couple feet away.
+          vol = 0.10 * k * (1 - dist / FAR);
+          if (vol < 0) vol = 0;
+        }
+        const now = ac.currentTime;
+        const cur = _msFanGain.gain.value;
+        // Tiny per-frame ramp so motion doesn't zipper the gain.
+        try {
+          _msFanGain.gain.cancelScheduledValues(now);
+          _msFanGain.gain.setValueAtTime(Math.max(0.0001, cur), now);
+          _msFanGain.gain.linearRampToValueAtTime(Math.max(0.0001, vol), now + 0.08);
+        } catch (e) { }
+      }
+    }
+
+    if (!_miniSplitOn || !_miniSplitAirPoints || !_miniSplitAirData) return;
+    const arr = _miniSplitAirPoints.geometry.attributes.position.array;
+    const data = _miniSplitAirData;
+    for (let i = 0; i < data.length; i++) {
+      const p = data[i];
+      p.age += dt;
+      const k = i * 3;
+      if (p.age >= p.life) {
+        // Respawn at the vent face, jittered across width + tiny depth/height.
+        arr[k    ] = _msVentWorldX + (Math.random() - 0.5) * _msVentWidth;
+        arr[k + 1] = _msVentWorldY + (Math.random() - 0.5) * 1.4;
+        arr[k + 2] = _msVentWorldZ + (Math.random() - 0.5) * 0.4;
+        // Forward (+Z) push, slight downward droop, tiny side spread.
+        p.vx = (Math.random() - 0.5) * 1.5;
+        p.vy = -1.0 - Math.random() * 1.4;
+        p.vz = 14 + Math.random() * 7;
+        p.age = 0;
+        p.life = 1.6 + Math.random() * 1.0;
+        continue;
+      }
+      arr[k    ] += p.vx * dt;
+      arr[k + 1] += p.vy * dt;
+      arr[k + 2] += p.vz * dt;
+    }
+    _miniSplitAirPoints.geometry.attributes.position.needsUpdate = true;
+  }
+
+  function resetMiniSplit() { if (_miniSplitOn) setMiniSplitOn(false); }
 
   // ─── Cat food feeder on black shoe box (TV wall / closet corner) ────
   let _foodGroup = null;
@@ -3785,11 +3947,12 @@ export function createRoom(scene) {
   // Corner fill — patch gap between left wall (z=48.5) and back wall (z=49)
   roomBox(0.5, wallHeight, 0.5, 0xd8d4ce, leftWallX, floorY + wallHeight / 2, 48.75, 0, 0, 0);
 
-  // Window sill
-  roomBox(0.8, 0.5, winW + 2, 0xc8c4be, leftWallX + 0.4, winBottom - 0.25, winCenterZ, 0, 0, 0);
+  // Window sill — deeper than the frame so it reads as a real ledge
+  // sitting beneath the trim.
+  roomBox(1.6, 0.5, winW + 2, 0xc8c4be, leftWallX + 0.8, winBottom - 0.25, winCenterZ, 0, 0, 0);
 
   // Window frame + glass — shared model (bedroom window is NOT openable).
-  const frameD = 0.6;
+  const frameD = 1.2;
   const wallInnerX = leftWallX + 0.25;
   const trimX = wallInnerX + frameD / 2 + 0.04; // back face ~0.04" proud of wall
   const bedroomWindow = buildWindowModel({ width: winW, height: winH });
@@ -3897,6 +4060,132 @@ export function createRoom(scene) {
   moonGlow.castShadow = false;
   moonGlow._isRoom = true;
   addRoom(moonGlow);
+
+  // Avatar painting — framed art hung on the WINDOW wall (-X), in the
+  // bed-clear stretch between the window and the TV wall. Source image
+  // is 930×1280 (portrait, ~0.726:1). Matte and photo sit flat against
+  // the wall; the wood frame is a raised lip around them. Mirrors the
+  // Gyarados painting in the office, but oriented to face +X.
+  {
+    const photoW = 12;
+    const photoH = 12 * (1280 / 930);   // matches source aspect ratio (~16.52)
+    const matteMarginX = photoW * 0.20;
+    const matteMarginY = photoH * 0.20;
+    const matteW = photoW + matteMarginX * 2;
+    const matteH = photoH + matteMarginY * 2;
+    const frameBorder = 1.25;       // wood lip thickness on each side
+    const lipDepth = 1.1;           // how far the lip protrudes off the wall
+    // Hung between the TV wall and the foot of the bed, nudged 6"
+    // closer to the window than the wall midpoint.
+    const centerZ = (oppWallZ + (BED_Z - BED_L / 2)) / 2 + 6;  // ≈ -49.9
+    const centerY = floorY + 52;    // natural hang height (slightly above eye)
+    const wallFaceX = leftWallX + 0.25;   // interior face of the window wall
+
+    const frameMat = new THREE.MeshStandardMaterial({
+      color: 0x2b1d12, roughness: 0.55, metalness: 0.05,
+    });
+    // Four lip pieces forming a picture-frame border. Back face flush with
+    // the wall; front face protrudes by lipDepth toward the room (+X).
+    const lipX = wallFaceX + lipDepth / 2;
+    // Top lip
+    {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(lipDepth, frameBorder, matteW + frameBorder * 2),
+        frameMat);
+      m.position.set(lipX, centerY + matteH / 2 + frameBorder / 2, centerZ);
+      m.castShadow = true; m.receiveShadow = true;
+      m._isRoom = true; addRoom(m);
+    }
+    // Bottom lip
+    {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(lipDepth, frameBorder, matteW + frameBorder * 2),
+        frameMat);
+      m.position.set(lipX, centerY - matteH / 2 - frameBorder / 2, centerZ);
+      m.castShadow = true; m.receiveShadow = true;
+      m._isRoom = true; addRoom(m);
+    }
+    // -Z lip
+    {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(lipDepth, matteH, frameBorder),
+        frameMat);
+      m.position.set(lipX, centerY, centerZ - matteW / 2 - frameBorder / 2);
+      m.castShadow = true; m.receiveShadow = true;
+      m._isRoom = true; addRoom(m);
+    }
+    // +Z lip
+    {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(lipDepth, matteH, frameBorder),
+        frameMat);
+      m.position.set(lipX, centerY, centerZ + matteW / 2 + frameBorder / 2);
+      m.castShadow = true; m.receiveShadow = true;
+      m._isRoom = true; addRoom(m);
+    }
+
+    // White matte — sits ~0.05" off the wall, fills the inside of the lip.
+    const matteMat = new THREE.MeshStandardMaterial({
+      color: 0xf5f1e8, roughness: 0.95, metalness: 0.0,
+    });
+    const matte = new THREE.Mesh(
+      new THREE.PlaneGeometry(matteW, matteH),
+      matteMat
+    );
+    matte.rotation.y = Math.PI / 2;   // face +X (room interior)
+    matte.position.set(wallFaceX + 0.05, centerY, centerZ);
+    matte.receiveShadow = true;
+    matte._isRoom = true;
+    addRoom(matte);
+
+    // Photo — smaller plane just in front of the matte; matte border
+    // shows around all four sides as a uniform white margin.
+    const photoMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, roughness: 0.85, metalness: 0.0,
+    });
+    const photo = new THREE.Mesh(
+      new THREE.PlaneGeometry(photoW, photoH),
+      photoMat
+    );
+    photo.rotation.y = Math.PI / 2;   // face +X (room interior)
+    photo.position.set(wallFaceX + 0.07, centerY, centerZ);
+    photo.receiveShadow = true;
+    photo._isRoom = true;
+    addRoom(photo);
+
+    new THREE.TextureLoader().load(
+      'img/avatar_painting.jpg',
+      (tex) => {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = Math.min(8, (state.renderer ? state.renderer.capabilities.getMaxAnisotropy() : 4));
+        photo.material.map = tex;
+        photo.material.needsUpdate = true;
+      },
+      undefined,
+      () => { /* fall back to blank photo if missing */ }
+    );
+
+    // Glass-like sheen — overlay the photo+matte with reflective highlights
+    // without refracting the image. Matches the Gyarados painting's sheen.
+    const sheenMat = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      roughness: 1.0,
+      metalness: 0.0,
+      transparent: true,
+      opacity: 0.06,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.05,
+      envMapIntensity: 1.6,
+    });
+    const sheen = new THREE.Mesh(
+      new THREE.PlaneGeometry(matteW, matteH),
+      sheenMat
+    );
+    sheen.rotation.y = Math.PI / 2;   // face +X (room interior)
+    sheen.position.set(wallFaceX + 0.09, centerY, centerZ);
+    sheen._isRoom = true;
+    addRoom(sheen);
+  }
 
   // Ceiling light fixture — flush-mount dome with warm SpotLight
   const ceilY = floorY + 79.5; // just below ceiling
@@ -4767,6 +5056,11 @@ export function createRoom(scene) {
     },
     isFoodVisible: () => _foodGroup && _foodGroup.length ? _foodGroup[0].visible : false,
     getFoodBowlMesh: () => _foodBowlMesh,
+    // Mini-split (clickable A/C unit on the TV wall)
+    setMiniSplitOn,
+    isMiniSplitOn,
+    updateMiniSplit,
+    resetMiniSplit,
     toggleDebugWallLabels: (show) => {
       const vis = typeof show === 'boolean' ? show : !_debugWallLabels[0]?.visible;
       for (const l of _debugWallLabels) l.visible = vis;

@@ -59,11 +59,16 @@ export const CAT_MODEL_PRESETS = {
 };
 
 // Canonical secret-coin IDs used by unlock/progress checks.
+//
+// `secret_pb3` is a placeholder left over from the retired ceiling-light
+// Power BI trio. It will be reassigned to a new interaction trigger
+// (alongside `secret_minisplit` and `secret_windowOpen`) in a future
+// session; until then it's intentionally unobtainable.
 export const SECRET_COIN_IDS = Object.freeze([
   'secret_binder',
   'secret_lamp',
-  'secret_pb1',
-  'secret_pb2',
+  'secret_minisplit',
+  'secret_windowOpen',
   'secret_pb3',
   'secret_window',
   'secret_drawer',
