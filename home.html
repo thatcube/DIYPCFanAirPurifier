@@ -133,6 +133,65 @@
       align-items: center;
       justify-content: center;
     }
+
+    /* Work-in-progress notice — full-bleed footer strip attached to
+       the bottom of the splash card. Negative margins cancel the
+       card's 44px / 36px padding so the strip touches the card edges,
+       and matching bottom border-radius lets it share the card's
+       rounded corners cleanly. The card itself doesn't set
+       overflow:hidden (its top sheen ::before would clip), so we
+       round the strip's own bottom corners to match. */
+    .wip-notice {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      /* Cancel card padding (44px 36px 36px) so the strip is full-bleed. */
+      margin: 12px -36px -36px;
+      padding: 12px 18px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #ffd9b8;
+      background: rgba(255, 217, 184, 0.06);
+      border-top: 1px solid rgba(255, 217, 184, 0.22);
+      border-radius: 0 0 32px 32px;
+    }
+
+    .wip-notice i {
+      font-size: 13px;
+      color: #ffb877;
+    }
+
+    .wip-notice__detail {
+      font-weight: 500;
+      color: rgba(255, 232, 210, 0.78);
+    }
+
+    /* Mobile mirror — main.css drops card padding to 32px 22px 26px
+       and corner radius to 26px below 540px; match both. */
+    @media (max-width: 540px) {
+      .wip-notice {
+        margin: 12px -22px -26px;
+        border-radius: 0 0 26px 26px;
+      }
+    }
+
+    /* Inline link in the splash tagline (e.g. the word "leaderboard").
+       Uses the cyan accent the about-page hero links use so internal
+       nav links read the same across surfaces. */
+    .title-splash-tagline a {
+      color: #9fe3ff;
+      text-decoration: underline;
+      text-decoration-color: rgba(159, 227, 255, 0.45);
+      text-underline-offset: 3px;
+      transition: color 160ms ease, text-decoration-color 160ms ease;
+    }
+
+    .title-splash-tagline a:hover,
+    .title-splash-tagline a:focus-visible {
+      color: #fff;
+      text-decoration-color: rgba(255, 255, 255, 0.7);
+    }
   </style>
 </head>
 
@@ -182,7 +241,7 @@
       </h1>
       <p class="title-splash-tagline">
         A first-person speedrun through a 3D replica of my room. Pick a cat (or a Totodile), find secret coins, try to
-        top the leaderboard.
+        top the <a href="/leaderboard" data-spa-link>leaderboard</a>.
       </p>
       <div class="title-splash-cta">
         <!-- Plain anchor — the SPA router intercepts site-tab clicks
@@ -194,6 +253,11 @@
             <span>Play</span>
           </span>
         </a>
+      </div>
+      <div class="wip-notice" role="status">
+        <i class="ph-fill ph-warning"></i>
+        <span>Work in progress</span>
+        <span class="wip-notice__detail">— expect some bugs, mostly works</span>
       </div>
     </div>
   </main>
@@ -441,6 +505,19 @@
             fullNav(a.href);
           }
           return;
+        }
+
+        // Inline content links opting into the SPA router (e.g. the
+        // "leaderboard" word in the splash tagline). Same iframe-
+        // preserving swap as tab clicks, just without the tab styling.
+        if (a.hasAttribute('data-spa-link')) {
+          const targetView = viewFor(url.pathname);
+          const currentView = viewFor(location.pathname);
+          if (targetView && targetView !== 'play' && currentView && currentView !== 'play') {
+            e.preventDefault();
+            swap(url.pathname + url.search + url.hash);
+            return;
+          }
         }
 
         // The big Play CTA: instead of navigating to /play (which
