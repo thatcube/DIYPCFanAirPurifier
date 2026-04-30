@@ -35,12 +35,19 @@
     }
 
     /* main.css locks html/body { overflow: hidden; height: 100% } for the 3D
-       game; override here so the share page scrolls when content overflows. */
+       game; override here so the share page scrolls when content overflows.
+       !important is required because Vite's production build moves the
+       <link rel="stylesheet" href="./src/styles/main.css"> to the END of
+       <head> (after this inline <style>), so without !important the
+       lock would win on source order during direct-load. (SPA nav
+       "fixes" it accidentally because the router re-appends inline
+       <style> blocks to the head when swapping <main>, putting them
+       last again — but only after the first navigation.) */
     html,
     body {
-      height: auto;
-      overflow-x: hidden;
-      overflow-y: auto;
+      height: auto !important;
+      overflow-x: hidden !important;
+      overflow-y: auto !important;
     }
 
     body {

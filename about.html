@@ -29,12 +29,15 @@
     }
 
     /* main.css locks html/body { overflow: hidden; height: 100% } for the 3D
-       game; override here so the about page scrolls when content overflows. */
+       game; override here so the about page scrolls when content overflows.
+       !important: see leaderboard.html for the same pattern — Vite moves
+       the bundled main.css <link> to the end of <head>, so without
+       !important the overflow lock wins source-order on direct load. */
     html,
     body {
-      height: auto;
-      overflow-x: hidden;
-      overflow-y: auto;
+      height: auto !important;
+      overflow-x: hidden !important;
+      overflow-y: auto !important;
     }
 
     body {
@@ -185,6 +188,7 @@
          the trail+word unit. */
       transform: translateX(clamp(20px, 3vw, 36px));
     }
+
     .hero__title::before,
     .hero__title::after,
     .hero__title-speed-line {
@@ -200,21 +204,25 @@
       filter: blur(0.6px);
       pointer-events: none;
     }
+
     .hero__title::before {
       width: 7%;
       top: 25%;
       left: -8%;
     }
+
     .hero__title::after {
       width: 5.5%;
       top: 75%;
       left: -7%;
     }
+
     .hero__title-speed-line {
       width: 5%;
       top: 48%;
       left: -5%;
     }
+
     .hero__title-main {
       position: relative;
       background: linear-gradient(180deg, #ffffff 0%, #f4faff 55%, #d8e8f5 100%);
@@ -499,7 +507,7 @@
         <span class="hero__title-main">Zoomies</span>
       </h1>
       <p class="hero__lede">
-        A first-person speedrun through a 3D replica of <b>my actual bedroom</b>, rendered live in your browser with
+        A speedrun through a 3D replica of <b>my bedroom</b>, rendered directly in your browser with
         <a href="https://threejs.org/" target="_blank" rel="noopener noreferrer">three.js</a>.
         Most of the room — walls, lamps, dresser, posters, the DIY purifier that started this whole thing —
         is built from primitives. A few guests are imported: the cats, a Totodile, a MacBook, a skateboard.
@@ -548,7 +556,8 @@
           <i class="ph-fill ph-cat"></i>
           <div>
             <b>Pick your runner</b>
-            <span>Four cats (including Cursed Korra — my real cat, but the model came out so jank she earned the name) and a Totodile.</span>
+            <span>Four cats (including Cursed Korra — my real cat, but the model came out so jank she earned the name)
+              and a Totodile.</span>
           </div>
         </li>
         <li>
