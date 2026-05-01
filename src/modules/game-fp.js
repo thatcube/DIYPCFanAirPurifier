@@ -1222,17 +1222,16 @@ const _IS_MAC = typeof navigator !== 'undefined' && /mac/i.test(navigator.platfo
 // FF/mac collision mode:
 // - lite: skip dynamic collision rebuilds and use static + purifier collision only.
 // - full: include all dynamic collision volumes (doors/drawers/window/desk/etc).
-let _ffMacCollisionMode = (_IS_FIREFOX && _IS_MAC) ? 'lite' : 'full';
+// Default everywhere to 'full' so dynamic props (bifold doors, drawers, window,
+// desk, etc.) block the player on Firefox/mac just like other browsers. The
+// 'lite' path remains available as an explicit opt-in via _setFfMacCollisionMode.
+let _ffMacCollisionMode = 'full';
 try {
   const savedCollisionMode = localStorage.getItem(FF_MAC_COLLISION_MODE_KEY);
   if (savedCollisionMode === 'full' || savedCollisionMode === 'lite') {
     _ffMacCollisionMode = savedCollisionMode;
   }
 } catch (e) { }
-if (_IS_FIREFOX && _IS_MAC) {
-  _ffMacCollisionMode = 'lite';
-  try { localStorage.setItem(FF_MAC_COLLISION_MODE_KEY, 'lite'); } catch (e) { }
-}
 // FF/mac pointer mode: direct = apply movementX/Y immediately,
 // reconstruct = pulse-to-velocity reconstruction in updatePhysics.
 // queue = accumulate pulses and drain smoothly per frame.
@@ -3286,7 +3285,10 @@ function _getBoxes(nowTs = 0) {
     for (let i = 0; i < _purifierBoxesCache.length; i++) result.push(_purifierBoxesCache[i]);
   }
 
-  if (_IS_FIREFOX && _IS_MAC && _ffMacCollisionMode === 'lite') {
+  if (_ffMacCollisionMode === 'lite') {
+    // Explicit opt-in lite mode: skip dynamic collision rebuilds (doors,
+    // drawers, window, desk, etc.) and use static + purifier collision only.
+    // Off by default — only enabled via _setFfMacCollisionMode('lite').
     _ffMacBoxesCache = result;
     _ffMacBoxesCacheTs = nowTs || ((typeof performance !== 'undefined' && performance.now)
       ? performance.now()
