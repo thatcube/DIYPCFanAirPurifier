@@ -174,9 +174,9 @@
        we're killing. We override the animation entirely on first
        load and use a CSS background-color transition (opaque dark →
        glass) as the entrance instead, kicked by JS once the iframe
-       scene reports ready. SPA-nav into /leaderboard still gets a
-       soft fade via <main>'s is-entering choreography. */
-    main.page>.board {
+       scene reports ready. For SPA-nav into /leaderboard, we keep the
+       shared content entrance animation so this page matches /about. */
+    main.page:not([data-spa="1"])>.board {
       animation: none !important;
       opacity: 1 !important;
       transform: none !important;
@@ -1381,13 +1381,35 @@
           return;
         }
 
+        // Inline content links opting into the SPA router (for
+        // example, home's in-copy leaderboard link). This keeps the
+        // shared bg iframe alive exactly like tab clicks do.
+        if (a.hasAttribute('data-spa-link')) {
+          const targetView = viewFor(url.pathname);
+          const currentView = viewFor(location.pathname);
+          if (targetView && targetView !== 'play' && currentView && currentView !== 'play') {
+            e.preventDefault();
+            swap(url.pathname + url.search + url.hash);
+            return;
+          }
+        }
+
         // The big Play CTA — promote the existing bg iframe in place
         // instead of doing a top-level navigation. Same path home uses:
         // skips the three.js scene rebuild that fullNav('/play') would
         // cause, so the room flows seamlessly into the picker.
         if (a.hasAttribute('data-play-cta')) {
           e.preventDefault();
-          promoteToPlay(a.href);
+          const isFfMac = /firefox/i.test(navigator.userAgent || '')
+            && /mac/i.test(navigator.platform || navigator.userAgent || '');
+          // Firefox/mac can run promoted iframe gameplay at 60Hz on
+          // high-refresh displays. Prefer a full /play navigation there
+          // so the game runs as the top-level document.
+          if (isFfMac) {
+            fullNav(a.href, { slow: true });
+          } else {
+            promoteToPlay(a.href);
+          }
         }
       });
 

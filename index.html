@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DIY Air Purifier – 3D Model</title>
+  <title>Zoomies – 3D Game</title>
   <link rel="icon"
     href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%8C%AC%EF%B8%8F%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2860,7 +2860,7 @@
       <div class="guide-scroll" onclick="toggleGuide()">
         <div class="guide-panel" onclick="event.stopPropagation()">
           <button class="guide-close" onclick="toggleGuide()"><i class="ph ph-x"></i></button>
-          <h1>DIY Air Purifier</h1>
+          <h1>Zoomies</h1>
           <p class="guide-subtitle">Build plan &amp; instructions</p>
 
           <h2><i class="ph ph-ruler"></i>Box Dimensions</h2>
@@ -8123,22 +8123,24 @@
 
       // Clear color + fog
       const clearCol = lerpHex(NIGHT_CLEAR, DAY_CLEAR, sun);
+      const fogEnabled = window.__legacyFogEnabled !== false;
       renderer.setClearColor(clearCol.clone(), 1);
       scene.fog.color.copy(clearCol);
-      scene.fog.density = mix(0.003, 0.0015, sun);
+      scene.fog.density = fogEnabled ? mix(0.003, 0.0015, sun) : 0;
       renderer.toneMappingExposure = mix(1.02, 1.34, sun);
 
       // Window sun beam + broad daylight fill
+      const windowSunEnabled = window.__legacyWindowSunEnabled !== false;
       const keyColor = warm > 0.1 ? lerpHex(0xffe0a0, GOLDEN_KEY, warm) : lerpHex(0x6688cc, 0xffe0a0, sun);
       key.color.copy(keyColor);
       windowSun.color.copy(keyColor);
       const baseKeyIntensity = mix(0.14, 0.95, sun) + warm * 0.1;
       // key = fixed shadow-caster, always aimed straight through window center (no sweep)
-      key.intensity = beam > 0 ? Math.max(0.18, baseKeyIntensity * 0.5) * beam : 0;
+      key.intensity = (windowSunEnabled && beam > 0) ? Math.max(0.18, baseKeyIntensity * 0.5) * beam : 0;
       // windowSun = sweeping non-shadow light for the moving sun effect
-      windowSun.visible = beam > 0;
+      windowSun.visible = windowSunEnabled && beam > 0;
       windowSun.castShadow = false;
-      windowSun.intensity = beam > 0 ? Math.max(0.15, baseKeyIntensity * 0.5) * beam : 0;
+      windowSun.intensity = (windowSunEnabled && beam > 0) ? Math.max(0.15, baseKeyIntensity * 0.5) * beam : 0;
 
       // Keep source constrained to aperture, but allow a wide in-room sweep direction.
       const beamSrcY = Math.max(winBottom + 4, Math.min(winTop - 4, mix(winTop + 11, winTop + 1, dayTravel)));
@@ -10380,7 +10382,9 @@
       const animFrameScale = animDtSec * 60;
 
       // Play Mode collectibles — spin, bob, and check for pickup.
-      _updateCoins(ts, animFrameScale);
+      if (_perfCoinsEnabled) {
+        _updateCoins(ts, animFrameScale);
+      }
 
       // Rainbow RGB cycling — smooth gradient flowing across all fans. The
       // hue drift is slow (~0.06 rev/sec) so we don't need 60 Hz updates;
@@ -10620,16 +10624,35 @@
         _fpLastPhysicsTs = ts;
         const _fpFrameScale = _fpDtMs / (1000 / 60);
 
-        // Apply queued pointer-lock look deltas in fixed-size chunks to prevent jumpy turns on slower browsers.
-        const maxLookStep = 28;
-        const stepX = Math.max(-maxLookStep, Math.min(maxLookStep, _fpLookDX));
-        const stepY = Math.max(-maxLookStep, Math.min(maxLookStep, _fpLookDY));
-        _fpLookDX -= stepX;
-        _fpLookDY -= stepY;
-        if (Math.abs(_fpLookDX) > maxLookStep * 4) _fpLookDX *= 0.6;
-        if (Math.abs(_fpLookDY) > maxLookStep * 4) _fpLookDY *= 0.6;
+        // Legacy route FF/mac pipeline: drain event bursts smoothly instead of
+        // hard step-clamps, then optionally smooth only the rendered view.
+        let stepX = 0;
+        let stepY = 0;
+        const _ffMacQueueActive = _fpIsFirefox && _fpIsMac && document.pointerLockElement && _ffMacPointerMode === 'queue';
+        if (_ffMacQueueActive) {
+          const qAlpha = 1 - Math.exp(-_fpDtMs / _ffMacQueueTauMs);
+          stepX = _ffMacQueueDX * qAlpha;
+          stepY = _ffMacQueueDY * qAlpha;
+          _ffMacQueueDX -= stepX;
+          _ffMacQueueDY -= stepY;
+        } else {
+          stepX = _fpLookDX;
+          stepY = _fpLookDY;
+        }
+        _fpLookDX = 0;
+        _fpLookDY = 0;
         _fpYaw -= stepX * 0.002;
         _fpPitch = Math.max(_fpPitchMin, Math.min(_fpPitchMax, _fpPitch - stepY * 0.002));
+        const _ffMacViewSmoothActive = _fpIsFirefox && _fpIsMac && document.pointerLockElement && _ffMacViewMode === 'decoupled';
+        if (_ffMacViewSmoothActive) {
+          const viewAlpha = 1 - Math.exp(-_fpDtMs / _ffMacViewTauMs);
+          _fpRenderYaw += _shortAngleDelta(_fpYaw, _fpRenderYaw) * viewAlpha;
+          _fpRenderPitch += (_fpPitch - _fpRenderPitch) * viewAlpha;
+          _fpRenderPitch = Math.max(_fpPitchMin, Math.min(_fpPitchMax, _fpRenderPitch));
+        } else {
+          _fpRenderYaw = _fpYaw;
+          _fpRenderPitch = _fpPitch;
+        }
 
         const spd = _fpKeys.shift ? 0.45 : 0.22;
         const fwd = _fpFwd.set(-Math.sin(_fpYaw), 0, -Math.cos(_fpYaw));
@@ -10785,11 +10808,13 @@
         // looking at the cat below/in front. The cat is parented at _fpPos so
         // it can't visually separate from where collision says you are.
         const lookDir = _fpViewDir.set(
-          -Math.sin(_fpYaw) * Math.cos(_fpPitch),
-          Math.sin(_fpPitch),
-          -Math.cos(_fpYaw) * Math.cos(_fpPitch)
+          -Math.sin(_fpRenderYaw) * Math.cos(_fpRenderPitch),
+          Math.sin(_fpRenderPitch),
+          -Math.cos(_fpRenderYaw) * Math.cos(_fpRenderPitch)
         );
-        _stepCatMixer(ts, horizSpd);
+        if (_perfCatAnimEnabled) {
+          _stepCatMixer(ts, horizSpd);
+        }
         // ── Proximity-based MacBook music volume ──
         // Fade music based on distance to the laptop so it sounds like it's
         // actually coming from the MacBook speaker, not a global jukebox.
@@ -10902,32 +10927,42 @@
           catGroup.rotation.z = 0;
         }
         // Crosshair interaction check — raycast from center of screen (throttled for smoother play mode).
-        if (ts >= _fpNextRaycastTs) {
-          _fpNextRaycastTs = ts + _fpRaycastIntervalMs;
-          _fpRay.setFromCamera(_fpRayCenter, camera);
-          const _fpHits = _fpRay.intersectObjects(scene.children, true);
-          _fpHoverTarget = null;
-          for (const h of _fpHits) {
-            if (h.distance > _fpInteractRange) break; // interaction range
-            if (!isAncestorVisible(h.object)) continue;
-            // Skip the player's own body (only visible in 3rd-person cat cam)
-            // so the cat doesn't block its own interaction ray.
-            let _self = false;
-            for (let p = h.object; p; p = p.parent) { if (p === catGroup) { _self = true; break; } }
-            if (_self) continue;
-            const target = getInteractiveTarget(h.object);
-            if (target) { _fpHoverTarget = target; break; }
-            // Non-interactive visible solid in the line of sight: stop here
-            // so you can't click interactables through walls, doors, etc.
-            break;
+        if (_perfRaycastEnabled) {
+          if (ts >= _fpNextRaycastTs) {
+            _fpNextRaycastTs = ts + _fpRaycastIntervalMs;
+            _fpRay.setFromCamera(_fpRayCenter, camera);
+            const _fpHits = _fpRay.intersectObjects(scene.children, true);
+            _fpHoverTarget = null;
+            for (const h of _fpHits) {
+              if (h.distance > _fpInteractRange) break; // interaction range
+              if (!isAncestorVisible(h.object)) continue;
+              // Skip the player's own body (only visible in 3rd-person cat cam)
+              // so the cat doesn't block its own interaction ray.
+              let _self = false;
+              for (let p = h.object; p; p = p.parent) { if (p === catGroup) { _self = true; break; } }
+              if (_self) continue;
+              const target = getInteractiveTarget(h.object);
+              if (target) { _fpHoverTarget = target; break; }
+              // Non-interactive visible solid in the line of sight: stop here
+              // so you can't click interactables through walls, doors, etc.
+              break;
+            }
           }
+        } else {
+          _fpHoverTarget = null;
         }
-        const _fpTarget = _fpHoverTarget;
+        const _fpTarget = _perfRaycastEnabled ? _fpHoverTarget : null;
         // Update crosshair style
         const ch = document.getElementById('fpCrosshair');
         if (ch) {
           ch.style.borderColor = _fpTarget ? '#44ff44' : 'rgba(255,255,255,0.6)';
           ch.style.transform = _fpTarget ? 'translate(-50%,-50%) scale(2.0)' : 'translate(-50%,-50%) scale(1)';
+        }
+        const _diag = document.getElementById('fpInputDiag');
+        if (_diag) {
+          const lockState = document.pointerLockElement ? 'lock' : 'free';
+          const qMag = Math.hypot(_ffMacQueueDX, _ffMacQueueDY).toFixed(1);
+          _diag.textContent = `input:${lockState} ptr=${_ffMacPointerMode} view=${_ffMacViewMode} q=${qMag} tauQ=${Math.round(_ffMacQueueTauMs)} tauV=${Math.round(_ffMacViewTauMs)}`;
         }
         // Store for click handler
         window._fpLookTarget = _fpTarget;
@@ -11032,6 +11067,7 @@
     const _fpFloorY = -(H / 2 + ply + bunFootH) + 4; // 4" tall mini dude standing on floor (eye height ~4")
     let _fpPos = new THREE.Vector3(0, _fpFloorY, 30); // starting position
     let _fpYaw = 0, _fpPitch = 0, _fpVy = 0;
+    let _fpRenderYaw = 0, _fpRenderPitch = 0;
     let _lastCatFacingYaw = Math.PI; // initial: face toward -Z (same as spawn heading)
     // Horizontal velocity smoothing for a natural walk feel (accel/decel instead
     // of instant start/stop). _fpBobPhase drives a subtle headbob while moving
@@ -11048,6 +11084,72 @@
     const _fpRayCenter = new THREE.Vector2(0, 0);
     const _fpKeys = { w: false, a: false, s: false, d: false, space: false, shift: false };
     let _fpLookDX = 0, _fpLookDY = 0;
+    const _fpIsFirefox = /firefox/i.test((navigator.userAgent || ''));
+    const _fpIsMac = /mac/i.test((navigator.platform || navigator.userAgent || ''));
+    let _ffMacPointerMode = 'direct'; // direct | queue
+    let _ffMacQueueTauMs = 24;
+    let _ffMacQueueDX = 0, _ffMacQueueDY = 0;
+    let _ffMacViewMode = 'raw'; // raw | decoupled
+    let _ffMacViewTauMs = 30;
+
+    function _shortAngleDelta(target, current) {
+      const tau = Math.PI * 2;
+      let d = (target - current + Math.PI) % tau;
+      if (d < 0) d += tau;
+      return d - Math.PI;
+    }
+
+    function _resetLegacyFfMacLookState() {
+      _fpLookDX = 0; _fpLookDY = 0;
+      _ffMacQueueDX = 0; _ffMacQueueDY = 0;
+      _fpRenderYaw = _fpYaw;
+      _fpRenderPitch = _fpPitch;
+    }
+
+    function _setLegacyFfMacPointerMode(mode) {
+      const m = String(mode || '').toLowerCase();
+      _ffMacPointerMode = (m === 'direct' || m === 'raw') ? 'direct' : 'queue';
+      _resetLegacyFfMacLookState();
+      return _ffMacPointerMode;
+    }
+
+    function _setLegacyFfMacViewMode(mode) {
+      const m = String(mode || '').toLowerCase();
+      _ffMacViewMode = (m === 'raw' || m === 'off') ? 'raw' : 'decoupled';
+      _resetLegacyFfMacLookState();
+      return _ffMacViewMode;
+    }
+
+    function _setLegacyFfMacViewTau(ms) {
+      const n = Number(ms);
+      if (!Number.isFinite(n)) return _ffMacViewTauMs;
+      _ffMacViewTauMs = Math.max(6, Math.min(45, n));
+      return _ffMacViewTauMs;
+    }
+
+    function _setLegacyFfMacQueueTau(ms) {
+      const n = Number(ms);
+      if (!Number.isFinite(n)) return _ffMacQueueTauMs;
+      _ffMacQueueTauMs = Math.max(6, Math.min(45, n));
+      return _ffMacQueueTauMs;
+    }
+
+    // Legacy-route parity with vite /play debug helpers.
+    window._setFfMacPointerMode = _setLegacyFfMacPointerMode;
+    window._getFfMacPointerMode = () => _ffMacPointerMode;
+    window._setFfMacViewMode = _setLegacyFfMacViewMode;
+    window._getFfMacViewMode = () => _ffMacViewMode;
+    window._setFfMacAimMode = _setLegacyFfMacViewMode;
+    window._getFfMacAimMode = () => _ffMacViewMode;
+    window._setFfMacViewTau = _setLegacyFfMacViewTau;
+    window._getFfMacViewTau = () => _ffMacViewTauMs;
+    window._setFfMacAimTau = _setLegacyFfMacViewTau;
+    window._getFfMacAimTau = () => _ffMacViewTauMs;
+    window._setFfMacQueueTau = _setLegacyFfMacQueueTau;
+    window._getFfMacQueueTau = () => _ffMacQueueTauMs;
+    window._setThirdCamSolver = () => 'legacy';
+    window._getThirdCamSolver = () => 'legacy';
+
     let _fpHoverTarget = null;
     let _fpNextRaycastTs = 0;
     const _fpRaycastIntervalMs = 32;
@@ -11460,6 +11562,7 @@
     <span id="runTimerText" style="display:inline-block;min-width:84px;font-variant-numeric:tabular-nums;font-family:'SF Mono',Menlo,Consolas,monospace">00:00.000</span>
     <span id="runTimerState" style="margin-left:8px;font-size:10px;opacity:0.66">READY</span>
     <div id="fpsMini" style="margin-top:3px;font-size:9px;letter-spacing:0.6px;opacity:0.42;font-family:'SF Mono',Menlo,Consolas,monospace;font-weight:600;color:#dbe6f2">— fps</div>
+    <div id="fpInputDiag" style="position:relative;top:40px;margin-top:2px;line-height:1.3;font-size:9px;letter-spacing:0.4px;opacity:0.58;font-family:'SF Mono',Menlo,Consolas,monospace;font-weight:600;color:#9fe3ff">input: pending</div>
   </div>
   <div id="fpLeaderboard" style="position:fixed;top:16px;right:16px;min-width:290px;max-width:340px;
     background:linear-gradient(180deg,rgba(12,18,27,0.92),rgba(7,10,15,0.9));color:#e8eef7;
@@ -11611,6 +11714,13 @@
     <div id="fpPauseToggles">
       <label class="fpPauseToggle"><input type="checkbox" id="fpPauseMute"><span>Mute SFX (M)</span></label>
       <label class="fpPauseToggle"><input type="checkbox" id="fpPauseMuteMusic"><span>Mute Music (,)</span></label>
+      <label class="fpPauseToggle"><input type="checkbox" id="fpPausePerfWindowSun"><span>Perf test: Outside sunlight</span></label>
+      <label class="fpPauseToggle"><input type="checkbox" id="fpPausePerfShadows"><span>Perf test: Shadows</span></label>
+      <label class="fpPauseToggle"><input type="checkbox" id="fpPausePerfFog"><span>Perf test: Fog</span></label>
+      <label class="fpPauseToggle"><input type="checkbox" id="fpPausePerfAdaptive"><span>Perf test: Adaptive quality</span></label>
+      <label class="fpPauseToggle"><input type="checkbox" id="fpPausePerfCatAnim"><span>Perf test: Cat animation</span></label>
+      <label class="fpPauseToggle"><input type="checkbox" id="fpPausePerfCoins"><span>Perf test: Coin simulation</span></label>
+      <label class="fpPauseToggle"><input type="checkbox" id="fpPausePerfRaycast"><span>Perf test: Interaction raycast</span></label>
       <button type="button" class="fpPauseBtn" id="fpPauseReset" style="padding:6px 12px;font-size:12px;border-radius:999px">Reset run</button>
       <button type="button" class="fpPauseBtn" id="fpPauseRename" style="padding:6px 12px;font-size:12px;border-radius:999px">Rename</button>
     </div>
@@ -11994,10 +12104,55 @@
     let _fpPaused = false;
     const _LB_MUTE_KEY = 'diy_air_purifier_muted_v1';
     const _MUSIC_MUTE_KEY = 'diy_air_purifier_music_muted_v1';
+    const _PERF_WINDOW_SUN_KEY = 'diy_air_purifier_perf_window_sun_legacy_v1';
+    const _PERF_SHADOWS_KEY = 'diy_air_purifier_perf_shadows_legacy_v1';
+    const _PERF_FOG_KEY = 'diy_air_purifier_perf_fog_legacy_v1';
+    const _PERF_ADAPTIVE_KEY = 'diy_air_purifier_perf_adaptive_legacy_v1';
+    const _PERF_CAT_ANIM_KEY = 'diy_air_purifier_perf_cat_anim_legacy_v1';
+    const _PERF_COINS_KEY = 'diy_air_purifier_perf_coins_legacy_v1';
+    const _PERF_RAYCAST_KEY = 'diy_air_purifier_perf_raycast_legacy_v1';
     let _sfxMuted = false;
     let _musicMuted = false;
+    let _perfWindowSunEnabled = true;
+    let _perfShadowsEnabled = true;
+    let _perfFogEnabled = true;
+    let _adaptiveQualityEnabled = true;
+    let _perfCatAnimEnabled = true;
+    let _perfCoinsEnabled = true;
+    let _perfRaycastEnabled = true;
     try { _sfxMuted = localStorage.getItem(_LB_MUTE_KEY) === '1'; } catch (e) { }
     try { _musicMuted = localStorage.getItem(_MUSIC_MUTE_KEY) === '1'; } catch (e) { }
+    try { _perfWindowSunEnabled = localStorage.getItem(_PERF_WINDOW_SUN_KEY) !== '0'; } catch (e) { }
+    try { _perfShadowsEnabled = localStorage.getItem(_PERF_SHADOWS_KEY) !== '0'; } catch (e) { }
+    try { _perfFogEnabled = localStorage.getItem(_PERF_FOG_KEY) !== '0'; } catch (e) { }
+    try { _adaptiveQualityEnabled = localStorage.getItem(_PERF_ADAPTIVE_KEY) !== '0'; } catch (e) { }
+    try { _perfCatAnimEnabled = localStorage.getItem(_PERF_CAT_ANIM_KEY) !== '0'; } catch (e) { }
+    try { _perfCoinsEnabled = localStorage.getItem(_PERF_COINS_KEY) !== '0'; } catch (e) { }
+    try { _perfRaycastEnabled = localStorage.getItem(_PERF_RAYCAST_KEY) !== '0'; } catch (e) { }
+    // Read by applyTimeOfDay() so perf toggles survive TOD re-application.
+    window.__legacyWindowSunEnabled = _perfWindowSunEnabled;
+    window.__legacyFogEnabled = _perfFogEnabled;
+
+    function _applyPerfToggles(refreshTod) {
+      window.__legacyWindowSunEnabled = _perfWindowSunEnabled;
+      window.__legacyFogEnabled = _perfFogEnabled;
+
+      renderer.shadowMap.enabled = _perfShadowsEnabled;
+      if (typeof key !== 'undefined' && key) key.castShadow = _perfShadowsEnabled;
+      if (_perfShadowsEnabled) _markShadowsDirty();
+
+      if (refreshTod) {
+        const tod = parseInt(document.getElementById('todSlider')?.value || '870', 10);
+        applyTimeOfDay(Number.isFinite(tod) ? tod : 870);
+      } else if (!_perfFogEnabled && scene.fog) {
+        scene.fog.density = 0;
+      }
+
+      if (!_perfWindowSunEnabled) {
+        if (typeof key !== 'undefined' && key) key.intensity = 0;
+        if (typeof windowSun !== 'undefined' && windowSun) windowSun.intensity = 0;
+      }
+    }
     function _applyAudioMute() {
       // SFX: suspend/resume AudioContext for coin chime + bonk sounds.
       // Music uses a separate mute path so they're independent.
@@ -12048,7 +12203,7 @@
         // and hide the crosshair (can't interact while paused).
         _fpKeys.w = false; _fpKeys.a = false; _fpKeys.s = false; _fpKeys.d = false;
         _fpKeys.space = false; _fpKeys.shift = false;
-        _fpLookDX = 0; _fpLookDY = 0;
+        _resetLegacyFfMacLookState();
         // Reset physics dt so the resume frame doesn't apply a giant velocity
         // step from accumulated wall-clock time.
         _fpLastPhysicsTs = 0;
@@ -12061,6 +12216,20 @@
         if (cb) cb.checked = _sfxMuted;
         const cbm = document.getElementById('fpPauseMuteMusic');
         if (cbm) cbm.checked = _musicMuted;
+        const perfSun = document.getElementById('fpPausePerfWindowSun');
+        if (perfSun) perfSun.checked = _perfWindowSunEnabled;
+        const perfSh = document.getElementById('fpPausePerfShadows');
+        if (perfSh) perfSh.checked = _perfShadowsEnabled;
+        const perfFog = document.getElementById('fpPausePerfFog');
+        if (perfFog) perfFog.checked = _perfFogEnabled;
+        const perfAdaptive = document.getElementById('fpPausePerfAdaptive');
+        if (perfAdaptive) perfAdaptive.checked = _adaptiveQualityEnabled;
+        const perfCatAnim = document.getElementById('fpPausePerfCatAnim');
+        if (perfCatAnim) perfCatAnim.checked = _perfCatAnimEnabled;
+        const perfCoins = document.getElementById('fpPausePerfCoins');
+        if (perfCoins) perfCoins.checked = _perfCoinsEnabled;
+        const perfRaycast = document.getElementById('fpPausePerfRaycast');
+        if (perfRaycast) perfRaycast.checked = _perfRaycastEnabled;
       } else {
         const ch = document.getElementById('fpCrosshair');
         if (ch) ch.style.opacity = '';
@@ -12426,7 +12595,7 @@
       _fpKeys.w = false; _fpKeys.a = false; _fpKeys.s = false; _fpKeys.d = false;
       _fpKeys.space = false; _fpKeys.shift = false;
       _camKeys.w = false; _camKeys.a = false; _camKeys.s = false; _camKeys.d = false;
-      _fpLookDX = 0; _fpLookDY = 0;
+      _resetLegacyFfMacLookState();
     }
     function _closeNameDialog() {
       if (!_nameDialogOpen) return;
@@ -12972,6 +13141,10 @@
       _fpBobPhase = 0;
       _fpLookDX = 0;
       _fpLookDY = 0;
+      _ffMacQueueDX = 0;
+      _ffMacQueueDY = 0;
+      _fpRenderYaw = _fpYaw;
+      _fpRenderPitch = _fpPitch;
       _fpHoverTarget = null;
       _fpNextRaycastTs = 0;
       _clearPlayInputState();
@@ -13072,7 +13245,7 @@
           outdoor.visible = outdoor._fpSavedVisible !== undefined ? outdoor._fpSavedVisible : true;
         }
         _fpKeys.w = false; _fpKeys.a = false; _fpKeys.s = false; _fpKeys.d = false; _fpKeys.space = false; _fpKeys.shift = false;
-        _fpLookDX = 0; _fpLookDY = 0;
+        _resetLegacyFfMacLookState();
         _fpHoverTarget = null;
         _fpNextRaycastTs = 0;
         _camKeys.w = false; _camKeys.a = false; _camKeys.s = false; _camKeys.d = false;
@@ -13098,9 +13271,18 @@
       if (!_fpMode || !document.pointerLockElement) return;
       const rawX = e.movementX || e.mozMovementX || 0;
       const rawY = e.movementY || e.mozMovementY || 0;
-      const maxEventDelta = 120;
-      _fpLookDX += Math.max(-maxEventDelta, Math.min(maxEventDelta, rawX));
-      _fpLookDY += Math.max(-maxEventDelta, Math.min(maxEventDelta, rawY));
+      const useQueue = _fpIsFirefox && _fpIsMac && _ffMacPointerMode === 'queue';
+      if (useQueue) {
+        const maxEventDelta = 64;
+        const cappedX = Math.max(-maxEventDelta, Math.min(maxEventDelta, rawX));
+        const cappedY = Math.max(-maxEventDelta, Math.min(maxEventDelta, rawY));
+        _ffMacQueueDX = Math.max(-260, Math.min(260, _ffMacQueueDX + cappedX));
+        _ffMacQueueDY = Math.max(-260, Math.min(260, _ffMacQueueDY + cappedY));
+      } else {
+        const maxEventDelta = 120;
+        _fpLookDX += Math.max(-maxEventDelta, Math.min(maxEventDelta, rawX));
+        _fpLookDY += Math.max(-maxEventDelta, Math.min(maxEventDelta, rawY));
+      }
     });
     // WASD keys for first-person (captured in keydown/keyup)
     document.addEventListener('keydown', e => {
@@ -13247,6 +13429,49 @@
     });
     document.getElementById('fpPauseMute').addEventListener('change', e => _setSfxMuted(!!e.target.checked));
     document.getElementById('fpPauseMuteMusic').addEventListener('change', e => _setMusicMuted(!!e.target.checked));
+    document.getElementById('fpPausePerfWindowSun').addEventListener('change', e => {
+      _perfWindowSunEnabled = !!e.target.checked;
+      try { localStorage.setItem(_PERF_WINDOW_SUN_KEY, _perfWindowSunEnabled ? '1' : '0'); } catch (err) { }
+      _applyPerfToggles(true);
+    });
+    document.getElementById('fpPausePerfShadows').addEventListener('change', e => {
+      _perfShadowsEnabled = !!e.target.checked;
+      try { localStorage.setItem(_PERF_SHADOWS_KEY, _perfShadowsEnabled ? '1' : '0'); } catch (err) { }
+      _applyPerfToggles(false);
+    });
+    document.getElementById('fpPausePerfFog').addEventListener('change', e => {
+      _perfFogEnabled = !!e.target.checked;
+      try { localStorage.setItem(_PERF_FOG_KEY, _perfFogEnabled ? '1' : '0'); } catch (err) { }
+      _applyPerfToggles(true);
+    });
+    document.getElementById('fpPausePerfAdaptive').addEventListener('change', e => {
+      _adaptiveQualityEnabled = !!e.target.checked;
+      try { localStorage.setItem(_PERF_ADAPTIVE_KEY, _adaptiveQualityEnabled ? '1' : '0'); } catch (err) { }
+      if (_adaptiveQualityEnabled) {
+        qualitySettled = false;
+        qualitySamples = 0;
+        qualitySum = 0;
+        qualityWindowStart = performance.now();
+      } else {
+        qualitySettled = true;
+      }
+    });
+    document.getElementById('fpPausePerfCatAnim').addEventListener('change', e => {
+      _perfCatAnimEnabled = !!e.target.checked;
+      try { localStorage.setItem(_PERF_CAT_ANIM_KEY, _perfCatAnimEnabled ? '1' : '0'); } catch (err) { }
+    });
+    document.getElementById('fpPausePerfCoins').addEventListener('change', e => {
+      _perfCoinsEnabled = !!e.target.checked;
+      try { localStorage.setItem(_PERF_COINS_KEY, _perfCoinsEnabled ? '1' : '0'); } catch (err) { }
+    });
+    document.getElementById('fpPausePerfRaycast').addEventListener('change', e => {
+      _perfRaycastEnabled = !!e.target.checked;
+      try { localStorage.setItem(_PERF_RAYCAST_KEY, _perfRaycastEnabled ? '1' : '0'); } catch (err) { }
+      if (!_perfRaycastEnabled) {
+        _fpHoverTarget = null;
+        window._fpLookTarget = null;
+      }
+    });
     document.getElementById('fpPauseReset').addEventListener('click', () => {
       _setFpPaused(false);
       _resetFpRun();
@@ -13257,6 +13482,7 @@
     });
     // Sync initial mute state on load.
     _applyAudioMute();
+    _applyPerfToggles(true);
 
     // ─── Adaptive quality ───
     // Monitors FPS over several seconds and downgrades rendering if needed.
@@ -13278,6 +13504,7 @@
     }
     function checkPerformance(fps, isActive) {
       if (!isActive) return;
+      if (!_adaptiveQualityEnabled) return;
       if (qualitySettled) return;
       qualitySum += fps; qualitySamples++;
       const elapsed = performance.now() - qualityWindowStart;

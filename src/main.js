@@ -148,7 +148,7 @@ function markShadowsDirty() {
 
 // ── Initialize ──────────────────────────────────────────────────────
 
-console.log('[main] DIY Air Purifier — modular build');
+console.log('[main] Zoomies — modular build');
 
 // Renderer (must exist before createScene so PMREM env map can be built)
 const canvas = document.getElementById('c');
@@ -161,8 +161,7 @@ const { scene, camera } = createScene();
 const _fpPerfState = {
   applied: false,
   prePixelRatio: renderer.getPixelRatio(),
-  preShadowEnabled: renderer.shadowMap.enabled,
-  preKeyCastShadow: false
+  appliedScale: null
 };
 
 function _getQualityDprCap() {
@@ -170,31 +169,34 @@ function _getQualityDprCap() {
   return tiers[state.qualityTier] || tiers[0] || 1;
 }
 
+function _isFfMacPlatform() {
+  return typeof navigator !== 'undefined'
+    && /firefox/i.test(navigator.userAgent || '')
+    && /mac/i.test(navigator.platform || navigator.userAgent || '');
+}
+
 function _applyFpPerformanceProfile(fpActive) {
-  if (fpActive === _fpPerfState.applied) return;
-  _fpPerfState.applied = fpActive;
+  const applyProfile = !!(fpActive && _fpPerfResolutionEnabled);
+  const profileScale = _clampFpResolutionScale(_fpPerfResolutionScale);
+  const scaleChanged = _fpPerfState.appliedScale == null
+    || Math.abs(_fpPerfState.appliedScale - profileScale) > 0.0001;
+  if (applyProfile === _fpPerfState.applied && (!applyProfile || !scaleChanged)) return;
+  _fpPerfState.applied = applyProfile;
 
-  if (fpActive) {
-    _fpPerfState.prePixelRatio = renderer.getPixelRatio();
-    _fpPerfState.preShadowEnabled = renderer.shadowMap.enabled;
-    _fpPerfState.preKeyCastShadow = !!lighting.key?.castShadow;
-
-    // Aggressive play-mode profile for very high FPS targets.
-    const fpDprCap = state.isMobile ? 0.42 : 0.5;
+  if (applyProfile) {
+    if (!_fpPerfState.appliedScale) {
+      _fpPerfState.prePixelRatio = renderer.getPixelRatio();
+    }
+    const fpDprCap = state.isMobile ? Math.min(0.75, profileScale) : profileScale;
     renderer.setPixelRatio(Math.min(_fpPerfState.prePixelRatio, fpDprCap));
-    // Shadows stay enabled. Shadow throttle is DISABLED in FP mode
-    // (see animate loop) — throttling at 8 Hz while rendering at 200+
-    // FPS causes visible shadow jitter on moving casters. Updating
-    // every frame is the only way to avoid the stepping artifact.
+    _fpPerfState.appliedScale = profileScale;
     markShadowsDirty();
     onResize();
     return;
   }
 
+  _fpPerfState.appliedScale = null;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, _getQualityDprCap()));
-  renderer.shadowMap.enabled = _fpPerfState.preShadowEnabled;
-  if (lighting.key) lighting.key.castShadow = _fpPerfState.preKeyCastShadow;
-  markShadowsDirty();
   onResize();
 }
 
@@ -748,9 +750,46 @@ function _refreshBababooeyCardLockState() {
 let _previewsInited = false;
 let _charSelectFocusTrap = null;
 let _charSelectSavedFocus = null;
+
+// One-shot V8/GPU warm-up for the FP run loop. Called from
+// _openCharSelect — by the time the player clicks Start, the JIT has
+// already compiled the cat skinning + per-frame ability update paths
+// once, so first-frame cost in FP is closer to steady-state cost.
+// Each piece is a no-op when nothing is active, so it's safe to run
+// against the live scene during the picker.
+let _fpRunPrewarmed = false;
+function _prewarmFpRun() {
+  if (_fpRunPrewarmed) return;
+  _fpRunPrewarmed = true;
+  // Tip the work into idle time so it never fights the picker's
+  // entrance animation.
+  const run = () => {
+    // Safety: if the player clicked Start before the idle callback
+    // fired, FP is already running. Skip — touching catMixer.update
+    // or renderer.compile mid-frame causes a visible mouse-look stall
+    // (compile can take 50-300ms while it links shader programs).
+    if (gameFp.fpMode) return;
+    try { catAnimation.catMixer?.update(0); } catch (e) { /* ignore */ }
+    try { fireball.update(0); } catch (e) { /* ignore */ }
+    try { kamehameha.update(0); } catch (e) { /* ignore */ }
+    // Fold in any materials that arrived after the boot-time compile
+    // (late cat load, Super Saiyan halo, etc.). Idempotent if nothing
+    // new is present.
+    try { renderer.compile(scene, camera); } catch (e) { /* ignore */ }
+  };
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(run, { timeout: 1500 });
+  } else {
+    setTimeout(run, 200);
+  }
+}
+
 window._openCharSelect = () => {
   // Release pointer lock if held
   if (document.pointerLockElement) document.exitPointerLock();
+  // Warm up the FP run loop while the player is choosing — by the
+  // time they hit Start, the JIT and GPU shader caches are ready.
+  _prewarmFpRun();
   // Hide the splash if it's open — the picker takes over from here.
   const sp = document.getElementById('titleSplash');
   if (sp) sp.classList.remove('open');
@@ -1427,6 +1466,337 @@ window._toggleFps = () => {
 };
 _applyFpsVisibility();
 
+// Pause-menu performance test toggles. Used to isolate whether visual
+// effects, resolution scaling, and runtime budget settings impact camera feel.
+const PERF_WINDOW_SUN_KEY = 'diy_air_purifier_perf_window_sun_v1';
+const PERF_SHADOWS_KEY = 'diy_air_purifier_perf_shadows_v1';
+const PERF_FOG_KEY = 'diy_air_purifier_perf_fog_v1';
+const PERF_FP_PROFILE_KEY = 'diy_air_purifier_perf_profile_v1';
+const PERF_FP_RESOLUTION_KEY = 'diy_air_purifier_perf_resolution_v1';
+const PERF_FP_RESOLUTION_SCALE_KEY = 'diy_air_purifier_perf_resolution_scale_v1';
+const PERF_FP_SHADOW_INTERVAL_KEY = 'diy_air_purifier_perf_fp_shadow_interval_v1';
+const PERF_CAT_ANIM_KEY = 'diy_air_purifier_perf_cat_anim_v1';
+const PERF_COINS_KEY = 'diy_air_purifier_perf_coins_v1';
+const PERF_PURIFIER_KEY = 'diy_air_purifier_perf_purifier_v1';
+const PERF_ABILITIES_KEY = 'diy_air_purifier_perf_abilities_v1';
+const PERF_RAYCAST_KEY = 'diy_air_purifier_perf_raycast_v1';
+
+const FP_RESOLUTION_SCALE_MIN = 0.35;
+const FP_RESOLUTION_SCALE_MAX = 1.2;
+const FP_SHADOW_INTERVAL_MIN_MS = 0;
+const FP_SHADOW_INTERVAL_MAX_MS = 120;
+
+function _getDefaultFpResolutionScale() {
+  if (state.isMobile) return 0.5;
+  return _isFfMacPlatform() ? 0.6 : 0.68;
+}
+
+function _clampFpResolutionScale(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return _getDefaultFpResolutionScale();
+  return Math.max(FP_RESOLUTION_SCALE_MIN, Math.min(FP_RESOLUTION_SCALE_MAX, n));
+}
+
+function _clampFpShadowInterval(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(FP_SHADOW_INTERVAL_MIN_MS, Math.min(FP_SHADOW_INTERVAL_MAX_MS, Math.round(n)));
+}
+
+function _formatFpResolutionScaleLabel(scale) {
+  return `${Math.round(_clampFpResolutionScale(scale) * 100)}%`;
+}
+
+function _formatFpShadowIntervalLabel(ms) {
+  const n = _clampFpShadowInterval(ms);
+  return n <= 0 ? 'Every frame' : `Every ${n} ms`;
+}
+
+let _perfWindowSunEnabled = true;
+let _perfShadowsEnabled = true;
+let _perfFogEnabled = true;
+let _fpPerfProfileEnabled = true;
+let _fpPerfResolutionEnabled = true;
+let _fpPerfResolutionScale = _getDefaultFpResolutionScale();
+let _fpPerfShadowIntervalMs = 0;
+let _perfCatAnimEnabled = true;
+let _perfCoinsEnabled = true;
+let _perfPurifierEnabled = true;
+let _perfAbilitiesEnabled = true;
+let _perfRaycastEnabled = true;
+try { _perfWindowSunEnabled = localStorage.getItem(PERF_WINDOW_SUN_KEY) !== '0'; } catch (e) { }
+try { _perfShadowsEnabled = localStorage.getItem(PERF_SHADOWS_KEY) !== '0'; } catch (e) { }
+try { _perfFogEnabled = localStorage.getItem(PERF_FOG_KEY) !== '0'; } catch (e) { }
+try { _fpPerfProfileEnabled = localStorage.getItem(PERF_FP_PROFILE_KEY) !== '0'; } catch (e) { }
+try {
+  const savedResEnabled = localStorage.getItem(PERF_FP_RESOLUTION_KEY);
+  if (savedResEnabled == null) {
+    // Migrate old profile setting to the new resolution toggle once.
+    _fpPerfResolutionEnabled = _fpPerfProfileEnabled;
+  } else {
+    _fpPerfResolutionEnabled = savedResEnabled !== '0';
+  }
+} catch (e) { }
+try {
+  const savedResScale = localStorage.getItem(PERF_FP_RESOLUTION_SCALE_KEY);
+  if (savedResScale != null) _fpPerfResolutionScale = _clampFpResolutionScale(savedResScale);
+} catch (e) { }
+try {
+  const savedShadowInterval = localStorage.getItem(PERF_FP_SHADOW_INTERVAL_KEY);
+  if (savedShadowInterval != null) _fpPerfShadowIntervalMs = _clampFpShadowInterval(savedShadowInterval);
+} catch (e) { }
+try { _perfCatAnimEnabled = localStorage.getItem(PERF_CAT_ANIM_KEY) !== '0'; } catch (e) { }
+try { _perfCoinsEnabled = localStorage.getItem(PERF_COINS_KEY) !== '0'; } catch (e) { }
+try { _perfPurifierEnabled = localStorage.getItem(PERF_PURIFIER_KEY) !== '0'; } catch (e) { }
+try { _perfAbilitiesEnabled = localStorage.getItem(PERF_ABILITIES_KEY) !== '0'; } catch (e) { }
+try { _perfRaycastEnabled = localStorage.getItem(PERF_RAYCAST_KEY) !== '0'; } catch (e) { }
+
+function _getCurrentTodMinute() {
+  const slider = document.getElementById('todSlider');
+  const minute = parseInt(slider?.value || String(_initMinute), 10);
+  if (!Number.isFinite(minute)) return _initMinute;
+  return Math.max(0, Math.min(1439, minute));
+}
+
+function _syncPausePerfToggleUi() {
+  const sunSw = document.getElementById('fpPausePerfWindowSun');
+  const sunSt = document.getElementById('fpPausePerfWindowSunState');
+  const shadowSw = document.getElementById('fpPausePerfShadows');
+  const shadowSt = document.getElementById('fpPausePerfShadowsState');
+  const fogSw = document.getElementById('fpPausePerfFog');
+  const fogSt = document.getElementById('fpPausePerfFogState');
+  const resSw = document.getElementById('fpPausePerfResolution');
+  const resSt = document.getElementById('fpPausePerfResolutionState');
+  const resRange = document.getElementById('fpPausePerfResolutionScale');
+  const resVal = document.getElementById('fpPausePerfResolutionScaleVal');
+  const profileSw = document.getElementById('fpPausePerfFpProfile');
+  const profileSt = document.getElementById('fpPausePerfFpProfileState');
+  const fpShadowRange = document.getElementById('fpPausePerfShadowCadence');
+  const fpShadowVal = document.getElementById('fpPausePerfShadowCadenceVal');
+  const catSw = document.getElementById('fpPausePerfCatAnim');
+  const catSt = document.getElementById('fpPausePerfCatAnimState');
+  const coinsSw = document.getElementById('fpPausePerfCoins');
+  const coinsSt = document.getElementById('fpPausePerfCoinsState');
+  const purifierSw = document.getElementById('fpPausePerfPurifier');
+  const purifierSt = document.getElementById('fpPausePerfPurifierState');
+  const abilitiesSw = document.getElementById('fpPausePerfAbilities');
+  const abilitiesSt = document.getElementById('fpPausePerfAbilitiesState');
+  const raycastSw = document.getElementById('fpPausePerfRaycast');
+  const raycastSt = document.getElementById('fpPausePerfRaycastState');
+
+  if (sunSw) {
+    sunSw.classList.toggle('on', _perfWindowSunEnabled);
+    sunSw.setAttribute('aria-checked', String(_perfWindowSunEnabled));
+  }
+  if (sunSt) {
+    sunSt.textContent = _perfWindowSunEnabled ? 'On' : 'Off';
+    sunSt.classList.toggle('off', !_perfWindowSunEnabled);
+  }
+
+  if (shadowSw) {
+    shadowSw.classList.toggle('on', _perfShadowsEnabled);
+    shadowSw.setAttribute('aria-checked', String(_perfShadowsEnabled));
+  }
+  if (shadowSt) {
+    shadowSt.textContent = _perfShadowsEnabled ? 'On' : 'Off';
+    shadowSt.classList.toggle('off', !_perfShadowsEnabled);
+  }
+
+  if (fogSw) {
+    fogSw.classList.toggle('on', _perfFogEnabled);
+    fogSw.setAttribute('aria-checked', String(_perfFogEnabled));
+  }
+  if (fogSt) {
+    fogSt.textContent = _perfFogEnabled ? 'On' : 'Off';
+    fogSt.classList.toggle('off', !_perfFogEnabled);
+  }
+
+  if (resSw) {
+    resSw.classList.toggle('on', _fpPerfResolutionEnabled);
+    resSw.setAttribute('aria-checked', String(_fpPerfResolutionEnabled));
+  }
+  if (resSt) {
+    resSt.textContent = _fpPerfResolutionEnabled ? 'On' : 'Off';
+    resSt.classList.toggle('off', !_fpPerfResolutionEnabled);
+  }
+  if (resRange) {
+    resRange.value = String(_clampFpResolutionScale(_fpPerfResolutionScale));
+    resRange.disabled = !_fpPerfResolutionEnabled;
+  }
+  if (resVal) {
+    resVal.textContent = _fpPerfResolutionEnabled
+      ? _formatFpResolutionScaleLabel(_fpPerfResolutionScale)
+      : 'Bypassed';
+    resVal.classList.toggle('off', !_fpPerfResolutionEnabled);
+  }
+
+  if (profileSw) {
+    profileSw.classList.toggle('on', _fpPerfProfileEnabled);
+    profileSw.setAttribute('aria-checked', String(_fpPerfProfileEnabled));
+  }
+  if (profileSt) {
+    profileSt.textContent = _fpPerfProfileEnabled ? 'On' : 'Off';
+    profileSt.classList.toggle('off', !_fpPerfProfileEnabled);
+  }
+  if (fpShadowRange) {
+    fpShadowRange.value = String(_clampFpShadowInterval(_fpPerfShadowIntervalMs));
+    fpShadowRange.disabled = !_fpPerfProfileEnabled;
+  }
+  if (fpShadowVal) {
+    fpShadowVal.textContent = _fpPerfProfileEnabled
+      ? _formatFpShadowIntervalLabel(_fpPerfShadowIntervalMs)
+      : 'Bypassed';
+    fpShadowVal.classList.toggle('off', !_fpPerfProfileEnabled);
+  }
+
+  if (catSw) {
+    catSw.classList.toggle('on', _perfCatAnimEnabled);
+    catSw.setAttribute('aria-checked', String(_perfCatAnimEnabled));
+  }
+  if (catSt) {
+    catSt.textContent = _perfCatAnimEnabled ? 'On' : 'Off';
+    catSt.classList.toggle('off', !_perfCatAnimEnabled);
+  }
+
+  if (coinsSw) {
+    coinsSw.classList.toggle('on', _perfCoinsEnabled);
+    coinsSw.setAttribute('aria-checked', String(_perfCoinsEnabled));
+  }
+  if (coinsSt) {
+    coinsSt.textContent = _perfCoinsEnabled ? 'On' : 'Off';
+    coinsSt.classList.toggle('off', !_perfCoinsEnabled);
+  }
+
+  if (purifierSw) {
+    purifierSw.classList.toggle('on', _perfPurifierEnabled);
+    purifierSw.setAttribute('aria-checked', String(_perfPurifierEnabled));
+  }
+  if (purifierSt) {
+    purifierSt.textContent = _perfPurifierEnabled ? 'On' : 'Off';
+    purifierSt.classList.toggle('off', !_perfPurifierEnabled);
+  }
+
+  if (abilitiesSw) {
+    abilitiesSw.classList.toggle('on', _perfAbilitiesEnabled);
+    abilitiesSw.setAttribute('aria-checked', String(_perfAbilitiesEnabled));
+  }
+  if (abilitiesSt) {
+    abilitiesSt.textContent = _perfAbilitiesEnabled ? 'On' : 'Off';
+    abilitiesSt.classList.toggle('off', !_perfAbilitiesEnabled);
+  }
+
+  if (raycastSw) {
+    raycastSw.classList.toggle('on', _perfRaycastEnabled);
+    raycastSw.setAttribute('aria-checked', String(_perfRaycastEnabled));
+  }
+  if (raycastSt) {
+    raycastSt.textContent = _perfRaycastEnabled ? 'On' : 'Off';
+    raycastSt.classList.toggle('off', !_perfRaycastEnabled);
+  }
+}
+
+function _applyPausePerfToggles({ refreshTod = false } = {}) {
+  // lighting.applyTimeOfDay reads these flags every time TOD updates.
+  window.__diyWindowSunEnabled = _perfWindowSunEnabled;
+  window.__diyFogEnabled = _perfFogEnabled;
+  if (typeof gameFp.setInteractionRaycastEnabled === 'function') {
+    gameFp.setInteractionRaycastEnabled(_perfRaycastEnabled);
+  }
+
+  renderer.shadowMap.enabled = _perfShadowsEnabled;
+  if (lighting.key) lighting.key.castShadow = _perfShadowsEnabled;
+  if (_perfShadowsEnabled) markShadowsDirty();
+
+  if (refreshTod) {
+    lighting.applyTimeOfDay(_getCurrentTodMinute(), todRefs);
+  } else if (scene.fog && !_perfFogEnabled) {
+    scene.fog.density = 0;
+  }
+
+  if (!_perfWindowSunEnabled) {
+    if (lighting.key) lighting.key.intensity = 0;
+    if (lighting.windowSun) lighting.windowSun.intensity = 0;
+  }
+
+  // Apply immediately if this was toggled while in an active run.
+  _applyFpPerformanceProfile(gameFp.fpMode);
+  _syncPausePerfToggleUi();
+}
+
+window._togglePerfWindowSun = () => {
+  _perfWindowSunEnabled = !_perfWindowSunEnabled;
+  try { localStorage.setItem(PERF_WINDOW_SUN_KEY, _perfWindowSunEnabled ? '1' : '0'); } catch (e) { }
+  _applyPausePerfToggles({ refreshTod: true });
+};
+
+window._togglePerfShadows = () => {
+  _perfShadowsEnabled = !_perfShadowsEnabled;
+  try { localStorage.setItem(PERF_SHADOWS_KEY, _perfShadowsEnabled ? '1' : '0'); } catch (e) { }
+  _applyPausePerfToggles();
+};
+
+window._togglePerfFog = () => {
+  _perfFogEnabled = !_perfFogEnabled;
+  try { localStorage.setItem(PERF_FOG_KEY, _perfFogEnabled ? '1' : '0'); } catch (e) { }
+  _applyPausePerfToggles({ refreshTod: true });
+};
+
+window._toggleFpPerfResolution = () => {
+  _fpPerfResolutionEnabled = !_fpPerfResolutionEnabled;
+  try { localStorage.setItem(PERF_FP_RESOLUTION_KEY, _fpPerfResolutionEnabled ? '1' : '0'); } catch (e) { }
+  _applyPausePerfToggles();
+};
+
+window._setFpPerfResolutionScale = (value) => {
+  _fpPerfResolutionScale = _clampFpResolutionScale(value);
+  try { localStorage.setItem(PERF_FP_RESOLUTION_SCALE_KEY, String(_fpPerfResolutionScale)); } catch (e) { }
+  _applyPausePerfToggles();
+};
+
+window._toggleFpPerfProfile = () => {
+  _fpPerfProfileEnabled = !_fpPerfProfileEnabled;
+  try { localStorage.setItem(PERF_FP_PROFILE_KEY, _fpPerfProfileEnabled ? '1' : '0'); } catch (e) { }
+  _applyPausePerfToggles();
+};
+
+window._setFpPerfShadowCadence = (value) => {
+  _fpPerfShadowIntervalMs = _clampFpShadowInterval(value);
+  try { localStorage.setItem(PERF_FP_SHADOW_INTERVAL_KEY, String(_fpPerfShadowIntervalMs)); } catch (e) { }
+  _syncPausePerfToggleUi();
+};
+
+window._togglePerfCatAnim = () => {
+  _perfCatAnimEnabled = !_perfCatAnimEnabled;
+  try { localStorage.setItem(PERF_CAT_ANIM_KEY, _perfCatAnimEnabled ? '1' : '0'); } catch (e) { }
+  _syncPausePerfToggleUi();
+};
+
+window._togglePerfCoins = () => {
+  _perfCoinsEnabled = !_perfCoinsEnabled;
+  try { localStorage.setItem(PERF_COINS_KEY, _perfCoinsEnabled ? '1' : '0'); } catch (e) { }
+  _syncPausePerfToggleUi();
+};
+
+window._togglePerfPurifier = () => {
+  _perfPurifierEnabled = !_perfPurifierEnabled;
+  try { localStorage.setItem(PERF_PURIFIER_KEY, _perfPurifierEnabled ? '1' : '0'); } catch (e) { }
+  _syncPausePerfToggleUi();
+};
+
+window._togglePerfAbilities = () => {
+  _perfAbilitiesEnabled = !_perfAbilitiesEnabled;
+  try { localStorage.setItem(PERF_ABILITIES_KEY, _perfAbilitiesEnabled ? '1' : '0'); } catch (e) { }
+  _syncPausePerfToggleUi();
+};
+
+window._togglePerfRaycast = () => {
+  _perfRaycastEnabled = !_perfRaycastEnabled;
+  try { localStorage.setItem(PERF_RAYCAST_KEY, _perfRaycastEnabled ? '1' : '0'); } catch (e) { }
+  _applyPausePerfToggles();
+};
+
+_applyPausePerfToggles({ refreshTod: true });
+
 // MPH HUD toggle
 window._toggleMph = () => {
   gameFp.setMphVisible(!gameFp.mphVisible);
@@ -1515,11 +1885,13 @@ function animate(ts) {
 
   // Coins (spin/bob/pickup) — only active in game mode
   if (gameFp.fpMode) {
-    const prevScore = coins.coinScore;
-    const prevSecret = coins.coinSecretScore;
-    coins.updateCoins(ts, gameFp.fpPos);
-    if (coins.coinScore > prevScore) coinBump();
-    if (coins.coinSecretScore > prevSecret) secretCoinBump();
+    if (_perfCoinsEnabled) {
+      const prevScore = coins.coinScore;
+      const prevSecret = coins.coinSecretScore;
+      coins.updateCoins(ts, gameFp.fpPos);
+      if (coins.coinScore > prevScore) coinBump();
+      if (coins.coinSecretScore > prevSecret) secretCoinBump();
+    }
     // MacBook music proximity volume (full within ~2 ft, steep falloff beyond)
     if (roomRefs && typeof roomRefs.updateMacbookProximity === 'function') {
       roomRefs.updateMacbookProximity(gameFp.fpPos);
@@ -1555,7 +1927,7 @@ function animate(ts) {
     // If we ever allow finishing with partial completion (timer end,
     // forfeit, etc.), switch this to pass coins.coinScore so the saved
     // value reflects what the player actually collected.
-    if (coins.coinScore >= coins.coinTotal && coins.coinTotal > 0 && !leaderboard.isFinished()) {
+    if (_perfCoinsEnabled && coins.coinScore >= coins.coinTotal && coins.coinTotal > 0 && !leaderboard.isFinished()) {
       leaderboard.stopTimer();
       const finalTime = leaderboard.getElapsed();
       gameFp.setPaused(true);
@@ -1574,7 +1946,7 @@ function animate(ts) {
   }
 
   // Cat animation mixer + walk/idle blend
-  if (catAnimation.catMixer) {
+  if (_perfCatAnimEnabled && catAnimation.catMixer) {
     const preset = catAppearance.getSelectedModelPreset();
     const catAnimSpeed = Math.max(0.12, Number(preset.animSpeed) || 1);
     const isBababooey = catAppearance.catModelKey === 'bababooey';
@@ -1807,7 +2179,9 @@ function animate(ts) {
   }
 
   // Purifier animations (fan spin, explode lerp, filter/drawer/bifold)
-  purifierRefs.update(dtSec, animFrameScale, gameFp.fpMode);
+  if (_perfPurifierEnabled) {
+    purifierRefs.update(dtSec, animFrameScale, gameFp.fpMode);
+  }
 
   // Mini-split air-stream particles (no-op when unit is off)
   if (roomRefs && typeof roomRefs.updateMiniSplit === 'function') {
@@ -1818,8 +2192,10 @@ function animate(ts) {
   // ticks them via _inspectorTick above when active.
 
   // Fireballs
-  fireball.update(dtSec);
-  kamehameha.update(dtSec);
+  if (_perfAbilitiesEnabled) {
+    fireball.update(dtSec);
+    kamehameha.update(dtSec);
+  }
 
   // Shadow throttle — update on dirty flag OR periodically.
   // In FP (game) mode: update EVERY frame. Throttling at 8 Hz while
@@ -1829,9 +2205,14 @@ function animate(ts) {
   // old, so the shadows on walls/floor appear to snap and trail.
   if (renderer.shadowMap.enabled) {
     if (gameFp.fpMode) {
-      renderer.shadowMap.needsUpdate = true;
-      _shadowDirtyOneShot = false;
-      _lastShadowUpdateTs = ts;
+      const fpShadowIntervalMs = _fpPerfProfileEnabled ? _clampFpShadowInterval(_fpPerfShadowIntervalMs) : 0;
+      if (fpShadowIntervalMs <= 0
+        || _shadowDirtyOneShot
+        || (ts - _lastShadowUpdateTs) >= fpShadowIntervalMs) {
+        renderer.shadowMap.needsUpdate = true;
+        _shadowDirtyOneShot = false;
+        _lastShadowUpdateTs = ts;
+      }
     } else if (_shadowDirtyOneShot || (ts - _lastShadowUpdateTs) >= SHADOW_UPDATE_INTERVAL_MS) {
       renderer.shadowMap.needsUpdate = true;
       _shadowDirtyOneShot = false;

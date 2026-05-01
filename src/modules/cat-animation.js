@@ -63,6 +63,10 @@ const previewBaseScale = new THREE.Vector3(1, 1, 1);
 const baseLocalPos = new THREE.Vector3();
 const baseLocalQuat = new THREE.Quaternion();
 let gameLoadNonce = 0;
+// Tracks which model key produced the currently-mounted catModel.
+// Used by loadGameplayCat() to skip a redundant reload when Start is
+// pressed without changing the model selection.
+let _loadedModelKey = null;
 let nodStartTs = -1e9;
 let castStartTs = -1e9;
 let castHoldActive = false;
@@ -299,6 +303,20 @@ function _cacheKnockoverLift(model) {
  * @param {object} refs - { applyCatColorToModel, playLauncherOpen, setLauncherCatPreview }
  */
 export function loadGameplayCat(refs = {}) {
+  // Fast-path: if the requested model is already loaded and live in the
+  // scene, skip the entire reload. clearGameplayCat() + GLB parse +
+  // scene-graph rebuild + animation-clip parsing is the dominant cost
+  // on first-Start (100-500ms on weak hardware) and shows up as a
+  // noticeable lag between clicking Play and being able to move. The
+  // R-key reset path doesn't reload the cat, which is exactly why
+  // resets feel instant — this brings first-Start in line.
+  if (catModel && _loadedModelKey === catModelKey) {
+    if (refs.applyCatColorToModel) refs.applyCatColorToModel();
+    if (typeof refs.onModelReady === 'function') {
+      try { refs.onModelReady(); } catch (e) { /* ignore */ }
+    }
+    return;
+  }
   console.log('[cat-anim] loadGameplayCat called, GLTFLoader=', typeof GLTFLoader);
   const nonce = ++gameLoadNonce;
   clearGameplayCat();
@@ -407,6 +425,10 @@ function _initGameplayCatFromScene(scene, animations, src, refs, nonce) {
     else if (catWalkAction) catWalkAction.weight = 1;
   }
 
+  // Mark which model is now live so the next loadGameplayCat() call
+  // can short-circuit if the selection didn't change.
+  _loadedModelKey = catModelKey;
+
   if (typeof refs.onModelReady === 'function') {
     try { refs.onModelReady(); } catch (e) { console.warn('onModelReady cb failed', e); }
   }
@@ -417,6 +439,7 @@ export function clearGameplayCat() {
   catWalkAction = null; catIdleAction = null;
   if (catModel && catModel.parent) catModel.parent.remove(catModel);
   catModel = null;
+  _loadedModelKey = null;
   _babaRunPhase = 0;
   _babaRunLastTs = -1;
   _totoRunPhase = 0;

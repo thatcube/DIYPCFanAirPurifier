@@ -127,18 +127,23 @@
        animates the card from opacity:0 + translateY(12px) +
        blur(8px) to ready over 0.7s. On home that animation IS the
        delay we're trying to eliminate — the boot→glass morph
-       replaces it. (SPA-nav into home loses the entrance too, but
-       <main>'s own is-entering choreography in main.css covers that
-       case with a softer fade.) */
+       replaces it. For SPA-nav into home, we still allow the shared
+       content entrance animation; only direct-load home suppresses it
+       so first paint remains instant. */
     main.page>.title-splash-card {
       display: block;
-      animation: none !important;
-      opacity: 1 !important;
-      transform: none !important;
-      filter: none !important;
+      opacity: 1;
+      transform: none;
+      filter: none;
       transition:
         background-color 0.65s cubic-bezier(0.32, 0.72, 0, 1),
         border-color 0.5s ease-out;
+    }
+
+    /* Suppress the keyframe only on direct-load home. SPA-inserted
+       <main data-spa="1"> keeps its entrance animation. */
+    main.page:not([data-spa="1"])>.title-splash-card {
+      animation: none !important;
     }
 
     /* Boot state — opaque dark fill replaces var(--glass). The
@@ -323,7 +328,7 @@
             <span>Loading…</span>
           </span>
           <span class="title-splash-play-content title-splash-play-content--ready">
-            <span>Play</span>
+            <span>Play game</span>
           </span>
         </a>
       </div>

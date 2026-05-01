@@ -227,9 +227,17 @@ export function applyTimeOfDay(minuteOfDay, refs) {
 
   // Clear color + fog
   const clearCol = lerpHex(NIGHT_CLEAR, DAY_CLEAR, sun);
+  const windowSunEnabled = (typeof window === 'undefined')
+    ? true
+    : window.__diyWindowSunEnabled !== false;
+  const fogEnabled = (typeof window === 'undefined')
+    ? true
+    : window.__diyFogEnabled !== false;
   renderer.setClearColor(clearCol.clone(), 1);
-  scene.fog.color.copy(clearCol);
-  scene.fog.density = mix(0.003, 0.0015, sun);
+  if (scene.fog) {
+    scene.fog.color.copy(clearCol);
+    scene.fog.density = fogEnabled ? mix(0.003, 0.0015, sun) : 0;
+  }
   // Exposure curve — lower at night so surfaces darken naturally via lighting
   // instead of forcing dark material colors. Daytime peak dialed down ~20%
   // so clicking the window to switch to day isn't blinding.
@@ -242,13 +250,13 @@ export function applyTimeOfDay(minuteOfDay, refs) {
   key.color.copy(keyColor);
   windowSun.color.copy(keyColor);
   const baseKeyIntensity = mix(0.34, 1.85, sun) + warm * 0.18;
-  key.intensity = beam > 0 ? Math.max(0.4, baseKeyIntensity * 0.75) * beam : 0;
+  key.intensity = (windowSunEnabled && beam > 0) ? Math.max(0.4, baseKeyIntensity * 0.75) * beam : 0;
   // SpotLight intensity is in candela (physically correct) — scale up from the
   // legacy baseKeyIntensity so the beam is actually visible on surfaces.
   // Note: windowSun.visible stays true permanently (see createLights) — we
   // only modulate intensity so the day↔night toggle never triggers a shader
   // recompile from a light-count change.
-  windowSun.intensity = beam > 0 ? Math.max(50, baseKeyIntensity * 140) * beam : 0;
+  windowSun.intensity = (windowSunEnabled && beam > 0) ? Math.max(50, baseKeyIntensity * 140) * beam : 0;
 
   // Window sun sweep positions
   const beamSrcY = Math.max(refs.winBottom + 4, Math.min(refs.winTop - 4, mix(refs.winTop + 11, refs.winTop + 1, dayTravel)));

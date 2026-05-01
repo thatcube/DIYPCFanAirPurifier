@@ -1904,8 +1904,12 @@ export function createPurifier(scene) {
     } else {
       _dragFilter=null;
       if(Math.abs(e.clientX-_clickStartX)<15 && Math.abs(e.clientY-_clickStartY)<15){
-        // In FP mode with pointer lock, click is handled on mousedown for better browser compatibility.
-        if(_fpMode && document.pointerLockElement){
+        // In FP mode, the actual interaction fires from the mousedown
+        // handler below using the screen-center crosshair raycast, NOT
+        // the cursor's clientX/Y position. This holds whether or not
+        // we have pointer lock (Firefox+macOS uses an unlocked-cursor
+        // fallback — see _USE_UNLOCKED_LOOK in game-fp.js).
+        if(_fpMode){
           // no-op
         } else {
           handleClick(e.clientX,e.clientY);
@@ -1916,7 +1920,7 @@ export function createPurifier(scene) {
   });
   window.addEventListener('mousedown',e=>{
     if(e.button!==0) return;
-    if(_fpMode && document.pointerLockElement){
+    if(_fpMode){
       // Exaggerated head nod on every click, regardless of whether we hit an
       // interactive target. Feels playful and confirms the click registered.
       if(typeof _triggerCatNod==='function') _triggerCatNod();

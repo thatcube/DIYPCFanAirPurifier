@@ -532,8 +532,7 @@
       <p>
         Then I added the room around it. Then a cat to run around the room. Then coins for
         the cat to collect. Then a leaderboard, then fireballs, then a few abilities that
-        nobody asked for. The repo is still called <code>DIYPCFanAirPurifier</code> because
-        renaming it now would feel like lying about how it got here.
+        nobody asked for. That prototype snowballed into <b>Zoomies</b>.
       </p>
       <p>
         If you want to actually build one — or just see what other people have come up with —
@@ -602,6 +601,19 @@
         <a href="https://vite.dev/" target="_blank" rel="noopener noreferrer">Vite</a> to ship it, and
         <a href="https://www.netlify.com/" target="_blank" rel="noopener noreferrer">Netlify</a> for hosting.
         Things will break. Animations are jank. The cat is fine with this.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Known issues</h2>
+      <p>
+        <b>Firefox + macOS trackpad:</b> camera input can feel less responsive than other browsers,
+        and some systems appear to run the game loop at 60Hz even on high-refresh displays.
+        Mouse input is generally better behaved on that combo right now.
+      </p>
+      <p>
+        We keep this documented in the project README and will continue iterating on it,
+        but gameplay is currently most consistent on Chromium-based browsers and Safari.
       </p>
     </section>
 
@@ -862,6 +874,19 @@
             fullNav(a.href);
           }
           return;
+        }
+
+        // Inline content links opting into the SPA router (for
+        // example, home's in-copy leaderboard link). This keeps the
+        // shared bg iframe alive exactly like tab clicks do.
+        if (a.hasAttribute('data-spa-link')) {
+          const targetView = viewFor(url.pathname);
+          const currentView = viewFor(location.pathname);
+          if (targetView && targetView !== 'play' && currentView && currentView !== 'play') {
+            e.preventDefault();
+            swap(url.pathname + url.search + url.hash);
+            return;
+          }
         }
 
         // The big Play CTA — promote the existing bg iframe in place

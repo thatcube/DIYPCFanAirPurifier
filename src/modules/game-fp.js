@@ -40,6 +40,17 @@ let _deathLocked = false;
 export const fpKeys = { w: false, a: false, s: false, d: false, space: false, shift: false };
 export let fpLookDX = 0;
 export let fpLookDY = 0;
+// Frame-time velocity smoothing state. updatePhysics() converts the
+// per-frame accumulated delta (fpLookDX/Y) into a per-ms velocity,
+// low-pass filters it into (_lookVelX, _lookVelY) with a framerate-
+// independent time constant, and integrates velocity * frame_dt into
+// yaw/pitch. This stays smooth across all monitor/input combinations
+// (30/60/120/540Hz screens, any mouse or trackpad poll rate) because
+// the smoothing window is in milliseconds, not frames.
+let _lookVelX = 0;     // px/ms
+let _lookVelY = 0;     // px/ms
+let _lookYawTarget = 0;
+let _lookPitchTarget = 0;
 
 export let lastCatFacingYaw = Math.PI;
 export let fpCamMode = 'third'; // 'first' or 'third'
@@ -57,6 +68,13 @@ const SPEED_MODE_KEY = 'diy_air_purifier_speed_mode_v1';
 const SKATE_MODE_KEY = 'diy_air_purifier_skate_mode_v1';
 const SKATEBOARD_FOUND_KEY = 'diy_air_purifier_skateboard_found_v1';
 const MPH_VIS_KEY = 'diy_air_purifier_mph_visible_v1';
+const FF_MAC_LOOK_HZ_KEY = 'diy_air_purifier_ff_mac_look_hz_v1';
+const FF_MAC_POINTER_MODE_KEY = 'diy_air_purifier_ff_mac_pointer_mode_v1';
+const FF_MAC_VIEW_MODE_KEY = 'diy_air_purifier_ff_mac_view_mode_v1';
+const FF_MAC_VIEW_TAU_KEY = 'diy_air_purifier_ff_mac_view_tau_v1';
+const FF_MAC_COLLISION_MODE_KEY = 'diy_air_purifier_ff_mac_collision_mode_v1';
+const UNLOCKED_LOOK_MODE_KEY = 'diy_air_purifier_unlocked_look_mode_v2';
+const THIRD_CAM_SOLVER_KEY = 'diy_air_purifier_third_cam_solver_v1';
 
 try { sfxMuted = localStorage.getItem(SFX_MUTE_KEY) === '1'; } catch (e) { }
 try { musicMuted = localStorage.getItem(MUSIC_MUTE_KEY) === '1'; } catch (e) { }
@@ -222,6 +240,22 @@ function _syncMphHud() {
 
 export function syncMphHud() { _syncMphHud(); }
 
+export function setInteractionRaycastEnabled(enabled) {
+  _interactionRaycastEnabled = !!enabled;
+  if (_interactionRaycastEnabled) return;
+  _wasAimingAtInteractable = false;
+  _crosshairAimingAtInteractable = false;
+  const tooltip = document.getElementById('fpCrosshairTooltip');
+  if (tooltip) {
+    tooltip.classList.remove('visible');
+    tooltip._lastHtml = '';
+  }
+  if (_cachedCrosshair) {
+    _cachedCrosshair._aiming = false;
+    _cachedCrosshair.classList.remove('aiming');
+  }
+}
+
 function _syncAudioToggleUi() {
   const sfxTog = document.getElementById('fpPauseMuteSfx');
   const musicTog = document.getElementById('fpPauseMuteMusic');
@@ -342,6 +376,12 @@ export function getHorizSpeed() {
 
 let _bobPhase = 0;
 let _lastPhysicsTs = 0;
+// True between entering FP / resetting a run and the first frame of
+// `updatePhysics()` actually executing. Defers leaderboard.startTimer()
+// from the click moment to the first playable frame so any boot-time
+// stalls (model parse, JIT, pointer-lock acquisition, GPU warm-up)
+// don't get billed to the player's run time. See updatePhysics().
+let _pendingTimerStart = false;
 let _spaceHeld = 0;            // total frames space has been held (legacy: jump-hold UI)
 let _tierGateHeld = 0;         // frames held at the current tier gate (stepped charge)
 let _jumpHoldFrames = 0;       // frames of variable-height boost applied this jump
@@ -361,6 +401,7 @@ let _wasAimingAtInteractable = false;
 let _lastAimToneTs = 0;
 let _lastCrosshairRaycastTs = 0;
 let _crosshairAimingAtInteractable = false;
+let _interactionRaycastEnabled = true;
 let _lastFootstepTs = 0;
 let _wasFootstepMoving = false;
 let _skateLean = 0;
@@ -853,6 +894,558 @@ function _sampleSuperSaiyanChargeShake(ts, strength, out = _ssShakeOffset) {
 
 const PITCH_MIN = -1.45;
 const PITCH_MAX = 1.55;
+const LOOK_RAD_PER_PX = 0.0022;
+const FF_MAC_STALE_EVENT_MS = 120;
+const FF_MAC_GAP_DROP_MS = 260;
+const FF_MAC_GAP_DROP_MAG = 28;
+const FF_MAC_HARD_EVENT_MAX = 24;
+const FF_MAC_HARD_FRAME_MAX = 40;
+const FF_MAC_LOOK_HZ_MIN = 20;
+const FF_MAC_LOOK_HZ_MAX = 120;
+const FF_MAC_LOOK_HZ_DEFAULT = 60;
+let _ffMacAimSmoothTauMs = 10;
+let _ffMacQueueSmoothTauMs = 18;
+let _ffMacQueueMode = false;
+let _ffMacViewDecoupleMode = false;
+let FF_MAC_SIMPLE_MOUSEMOVE_MODE = false;
+let USE_POINTER_RAW = false;
+let _ffMacStepTauMs = 22;
+let _ffMacStepMaxDelta = 30;
+let _ffMacPendingClamp = 80;
+let _ffMacPulseLinear = 1.0;
+let _ffMacPulseLogScale = 1.6;
+let _ffMacPulseMax = 28;
+let _ffMacEventMaxDelta = FF_MAC_HARD_EVENT_MAX;
+let _ffMacDirectGain = 1.8;
+let _ffMacTailCarry = 0;
+let _ffMacDutyTarget = 0.20;
+let _ffMacSparseBoostMax = 2.4;
+let _ffMacPulseDutyEma = 0.20;
+let _ffMacLastNonZeroPulseTs = 0;
+let _ffMacVelDecayTauMs = 90;
+let _ffMacVelInjectTauMs = 6;
+let _ffMacVelHoldBaseMs = 24;
+let _ffMacVelBlend = 0.85;
+let _ffMacIdleFlushMs = 140;
+let _ffMacVelX = 0;
+let _ffMacVelY = 0;
+let _ffMacVelHoldMs = 0;
+let _ffMacLastEventTs = 0;
+let _ffMacLastInputTs = 0;
+let _ffMacLookHz = FF_MAC_LOOK_HZ_DEFAULT;
+let _ffMacLookStepMs = 1000 / FF_MAC_LOOK_HZ_DEFAULT;
+let _ffMacLookStepAccMs = 0;
+let _ffMacPendingDX = 0;
+let _ffMacPendingDY = 0;
+let _ffMacQueueDX = 0;
+let _ffMacQueueDY = 0;
+let _ffMacPreferPointerRaw = false;
+let _ffMacPointerRawSeenTs = 0;
+
+function _ffMacUpdateSparseBoost(nonZeroPulse) {
+  _ffMacPulseDutyEma = _ffMacPulseDutyEma * 0.98 + (nonZeroPulse ? 0.02 : 0);
+  const duty = Math.max(0.04, _ffMacPulseDutyEma);
+  const ratio = _ffMacDutyTarget / duty;
+  if (ratio <= 1) return 1;
+  return Math.max(1, Math.min(_ffMacSparseBoostMax, 1 + (ratio - 1) * 0.35));
+}
+
+function _ffMacCompressPulse(v) {
+  const a = Math.abs(v);
+  if (a <= 0) return 0;
+  if (a <= _ffMacPulseLinear) return v;
+  const c = _ffMacPulseLinear + Math.log1p(a - _ffMacPulseLinear) * _ffMacPulseLogScale;
+  return Math.sign(v) * Math.min(_ffMacPulseMax, c);
+}
+
+function _setFfMacLookHz(hz, persist = true) {
+  const n = Number(hz);
+  if (!Number.isFinite(n)) return _ffMacLookHz;
+  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
+  const platform = (typeof navigator !== 'undefined' && navigator.platform) ? navigator.platform : '';
+  const isFfMac = /firefox/i.test(ua) && /mac/i.test(platform || ua);
+  const minHz = isFfMac ? 45 : FF_MAC_LOOK_HZ_MIN;
+  _ffMacLookHz = Math.max(minHz, Math.min(FF_MAC_LOOK_HZ_MAX, n));
+  _ffMacLookStepMs = 1000 / _ffMacLookHz;
+  if (persist) {
+    try { localStorage.setItem(FF_MAC_LOOK_HZ_KEY, String(_ffMacLookHz)); } catch (e) { }
+  }
+  return _ffMacLookHz;
+}
+
+try {
+  const rawHz = localStorage.getItem(FF_MAC_LOOK_HZ_KEY);
+  if (rawHz != null) _setFfMacLookHz(parseFloat(rawHz), false);
+} catch (e) { }
+
+if (typeof window !== 'undefined') {
+  window._setFfMacLookHz = (hz) => _setFfMacLookHz(hz, true);
+  window._getFfMacLookHz = () => _ffMacLookHz;
+  window._setFfMacAimTau = (ms) => {
+    const n = Number(ms);
+    if (!Number.isFinite(n)) return _ffMacAimSmoothTauMs;
+    _ffMacAimSmoothTauMs = Math.max(6, Math.min(45, n));
+    try { localStorage.setItem(FF_MAC_VIEW_TAU_KEY, String(_ffMacAimSmoothTauMs)); } catch (e) { }
+    return _ffMacAimSmoothTauMs;
+  };
+  window._getFfMacAimTau = () => _ffMacAimSmoothTauMs;
+  window._setFfMacViewTau = window._setFfMacAimTau;
+  window._getFfMacViewTau = window._getFfMacAimTau;
+  window._setFfMacViewMode = (mode = 'raw') => _setFfMacViewMode(mode, { persist: true });
+  window._getFfMacViewMode = () => (_ffMacViewDecoupleMode ? 'decoupled' : 'raw');
+  window._setFfMacQueueTau = (ms) => {
+    const n = Number(ms);
+    if (!Number.isFinite(n)) return _ffMacQueueSmoothTauMs;
+    _ffMacQueueSmoothTauMs = Math.max(6, Math.min(40, n));
+    return _ffMacQueueSmoothTauMs;
+  };
+  window._getFfMacQueueTau = () => _ffMacQueueSmoothTauMs;
+  window._setFfMacPointerMode = (mode = 'direct') => _setFfMacPointerMode(mode, { persist: true });
+  window._getFfMacPointerMode = () => (_ffMacQueueMode ? 'queue' : (FF_MAC_SIMPLE_MOUSEMOVE_MODE ? 'direct' : 'reconstruct'));
+  window._setFfMacLookProfile = (profile = {}) => {
+    if (profile && typeof profile === 'object') {
+      const tau = Number(profile.tauMs);
+      if (Number.isFinite(tau)) _ffMacStepTauMs = Math.max(8, Math.min(120, tau));
+
+      const stepMax = Number(profile.stepMax);
+      if (Number.isFinite(stepMax)) _ffMacStepMaxDelta = Math.max(12, Math.min(FF_MAC_HARD_FRAME_MAX, stepMax));
+
+      const pendingClamp = Number(profile.pendingClamp);
+      if (Number.isFinite(pendingClamp)) _ffMacPendingClamp = Math.max(30, Math.min(220, pendingClamp));
+
+      const pulseLinear = Number(profile.pulseLinear);
+      if (Number.isFinite(pulseLinear)) _ffMacPulseLinear = Math.max(0, Math.min(12, pulseLinear));
+
+      const pulseLogScale = Number(profile.pulseLogScale);
+      if (Number.isFinite(pulseLogScale)) _ffMacPulseLogScale = Math.max(1.2, Math.min(5.0, pulseLogScale));
+
+      const pulseMax = Number(profile.pulseMax);
+      if (Number.isFinite(pulseMax)) _ffMacPulseMax = Math.max(8, Math.min(36, pulseMax));
+
+      const eventMax = Number(profile.eventMax);
+      if (Number.isFinite(eventMax)) _ffMacEventMaxDelta = Math.max(6, Math.min(FF_MAC_HARD_EVENT_MAX, eventMax));
+
+      const directGain = Number(profile.directGain);
+      if (Number.isFinite(directGain)) _ffMacDirectGain = Math.max(0.5, Math.min(2.2, directGain));
+
+      const tailCarry = Number(profile.tailCarry);
+      if (Number.isFinite(tailCarry)) _ffMacTailCarry = Math.max(0.0, Math.min(0.6, tailCarry));
+
+      const dutyTarget = Number(profile.dutyTarget);
+      if (Number.isFinite(dutyTarget)) _ffMacDutyTarget = Math.max(0.08, Math.min(0.35, dutyTarget));
+
+      const sparseBoostMax = Number(profile.sparseBoostMax);
+      if (Number.isFinite(sparseBoostMax)) _ffMacSparseBoostMax = Math.max(1.0, Math.min(1.8, sparseBoostMax));
+
+      const velDecayTauMs = Number(profile.velDecayTauMs);
+      if (Number.isFinite(velDecayTauMs)) _ffMacVelDecayTauMs = Math.max(16, Math.min(180, velDecayTauMs));
+
+      const velInjectTauMs = Number(profile.velInjectTauMs);
+      if (Number.isFinite(velInjectTauMs)) _ffMacVelInjectTauMs = Math.max(3, Math.min(40, velInjectTauMs));
+
+      const velHoldBaseMs = Number(profile.velHoldBaseMs);
+      if (Number.isFinite(velHoldBaseMs)) _ffMacVelHoldBaseMs = Math.max(8, Math.min(48, velHoldBaseMs));
+
+      const velBlend = Number(profile.velBlend);
+      if (Number.isFinite(velBlend)) _ffMacVelBlend = Math.max(0.1, Math.min(1.0, velBlend));
+
+      const idleFlushMs = Number(profile.idleFlushMs);
+      if (Number.isFinite(idleFlushMs)) _ffMacIdleFlushMs = Math.max(35, Math.min(220, idleFlushMs));
+
+      const queueTauMs = Number(profile.queueTauMs);
+      if (Number.isFinite(queueTauMs)) _ffMacQueueSmoothTauMs = Math.max(6, Math.min(40, queueTauMs));
+
+      const viewTauMs = Number(profile.viewTauMs ?? profile.aimTauMs);
+      if (Number.isFinite(viewTauMs)) {
+        _ffMacAimSmoothTauMs = Math.max(6, Math.min(45, viewTauMs));
+        try { localStorage.setItem(FF_MAC_VIEW_TAU_KEY, String(_ffMacAimSmoothTauMs)); } catch (e) { }
+      }
+
+      if (typeof profile.pointerMode === 'string') {
+        _setFfMacPointerMode(profile.pointerMode, { persist: true });
+      }
+      if (typeof profile.viewMode === 'string') {
+        _setFfMacViewMode(profile.viewMode, { persist: true });
+      }
+
+      const hz = Number(profile.hz);
+      if (Number.isFinite(hz)) _setFfMacLookHz(hz, true);
+    }
+    const duty = Math.max(0.04, _ffMacPulseDutyEma);
+    const sparseBoost = Math.max(1, Math.min(_ffMacSparseBoostMax, _ffMacDutyTarget / duty));
+    return {
+      hz: _ffMacLookHz,
+      stepMs: _ffMacLookStepMs,
+      tauMs: _ffMacStepTauMs,
+      stepMax: _ffMacStepMaxDelta,
+      pendingClamp: _ffMacPendingClamp,
+      pulseLinear: _ffMacPulseLinear,
+      pulseLogScale: _ffMacPulseLogScale,
+      pulseMax: _ffMacPulseMax,
+      eventMax: _ffMacEventMaxDelta,
+      directGain: _ffMacDirectGain,
+      tailCarry: _ffMacTailCarry,
+      dutyTarget: _ffMacDutyTarget,
+      sparseBoostMax: _ffMacSparseBoostMax,
+      velDecayTauMs: _ffMacVelDecayTauMs,
+      velInjectTauMs: _ffMacVelInjectTauMs,
+      velHoldBaseMs: _ffMacVelHoldBaseMs,
+      velBlend: _ffMacVelBlend,
+      idleFlushMs: _ffMacIdleFlushMs,
+      pointerMode: _ffMacQueueMode ? 'queue' : (FF_MAC_SIMPLE_MOUSEMOVE_MODE ? 'direct' : 'reconstruct'),
+      viewMode: _ffMacViewDecoupleMode ? 'decoupled' : 'raw',
+      queueTauMs: _ffMacQueueSmoothTauMs,
+      viewTauMs: _ffMacAimSmoothTauMs,
+      aimTauMs: _ffMacAimSmoothTauMs,
+      queueDX: _ffMacQueueDX,
+      queueDY: _ffMacQueueDY,
+      velX: _ffMacVelX,
+      velY: _ffMacVelY,
+      velHoldMs: _ffMacVelHoldMs,
+      pulseDuty: _ffMacPulseDutyEma,
+      sparseBoost,
+    };
+  };
+  window._getFfMacLookProfile = () => {
+    const duty = Math.max(0.04, _ffMacPulseDutyEma);
+    const sparseBoost = Math.max(1, Math.min(_ffMacSparseBoostMax, _ffMacDutyTarget / duty));
+    return {
+      hz: _ffMacLookHz,
+      stepMs: _ffMacLookStepMs,
+      tauMs: _ffMacStepTauMs,
+      stepMax: _ffMacStepMaxDelta,
+      pendingClamp: _ffMacPendingClamp,
+      pulseLinear: _ffMacPulseLinear,
+      pulseLogScale: _ffMacPulseLogScale,
+      pulseMax: _ffMacPulseMax,
+      eventMax: _ffMacEventMaxDelta,
+      directGain: _ffMacDirectGain,
+      tailCarry: _ffMacTailCarry,
+      dutyTarget: _ffMacDutyTarget,
+      sparseBoostMax: _ffMacSparseBoostMax,
+      velDecayTauMs: _ffMacVelDecayTauMs,
+      velInjectTauMs: _ffMacVelInjectTauMs,
+      velHoldBaseMs: _ffMacVelHoldBaseMs,
+      velBlend: _ffMacVelBlend,
+      idleFlushMs: _ffMacIdleFlushMs,
+      pointerMode: _ffMacQueueMode ? 'queue' : (FF_MAC_SIMPLE_MOUSEMOVE_MODE ? 'direct' : 'reconstruct'),
+      viewMode: _ffMacViewDecoupleMode ? 'decoupled' : 'raw',
+      queueTauMs: _ffMacQueueSmoothTauMs,
+      viewTauMs: _ffMacAimSmoothTauMs,
+      aimTauMs: _ffMacAimSmoothTauMs,
+      queueDX: _ffMacQueueDX,
+      queueDY: _ffMacQueueDY,
+      velX: _ffMacVelX,
+      velY: _ffMacVelY,
+      velHoldMs: _ffMacVelHoldMs,
+      pulseDuty: _ffMacPulseDutyEma,
+      sparseBoost,
+    };
+  };
+}
+
+function _resetLookInputState() {
+  fpLookDX = 0;
+  fpLookDY = 0;
+  _lookVelX = 0;
+  _lookVelY = 0;
+  _lookYawTarget = fpYaw;
+  _lookPitchTarget = fpPitch;
+  _ffMacLookStepAccMs = 0;
+  _ffMacPendingDX = 0;
+  _ffMacPendingDY = 0;
+  _ffMacQueueDX = 0;
+  _ffMacQueueDY = 0;
+  _ffMacPulseDutyEma = _ffMacDutyTarget;
+  _ffMacLastNonZeroPulseTs = 0;
+  _ffMacVelX = 0;
+  _ffMacVelY = 0;
+  _ffMacVelHoldMs = 0;
+  _ffMacLastEventTs = 0;
+  _ffMacLastInputTs = 0;
+  _ffMacPreferPointerRaw = false;
+  _ffMacPointerRawSeenTs = 0;
+}
+
+function _applyRawLookDelta(rawX, rawY) {
+  if (!rawX && !rawY) return;
+  fpYaw -= rawX * LOOK_RAD_PER_PX * mouseSens;
+  fpPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, fpPitch - rawY * LOOK_RAD_PER_PX * mouseSens));
+}
+
+function _getInputEventAgeMs(e) {
+  if (!e) return 0;
+  const ts = Number(e.timeStamp);
+  if (!Number.isFinite(ts)) return 0;
+  const hasPerf = typeof performance !== 'undefined' && typeof performance.now === 'function';
+  const perfNow = hasPerf ? performance.now() : 0;
+  const dateNow = Date.now();
+
+  // Firefox/mac can report either DOMHighResTimeStamp (relative) or
+  // epoch-based ms for input events depending on path.
+  let age = 0;
+  if (ts > 1e12) {
+    age = dateNow - ts;
+  } else if (perfNow) {
+    age = perfNow - ts;
+  }
+
+  if (!Number.isFinite(age)) return 0;
+  if (age < 0) return 0;
+  if (age > 5000) return 0;
+  return age;
+}
+
+function _shortAngleDelta(target, current) {
+  const tau = Math.PI * 2;
+  let d = (target - current + Math.PI) % tau;
+  if (d < 0) d += tau;
+  return d - Math.PI;
+}
+
+// Firefox detection. Used to side-step browser bugs in the mouse-look
+// pipeline. Firefox bug 1417702 (still NEW after 8 years) documents
+// that mousemove coalescing under pointer lock corrupts movementX/Y
+// because real and synthesized recenter events get merged at the IPC
+// layer with no way to distinguish them. Comment 12: "Mouse coalescing
+// in content side also break[s] it". So on Firefox we deliberately
+// skip getCoalescedEvents() and consume only the top-level event.
+const _IS_FIREFOX = typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent || '');
+// macOS detection. Bugzilla 1417702 manifests catastrophically on
+// Firefox + macOS specifically (60% of pointer-lock events arrive
+// with movementX=0 AND movementY=0 because the OS merges the
+// synthesized recenter request with real motion and they cancel out;
+// the few events that aren't canceled spike to 3-4× the natural
+// ceiling). Firefox + Windows works correctly. We use clientX/Y
+// deltas (no pointer lock) on this exact combo.
+const _IS_MAC = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform || navigator.userAgent || '');
+// FF/mac collision mode:
+// - lite: skip dynamic collision rebuilds and use static + purifier collision only.
+// - full: include all dynamic collision volumes (doors/drawers/window/desk/etc).
+let _ffMacCollisionMode = (_IS_FIREFOX && _IS_MAC) ? 'lite' : 'full';
+try {
+  const savedCollisionMode = localStorage.getItem(FF_MAC_COLLISION_MODE_KEY);
+  if (savedCollisionMode === 'full' || savedCollisionMode === 'lite') {
+    _ffMacCollisionMode = savedCollisionMode;
+  }
+} catch (e) { }
+if (_IS_FIREFOX && _IS_MAC) {
+  _ffMacCollisionMode = 'lite';
+  try { localStorage.setItem(FF_MAC_COLLISION_MODE_KEY, 'lite'); } catch (e) { }
+}
+// FF/mac pointer mode: direct = apply movementX/Y immediately,
+// reconstruct = pulse-to-velocity reconstruction in updatePhysics.
+// queue = accumulate pulses and drain smoothly per frame.
+// Default to direct/raw so pointer lock behaves like stock
+// PointerLockControls (no built-in backlog/catch-up latency).
+if (_IS_FIREFOX && _IS_MAC) {
+  _ffMacQueueMode = false;
+  _ffMacViewDecoupleMode = false;
+  FF_MAC_SIMPLE_MOUSEMOVE_MODE = true;
+} else {
+  _ffMacQueueMode = false;
+  _ffMacViewDecoupleMode = false;
+  FF_MAC_SIMPLE_MOUSEMOVE_MODE = true;
+}
+try {
+  const savedPointerMode = localStorage.getItem(FF_MAC_POINTER_MODE_KEY);
+  if (savedPointerMode === 'direct') {
+    _ffMacQueueMode = false;
+    FF_MAC_SIMPLE_MOUSEMOVE_MODE = true;
+  } else if (savedPointerMode === 'reconstruct') {
+    // Migrate prior reconstruct preference to queue smoothing.
+    _ffMacQueueMode = true;
+    FF_MAC_SIMPLE_MOUSEMOVE_MODE = false;
+  } else if (savedPointerMode === 'queue') {
+    _ffMacQueueMode = true;
+    FF_MAC_SIMPLE_MOUSEMOVE_MODE = false;
+  }
+} catch (e) { }
+try {
+  const savedViewMode = localStorage.getItem(FF_MAC_VIEW_MODE_KEY);
+  if (savedViewMode === 'raw') _ffMacViewDecoupleMode = false;
+  else if (savedViewMode === 'decoupled') _ffMacViewDecoupleMode = true;
+} catch (e) { }
+// Prior experiments persisted queue/decoupled modes locally. Force modern
+// FF/mac startup onto direct/raw so stale localStorage never re-enables a
+// laggy path unless the user explicitly opts in during this session.
+if (_IS_FIREFOX && _IS_MAC) {
+  _ffMacQueueMode = false;
+  FF_MAC_SIMPLE_MOUSEMOVE_MODE = true;
+  _ffMacViewDecoupleMode = false;
+  USE_POINTER_RAW = false;
+  try {
+    localStorage.setItem(FF_MAC_POINTER_MODE_KEY, 'direct');
+    localStorage.setItem(FF_MAC_VIEW_MODE_KEY, 'raw');
+  } catch (e) { }
+}
+try {
+  const savedViewTau = parseFloat(localStorage.getItem(FF_MAC_VIEW_TAU_KEY) || '');
+  if (Number.isFinite(savedViewTau)) {
+    _ffMacAimSmoothTauMs = Math.max(6, Math.min(45, savedViewTau));
+  }
+} catch (e) { }
+// Firefox+macOS unlocked-look fallback.
+// Production Three.js games (e.g. DISUKU) use stock pointer lock on
+// this combo without issue, which means our previous diagnosis ("the
+// browser is delivering corrupt deltas") was wrong. The stutter we
+// observed traces to OUR pipeline: an accumulate-in-mousemove +
+// drain-in-physics pattern (one-frame look latency), getCoalescedEvents
+// skipping (drops legit sub-frame motion), unadjustedMovement requests
+// (Firefox is finicky about granting these), and per-event clamps
+// fighting natural mouse spikes. PointerLockControls.js writes
+// yaw/pitch DIRECTLY in the mousemove handler with no filtering and
+// it Just Works — we're now doing the same. We keep a runtime backend
+// switch so we can A/B pointer-lock vs unlocked on real hardware.
+// Keep pointer lock (bounded cursor) as the default input mode.
+// Unlocked look remains available only as an explicit runtime opt-in.
+let _useUnlockedLook = false;
+try {
+  const savedUnlocked = localStorage.getItem(UNLOCKED_LOOK_MODE_KEY);
+  if (savedUnlocked === '1') _useUnlockedLook = true;
+  else if (savedUnlocked === '0') _useUnlockedLook = false;
+} catch (e) { }
+if (_IS_FIREFOX && _IS_MAC) {
+  // Enforce bounded cursor behavior on Firefox/mac by default.
+  _useUnlockedLook = false;
+  try { localStorage.setItem(UNLOCKED_LOOK_MODE_KEY, '0'); } catch (e) { }
+}
+let _thirdCamSolver = (_IS_FIREFOX && _IS_MAC) ? 'minimal' : 'legacy';
+try {
+  const savedSolver = localStorage.getItem(THIRD_CAM_SOLVER_KEY);
+  if (savedSolver === 'minimal' || savedSolver === 'legacy') {
+    _thirdCamSolver = savedSolver;
+  }
+} catch (e) { }
+// Stale persisted solver settings can re-enable heavier camera behavior on
+// Firefox/mac. Force the minimal solver there so camera response stays direct.
+if (_IS_FIREFOX && _IS_MAC) {
+  _thirdCamSolver = 'minimal';
+  try { localStorage.setItem(THIRD_CAM_SOLVER_KEY, 'minimal'); } catch (e) { }
+}
+
+// Last-known cursor clientX/Y for the unlocked-look fallback. Hoisted
+// to module scope so both _requestPointerLockWithRetry (resets on
+// re-lock attempts) and updatePhysics (edge-pan) can see them. The
+// mousemove handler in _bindInputs is the only writer during normal
+// gameplay; it captures clientX/Y into these so deltas are computed
+// across events.
+let _deathLastClientX = null;
+let _deathLastClientY = null;
+// True while the cursor is OUTSIDE the document. Set by the mouseout
+// listener; cleared on the next mousemove (which also re-baselines
+// _deathLastClientX/Y so re-entry doesn't produce a jump delta).
+// While outside, _deathLastClientX is clamped to the edge the cursor
+// exited through, so the updatePhysics edge-pan keeps rotating in
+// that direction — the user can swipe "past" the window edge and
+// the camera keeps spinning until they bring the cursor back.
+let _unlockedCursorOutside = false;
+
+function _setUnlockedLookMode(enabled, { persist = true } = {}) {
+  // Keep cursor bounded on Firefox/mac by forcing pointer-lock mode.
+  if (_IS_FIREFOX && _IS_MAC && enabled) enabled = false;
+  _useUnlockedLook = !!enabled;
+  if (persist) {
+    try { localStorage.setItem(UNLOCKED_LOOK_MODE_KEY, _useUnlockedLook ? '1' : '0'); } catch (e) { }
+  }
+  _resetLookInputState();
+  _deathLastClientX = null;
+  _deathLastClientY = null;
+  _unlockedCursorOutside = false;
+
+  if (!fpMode) return _useUnlockedLook;
+
+  if (_useUnlockedLook) {
+    _fpIgnorePointerUnlock = true;
+    if (document.pointerLockElement && document.exitPointerLock) {
+      try { document.exitPointerLock(); } catch (e) { }
+    }
+    document.body.classList.add('fp-no-cursor');
+    try {
+      const el = document.documentElement;
+      if (el && el.requestFullscreen && !document.fullscreenElement) {
+        const p = el.requestFullscreen();
+        if (p && typeof p.catch === 'function') p.catch(() => { });
+      }
+    } catch (e) { }
+    setTimeout(() => { _fpIgnorePointerUnlock = false; }, 300);
+  } else {
+    document.body.classList.remove('fp-no-cursor');
+    if (document.fullscreenElement && document.exitFullscreen) {
+      try {
+        const p = document.exitFullscreen();
+        if (p && typeof p.catch === 'function') p.catch(() => { });
+      } catch (e) { }
+    }
+    _requestPointerLockWithRetry(2, 0);
+  }
+  return _useUnlockedLook;
+}
+
+function _setFfMacPointerMode(mode, { persist = true } = {}) {
+  // Keep one deterministic path: direct pointer-lock deltas only.
+  _ffMacQueueMode = false;
+  FF_MAC_SIMPLE_MOUSEMOVE_MODE = true;
+  if (persist) {
+    try {
+      localStorage.setItem(FF_MAC_POINTER_MODE_KEY, 'direct');
+    } catch (e) { }
+  }
+  _resetLookInputState();
+  return 'direct';
+}
+
+function _setFfMacViewMode(mode, { persist = true } = {}) {
+  // Keep one deterministic path: render straight from gameplay yaw/pitch.
+  _ffMacViewDecoupleMode = false;
+  if (persist) {
+    try {
+      localStorage.setItem(FF_MAC_VIEW_MODE_KEY, 'raw');
+    } catch (e) { }
+  }
+  _resetLookInputState();
+  return 'raw';
+}
+
+function _setThirdCamSolver(mode, { persist = true } = {}) {
+  const m = String(mode || '').toLowerCase();
+  _thirdCamSolver = (m === 'legacy' || m === 'full' || m === 'default')
+    ? 'legacy'
+    : 'minimal';
+  if (persist) {
+    try { localStorage.setItem(THIRD_CAM_SOLVER_KEY, _thirdCamSolver); } catch (e) { }
+  }
+  return _thirdCamSolver;
+}
+
+function _setFfMacCollisionMode(mode, { persist = true } = {}) {
+  const m = String(mode || '').toLowerCase();
+  _ffMacCollisionMode = (m === 'full') ? 'full' : 'lite';
+  if (persist) {
+    try { localStorage.setItem(FF_MAC_COLLISION_MODE_KEY, _ffMacCollisionMode); } catch (e) { }
+  }
+  _ffMacBoxesCache = null;
+  _ffMacBoxesCacheTs = 0;
+  return _ffMacCollisionMode;
+}
+
+function _isMinimalThirdCamSolver() {
+  return _thirdCamSolver === 'minimal';
+}
+
+if (typeof window !== 'undefined') {
+  window._setLookInputMode = (mode = 'pointerlock') => {
+    const m = String(mode || '').toLowerCase();
+    const unlocked = (m === 'unlocked' || m === 'client' || m === 'fullscreen' || m === 'edgepan');
+    _setUnlockedLookMode(unlocked, { persist: true });
+    return _useUnlockedLook ? 'unlocked' : 'pointerlock';
+  };
+  window._getLookInputMode = () => (_useUnlockedLook ? 'unlocked' : 'pointerlock');
+  window._setThirdCamSolver = (mode = 'minimal') => _setThirdCamSolver(mode, { persist: true });
+  window._getThirdCamSolver = () => _thirdCamSolver;
+  window._setFfMacCollisionMode = (mode = 'lite') => _setFfMacCollisionMode(mode, { persist: true });
+  window._getFfMacCollisionMode = () => _ffMacCollisionMode;
+}
 
 const _fwd = new THREE.Vector3();
 const _right = new THREE.Vector3();
@@ -882,6 +1475,19 @@ let _purifierRefs = null;
 let _onExitFp = null;
 let _fpHud = null;
 let _purifierGroup = null;
+let _ffMacPointerLockControls = null;
+const _ffMacLookEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+
+function _usingFfMacPointerLockControls() {
+  return !!(_IS_FIREFOX && _IS_MAC && _ffMacPointerLockControls && _ffMacPointerLockControls.isLocked);
+}
+
+function _syncLookFromCameraQuaternion() {
+  if (!_camera) return;
+  _ffMacLookEuler.setFromQuaternion(_camera.quaternion, 'YXZ');
+  fpYaw = _ffMacLookEuler.y;
+  fpPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, _ffMacLookEuler.x));
+}
 
 // Skateboard visual (loaded once, attached under cat feet)
 let _skateboardLoadStarted = false;
@@ -927,7 +1533,18 @@ let _macScreenHW = 0, _macScreenHH = 0;
 let _purifierBoxesCache = null;
 let _purifierBoxesDirtyFlag = true;
 let _purifierFilterSig = -1;
-export function invalidatePurifierCollision() { _purifierBoxesDirtyFlag = true; }
+export function invalidatePurifierCollision() {
+  _purifierBoxesDirtyFlag = true;
+  _ffMacBoxesCache = null;
+  _ffMacBoxesCacheTs = 0;
+}
+
+// Firefox/mac gameplay can spend too much time rebuilding dynamic
+// collision boxes every frame; cache for a larger window to reduce
+// main-thread contention that delays input event delivery.
+const FF_MAC_BOX_CACHE_MS = 120;
+let _ffMacBoxesCache = null;
+let _ffMacBoxesCacheTs = 0;
 
 function _isObjectVisibleInWorld(obj) {
   for (let n = obj; n; n = n.parent) {
@@ -1873,6 +2490,11 @@ export function init(refs) {
   _purifierRefs = refs.purifierRefs || null;
   _onExitFp = refs.onExitFp || null;
 
+  // Keep a single pointer-lock input path on Firefox/mac.
+  // The PointerLockControls bridge adds a second competing listener,
+  // which makes A/B debugging harder and can mask direct-path changes.
+  _ffMacPointerLockControls = null;
+
   // Build static collision boxes from room refs
   _buildStaticBoxes();
 
@@ -1932,26 +2554,58 @@ function _isPointerLockCooldownError(err) {
   return /pointer lock cannot be acquired immediately after the user has exited the lock/i.test(msg);
 }
 
+// Track whether the browser accepted unadjustedMovement so we don't
+// keep retrying it on every lock cycle. true/false once probed; null = unknown.
+let _unadjustedMovementSupported = null;
+
 function _requestPointerLockWithRetry(retries = 2, delayMs = 0) {
+  // Firefox + macOS: optional skip pointer lock entirely. See _useUnlockedLook
+  // comment near top of file. The unlocked clientX/Y delta path
+  // (originally just for the death window) is repurposed as the
+  // primary look path on this combo. Cursor is hidden via the
+  // .fp-no-cursor class (toggled by setPaused / fp mode entry).
+  if (_useUnlockedLook) {
+    _deathLastClientX = null;
+    _deathLastClientY = null;
+    return;
+  }
   const attempt = () => {
     if (!_canvas || !fpMode || fpPaused || document.pointerLockElement) return;
+
+    // Use stock pointer lock on Firefox + macOS. unadjustedMovement can
+    // quantize small trackpad deltas there. Other combos keep trying
+    // unadjusted first, then fall back.
     let req;
-    try {
-      req = _canvas.requestPointerLock();
-    } catch (err) {
-      if (_isPointerLockCooldownError(err) && retries > 0) {
-        _clearPointerLockRetry();
-        _pointerLockRetryTimer = setTimeout(() => {
-          _pointerLockRetryTimer = null;
-          _requestPointerLockWithRetry(retries - 1, 0);
-        }, 260);
+    let triedUnadjusted = false;
+    if (!(_IS_FIREFOX && _IS_MAC)) {
+      try {
+        triedUnadjusted = true;
+        req = _canvas.requestPointerLock({ unadjustedMovement: true });
+      } catch (err) {
+        req = null;
       }
-      return;
+    }
+    if (!req) {
+      try { req = _canvas.requestPointerLock(); } catch (err2) {
+        if (_isPointerLockCooldownError(err2) && retries > 0) {
+          _clearPointerLockRetry();
+          _pointerLockRetryTimer = setTimeout(() => {
+            _pointerLockRetryTimer = null;
+            _requestPointerLockWithRetry(retries - 1, 0);
+          }, 260);
+        }
+        return;
+      }
     }
 
     // Safari/modern browsers may return a Promise; always handle rejection.
     if (req && typeof req.then === 'function') {
       req.catch(err => {
+        // unadjustedMovement not granted on this combo → retry without.
+        if (triedUnadjusted && err && err.name === 'NotSupportedError') {
+          try { _canvas.requestPointerLock(); } catch (e) { /* ignore */ }
+          return;
+        }
         if (_isPointerLockCooldownError(err) && retries > 0) {
           _clearPointerLockRetry();
           _pointerLockRetryTimer = setTimeout(() => {
@@ -1979,6 +2633,8 @@ function _requestPointerLockWithRetry(retries = 2, delayMs = 0) {
 // Simplified set — just the major furniture. Full monolith had ~40 AABBs.
 
 function _buildStaticBoxes() {
+  _ffMacBoxesCache = null;
+  _ffMacBoxesCacheTs = 0;
   const fy = getFloorY();
   _staticBoxes = [];
 
@@ -2597,7 +3253,16 @@ function _sampleOutdoorGroundY(worldX, worldZ) {
   return flatY + 1;      // top of the 2"-tall grass/road slabs
 }
 
-function _getBoxes() {
+function _getBoxes(nowTs = 0) {
+  if (_IS_FIREFOX && _IS_MAC && _ffMacBoxesCache && !_purifierBoxesDirtyFlag) {
+    const ts = nowTs || ((typeof performance !== 'undefined' && performance.now)
+      ? performance.now()
+      : Date.now());
+    if ((ts - _ffMacBoxesCacheTs) < FF_MAC_BOX_CACHE_MS) {
+      return _ffMacBoxesCache;
+    }
+  }
+
   resetBoxPool();
   const result = _staticBoxes.slice();
 
@@ -2619,6 +3284,14 @@ function _getBoxes() {
   }
   if (_purifierBoxesCache) {
     for (let i = 0; i < _purifierBoxesCache.length; i++) result.push(_purifierBoxesCache[i]);
+  }
+
+  if (_IS_FIREFOX && _IS_MAC && _ffMacCollisionMode === 'lite') {
+    _ffMacBoxesCache = result;
+    _ffMacBoxesCacheTs = nowTs || ((typeof performance !== 'undefined' && performance.now)
+      ? performance.now()
+      : Date.now());
+    return result;
   }
 
   // Closet bifold doors — dynamic collision based on door state
@@ -3004,6 +3677,12 @@ function _getBoxes() {
     }
   }
 
+  if (_IS_FIREFOX && _IS_MAC) {
+    _ffMacBoxesCache = result;
+    _ffMacBoxesCacheTs = nowTs || ((typeof performance !== 'undefined' && performance.now)
+      ? performance.now()
+      : Date.now());
+  }
   return result;
 }
 
@@ -3034,10 +3713,24 @@ export function toggleFirstPerson() {
     _camera.fov = fpFov;
     _camera.updateProjectionMatrix();
 
+    // Keep cursor bounded on Firefox/mac by forcing pointer-lock mode.
+    if (_IS_FIREFOX && _IS_MAC) {
+      _setUnlockedLookMode(false, { persist: true });
+    }
+
     // Request pointer lock
     _fpIgnorePointerUnlock = true;
     setTimeout(() => { _fpIgnorePointerUnlock = false; }, 300);
     _requestPointerLockWithRetry(3, 0);
+    if (!state.isMobile) {
+      setTimeout(() => {
+        if (!fpMode || fpPaused || _deathLocked || _useUnlockedLook) return;
+        if (!document.pointerLockElement) {
+          if (_showToast) _showToast('Click the game to lock cursor');
+          setPaused(true);
+        }
+      }, 700);
+    }
 
     // Disable orbit controls
     if (_controls) _controls.enabled = false;
@@ -3052,7 +3745,12 @@ export function toggleFirstPerson() {
     // Reset coins + timer
     coins.fullReset();
     coins.setCoinsVisible(true);
-    leaderboard.startTimer();
+    // Defer the timer start until the first physics frame actually
+    // runs — see _pendingTimerStart for rationale. resetTimer() puts
+    // the HUD pill in the "Ready" state at 00:00.0 so it doesn't
+    // flash a stale finish/running state during the boot stall.
+    leaderboard.resetTimer();
+    _pendingTimerStart = true;
     void leaderboard.startSharedRun(isSpeedMode() ? 'speed' : 'normal');
 
     // Show cat in third-person
@@ -3068,6 +3766,26 @@ export function toggleFirstPerson() {
 
     if (_markShadowsDirty) _markShadowsDirty();
     document.body.classList.add('play-mode');
+    if (_useUnlockedLook) {
+      document.body.classList.add('fp-no-cursor');
+      // Firefox+macOS: pointer lock is broken (bug 1417702) so we use
+      // unlocked clientX/Y deltas. Without pointer lock there's no API
+      // to confine the cursor to the window — EXCEPT fullscreen mode,
+      // which bounds the cursor to the screen edge. Since the window
+      // *is* the screen in fullscreen, the cursor can't leave the
+      // game. Edge-pan still kicks in when the cursor reaches the
+      // viewport edge so you can rotate 360°. Wrapped in try/catch
+      // because requestFullscreen rejects if not from a user gesture
+      // (it should be — we got here from a Play button click — but
+      // belt-and-suspenders).
+      try {
+        const el = document.documentElement;
+        if (el && el.requestFullscreen && !document.fullscreenElement) {
+          const p = el.requestFullscreen();
+          if (p && typeof p.catch === 'function') p.catch(() => {});
+        }
+      } catch (e) { /* fullscreen unavailable; cursor will leave window */ }
+    }
     _syncSkateToggleUi();
     _playModeCue(true);
     if (_showToast) _showToast('Game mode! WASD to move, Space to jump (wall jump too!)');
@@ -3091,8 +3809,7 @@ export function toggleFirstPerson() {
 
     // Clear input
     for (const k in fpKeys) fpKeys[k] = false;
-    fpLookDX = 0;
-    fpLookDY = 0;
+    _resetLookInputState();
     _velX = 0;
     _velZ = 0;
     _lastPhysicsTs = 0;
@@ -3129,6 +3846,16 @@ export function toggleFirstPerson() {
     // Restore cat shadow casting for orbit mode
     catAnimation.setCatShadows(true);
     document.body.classList.remove('play-mode');
+    document.body.classList.remove('fp-no-cursor');
+    // Exit the fullscreen we entered on unlocked-look FP mode
+    // start. Skip if the user is already out of fullscreen (they
+    // hit Esc, etc.).
+    if (_useUnlockedLook && document.fullscreenElement && document.exitFullscreen) {
+      try {
+        const p = document.exitFullscreen();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch (e) { /* not in fullscreen */ }
+    }
     _syncSkateToggleUi();
     _playModeCue(false);
     // Notify the host so it can show the title splash (or whatever
@@ -3142,6 +3869,7 @@ function _respawn() {
   fpPos.set(PLAYER_SPAWN_X, getPlayerFloorY(), PLAYER_SPAWN_Z);
   fpYaw = 0;
   fpPitch = 0;
+  _resetLookInputState();
   fpVy = 0;
   _velX = 0;
   _velZ = 0;
@@ -3196,8 +3924,11 @@ function _resetRun() {
   _resetWorldState();
   coins.fullReset();
   coins.setCoinsVisible(true);
+  // Same deferred-start pattern as toggleFirstPerson(): the next
+  // updatePhysics() tick fires startTimer() so any single-frame stall
+  // from the world-state reset doesn't get billed to the run.
   leaderboard.resetTimer();
-  leaderboard.startTimer();
+  _pendingTimerStart = true;
   void leaderboard.startSharedRun(isSpeedMode() ? 'speed' : 'normal');
 }
 
@@ -3235,15 +3966,12 @@ export function setPaused(paused) {
   if (fpPaused) {
     // Clear held keys + look deltas
     for (const k in fpKeys) fpKeys[k] = false;
-    fpLookDX = 0;
-    fpLookDY = 0;
+    _resetLookInputState();
     _lastPhysicsTs = 0;
     _silenceSkateRoll(true);
     _silenceSsAudio();
-    // Pause the run timer too — physics/animation freeze on pause, so
-    // letting the timer keep counting would penalize the player for
-    // opening the menu. Resumed below when fpPaused flips back to false.
-    leaderboard.pauseTimer();
+    // Keep the run live while paused so Esc/auto-pause cannot freeze
+    // the timer or player momentum.
 
     // Show pause overlay (unless finish is showing)
     if (overlay && !finishOpen) {
@@ -3264,6 +3992,16 @@ export function setPaused(paused) {
     _syncMouseSensUi();
     _syncFovUi();
 
+    if (_useUnlockedLook) {
+      document.body.classList.remove('fp-no-cursor');
+      if (document.fullscreenElement && document.exitFullscreen) {
+        try {
+          const p = document.exitFullscreen();
+          if (p && typeof p.catch === 'function') p.catch(() => { });
+        } catch (e) { }
+      }
+    }
+
     // Release pointer lock
     _clearPointerLockRetry();
     _fpIgnorePointerUnlock = true;
@@ -3273,8 +4011,6 @@ export function setPaused(paused) {
     // Hide overlays
     if (overlay) overlay.style.display = 'none';
     if (crosshair) crosshair.style.opacity = '';
-    // Resume the run timer (mirrors the pauseTimer call above).
-    leaderboard.resumeTimer();
     // Release focus trap
     if (_pauseFocusTrap) { _pauseFocusTrap.release(); _pauseFocusTrap = null; }
     if (_pauseSavedFocus) { _pauseSavedFocus.restore(); _pauseSavedFocus = null; }
@@ -3283,7 +4019,18 @@ export function setPaused(paused) {
     if (_canvas && !state.isMobile) {
       _fpIgnorePointerUnlock = true;
       setTimeout(() => {
-        _requestPointerLockWithRetry(4, 0);
+        if (_useUnlockedLook) {
+          document.body.classList.add('fp-no-cursor');
+          try {
+            const el = document.documentElement;
+            if (el && el.requestFullscreen && !document.fullscreenElement) {
+              const p = el.requestFullscreen();
+              if (p && typeof p.catch === 'function') p.catch(() => { });
+            }
+          } catch (e) { }
+        } else {
+          _requestPointerLockWithRetry(4, 0);
+        }
         setTimeout(() => { _fpIgnorePointerUnlock = false; }, 300);
       }, 200);
     }
@@ -3305,8 +4052,7 @@ export function setDeathLock(enabled) {
     // own show step (in main.js) calls exitPointerLock() right before
     // it appears so the cursor can reach Revive / Reset Run.
     for (const k in fpKeys) fpKeys[k] = false;
-    fpLookDX = 0;
-    fpLookDY = 0;
+    _resetLookInputState();
     _lastPhysicsTs = 0;
     _silenceSkateRoll(true);
     _silenceSsAudio(true);
@@ -3391,26 +4137,164 @@ export function getJumpHoldFrames() {
 
 export function updatePhysics(ts, dtSec, animFrameScale) {
   if (!fpMode) return;
-  // While death-locked we still run the look pass below so the camera
-  // can pan during the death animation. Pause is the normal stop.
-  if (fpPaused && !_deathLocked) return;
+  // Keep simulation running while paused so Esc/auto-pause cannot freeze
+  // run time or movement. Death lock is handled by its own movement/input
+  // gates so the death sequence still behaves as designed.
+
+  // Fire the deferred run-timer start on the first physics frame after
+  // entering FP / resetting. Anchoring t=0 here means the clock starts
+  // at the moment the world is actually live and reacting to input,
+  // not at the moment the player clicked Play. Skip while death-locked
+  // (the run is already active in that case).
+  if (_pendingTimerStart && !_deathLocked) {
+    _pendingTimerStart = false;
+    leaderboard.startTimer();
+  }
 
   const fpDtMs = _lastPhysicsTs ? Math.min(80, Math.max(1, ts - _lastPhysicsTs)) : (1000 / 60);
   _lastPhysicsTs = ts;
   const frameScale = fpDtMs / (1000 / 60);
 
-  // ── Look (smoothed) ────────────────────────────────────────────────
-  // Look is processed even while death-locked so the player can watch
-  // the cat tip over in style. Movement (below) is gated by the lock.
-  const maxLookStep = 32;
-  const stepX = Math.max(-maxLookStep, Math.min(maxLookStep, fpLookDX));
-  const stepY = Math.max(-maxLookStep, Math.min(maxLookStep, fpLookDY));
-  fpLookDX -= stepX;
-  fpLookDY -= stepY;
-  if (Math.abs(fpLookDX) > maxLookStep * 4) fpLookDX *= 0.5;
-  if (Math.abs(fpLookDY) > maxLookStep * 4) fpLookDY *= 0.5;
-  fpYaw -= stepX * 0.0022 * mouseSens;
-  fpPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, fpPitch - stepY * 0.0022 * mouseSens));
+  // ── Look ──────────────────────────────────────────────────────────
+  // Frame-time velocity smoothing for non-pointer-lock look paths
+  // (mobile touch + unlocked death-window fallback). Pointer lock
+  // accumulates raw deltas in mousemove and applies them once per
+  // frame for low overhead and consistent pacing.
+  //
+  // The unlocked paths push raw deltas into
+  // fpLookDX/fpLookDY. Each frame: convert this-frame's accumulated
+  // delta into a per-ms velocity (frameVx = fpLookDX / fpDtMs),
+  // low-pass filter against the running velocity, and integrate
+  // (vel * fpDtMs) into yaw/pitch.
+  //
+  // Why frame-time, not event-time: when input poll rate matches
+  // screen refresh (e.g. 120Hz trackpad + 120Hz monitor) events
+  // don't fall evenly — some frames see 0 events, others see 2.
+  // Computing velocity per-event from dt-since-last-event makes
+  // velocity spike when bunched events arrive close together.
+  // Computing it once per frame from the frame's total delta is
+  // stable and self-correcting — total motion is preserved long-term
+  // because frames with 0 events still contribute the running
+  // velocity * dt while frames with bursts pull velocity up smoothly.
+  //
+  // Smoothing time constant tau is in MILLISECONDS so the same
+  // perceptual behavior holds at 30/60/120/540Hz, independent of
+  // both frame rate and input device rate. alpha = 1 - exp(-dt/tau)
+  // is the discrete equivalent of a first-order low-pass with
+  // continuous time constant tau.
+  {
+    if (document.pointerLockElement) {
+      // Pointer-lock look is applied directly in input events.
+      // Keep these queues empty so we don't add one-frame latency.
+      fpLookDX = 0;
+      fpLookDY = 0;
+      _lookVelX = 0;
+      _lookVelY = 0;
+      if (_IS_FIREFOX && _IS_MAC) {
+        if (_usingFfMacPointerLockControls()) {
+          _ffMacQueueMode = false;
+          FF_MAC_SIMPLE_MOUSEMOVE_MODE = true;
+          _ffMacViewDecoupleMode = false;
+          _syncLookFromCameraQuaternion();
+          _ffMacLookStepAccMs = 0;
+          _ffMacPendingDX = 0;
+          _ffMacPendingDY = 0;
+          _ffMacQueueDX = 0;
+          _ffMacQueueDY = 0;
+          _ffMacVelX = 0;
+          _ffMacVelY = 0;
+          _ffMacVelHoldMs = 0;
+        } else {
+        _ffMacQueueMode = false;
+        FF_MAC_SIMPLE_MOUSEMOVE_MODE = true;
+        _ffMacViewDecoupleMode = false;
+        _ffMacLookStepAccMs = 0;
+        _ffMacPendingDX = 0;
+        _ffMacPendingDY = 0;
+        _ffMacQueueDX = 0;
+        _ffMacQueueDY = 0;
+        _ffMacVelX = 0;
+        _ffMacVelY = 0;
+        _ffMacVelHoldMs = 0;
+        }
+      } else {
+        _ffMacLookStepAccMs = 0;
+        _ffMacPendingDX = 0;
+        _ffMacPendingDY = 0;
+        _ffMacQueueDX = 0;
+        _ffMacQueueDY = 0;
+        _ffMacVelX = 0;
+        _ffMacVelY = 0;
+        _ffMacVelHoldMs = 0;
+      }
+    } else {
+      _ffMacLookStepAccMs = 0;
+      _ffMacPendingDX = 0;
+      _ffMacPendingDY = 0;
+      _ffMacQueueDX = 0;
+      _ffMacQueueDY = 0;
+      _ffMacVelX = 0;
+      _ffMacVelY = 0;
+      _ffMacVelHoldMs = 0;
+      fpLookDX = 0;
+      fpLookDY = 0;
+      if (_useUnlockedLook) {
+        _lookVelX = 0;
+        _lookVelY = 0;
+        if (_deathLastClientX !== null) {
+          const vw = Math.max(1, window.innerWidth || 1);
+          const edgeBandPx = Math.max(18, Math.min(96, vw * 0.05));
+          let edgeStrength = 0;
+          if (_deathLastClientX <= edgeBandPx) {
+            edgeStrength = -Math.max(0, Math.min(1, (edgeBandPx - _deathLastClientX) / edgeBandPx));
+          } else if (_deathLastClientX >= (vw - edgeBandPx)) {
+            edgeStrength = Math.max(0, Math.min(1, (_deathLastClientX - (vw - edgeBandPx)) / edgeBandPx));
+          }
+          if (edgeStrength !== 0) {
+            const edgeSpeedPxPerSec = 820;
+            const edgeDx = edgeStrength * edgeSpeedPxPerSec * (fpDtMs / 1000);
+            _applyRawLookDelta(edgeDx, 0);
+          }
+        }
+      } else {
+        const frameVx = fpDtMs > 0 ? fpLookDX / fpDtMs : 0;
+        const frameVy = fpDtMs > 0 ? fpLookDY / fpDtMs : 0;
+        const tau = 15; // ms — smoothing time constant
+        const alpha = 1 - Math.exp(-fpDtMs / tau);
+        _lookVelX = _lookVelX * (1 - alpha) + frameVx * alpha;
+        _lookVelY = _lookVelY * (1 - alpha) + frameVy * alpha;
+        // Snap tiny residuals to zero so the camera doesn't crawl after
+        // the user has stopped moving.
+        if (Math.abs(_lookVelX) < 1e-4) _lookVelX = 0;
+        if (Math.abs(_lookVelY) < 1e-4) _lookVelY = 0;
+        if (_lookVelX !== 0 || _lookVelY !== 0) {
+          const dxThisFrame = _lookVelX * fpDtMs;
+          const dyThisFrame = _lookVelY * fpDtMs;
+          _applyRawLookDelta(dxThisFrame, dyThisFrame);
+        }
+      }
+    }
+  }
+
+  // FF/mac decoupled view: keep gameplay heading on raw fpYaw/fpPitch,
+  // but smooth the rendered camera orientation so integer pulse input
+  // does not show up as visible micro-stair-steps.
+  let renderYaw = fpYaw;
+  let renderPitch = fpPitch;
+  const useDecoupledView = _IS_FIREFOX && _IS_MAC && document.pointerLockElement && _ffMacViewDecoupleMode;
+  if (useDecoupledView) {
+    const alpha = 1 - Math.exp(-fpDtMs / _ffMacAimSmoothTauMs);
+    _lookYawTarget += _shortAngleDelta(fpYaw, _lookYawTarget) * alpha;
+    _lookPitchTarget += (fpPitch - _lookPitchTarget) * alpha;
+    _lookPitchTarget = Math.max(PITCH_MIN, Math.min(PITCH_MAX, _lookPitchTarget));
+    if (Math.abs(_shortAngleDelta(fpYaw, _lookYawTarget)) < 1e-6) _lookYawTarget = fpYaw;
+    if (Math.abs(fpPitch - _lookPitchTarget) < 1e-6) _lookPitchTarget = fpPitch;
+    renderYaw = _lookYawTarget;
+    renderPitch = _lookPitchTarget;
+  } else {
+    _lookYawTarget = fpYaw;
+    _lookPitchTarget = fpPitch;
+  }
 
   // Death lock: skip movement/physics from here on. The look pass above
   // already updated yaw/pitch; do a minimal camera write here so the
@@ -3420,9 +4304,9 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   // player's frozen position.
   if (_deathLocked) {
     const dLook = _viewDir.set(
-      -Math.sin(fpYaw) * Math.cos(fpPitch),
-      Math.sin(fpPitch),
-      -Math.cos(fpYaw) * Math.cos(fpPitch)
+      -Math.sin(renderYaw) * Math.cos(renderPitch),
+      Math.sin(renderPitch),
+      -Math.cos(renderYaw) * Math.cos(renderPitch)
     );
     if (fpCamMode === 'first') {
       _camera.position.set(fpPos.x, fpPos.y, fpPos.z);
@@ -3884,7 +4768,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   if (outdoorZone) {
     groundY = _sampleOutdoorGroundY(nx, nz) + EYE_H;
   }
-  const boxes = _getBoxes();
+  const boxes = _getBoxes(ts);
 
   for (const box of boxes) {
     // ── OBB (rotated box) collision ───────────────────────────────
@@ -4044,9 +4928,9 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
   // ── Camera ────────────────────────────────────────────────────────
   const lookDir = _viewDir.set(
-    -Math.sin(fpYaw) * Math.cos(fpPitch),
-    Math.sin(fpPitch),
-    -Math.cos(fpYaw) * Math.cos(fpPitch)
+    -Math.sin(renderYaw) * Math.cos(renderPitch),
+    Math.sin(renderPitch),
+    -Math.cos(renderYaw) * Math.cos(renderPitch)
   );
 
   if (fpCamMode === 'first') {
@@ -4057,130 +4941,134 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   } else {
     // Third-person
     const focal = _lookTarget.set(fpPos.x + fwd.x * 0.6, fpPos.y + 0.7, fpPos.z + fwd.z * 0.6);
-    const camShoulder = 0.9;
-    // pitchN: 0 = looking fully down, 1 = looking fully up
-    const pitchN = (fpPitch - PITCH_MIN) / (PITCH_MAX - PITCH_MIN);
-    const camDist = 9.0;
-    const camLift = 2.2;
-    // When looking up, the raw lookDir-based offset drops the camera
-    // BELOW the cat (so the cat fills the upper screen and blocks the
-    // ceiling view). To fix that without ditching third-person rotation,
-    // we blend the camera's positioning direction toward the yaw-only
-    // (horizontal) direction as pitch rises, and add extra lift + a bit
-    // of pull-back. Result: looking down still orbits around the cat
-    // (great for that close-up rotate-and-admire view), but looking up
-    // keeps the camera behind/above the cat so the ceiling stays clear.
-    const pitchUpT = Math.max(0, Math.min(1, (pitchN - 0.5) / 0.5));
-    const upEase = pitchUpT * pitchUpT * (3 - 2 * pitchUpT); // smoothstep
-    // fwd is yaw-only (horizontal); blend lookDir → fwd as we look up.
-    const camDirX = lookDir.x * (1 - upEase) + fwd.x * upEase;
-    const camDirY = lookDir.y * (1 - upEase);
-    const camDirZ = lookDir.z * (1 - upEase) + fwd.z * upEase;
-    const camDistEff = camDist * (1 + upEase * 0.35);
-    const camLiftEff = camLift + upEase * 3.0;
-    let dxC = -camDirX * camDistEff + right.x * camShoulder;
-    let dyC = -camDirY * camDistEff + camLiftEff;
-    let dzC = -camDirZ * camDistEff + right.z * camShoulder;
-
-    // Camera wall clamp — include closet area so player can walk in
-    // Guest doorway transition zone: when the focal point is near the
-    // right wall (X≈-51) and within the guest door Z range (34..66),
-    // allow the camera to follow into the office room smoothly.
-    const inGuestDoorway = focal.x < -51 + 4 && focal.x > -51 - 8
-      && focal.z > 34 - 2 && focal.z < 66 + 2;
-    const inGuestRoom = focal.x < -51 - 1 && focal.z > -78 && focal.z < 69;
-    // Match physics outdoorZone — true whenever the focal point is outside
-    // all three house volumes (bedroom, office, hallway). Y-bounded so the
-    // camera follows the player onto the roof instead of dropping inside.
-    // Threshold sits a touch above the ceiling (focal.y = fpPos.y + 0.7;
-    // indoor max ≈ fy+80.2) to avoid flicker at the indoor jump apex.
-    const _roofYf = getFloorY() + 82;
-    const fInBedroom = (focal.x >= -51 && focal.x <= 81 && focal.z >= -78 && focal.z <= 49 && focal.y < _roofYf);
-    const fInOffice = (focal.x >= -183 && focal.x <= -51 && focal.z >= -78 && focal.z <= 69 && focal.y < _roofYf);
-    const fInHallwayVol = (focal.x >= -51 && focal.x <= -11 && focal.z >= 49 && focal.z <= 289 && focal.y < _roofYf);
-    const inOutdoor = !(fInBedroom || fInOffice || fInHallwayVol);
-    const inHallway = focal.z > 49 - 1 && !inGuestDoorway && !inGuestRoom && !inOutdoor;
-    let camWallXMin, camWallXMax;
-    if (inOutdoor) {
-      camWallXMin = -3000;
-      camWallXMax = 3000;
-    } else if (inGuestRoom || inGuestDoorway) {
-      camWallXMin = -183 + 1;
-      camWallXMax = -LEFT_WALL_X - 1;
-    } else if (inHallway) {
-      camWallXMin = -51 + 1;
-      camWallXMax = -11 - 1;
+    if (_isMinimalThirdCamSolver()) {
+      // Minimal camera pipeline for FF/mac jitter isolation: no pitch-based
+      // solver, no room-clamp scaling, and no look-target blending.
+      const camDist = 8.8;
+      const camLift = 2.8;
+      const camShoulder = 0.35;
+      const cxC = focal.x - lookDir.x * camDist + right.x * camShoulder;
+      const cyC = focal.y - lookDir.y * camDist + camLift;
+      const czC = focal.z - lookDir.z * camDist + right.z * camShoulder;
+      _camera.position.set(cxC, cyC, czC);
+      _camera.lookAt(
+        cxC + lookDir.x * 10,
+        cyC + lookDir.y * 10,
+        czC + lookDir.z * 10
+      );
     } else {
-      camWallXMin = -(SIDE_WALL_X + CLOSET_DEPTH) + 1;
-      camWallXMax = -LEFT_WALL_X - 1;
-    }
-    // Z bounds must include closet interior (extends to cZ - cIW/2 = -89)
-    let camWallZMin = CLOSET_Z - CLOSET_INTERIOR_W / 2 + 1; // closet -Z side wall
-    // Default Z clamp stops at the back-wall inner face. When the player is in
-    // the hallway extension (focal X inside the hallway opening and past the
-    // back wall), extend Z so the camera can follow. Also extend for office
-    // and the guest doorway transition.
-    const inHallwayX = (focal.x >= -51 + 1 && focal.x <= -11 - 1);
-    let camWallZMax;
-    if ((inHallwayX && focal.z > 49 - 6) || inGuestRoom || inGuestDoorway) {
-      camWallZMax = 289 - 1;
-    } else {
-      camWallZMax = 49 - 1;
-    }
-    // Outdoors: the lawn extends far in every direction with no walls, so
-    // open up the Z clamp to match and let the camera follow the cat freely.
-    if (inOutdoor) {
-      camWallZMin = -3000;
-      camWallZMax = 3000;
-    }
-    // Camera Y min tracks the player's current ground, not the room floor,
-    // so on elevated surfaces (bed, nightstand) it doesn't clip below them.
-    // Outdoors the lawn drops well below floorY, so we drop the indoor floor
-    // term and let the camera sit just above the player's feet.
-    const cyMinFloor = inOutdoor ? (fpPos.y - EYE_H - 20) : (floorY + 0.5);
-    const cyMin = Math.max(cyMinFloor, fpPos.y - EYE_H + 1.5);
-    // Outdoors uses the same expanded ceiling as physics (floorY + 200).
-    const cyMax = inOutdoor ? (floorY + 200) - 2 : (floorY + 80) - 2;
-    const maxDX = dxC > 0 ? (camWallXMax - focal.x) : (focal.x - camWallXMin);
-    const maxDY = dyC > 0 ? (cyMax - focal.y) : (focal.y - cyMin);
-    const maxDZ = dzC > 0 ? (camWallZMax - focal.z) : (focal.z - camWallZMin);
-    const absDX = Math.abs(dxC), absDY = Math.abs(dyC), absDZ = Math.abs(dzC);
-    let scale = 1;
-    if (absDX > maxDX && absDX > 1e-4) scale = Math.min(scale, Math.max(0, maxDX) / absDX);
-    if (absDY > maxDY && absDY > 1e-4) scale = Math.min(scale, Math.max(0, maxDY) / absDY);
-    if (absDZ > maxDZ && absDZ > 1e-4) scale = Math.min(scale, Math.max(0, maxDZ) / absDZ);
-    scale = Math.max(scale, 0.18);
+      const camShoulder = 0.9;
+      // pitchN: 0 = looking fully down, 1 = looking fully up
+      const pitchN = (fpPitch - PITCH_MIN) / (PITCH_MAX - PITCH_MIN);
+      const camDist = 9.0;
+      const camLift = 2.2;
+      // When looking up, the raw lookDir-based offset drops the camera
+      // BELOW the cat (so the cat fills the upper screen and blocks the
+      // ceiling view). To fix that without ditching third-person rotation,
+      // we blend the camera's positioning direction toward the yaw-only
+      // (horizontal) direction as pitch rises, and add extra lift + a bit
+      // of pull-back. Result: looking down still orbits around the cat
+      // (great for that close-up rotate-and-admire view), but looking up
+      // keeps the camera behind/above the cat so the ceiling stays clear.
+      const pitchUpT = Math.max(0, Math.min(1, (pitchN - 0.5) / 0.5));
+      const upEase = pitchUpT * pitchUpT * (3 - 2 * pitchUpT); // smoothstep
+      // fwd is yaw-only (horizontal); blend lookDir → fwd as we look up.
+      const camDirX = lookDir.x * (1 - upEase) + fwd.x * upEase;
+      const camDirY = lookDir.y * (1 - upEase);
+      const camDirZ = lookDir.z * (1 - upEase) + fwd.z * upEase;
+      const camDistEff = camDist * (1 + upEase * 0.35);
+      const camLiftEff = camLift + upEase * 3.0;
+      let dxC = -camDirX * camDistEff + right.x * camShoulder;
+      let dyC = -camDirY * camDistEff + camLiftEff;
+      let dzC = -camDirZ * camDistEff + right.z * camShoulder;
 
-    let cxC = focal.x + dxC * scale;
-    let cyC = focal.y + dyC * scale;
-    let czC = focal.z + dzC * scale;
-    // Hard clamp — camera must never leave the room.
-    // Track how much the Y clamp shifts the camera so we can shift
-    // the lookAt target by the same amount, preserving the viewing
-    // angle and preventing the crosshair from jumping at the ceiling.
-    const idealCyC = cyC;
-    cxC = Math.max(camWallXMin, Math.min(camWallXMax, cxC));
-    cyC = Math.max(cyMin, Math.min(cyMax, cyC));
-    czC = Math.max(camWallZMin, Math.min(camWallZMax, czC));
-    const camYShift = cyC - idealCyC;
+      // Camera wall clamp — include closet area so player can walk in
+      // Guest doorway transition zone: when the focal point is near the
+      // right wall (X≈-51) and within the guest door Z range (34..66),
+      // allow the camera to follow into the office room smoothly.
+      const inGuestDoorway = focal.x < -51 + 4 && focal.x > -51 - 8
+        && focal.z > 34 - 2 && focal.z < 66 + 2;
+      const inGuestRoom = focal.x < -51 - 1 && focal.z > -78 && focal.z < 69;
+      // Match physics outdoorZone — true whenever the focal point is outside
+      // all three house volumes (bedroom, office, hallway). Y-bounded so the
+      // camera follows the player onto the roof instead of dropping inside.
+      // Threshold sits a touch above the ceiling (focal.y = fpPos.y + 0.7;
+      // indoor max ≈ fy+80.2) to avoid flicker at the indoor jump apex.
+      const _roofYf = getFloorY() + 82;
+      const fInBedroom = (focal.x >= -51 && focal.x <= 81 && focal.z >= -78 && focal.z <= 49 && focal.y < _roofYf);
+      const fInOffice = (focal.x >= -183 && focal.x <= -51 && focal.z >= -78 && focal.z <= 69 && focal.y < _roofYf);
+      const fInHallwayVol = (focal.x >= -51 && focal.x <= -11 && focal.z >= 49 && focal.z <= 289 && focal.y < _roofYf);
+      const inOutdoor = !(fInBedroom || fInOffice || fInHallwayVol);
+      const inHallway = focal.z > 49 - 1 && !inGuestDoorway && !inGuestRoom && !inOutdoor;
+      let camWallXMin, camWallXMax;
+      if (inOutdoor) {
+        camWallXMin = -3000;
+        camWallXMax = 3000;
+      } else if (inGuestRoom || inGuestDoorway) {
+        camWallXMin = -183 + 1;
+        camWallXMax = -LEFT_WALL_X - 1;
+      } else if (inHallway) {
+        camWallXMin = -51 + 1;
+        camWallXMax = -11 - 1;
+      } else {
+        camWallXMin = -(SIDE_WALL_X + CLOSET_DEPTH) + 1;
+        camWallXMax = -LEFT_WALL_X - 1;
+      }
+      // Z bounds must include closet interior (extends to cZ - cIW/2 = -89)
+      let camWallZMin = CLOSET_Z - CLOSET_INTERIOR_W / 2 + 1; // closet -Z side wall
+      // Default Z clamp stops at the back-wall inner face. When the player is in
+      // the hallway extension (focal X inside the hallway opening and past the
+      // back wall), extend Z so the camera can follow. Also extend for office
+      // and the guest doorway transition.
+      const inHallwayX = (focal.x >= -51 + 1 && focal.x <= -11 - 1);
+      let camWallZMax;
+      if ((inHallwayX && focal.z > 49 - 6) || inGuestRoom || inGuestDoorway) {
+        camWallZMax = 289 - 1;
+      } else {
+        camWallZMax = 49 - 1;
+      }
+      // Outdoors: the lawn extends far in every direction with no walls, so
+      // open up the Z clamp to match and let the camera follow the cat freely.
+      if (inOutdoor) {
+        camWallZMin = -3000;
+        camWallZMax = 3000;
+      }
+      // Camera Y min tracks the player's current ground, not the room floor,
+      // so on elevated surfaces (bed, nightstand) it doesn't clip below them.
+      // Outdoors the lawn drops well below floorY, so we drop the indoor floor
+      // term and let the camera sit just above the player's feet.
+      const cyMinFloor = inOutdoor ? (fpPos.y - EYE_H - 20) : (floorY + 0.5);
+      const cyMin = Math.max(cyMinFloor, fpPos.y - EYE_H + 1.5);
+      // Outdoors uses the same expanded ceiling as physics (floorY + 200).
+      const cyMax = inOutdoor ? (floorY + 200) - 2 : (floorY + 80) - 2;
+      const maxDX = dxC > 0 ? (camWallXMax - focal.x) : (focal.x - camWallXMin);
+      const maxDY = dyC > 0 ? (cyMax - focal.y) : (focal.y - cyMin);
+      const maxDZ = dzC > 0 ? (camWallZMax - focal.z) : (focal.z - camWallZMin);
+      const absDX = Math.abs(dxC), absDY = Math.abs(dyC), absDZ = Math.abs(dzC);
+      let scale = 1;
+      if (absDX > maxDX && absDX > 1e-4) scale = Math.min(scale, Math.max(0, maxDX) / absDX);
+      if (absDY > maxDY && absDY > 1e-4) scale = Math.min(scale, Math.max(0, maxDY) / absDY);
+      if (absDZ > maxDZ && absDZ > 1e-4) scale = Math.min(scale, Math.max(0, maxDZ) / absDZ);
+      scale = Math.max(scale, 0.18);
 
-    _camera.position.set(cxC, cyC, czC);
-    // Blend lookAt: when looking down (pitchN < 0.5), look at the cat
-    // so you can see its face. When looking up (pitchN > 0.5), look
-    // forward so ceiling/lights are visible and the cat doesn't block.
-    // pitchN=0.45 is the crossover (slightly below center).
-    const lookAtCatBlend = Math.max(0, Math.min(1, (0.55 - pitchN) * 3));
-    const fwdLookX = cxC + lookDir.x * 10;
-    const fwdLookY = cyC + lookDir.y * 10 + camYShift;
-    const fwdLookZ = czC + lookDir.z * 10;
-    const catLookX = focal.x;
-    const catLookY = focal.y + camYShift;
-    const catLookZ = focal.z;
-    _camera.lookAt(
-      fwdLookX + (catLookX - fwdLookX) * lookAtCatBlend,
-      fwdLookY + (catLookY - fwdLookY) * lookAtCatBlend,
-      fwdLookZ + (catLookZ - fwdLookZ) * lookAtCatBlend
-    );
+      let cxC = focal.x + dxC * scale;
+      let cyC = focal.y + dyC * scale;
+      let czC = focal.z + dzC * scale;
+      // Hard clamp — camera must never leave the room.
+      cxC = Math.max(camWallXMin, Math.min(camWallXMax, cxC));
+      cyC = Math.max(cyMin, Math.min(cyMax, cyC));
+      czC = Math.max(camWallZMin, Math.min(camWallZMax, czC));
+
+      _camera.position.set(cxC, cyC, czC);
+      // Keep camera aim strictly coupled to raw yaw/pitch input.
+      // Blending lookAt toward the cat introduces apparent "self-motion"
+      // under pointer-lock and makes trackpad input feel jumpy/unresponsive.
+      _camera.lookAt(
+        cxC + lookDir.x * 10,
+        cyC + lookDir.y * 10,
+        czC + lookDir.z * 10
+      );
+    }
 
     if (_catGroup) {
       if (_catGroup.parent !== _scene) _scene.add(_catGroup);
@@ -4330,7 +5218,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   // ── Crosshair interaction indicator ───────────────────────────────
   // Highlight crosshair when aiming at something clickable
   _cacheDom();
-  if (_cachedCrosshair) {
+  if (_cachedCrosshair && _interactionRaycastEnabled) {
     if (ts - _lastCrosshairRaycastTs >= RAYCAST_INTERVAL_MS) {
       _lastCrosshairRaycastTs = ts;
       _ray.setFromCamera(_rayCenter, _camera);
@@ -4380,6 +5268,14 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       crosshair._aiming = aiming;
       crosshair.classList.toggle('aiming', aiming);
     }
+  } else if (_cachedCrosshair && _cachedCrosshair._aiming) {
+    _cachedCrosshair._aiming = false;
+    _cachedCrosshair.classList.remove('aiming');
+    const tooltip = document.getElementById('fpCrosshairTooltip');
+    if (tooltip) {
+      tooltip.classList.remove('visible');
+      tooltip._lastHtml = '';
+    }
   }
 
   // ── Coin counter HUD ──────────────────────────────────────────────
@@ -4396,6 +5292,31 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       secretHud.style.display = 'none';
     }
   }
+
+  const inputDiag = document.getElementById('fpInputDiag');
+  if (inputDiag) {
+    if (fpMode) {
+      const lockState = _useUnlockedLook
+        ? (document.fullscreenElement ? 'lock:fs-unlocked' : 'lock:unlocked')
+        : (document.pointerLockElement ? 'lock:on' : 'lock:off');
+      const camMode = (fpCamMode === 'first') ? 'cam:first' : 'cam:third';
+      const solver = _isMinimalThirdCamSolver() ? 'solver:min' : 'solver:full';
+      const pointerMode = (_IS_FIREFOX && _IS_MAC)
+        ? (_ffMacQueueMode ? 'input:queue' : (FF_MAC_SIMPLE_MOUSEMOVE_MODE ? 'input:direct' : 'input:recon'))
+        : 'input:direct';
+      const viewMode = (_IS_FIREFOX && _IS_MAC && document.pointerLockElement && _ffMacViewDecoupleMode)
+        ? 'view:decoupled'
+        : 'view:raw';
+      const collisionMode = (_IS_FIREFOX && _IS_MAC)
+        ? `col:${_ffMacCollisionMode}`
+        : 'col:full';
+      inputDiag.hidden = false;
+      inputDiag.textContent = lockState + ' | ' + camMode + ' | ' + solver + ' | ' + pointerMode + ' | ' + viewMode + ' | ' + collisionMode;
+    } else {
+      inputDiag.hidden = true;
+      inputDiag.textContent = '';
+    }
+  }
 }
 
 // ── Input binding ───────────────────────────────────────────────────
@@ -4404,8 +5325,152 @@ function _bindInputs() {
   // Mouse look (pointer lock). During the death window we also accept
   // unlocked mouse motion as a fallback, so the camera keeps panning
   // even if the browser dropped pointer lock at the moment of overcharge.
-  let _deathLastClientX = null;
-  let _deathLastClientY = null;
+  // _deathLastClientX/Y are hoisted to module scope (see top of file).
+
+  // ── Look-input diagnostic ────────────────────────────────────────
+  // Toggle with backtick (`). Captures 5s of mousemove data, then
+  // dumps timing + delta distribution to console so we can see what
+  // Firefox/Safari/Chrome are actually delivering. Per-event log is
+  // suppressed; only the summary prints. Useful for chasing trackpad
+  // jitter on Firefox+macOS where movementX gets integer-quantized
+  // under pointer lock vs. the smooth clientX deltas the death-dialog
+  // code path receives.
+  let _lookDbgActive = false;
+  let _lookDbgUntil = 0;
+  let _lookDbgSamples = [];
+  let _lookDbgStaleDrops = 0;
+  let _lookDbgGapBurstDrops = 0;
+  let _lookDbgRawOnlyMousemoveDrops = 0;
+  let _lookDbgPulseCount = 0;
+
+  const _processPointerLockDelta = (e, rawX, rawY) => {
+    let useX = rawX;
+    let useY = rawY;
+    if (_IS_FIREFOX && _IS_MAC) {
+      const now = (typeof performance !== 'undefined' && performance.now)
+        ? performance.now()
+        : Date.now();
+      const ageMs = _getInputEventAgeMs(e);
+      if (ageMs > FF_MAC_STALE_EVENT_MS) {
+        if (_lookDbgActive) _lookDbgStaleDrops++;
+        return;
+      }
+      // Single active FF/mac path: same direct event-driven yaw/pitch flow
+      // used by stock PointerLockControls.
+      _ffMacQueueMode = false;
+      FF_MAC_SIMPLE_MOUSEMOVE_MODE = true;
+      _ffMacViewDecoupleMode = false;
+      _ffMacLastInputTs = now;
+      _ffMacLastEventTs = now;
+      _ffMacLookStepAccMs = 0;
+      _ffMacPendingDX = 0;
+      _ffMacPendingDY = 0;
+      _ffMacQueueDX = 0;
+      _ffMacQueueDY = 0;
+      _ffMacVelX = 0;
+      _ffMacVelY = 0;
+      _ffMacVelHoldMs = 0;
+      if (_lookDbgActive && (useX || useY)) _lookDbgPulseCount++;
+      _applyRawLookDelta(useX, useY);
+
+      if (_lookDbgActive) {
+        _lookDbgSamples.push({ t: now, dx: useX, dy: useY });
+        if (now > _lookDbgUntil) _finishLookDiag();
+      }
+      return;
+    }
+
+    _applyRawLookDelta(useX, useY);
+    if (_lookDbgActive) {
+      const now = performance.now();
+      _lookDbgSamples.push({ t: now, dx: useX, dy: useY });
+      if (now > _lookDbgUntil) _finishLookDiag();
+    }
+  };
+
+  function _startLookDiag() {
+    _lookDbgActive = true;
+    _lookDbgUntil = performance.now() + 5000;
+    _lookDbgSamples = [];
+    _lookDbgStaleDrops = 0;
+    _lookDbgGapBurstDrops = 0;
+    _lookDbgRawOnlyMousemoveDrops = 0;
+    _lookDbgPulseCount = 0;
+    const path = document.pointerLockElement
+      ? 'pointer-lock (movementX/Y)'
+      : 'unlocked (clientX/Y)';
+    console.log(`[look-dbg] capturing 5s — input path: ${path}`);
+  }
+  function _finishLookDiag() {
+    _lookDbgActive = false;
+    const s = _lookDbgSamples;
+    if (!s.length) { console.log('[look-dbg] no samples'); return; }
+    const dts = []; for (let i = 1; i < s.length; i++) dts.push(s[i].t - s[i - 1].t);
+    const dxs = s.map(x => Math.abs(x.dx)).filter(x => x > 0);
+    const dys = s.map(x => Math.abs(x.dy)).filter(x => x > 0);
+    const integerDx = s.filter(x => x.dx !== 0 && x.dx === Math.trunc(x.dx)).length;
+    const integerDy = s.filter(x => x.dy !== 0 && x.dy === Math.trunc(x.dy)).length;
+    const fractDx = s.filter(x => x.dx !== 0 && x.dx !== Math.trunc(x.dx)).length;
+    const fractDy = s.filter(x => x.dy !== 0 && x.dy !== Math.trunc(x.dy)).length;
+    const sum = arr => arr.reduce((a, b) => a + b, 0);
+    const fmt = n => n.toFixed(2);
+    console.log('[look-dbg] events:', s.length);
+    console.log('[look-dbg] event interval ms — min/avg/max:',
+      fmt(Math.min(...dts)), fmt(sum(dts) / dts.length), fmt(Math.max(...dts)));
+    console.log('[look-dbg] |dx| min/avg/max:',
+      dxs.length ? `${fmt(Math.min(...dxs))} / ${fmt(sum(dxs) / dxs.length)} / ${fmt(Math.max(...dxs))}` : '-');
+    console.log('[look-dbg] |dy| min/avg/max:',
+      dys.length ? `${fmt(Math.min(...dys))} / ${fmt(sum(dys) / dys.length)} / ${fmt(Math.max(...dys))}` : '-');
+    console.log('[look-dbg] dx integer/fractional:', integerDx, '/', fractDx,
+      fractDx === 0 ? '← INTEGER ONLY (the bug — FF pointer-lock quantization)' : '');
+    console.log('[look-dbg] dy integer/fractional:', integerDy, '/', fractDy);
+    if (_IS_FIREFOX && _IS_MAC) {
+      console.log('[look-dbg] ff-mac mode:', _ffMacQueueMode ? 'queue' : (FF_MAC_SIMPLE_MOUSEMOVE_MODE ? 'direct' : 'reconstruct'));
+      console.log('[look-dbg] ff-mac view mode:', _ffMacViewDecoupleMode ? 'decoupled' : 'raw');
+      console.log('[look-dbg] ff-mac stale drops:', _lookDbgStaleDrops);
+      console.log('[look-dbg] ff-mac gap-burst drops:', _lookDbgGapBurstDrops);
+      console.log('[look-dbg] ff-mac raw-only mousemove drops:', _lookDbgRawOnlyMousemoveDrops);
+      console.log('[look-dbg] ff-mac pointerraw enabled:', USE_POINTER_RAW);
+      console.log('[look-dbg] ff-mac pulse count:', _lookDbgPulseCount);
+      console.log('[look-dbg] ff-mac gain/decay/inject/holdBase/idleFlush:',
+        _ffMacDirectGain.toFixed(2), _ffMacVelDecayTauMs.toFixed(1),
+        _ffMacVelInjectTauMs.toFixed(1), _ffMacVelHoldBaseMs.toFixed(1),
+        _ffMacIdleFlushMs.toFixed(1));
+      console.log('[look-dbg] ff-mac queue tau ms / queue dxdy:',
+        _ffMacQueueSmoothTauMs.toFixed(1), _ffMacQueueDX.toFixed(2), _ffMacQueueDY.toFixed(2));
+      console.log('[look-dbg] ff-mac view tau ms:', _ffMacAimSmoothTauMs.toFixed(1));
+      const now = (typeof performance !== 'undefined' && performance.now)
+        ? performance.now()
+        : Date.now();
+      const idleMs = _ffMacLastInputTs > 0 ? (now - _ffMacLastInputTs) : 0;
+      console.log('[look-dbg] ff-mac vel/hold/idleMs:',
+        _ffMacVelX.toFixed(4), _ffMacVelY.toFixed(4),
+        _ffMacVelHoldMs.toFixed(1), idleMs.toFixed(1));
+      console.log('[look-dbg] ff-mac pending/lookStepMs:',
+        _ffMacPendingDX.toFixed(2), _ffMacPendingDY.toFixed(2),
+        _ffMacLookStepMs.toFixed(2), 'hz=', _ffMacLookHz.toFixed(1));
+    }
+  }
+
+  // Cursor left the document: pin clientX to whichever edge the
+  // cursor exited through (clamped into [0, innerWidth-1]) so
+  // updatePhysics edge-pan keeps rotating in that direction. The
+  // _unlockedCursorOutside flag tells the next mousemove to
+  // re-baseline without producing a jump delta. If the cursor
+  // exited through the top/bottom but with clientX in the middle
+  // of the viewport, the clamp leaves clientX outside the edge
+  // band and edge-pan stays at zero — no false spin.
+  document.addEventListener('mouseout', e => {
+    if (!fpMode || !_useUnlockedLook) return;
+    if (e.relatedTarget === null) {
+      const vw = window.innerWidth || 1;
+      const vh = window.innerHeight || 1;
+      _deathLastClientX = Math.max(0, Math.min(vw - 1, e.clientX));
+      _deathLastClientY = Math.max(0, Math.min(vh - 1, e.clientY));
+      _unlockedCursorOutside = true;
+    }
+  });
+
   document.addEventListener('mousemove', e => {
     if (!fpMode) return;
     // Note: deliberately NOT gated on _deathLocked — the camera should
@@ -4414,29 +5479,98 @@ function _bindInputs() {
     if (document.pointerLockElement) {
       _deathLastClientX = null;
       _deathLastClientY = null;
-      const rawX = e.movementX || 0;
-      const rawY = e.movementY || 0;
-      const maxDelta = 120;
-      fpLookDX += Math.max(-maxDelta, Math.min(maxDelta, rawX));
-      fpLookDY += Math.max(-maxDelta, Math.min(maxDelta, rawY));
+      if (fpPaused && !_deathLocked) return;
+      if (_usingFfMacPointerLockControls()) {
+        if (_lookDbgActive) {
+          const now = (typeof performance !== 'undefined' && performance.now)
+            ? performance.now()
+            : Date.now();
+          _syncLookFromCameraQuaternion();
+          _lookDbgSamples.push({ t: now, dx: 0, dy: 0 });
+          if (now > _lookDbgUntil) _finishLookDiag();
+        }
+        return;
+      }
+      if (_IS_FIREFOX && _IS_MAC && _ffMacPreferPointerRaw) {
+        const now = (typeof performance !== 'undefined' && performance.now)
+          ? performance.now()
+          : Date.now();
+        if ((now - _ffMacPointerRawSeenTs) < 140) {
+          if (_lookDbgActive) _lookDbgRawOnlyMousemoveDrops++;
+          return;
+        }
+        _ffMacPreferPointerRaw = false;
+      }
+      // Pointer-lock path: pure mousemove stream (matches stock
+      // PointerLockControls behavior and avoids raw/mouse event mixing).
+      const rawX = e.movementX ?? e.mozMovementX ?? e.webkitMovementX ?? 0;
+      const rawY = e.movementY ?? e.mozMovementY ?? e.webkitMovementY ?? 0;
+      _processPointerLockDelta(e, rawX, rawY);
       return;
     }
-    // Unlocked fallback — only active during the death window so we
-    // don't accidentally double-handle look in normal play.
-    if (!_deathLocked) return;
-    if (_deathLastClientX === null) {
+    // Unlocked fallback. Active in two cases:
+    //   1. Death window (clientX/Y can move while the death overlay
+    //      releases pointer lock for cursor access).
+    //   2. _useUnlockedLook (Firefox + macOS): we never request
+    //      pointer lock, so this path runs the whole game. Cursor is
+    //      hidden via .fp-no-cursor; the user has to lift fingers and
+    //      stroke again when the cursor pins to a window edge — a
+    //      tradeoff vs. the broken pointer-lock data on this combo.
+    if (!_deathLocked && !_useUnlockedLook) return;
+    if (fpPaused && !_deathLocked) return;
+    if (_deathLastClientX === null || _unlockedCursorOutside) {
       _deathLastClientX = e.clientX;
       _deathLastClientY = e.clientY;
+      _unlockedCursorOutside = false;
       return;
     }
     const dx = e.clientX - _deathLastClientX;
     const dy = e.clientY - _deathLastClientY;
     _deathLastClientX = e.clientX;
     _deathLastClientY = e.clientY;
-    const maxDelta = 120;
-    fpLookDX += Math.max(-maxDelta, Math.min(maxDelta, dx));
-    fpLookDY += Math.max(-maxDelta, Math.min(maxDelta, dy));
+    if (_useUnlockedLook) {
+      _applyRawLookDelta(dx, dy);
+    } else {
+      const maxDelta = 2000;
+      fpLookDX += Math.max(-maxDelta, Math.min(maxDelta, dx));
+      fpLookDY += Math.max(-maxDelta, Math.min(maxDelta, dy));
+    }
+    if (_lookDbgActive) {
+      _lookDbgSamples.push({ t: performance.now(), dx, dy });
+      if (performance.now() > _lookDbgUntil) _finishLookDiag();
+    }
   });
+
+  // Raw pointer stream (when supported) gives fresher input timing and
+  // less browser-side coalescing under pointer lock.
+  document.addEventListener('pointerrawupdate', e => {
+    if (!USE_POINTER_RAW) return;
+    if (!fpMode) return;
+    if (!document.pointerLockElement) return;
+    if (e.pointerType && e.pointerType !== 'mouse') return;
+    if (_IS_FIREFOX && _IS_MAC) {
+      const now = (typeof performance !== 'undefined' && performance.now)
+        ? performance.now()
+        : Date.now();
+      _ffMacPreferPointerRaw = true;
+      _ffMacPointerRawSeenTs = now;
+    }
+    _deathLastClientX = null;
+    _deathLastClientY = null;
+    if (fpPaused && !_deathLocked) return;
+    const rawX = e.movementX ?? e.mozMovementX ?? e.webkitMovementX ?? 0;
+    const rawY = e.movementY ?? e.mozMovementY ?? e.webkitMovementY ?? 0;
+    _processPointerLockDelta(e, rawX, rawY);
+  });
+
+  // Backtick toggles the look diagnostic. Works in pointer lock and
+  // during the death window so we can capture both paths.
+  document.addEventListener('keydown', e => {
+    if (!fpMode) return;
+    if (e.code === 'Backquote' && !_lookDbgActive) {
+      _startLookDiag();
+    }
+  }, true);
 
   // Keyboard
   document.addEventListener('keydown', e => {
@@ -4548,6 +5682,15 @@ function _bindInputs() {
       }
     });
   }
+  // Some browsers drop lock if focus or gesture routing changes. Re-acquire
+  // from any primary-button click while in active FP, not just canvas clicks.
+  document.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    if (!fpMode || fpPaused || _deathLocked || _useUnlockedLook) return;
+    if (!document.pointerLockElement) {
+      _requestPointerLockWithRetry(2, 0);
+    }
+  }, true);
 
   // Pointer lock change → auto-pause
   document.addEventListener('pointerlockchange', () => {
@@ -4560,6 +5703,19 @@ function _bindInputs() {
       setTimeout(() => {
         if (fpMode && !document.pointerLockElement && !fpPaused && !_deathLocked) setPaused(true);
       }, 100);
+    }
+  });
+
+  // Fullscreen change → auto-pause on the unlocked-look path. We
+  // request fullscreen on FP entry to keep the cursor confined to
+  // the screen; if the user hits Esc and drops out of fullscreen the
+  // cursor can roam freely again, so pause the game (mirrors the
+  // pointer-lock auto-pause above).
+  document.addEventListener('fullscreenchange', () => {
+    if (!_useUnlockedLook) return;
+    if (_deathLocked) return;
+    if (fpMode && !fpPaused && !document.fullscreenElement) {
+      setPaused(true);
     }
   });
 

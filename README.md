@@ -1,14 +1,24 @@
-# DIY PC Fan Air Purifier
+# Zoomies
 
-Interactive 3D model of a DIY air purifier built from:
+Zoomies is a browser-based 3D speedrun game where you play as a cat,
+collect coins (including secret ones), and submit leaderboard times.
 
-- **Plywood** — birch plywood construction
-- **Arctic P12 Pro fans** — 120mm PC fans (x8), 7-blade sickle design with pinwheel support brace
-- **3M 20×25×1 MERV 13 filters** — standard furnace filters
+The project started as a DIY air purifier visualizer and evolved into
+the current game.
 
 ## About
 
-This is a box-style air purifier designed around two rows of four Arctic P12 Pro fans pushing air through MERV 13 filtration. The 3D model lets you toggle between layout variants (front+back or front+top fan placement), switch wood stain options, and inspect the build from any angle.
+Built with three.js + Vite on the front end, and Cloudflare Workers + D1
+for leaderboard APIs/storage in production.
+
+## Known Issues
+
+- **Firefox + macOS trackpad:** camera input can feel less responsive than
+	other browsers.
+- **Firefox refresh rate behavior:** some systems appear to run gameplay at
+	~60Hz even on high-refresh displays.
+- **Current workaround:** mouse input is generally better on this combo;
+	Chromium-based browsers and Safari are currently more consistent.
 
 ## Run Locally (Match Live Frontend)
 
