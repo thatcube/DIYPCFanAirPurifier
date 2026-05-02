@@ -2375,8 +2375,13 @@ line-height: 1;
 }
 
 @keyframes pauseScrimOut {
-  from { opacity: 1; }
-  to   { opacity: 0; }
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
 }
 
 @keyframes pauseCardOut {
@@ -2384,6 +2389,7 @@ line-height: 1;
     opacity: 1;
     transform: scale(1) translateY(0);
   }
+
   to {
     opacity: 0;
     transform: scale(0.94) translateY(8px);
@@ -3066,7 +3072,7 @@ line-height: 1;
    between them, so they touched edge-to-edge. A small left margin
    on every kbd-after-kbd separates the glyphs without affecting the
    kbd→label spacing (handled by the literal space in row markup). */
-.pause-controls kbd + kbd {
+.pause-controls kbd+kbd {
   margin-left: 3px;
 }
 
@@ -3275,7 +3281,7 @@ line-height: 1;
 /* Nudge the label text down 3px so it sits visually centered against
    the icon — Phosphor glyphs render slightly above their baseline at
    this size, leaving the label looking top-heavy without the offset. */
-.settings-tab > span {
+.settings-tab>span {
   padding-top: 3px;
 }
 
