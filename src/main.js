@@ -1495,6 +1495,7 @@ const PERF_FP_PROFILE_KEY = 'diy_air_purifier_perf_profile_v1';
 const PERF_FP_RESOLUTION_KEY = 'diy_air_purifier_perf_resolution_v1';
 const PERF_FP_RESOLUTION_SCALE_KEY = 'diy_air_purifier_perf_resolution_scale_v1';
 const PERF_FP_SHADOW_INTERVAL_KEY = 'diy_air_purifier_perf_fp_shadow_interval_v1';
+const PERF_FPS_CAP_KEY = 'diy_air_purifier_perf_fps_cap_v1';
 const PERF_CAT_ANIM_KEY = 'diy_air_purifier_perf_cat_anim_v1';
 const PERF_COINS_KEY = 'diy_air_purifier_perf_coins_v1';
 const PERF_PURIFIER_KEY = 'diy_air_purifier_perf_purifier_v1';
@@ -1532,6 +1533,26 @@ function _formatFpShadowIntervalLabel(ms) {
   return n <= 0 ? 'Every frame' : `Every ${n} ms`;
 }
 
+// FPS cap. 0 = unlimited (no throttling). Otherwise the render loop
+// frame-skips to keep elapsed time per accepted frame ≥ 1000/cap ms.
+// Note: rAF frame-skip can only land on integer divisors of the
+// display refresh rate, so a cap of 60 on a 144Hz display will run at
+// ~72fps in practice — still a power/heat savings vs. uncapped.
+const FPS_CAP_MIN = 0;
+const FPS_CAP_MAX = 240;
+const FPS_CAP_STEP = 15;
+
+function _clampFpsCap(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.max(FPS_CAP_MIN, Math.min(FPS_CAP_MAX, Math.round(n / FPS_CAP_STEP) * FPS_CAP_STEP));
+}
+
+function _formatFpsCapLabel(cap) {
+  const n = _clampFpsCap(cap);
+  return n <= 0 ? 'Unlimited' : `${n} fps`;
+}
+
 let _perfWindowSunEnabled = true;
 let _perfShadowsEnabled = true;
 let _perfFogEnabled = true;
@@ -1539,6 +1560,7 @@ let _fpPerfProfileEnabled = true;
 let _fpPerfResolutionEnabled = true;
 let _fpPerfResolutionScale = _getDefaultFpResolutionScale();
 let _fpPerfShadowIntervalMs = 0;
+let _fpsCapValue = 0;
 let _perfCatAnimEnabled = true;
 let _perfCoinsEnabled = true;
 let _perfPurifierEnabled = true;
@@ -1564,6 +1586,10 @@ try {
 try {
   const savedShadowInterval = localStorage.getItem(PERF_FP_SHADOW_INTERVAL_KEY);
   if (savedShadowInterval != null) _fpPerfShadowIntervalMs = _clampFpShadowInterval(savedShadowInterval);
+} catch (e) { }
+try {
+  const savedFpsCap = localStorage.getItem(PERF_FPS_CAP_KEY);
+  if (savedFpsCap != null) _fpsCapValue = _clampFpsCap(savedFpsCap);
 } catch (e) { }
 try { _perfCatAnimEnabled = localStorage.getItem(PERF_CAT_ANIM_KEY) !== '0'; } catch (e) { }
 try { _perfCoinsEnabled = localStorage.getItem(PERF_COINS_KEY) !== '0'; } catch (e) { }
@@ -1593,6 +1619,8 @@ function _syncPausePerfToggleUi() {
   const profileSt = document.getElementById('fpPausePerfFpProfileState');
   const fpShadowRange = document.getElementById('fpPausePerfShadowCadence');
   const fpShadowVal = document.getElementById('fpPausePerfShadowCadenceVal');
+  const fpsCapRange = document.getElementById('fpPausePerfFpsCap');
+  const fpsCapVal = document.getElementById('fpPausePerfFpsCapVal');
   const catSw = document.getElementById('fpPausePerfCatAnim');
   const catSt = document.getElementById('fpPausePerfCatAnimState');
   const coinsSw = document.getElementById('fpPausePerfCoins');
@@ -1667,6 +1695,16 @@ function _syncPausePerfToggleUi() {
       ? _formatFpShadowIntervalLabel(_fpPerfShadowIntervalMs)
       : 'Bypassed';
     fpShadowVal.classList.toggle('off', !_fpPerfProfileEnabled);
+  }
+
+  if (fpsCapRange) {
+    fpsCapRange.value = String(_clampFpsCap(_fpsCapValue));
+  }
+  if (fpsCapVal) {
+    fpsCapVal.textContent = _formatFpsCapLabel(_fpsCapValue);
+    // Grey the label out only when there's no cap (i.e. the value is
+    // effectively a no-op). Matches the `.off` styling used elsewhere.
+    fpsCapVal.classList.toggle('off', _fpsCapValue <= 0);
   }
 
   if (catSw) {
@@ -1785,6 +1823,12 @@ window._setFpPerfShadowCadence = (value) => {
   _syncPausePerfToggleUi();
 };
 
+window._setFpsCap = (value) => {
+  _fpsCapValue = _clampFpsCap(value);
+  try { localStorage.setItem(PERF_FPS_CAP_KEY, String(_fpsCapValue)); } catch (e) { }
+  _syncPausePerfToggleUi();
+};
+
 window._togglePerfCatAnim = () => {
   _perfCatAnimEnabled = !_perfCatAnimEnabled;
   try { localStorage.setItem(PERF_CAT_ANIM_KEY, _perfCatAnimEnabled ? '1' : '0'); } catch (e) { }
@@ -1892,6 +1936,19 @@ const _elPauseOv = document.getElementById('fpPauseOverlay');
 
 function animate(ts) {
   requestAnimationFrame(animate);
+
+  // FPS cap: skip the rest of this frame if we're rendering faster
+  // than the user-selected target. Frame timing (`_lastFrameTs`) only
+  // advances on accepted frames, so dtSec stays correct on the next
+  // accepted frame. The 0.5ms tolerance avoids edge-of-interval
+  // jitter dropping us a tier (e.g. 60-cap on 60Hz scrolling to 30).
+  // Inherent rAF limitation: actual FPS can only land on integer
+  // divisors of the display refresh rate (60-cap on a 144Hz panel
+  // runs at ~72fps), but power/heat savings still apply.
+  if (_fpsCapValue > 0 && _lastFrameTs > 0) {
+    const targetMs = 1000 / _fpsCapValue;
+    if ((ts - _lastFrameTs) < targetMs - 0.5) return;
+  }
 
   _applyFpPerformanceProfile(gameFp.fpMode);
 

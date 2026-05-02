@@ -4407,6 +4407,10 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   _lastPhysicsTs = ts;
   const frameScale = fpDtMs / (1000 / 60);
 
+  // Sample any connected gamepad. Done first so look/movement state
+  // is set before the physics + look-smoothing pipeline reads it.
+  _pollGamepad(fpDtMs);
+
   // ── Look ──────────────────────────────────────────────────────────
   // Frame-time velocity smoothing for non-pointer-lock look paths
   // (mobile touch + unlocked death-window fallback). Pointer lock
@@ -5605,6 +5609,220 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   }
 }
 
+// ── Gamepad input ───────────────────────────────────────────────────
+//
+// Auto-detects the first connected pad (gamepadconnected event) and
+// polls its state once per physics tick from updatePhysics(). The
+// mapping targets the W3C Standard Gamepad layout — Xbox / PS / most
+// modern pads expose this when plugged in or paired. Right stick
+// produces look deltas fed through the same _applyRawLookDelta path
+// mouse uses, so the mouseSens slider applies identically. Buttons
+// are edge-detected with optional autorepeat so press/release
+// matches the keyboard handlers' semantics.
+
+// Standard mapping (Xbox-style names).
+const GP_A = 0, GP_B = 1, GP_X_BTN = 2, GP_Y_BTN = 3;
+const GP_LB = 4, GP_RB = 5, GP_LT = 6, GP_RT = 7;
+const GP_BACK = 8, GP_START = 9, GP_L3 = 10, GP_R3 = 11;
+const GP_DUP = 12, GP_DDOWN = 13, GP_DLEFT = 14, GP_DRIGHT = 15;
+
+// Stick / look tuning. Yaw is faster than pitch for typical FPS feel;
+// both are pre-mouseSens so the existing slider scales them.
+const _GP_DEADZONE_MOVE = 0.28;
+const _GP_DEADZONE_LOOK = 0.18;
+const _GP_YAW_DEG_PER_SEC = 360;
+const _GP_PITCH_DEG_PER_SEC = 220;
+const _GP_BTN_REPEAT_INITIAL_MS = 380;
+const _GP_BTN_REPEAT_INTERVAL_MS = 90;
+
+let _gamepadIndex = -1;          // active pad's index, -1 = none
+let _gamepadPrevButtons = [];    // previous frame's pressed[] bools
+let _gamepadHoldStart = [];      // ts when each button started being held
+let _gamepadLastRepeat = [];     // ts of most recent autorepeat fire
+// Tracks whether the pad was driving WASD last frame, so we don't
+// stomp keyboard input when the player is using both.
+let _gamepadWasMoving = false;
+
+function _gamepadConnect(idx) {
+  _gamepadIndex = idx;
+  _gamepadPrevButtons = [];
+  _gamepadHoldStart = [];
+  _gamepadLastRepeat = [];
+  _gamepadWasMoving = false;
+  if (_showToast) {
+    let label = 'Controller';
+    try {
+      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const p = pads && pads[idx];
+      if (p && p.id) label = String(p.id).split('(')[0].trim() || 'Controller';
+    } catch { /* navigator may not exist in unusual hosts */ }
+    _showToast(`${label} connected`);
+  }
+}
+
+function _gamepadDisconnect(idx) {
+  if (_gamepadIndex !== idx) return;
+  _gamepadIndex = -1;
+  _gamepadPrevButtons = [];
+  _gamepadHoldStart = [];
+  _gamepadLastRepeat = [];
+  // Clear anything the pad was holding so the cat doesn't keep walking
+  // off after a battery dies mid-run.
+  if (_gamepadWasMoving) {
+    fpKeys.w = fpKeys.a = fpKeys.s = fpKeys.d = false;
+  }
+  fpKeys.space = false;
+  fpKeys.shift = false;
+  _trickManualHeld = false;
+  _gamepadWasMoving = false;
+  if (_showToast) _showToast('Controller disconnected');
+}
+
+function _gpStickCurve(v, deadzone) {
+  const a = Math.abs(v);
+  if (a < deadzone) return 0;
+  // Remap (deadzone..1) → (0..1) then square for a softer center —
+  // small tilts give precise aim, full deflection swings fast.
+  const remapped = (a - deadzone) / (1 - deadzone);
+  return Math.sign(v) * remapped * remapped;
+}
+
+function _pollGamepad(fpDtMs) {
+  if (_gamepadIndex < 0) return;
+  if (!navigator.getGamepads) return;
+  const pads = navigator.getGamepads();
+  const pad = pads && pads[_gamepadIndex];
+  if (!pad || !pad.connected) return;
+
+  // ── Sticks ──────────────────────────────────────────────────────
+  const lx = _gpStickCurve(pad.axes[0] || 0, _GP_DEADZONE_MOVE);
+  const ly = _gpStickCurve(pad.axes[1] || 0, _GP_DEADZONE_MOVE);
+  const rx = _gpStickCurve(pad.axes[2] || 0, _GP_DEADZONE_LOOK);
+  const ry = _gpStickCurve(pad.axes[3] || 0, _GP_DEADZONE_LOOK);
+
+  const btn = (i) => !!(pad.buttons[i] && pad.buttons[i].pressed);
+
+  const dUp = btn(GP_DUP), dDn = btn(GP_DDOWN);
+  const dLf = btn(GP_DLEFT), dRt = btn(GP_DRIGHT);
+
+  // ── Movement (left stick + D-pad) ───────────────────────────────
+  // Only overwrite WASD when the pad is currently driving movement
+  // OR was driving last frame (so the centering frame can release the
+  // keys). After that we leave fpKeys alone, letting keyboard input
+  // own the booleans without a tug-of-war.
+  const moving = (lx !== 0) || (ly !== 0) || dUp || dDn || dLf || dRt;
+  if (!fpPaused && !_deathLocked && (moving || _gamepadWasMoving)) {
+    fpKeys.w = ly < -0.15 || dUp;
+    fpKeys.s = ly > 0.15  || dDn;
+    fpKeys.a = lx < -0.15 || dLf;
+    fpKeys.d = lx > 0.15  || dRt;
+  }
+  _gamepadWasMoving = moving;
+
+  // ── Look (right stick) ──────────────────────────────────────────
+  // Convert stick deflection to a px-equivalent delta so it flows
+  // through the same _applyRawLookDelta path mouse uses. mouseSens
+  // is applied inside that helper.
+  if (!fpPaused && !_deathLocked && (rx !== 0 || ry !== 0)) {
+    const yawPxPerSec = (_GP_YAW_DEG_PER_SEC * Math.PI / 180) / LOOK_RAD_PER_PX;
+    const pitchPxPerSec = (_GP_PITCH_DEG_PER_SEC * Math.PI / 180) / LOOK_RAD_PER_PX;
+    const dtSec = Math.max(0, fpDtMs) / 1000;
+    _applyRawLookDelta(rx * yawPxPerSec * dtSec, ry * pitchPxPerSec * dtSec);
+  }
+
+  // ── Buttons ─────────────────────────────────────────────────────
+  const now = (typeof performance !== 'undefined' && performance.now)
+    ? performance.now() : Date.now();
+  const prev = _gamepadPrevButtons;
+  const curr = new Array(pad.buttons.length);
+  for (let i = 0; i < pad.buttons.length; i++) curr[i] = btn(i);
+
+  const pressed  = (i) => !!curr[i] && !prev[i];
+  const released = (i) => !curr[i] && !!prev[i];
+  // Returns true on initial press AND on autorepeat ticks while held —
+  // mirrors the keyboard's KeyDown autorepeat for X/F.
+  const pressedRepeat = (i) => {
+    if (pressed(i)) {
+      _gamepadHoldStart[i] = now;
+      _gamepadLastRepeat[i] = now;
+      return true;
+    }
+    if (curr[i] && prev[i]) {
+      const heldFor = now - (_gamepadHoldStart[i] || now);
+      if (heldFor >= _GP_BTN_REPEAT_INITIAL_MS) {
+        const since = now - (_gamepadLastRepeat[i] || 0);
+        if (since >= _GP_BTN_REPEAT_INTERVAL_MS) {
+          _gamepadLastRepeat[i] = now;
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  // Start always works (pause toggle / close skate onboarding) — even
+  // while paused, since that's the whole point.
+  if (pressed(GP_START)) {
+    if (_skateOnboardingOpen) _closeSkateOnboarding();
+    else if (!_deathLocked) setPaused(!fpPaused);
+  }
+
+  if (!fpPaused && !_deathLocked) {
+    // Hold-style: mutate fpKeys / trick flags only when the pad is
+    // actively touching that input, so keyboard isn't overwritten.
+    if (curr[GP_A]  || prev[GP_A])  fpKeys.space = !!curr[GP_A];
+    if (curr[GP_L3] || prev[GP_L3]) fpKeys.shift = !!curr[GP_L3];
+    if (curr[GP_RB] || prev[GP_RB]) _trickManualHeld = !!curr[GP_RB] && skateMode;
+
+    // Press-style: edge-triggered.
+    // Reset run is on Select/Back (not B) so it can't be hit by an
+    // accidental thumb-bump on the right action cluster mid-run.
+    if (pressed(GP_BACK))  { _resetRun(); if (_showToast) _showToast('Reset!'); }
+    if (pressed(GP_B))     _toggleHelp();
+    if (pressed(GP_Y_BTN)) setCamMode();
+    if (pressed(GP_R3)) {
+      if (skateboardFound) setSkateMode(!skateMode);
+      else if (_showToast) _showToast('Find the hidden skateboard first!');
+    }
+    if (pressed(GP_LB) && skateMode && !_trickKickflipActive) {
+      _trickKickflipActive = true;
+      _trickKickflip = 0;
+    }
+
+    // Fireball / kamehameha (X). Press = first hit; held = autorepeat
+    // with repeat=true so SS charge isn't restarted; release = key-up.
+    if (pressed(GP_X_BTN)) {
+      if (typeof window._fireballKeyDown === 'function') window._fireballKeyDown(false);
+      else if (typeof window._shootFireball === 'function') window._shootFireball();
+    } else if (pressedRepeat(GP_X_BTN) && typeof window._fireballKeyDown === 'function') {
+      window._fireballKeyDown(true);
+    }
+    if (released(GP_X_BTN) && typeof window._fireballKeyUp === 'function') {
+      window._fireballKeyUp();
+    }
+
+    // Skate spin (LT). Tap stacks at the spam-tap cap; autorepeat
+    // while held uses the lower hold cap (mirrors X-key e.repeat).
+    if (skateMode && pressedRepeat(GP_LT)) {
+      const SPIN_BASE = Math.PI * 2.66;
+      const SPIN_CAP = Math.PI * 20;
+      const SPIN_HOLD_CAP = SPIN_CAP * 0.6;
+      const isHoldRepeat = curr[GP_LT] && prev[GP_LT];
+      const cap = isHoldRepeat ? SPIN_HOLD_CAP : SPIN_CAP;
+      if (_trickSpinSpeed >= cap) {
+        _trickSpinBoost = true;
+      } else {
+        const ratio = Math.min(1, _trickSpinSpeed / cap);
+        const falloff = (1 - ratio) * (1 - ratio) * 0.8 + 0.2;
+        _trickSpinSpeed = Math.min(_trickSpinSpeed + SPIN_BASE * falloff, cap);
+        _trickSpinBoost = true;
+      }
+    }
+  }
+
+  _gamepadPrevButtons = curr;
+}
+
 // ── Input binding ───────────────────────────────────────────────────
 
 function _bindInputs() {
@@ -6098,4 +6316,29 @@ function _bindInputs() {
     _canvas.addEventListener('touchend', clearLook, { passive: true });
     _canvas.addEventListener('touchcancel', clearLook, { passive: true });
   }
+
+  // ── Gamepad connect / disconnect ────────────────────────────────
+  // Auto-detect: latch on to the first connected pad. If a second
+  // pad connects we ignore it (single-player). On disconnect, clear
+  // any held inputs the pad was driving.
+  window.addEventListener('gamepadconnected', (e) => {
+    if (_gamepadIndex >= 0) return;
+    if (!e.gamepad) return;
+    _gamepadConnect(e.gamepad.index);
+  });
+  window.addEventListener('gamepaddisconnected', (e) => {
+    if (!e.gamepad) return;
+    _gamepadDisconnect(e.gamepad.index);
+  });
+  // If a pad was already connected before this code ran (browser
+  // restored state on a refresh), pick it up on the next tick.
+  try {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (let i = 0; i < pads.length; i++) {
+      if (pads[i] && pads[i].connected) {
+        _gamepadConnect(i);
+        break;
+      }
+    }
+  } catch { /* not supported */ }
 }

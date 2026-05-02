@@ -128,6 +128,17 @@ const CONTROLS = [
     initialLabel: 'Every frame',
   },
   {
+    id: 'fpPausePerfFpsCap', tabs: ['performance'], type: 'slider',
+    label: 'FPS cap', icon: 'ph ph-gauge',
+    hint: 'Throttle frame rate to save power. 0 = unlimited.',
+    keywords: 'fps frame rate cap limit throttle performance battery power',
+    rangeId: 'fpPausePerfFpsCap', valId: 'fpPausePerfFpsCapVal',
+    min: 0, max: 240, step: 15, value: 0,
+    aria: 'FPS cap',
+    oninput: '_setFpsCap',
+    initialLabel: 'Unlimited',
+  },
+  {
     id: 'fpPausePerfCatAnim', tabs: ['performance'], type: 'toggle',
     label: 'Cat animation stack', icon: 'ph ph-cat',
     keywords: 'animation procedural cat character performance',
@@ -268,6 +279,27 @@ const KEYBOARD_REF_SKATE = [
   { keys: ['F'], desc: 'Board spin' },
 ];
 
+// Controller reference. Auto-detected on connect; default mapping is
+// Xbox-style (PS layout maps the same physical buttons by position).
+const CONTROLLER_REF = [
+  { keys: ['L Stick'],   desc: 'Move' },
+  { keys: ['R Stick'],   desc: 'Look' },
+  { keys: ['A'],         desc: 'Jump (hold)' },
+  { keys: ['L3'],        desc: 'Sprint' },
+  { keys: ['Y'],         desc: 'Camera' },
+  { keys: ['B'],         desc: 'Help' },
+  { keys: ['X'],         desc: 'Fireball / charge' },
+  { keys: ['Select'],    desc: 'Reset run' },
+  { keys: ['Start'],     desc: 'Pause' },
+];
+
+const CONTROLLER_REF_SKATE = [
+  { keys: ['R3'], desc: 'Get on / off the board' },
+  { keys: ['LB'], desc: 'Kickflip' },
+  { keys: ['RB'], desc: 'Manual / wheelie' },
+  { keys: ['LT'], desc: 'Board spin' },
+];
+
 // ────────────────────────────────────────────────────────────────────
 // Renderers
 // ────────────────────────────────────────────────────────────────────
@@ -349,15 +381,22 @@ function _renderKbdGroup(entries) {
 function _renderKeyboardRef() {
   const generalRows = _renderKbdGroup(KEYBOARD_REF);
   const skateRows = _renderKbdGroup(KEYBOARD_REF_SKATE);
+  const padRows = _renderKbdGroup(CONTROLLER_REF);
+  const padSkateRows = _renderKbdGroup(CONTROLLER_REF_SKATE);
   // Single data-search blob covers the whole keyboard reference (both groups).
-  const allEntries = KEYBOARD_REF.concat(KEYBOARD_REF_SKATE);
+  const allEntries = KEYBOARD_REF.concat(KEYBOARD_REF_SKATE)
+    .concat(CONTROLLER_REF).concat(CONTROLLER_REF_SKATE);
   const searchBlob = allEntries.map(r => `${r.keys.join(' ')} ${r.desc}`).join(' ').toLowerCase();
   return `
-    <div class="settings-keyboard-ref" data-search="${_esc('keyboard shortcuts skate skateboard ' + searchBlob)}" data-row="keyboard-ref">
+    <div class="settings-keyboard-ref" data-search="${_esc('keyboard shortcuts skate skateboard controller gamepad xbox playstation ' + searchBlob)}" data-row="keyboard-ref">
       <h3 class="pause-section-title"><i class="ph ph-keyboard"></i> Keyboard</h3>
       <div class="pause-controls">${generalRows}</div>
       <h3 class="pause-section-title pause-section-title--sub"><span class="pause-section-emoji" aria-hidden="true">🛹</span> Skateboard</h3>
       <div class="pause-controls">${skateRows}</div>
+      <h3 class="pause-section-title"><i class="ph ph-game-controller"></i> Controller</h3>
+      <div class="pause-controls">${padRows}</div>
+      <h3 class="pause-section-title pause-section-title--sub"><span class="pause-section-emoji" aria-hidden="true">🛹</span> Skateboard</h3>
+      <div class="pause-controls">${padSkateRows}</div>
       <button class="pause-link pause-link--footer" type="button"
         onclick="window._enterInspector&&window._enterInspector()">
         <i class="ph ph-magnifying-glass"></i> Inspect air purifier
@@ -463,6 +502,7 @@ const _STORAGE_KEYS = {
   fpResolution: 'diy_air_purifier_perf_resolution_v1',
   fpResolutionScale: 'diy_air_purifier_perf_resolution_scale_v1',
   fpShadowInterval:  'diy_air_purifier_perf_fp_shadow_interval_v1',
+  fpsCap:       'diy_air_purifier_perf_fps_cap_v1',
   catAnim:      'diy_air_purifier_perf_cat_anim_v1',
   coins:        'diy_air_purifier_perf_coins_v1',
   purifier:     'diy_air_purifier_perf_purifier_v1',
@@ -582,6 +622,15 @@ function _refreshPanelFromStorage(host) {
       : 'Bypassed';
     shV.classList.toggle('off', !profOn);
   }
+  // FPS cap — independent of fpProfile (always honored).
+  const cap = Math.max(0, Math.round(_readNum('fpsCap', 0)));
+  const capR = host.querySelector('#fpPausePerfFpsCap');
+  const capV = host.querySelector('#fpPausePerfFpsCapVal');
+  if (capR) capR.value = String(cap);
+  if (capV) {
+    capV.textContent = cap <= 0 ? 'Unlimited' : `${cap} fps`;
+    capV.classList.toggle('off', cap <= 0);
+  }
 }
 
 // List of handler globals the panel calls. We proxy each one to the
@@ -591,6 +640,7 @@ const _PROXY_FNS = [
   '_togglePerfWindowSun', '_togglePerfShadows', '_togglePerfFog',
   '_toggleFpPerfResolution', '_setFpPerfResolutionScale',
   '_toggleFpPerfProfile', '_setFpPerfShadowCadence',
+  '_setFpsCap',
   '_togglePerfCatAnim', '_togglePerfCoins', '_togglePerfPurifier',
   '_togglePerfAbilities', '_togglePerfRaycast',
   '_toggleDebugWallLabels',
