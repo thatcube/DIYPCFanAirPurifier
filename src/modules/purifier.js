@@ -2423,16 +2423,34 @@ export function createPurifier(scene) {
       const refs = (typeof window !== 'undefined') ? window._roomRefs : null;
       if(!refs || !refs.standingDesk) return;
       const sd = refs.standingDesk;
-      if(_standingDeskLerps.length) return; // already animating
+      // Flip target. If already animating, this reverses direction mid-flight
+      // so the user can stop/redirect the desk by clicking again.
       sd.raised = !sd.raised;
       sd.target = sd.raised ? sd.max : 0;
-      _standingDeskLerps.push({ sd });
-      // Motor whir for the full duration of travel (rise speed = 1.6"/s).
+      const reversing = _standingDeskLerps.length > 0;
+      let entry;
+      if(reversing){
+        entry = _standingDeskLerps[_standingDeskLerps.length - 1];
+        // Quickly fade out the old motor sound so the new one can take over
+        // without two whines stacking. The old gain node keeps running its
+        // ramp on its own — we just stop the lerp from poking its value.
+        const oldGain = entry.motorGain;
+        if(oldGain){
+          try{
+            const ac = oldGain.context;
+            const t = ac.currentTime;
+            oldGain.gain.cancelScheduledValues(t);
+            oldGain.gain.setValueAtTime(oldGain.gain.value, t);
+            oldGain.gain.linearRampToValueAtTime(0.0001, t + 0.08);
+          }catch(_){}
+        }
+      } else {
+        entry = { sd };
+        _standingDeskLerps.push(entry);
+      }
+      // Motor whir for the duration of remaining travel (speed = 1.6"/s).
       const travel = Math.abs(sd.target - sd.rise);
-      const motorGain = _playStandingDeskMotor(travel / 1.6, sd.raised);
-      // Stash the gain node + desk world position on the lerp entry so the
-      // tick loop can fade by distance.
-      _standingDeskLerps[_standingDeskLerps.length - 1].motorGain = motorGain;
+      entry.motorGain = _playStandingDeskMotor(travel / 1.6, sd.raised);
       // First time raising → reveal the secret blue coin on the desktop.
       // The desk lerp drags onStandingDesk-tagged coins up with the surface.
       if(sd.raised && _fpMode) spawnSecretDrawerCoin();
