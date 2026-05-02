@@ -1372,7 +1372,10 @@
       const TAB_ORDER = ['home', 'leaderboard', 'about', 'settings'];
 
       async function swap(href) {
-        const targetView = viewFor(href);
+        // viewFor matches exact pathnames, so strip any #hash / ?query
+        // before lookup — otherwise '/about#known-issues' returns null
+        // and we fall through to a full reload.
+        const targetView = viewFor(new URL(href, location.href).pathname);
         if (!targetView || targetView === 'play') { fullNav(href); return; }
 
         const oldMain = document.querySelector('main.page');
@@ -1472,7 +1475,19 @@
           });
         }
 
-        window.scrollTo(0, 0);
+        // If the destination URL carries a #hash, scroll the matching
+        // element into view instead of jumping to the top — lets links
+        // like /about#known-issues land on the right section after SPA
+        // swap-in.
+        const hash = location.hash;
+        const target = hash && hash.length > 1
+          ? document.getElementById(decodeURIComponent(hash.slice(1)))
+          : null;
+        if (target) {
+          target.scrollIntoView({ block: 'start', behavior: reduced ? 'auto' : 'smooth' });
+        } else {
+          window.scrollTo(0, 0);
+        }
       }
 
       document.addEventListener('click', (e) => {

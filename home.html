@@ -237,6 +237,19 @@
       color: rgba(255, 232, 210, 0.78);
     }
 
+    .wip-notice a {
+      color: inherit;
+      text-decoration: underline;
+      text-decoration-color: rgba(255, 217, 184, 0.55);
+      text-underline-offset: 3px;
+      transition: text-decoration-color 160ms ease;
+    }
+
+    .wip-notice a:hover,
+    .wip-notice a:focus-visible {
+      text-decoration-color: #ffd9b8;
+    }
+
     /* Mobile mirror — main.css drops card padding to 32px 22px 26px
        and corner radius to 26px below 540px; match both. */
     @media (max-width: 540px) {
@@ -325,8 +338,7 @@
         <a class="title-splash-play glass-btn glass-btn--primary" href="/play" data-play-cta>
           <!-- Boot/loading row — visible while body.is-booting (see
                inline CSS above). Reuses the .title-splash-play-spinner
-               keyframes from main.css so the spinner here matches the
-               one on /play's title screen exactly. -->
+               pattern from the original index.html splash. -->
           <span class="title-splash-play-content title-splash-play-content--loading">
             <span class="title-splash-play-spinner" aria-hidden="true"></span>
             <span>Loading…</span>
@@ -338,8 +350,7 @@
       </div>
       <div class="wip-notice" role="status">
         <i class="ph-fill ph-warning"></i>
-        <span>Work in progress</span>
-        <span class="wip-notice__detail">— expect some bugs, mostly works</span>
+        <span>This game is unfinished and there are <a href="/about#known-issues" data-spa-link>known issues</a></span>
       </div>
     </div>
   </main>
@@ -534,7 +545,10 @@
       const TAB_ORDER = ['home', 'leaderboard', 'about', 'settings'];
 
       async function swap(href) {
-        const targetView = viewFor(href);
+        // viewFor matches exact pathnames, so strip any #hash / ?query
+        // before lookup — otherwise '/about#known-issues' returns null
+        // and we fall through to a full reload.
+        const targetView = viewFor(new URL(href, location.href).pathname);
         if (!targetView || targetView === 'play') { fullNav(href); return; }
 
         const oldMain = document.querySelector('main.page');
@@ -638,7 +652,19 @@
           });
         }
 
-        window.scrollTo(0, 0);
+        // If the destination URL carries a #hash, scroll the matching
+        // element into view instead of jumping to the top — lets links
+        // like /about#known-issues land on the right section after SPA
+        // swap-in.
+        const hash = location.hash;
+        const target = hash && hash.length > 1
+          ? document.getElementById(decodeURIComponent(hash.slice(1)))
+          : null;
+        if (target) {
+          target.scrollIntoView({ block: 'start', behavior: reduced ? 'auto' : 'smooth' });
+        } else {
+          window.scrollTo(0, 0);
+        }
       }
 
       document.addEventListener('click', (e) => {
