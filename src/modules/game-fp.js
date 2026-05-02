@@ -5687,6 +5687,147 @@ function _gpStickCurve(v, deadzone) {
   return Math.sign(v) * remapped * remapped;
 }
 
+// ── Menu navigation (active when a modal/pause is up) ──────────────
+// Mirrors keyboard arrow-keys + Enter/Esc. We synthesize focus moves
+// and click() calls so existing dialog handlers keep working unchanged.
+const _GP_NAV_THRESHOLD = 0.55;             // post-curve stick level that counts as a nav press
+const _GP_NAV_REPEAT_INITIAL_MS = 380;
+const _GP_NAV_REPEAT_INTERVAL_MS = 110;
+const _gpNavLatch = { up: false, down: false, left: false, right: false };
+const _gpNavHoldStart = { up: 0, down: 0, left: 0, right: 0 };
+const _gpNavLastRepeat = { up: 0, down: 0, left: 0, right: 0 };
+
+function _menuNavActive() {
+  if (!fpMode) return false;
+  if (_deathLocked) return false;
+  if (fpPaused) return true;
+  if (_skateOnboardingOpen) return true;
+  try {
+    if (leaderboard.isFinishDialogOpen()) return true;
+    if (leaderboard.isNameDialogOpen()) return true;
+  } catch { /* leaderboard module shape unexpected */ }
+  return false;
+}
+
+function _findActiveModal() {
+  // Priority order: topmost / most-modal first. We pick the first
+  // visible candidate; the rest are either hidden or layered beneath.
+  const candidates = [
+    document.getElementById('fpSkateOnboarding'),
+    document.querySelector('.name-dialog-card'),
+    document.getElementById('finishDialogCard'),
+    document.querySelector('.pause-card'),
+  ];
+  for (const el of candidates) {
+    if (!el) continue;
+    if (el.offsetParent === null) continue;
+    return el;
+  }
+  return null;
+}
+
+const _NAV_FOCUSABLE_SELECTOR =
+  'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), ' +
+  'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function _focusableIn(container) {
+  if (!container) return [];
+  const all = container.querySelectorAll(_NAV_FOCUSABLE_SELECTOR);
+  const out = [];
+  for (const el of all) {
+    if (el.offsetParent === null) continue;        // not rendered
+    if (el.getAttribute('aria-hidden') === 'true') continue;
+    // Skip elements inside a hidden ancestor (offsetParent catches most
+    // cases but display:contents parents can fool it).
+    out.push(el);
+  }
+  return out;
+}
+
+function _navMove(dir) {
+  const modal = _findActiveModal();
+  if (!modal) return;
+  const focused = document.activeElement;
+
+  // Range slider: left/right adjusts the value instead of moving focus.
+  if (focused && focused.tagName === 'INPUT' && focused.type === 'range'
+      && (dir === 'left' || dir === 'right')) {
+    const step = parseFloat(focused.step) || 1;
+    const minRaw = parseFloat(focused.min);
+    const maxRaw = parseFloat(focused.max);
+    const val = parseFloat(focused.value) || 0;
+    const candidate = dir === 'left' ? val - step : val + step;
+    const min = Number.isFinite(minRaw) ? minRaw : -Infinity;
+    const max = Number.isFinite(maxRaw) ? maxRaw : Infinity;
+    const next = Math.max(min, Math.min(max, candidate));
+    if (next !== val) {
+      focused.value = String(next);
+      focused.dispatchEvent(new Event('input',  { bubbles: true }));
+      focused.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    return;
+  }
+
+  const focusables = _focusableIn(modal);
+  if (focusables.length === 0) return;
+  const idx = focused ? focusables.indexOf(focused) : -1;
+  let nextIdx;
+  if (dir === 'up' || dir === 'left') {
+    nextIdx = idx <= 0 ? focusables.length - 1 : idx - 1;
+  } else {
+    nextIdx = idx < 0 ? 0 : (idx + 1) % focusables.length;
+  }
+  const target = focusables[nextIdx];
+  if (target && typeof target.focus === 'function') target.focus();
+}
+
+function _navActivate() {
+  const focused = document.activeElement;
+  if (!focused) return;
+  if (focused.tagName === 'INPUT') {
+    const t = focused.type;
+    // Range sliders and text-like inputs ignore A; A is for buttons/checkboxes.
+    if (t === 'range' || t === 'text' || t === 'search' || t === 'email'
+        || t === 'password' || t === 'number' || t === 'tel' || t === 'url') {
+      return;
+    }
+  }
+  if (focused.tagName === 'TEXTAREA') return;
+  if (typeof focused.click === 'function') focused.click();
+}
+
+function _navCancel() {
+  // Synthesize an Escape so existing dialog/pause handlers run.
+  const evt = new KeyboardEvent('keydown', {
+    key: 'Escape', code: 'Escape', bubbles: true, cancelable: true,
+  });
+  document.dispatchEvent(evt);
+}
+
+function _navDirEdge(active, key, now) {
+  // Returns true on the initial latch AND on autorepeat ticks while held.
+  const wasLatched = _gpNavLatch[key];
+  if (active && !wasLatched) {
+    _gpNavLatch[key] = true;
+    _gpNavHoldStart[key] = now;
+    _gpNavLastRepeat[key] = now;
+    return true;
+  }
+  if (active && wasLatched) {
+    const heldFor = now - _gpNavHoldStart[key];
+    if (heldFor >= _GP_NAV_REPEAT_INITIAL_MS) {
+      const since = now - _gpNavLastRepeat[key];
+      if (since >= _GP_NAV_REPEAT_INTERVAL_MS) {
+        _gpNavLastRepeat[key] = now;
+        return true;
+      }
+    }
+    return false;
+  }
+  if (!active && wasLatched) _gpNavLatch[key] = false;
+  return false;
+}
+
 function _pollGamepad(fpDtMs) {
   if (_gamepadIndex < 0) return;
   if (!navigator.getGamepads) return;
@@ -5767,6 +5908,24 @@ function _pollGamepad(fpDtMs) {
     else if (!_deathLocked) setPaused(!fpPaused);
   }
 
+  // ── Menu navigation ────────────────────────────────────────────
+  // When the pause overlay or any modal is up, the pad drives focus
+  // moves + click() on the active dialog instead of gameplay inputs.
+  if (_menuNavActive()) {
+    const navUp = dUp || ly < -_GP_NAV_THRESHOLD;
+    const navDn = dDn || ly >  _GP_NAV_THRESHOLD;
+    const navLf = dLf || lx < -_GP_NAV_THRESHOLD;
+    const navRt = dRt || lx >  _GP_NAV_THRESHOLD;
+    if (_navDirEdge(navUp, 'up',    now)) _navMove('up');
+    if (_navDirEdge(navDn, 'down',  now)) _navMove('down');
+    if (_navDirEdge(navLf, 'left',  now)) _navMove('left');
+    if (_navDirEdge(navRt, 'right', now)) _navMove('right');
+    if (pressed(GP_A)) _navActivate();
+    if (pressed(GP_B)) _navCancel();
+    _gamepadPrevButtons = curr;
+    return;
+  }
+
   if (!fpPaused && !_deathLocked) {
     // Hold-style: mutate fpKeys / trick flags only when the pad is
     // actively touching that input, so keyboard isn't overwritten.
@@ -5778,7 +5937,6 @@ function _pollGamepad(fpDtMs) {
     // Reset run is on Select/Back (not B) so it can't be hit by an
     // accidental thumb-bump on the right action cluster mid-run.
     if (pressed(GP_BACK))  { _resetRun(); if (_showToast) _showToast('Reset!'); }
-    if (pressed(GP_B))     _toggleHelp();
     if (pressed(GP_Y_BTN)) setCamMode();
     if (pressed(GP_R3)) {
       if (skateboardFound) setSkateMode(!skateMode);
@@ -5789,15 +5947,31 @@ function _pollGamepad(fpDtMs) {
       _trickKickflip = 0;
     }
 
-    // Fireball / kamehameha (X). Press = first hit; held = autorepeat
-    // with repeat=true so SS charge isn't restarted; release = key-up.
+    // Interact (X / Square). Synthesizes a primary mousedown so the
+    // existing FP screen-center raycast in purifier.js (toggles fans,
+    // opens drawers/doors, picks coins, etc.) runs identically to a
+    // real click. Edge-triggered — no autorepeat.
     if (pressed(GP_X_BTN)) {
+      try {
+        const evt = new MouseEvent('mousedown', {
+          button: 0, buttons: 1, bubbles: true, cancelable: true,
+          clientX: (window.innerWidth || 0) / 2,
+          clientY: (window.innerHeight || 0) / 2,
+        });
+        window.dispatchEvent(evt);
+      } catch { /* MouseEvent not constructable in unusual hosts */ }
+    }
+
+    // Fireball / kamehameha (B / Circle). Press = first hit; held =
+    // autorepeat with repeat=true so SS charge isn't restarted;
+    // release = key-up.
+    if (pressed(GP_B)) {
       if (typeof window._fireballKeyDown === 'function') window._fireballKeyDown(false);
       else if (typeof window._shootFireball === 'function') window._shootFireball();
-    } else if (pressedRepeat(GP_X_BTN) && typeof window._fireballKeyDown === 'function') {
+    } else if (pressedRepeat(GP_B) && typeof window._fireballKeyDown === 'function') {
       window._fireballKeyDown(true);
     }
-    if (released(GP_X_BTN) && typeof window._fireballKeyUp === 'function') {
+    if (released(GP_B) && typeof window._fireballKeyUp === 'function') {
       window._fireballKeyUp();
     }
 

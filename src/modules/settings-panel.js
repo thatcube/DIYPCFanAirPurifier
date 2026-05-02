@@ -287,8 +287,8 @@ const CONTROLLER_REF = [
   { keys: ['A'],         desc: 'Jump (hold)' },
   { keys: ['L3'],        desc: 'Sprint' },
   { keys: ['Y'],         desc: 'Camera' },
-  { keys: ['B'],         desc: 'Help' },
-  { keys: ['X'],         desc: 'Fireball / charge' },
+  { keys: ['X'],         desc: 'Interact' },
+  { keys: ['B'],         desc: 'Fireball / charge' },
   { keys: ['Select'],    desc: 'Reset run' },
   { keys: ['Start'],     desc: 'Pause' },
 ];
@@ -335,6 +335,7 @@ function _renderToggleRow(c) {
     <div class="pause-toggle-row${classAttr}"${rowIdAttr}${rowStyle} ${_searchAttrs(c)}>
       <span class="pause-toggle-label"${labelTitle}><i class="${_esc(c.icon)}"></i> ${_esc(c.label)}</span>
       <div class="toggle-sw${onAttr}" id="${_esc(c.swId)}" role="switch" aria-checked="${c.initialOn ? 'true' : 'false'}"
+        tabindex="0"
         onclick="${onclick}"></div>
       <span class="pause-toggle-state${stateOff}" id="${_esc(c.stateId)}">${stateText}</span>
     </div>`;
