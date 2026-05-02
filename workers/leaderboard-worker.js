@@ -882,11 +882,21 @@ async function getRequestIpHash(request, env) {
 }
 
 function extractIp(request) {
+  // Prefer the leftmost X-Forwarded-For entry — that's the original
+  // client IP. Our Netlify config rewrites /api/* to the worker as a
+  // server-side proxy, so cf-connecting-ip from CF's POV is the
+  // Netlify edge node's IP, which varies request-to-request and
+  // breaks per-run ip-hash continuity (start vs coin/finish).
+  // Fall back to cf-connecting-ip when there's no XFF (direct hits
+  // to *.workers.dev).
+  const xff = request.headers.get('x-forwarded-for');
+  if (xff) {
+    const first = xff.split(',')[0].trim();
+    if (first) return first;
+  }
+
   const cfIp = request.headers.get('cf-connecting-ip');
   if (cfIp) return cfIp;
-
-  const xff = request.headers.get('x-forwarded-for');
-  if (xff) return xff.split(',')[0].trim();
 
   return 'unknown';
 }

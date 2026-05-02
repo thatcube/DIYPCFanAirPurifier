@@ -2259,10 +2259,27 @@ function _fitSkateboardToCat(force = false) {
 let _pickupSkateboardMesh = null;
 let _pickupSkateboardLoaded = false;
 let _pickupBobPhase = 0;
+// Scene-parented sparkle light. Created at intensity 0 BEFORE the
+// async GLB load completes so adding the loaded mesh doesn't change
+// the scene's active-light count (which would force three.js to
+// recompile every PBR material's shader — same hitch the SS env light
+// and shared fireball light avoid). Driven via intensity 0 ↔ 120 on
+// load + collect, never .visible, never scene.add/remove.
+let _pickupSkateGlowLight = null;
+const _PICKUP_SKATE_GLOW_INTENSITY = 120;
 
 function _spawnPickupSkateboard() {
   if (_pickupSkateboardLoaded || skateboardFound || !_scene) return;
   _pickupSkateboardLoaded = true;
+
+  // Pre-create the pickup glow light at intensity 0 so the active light
+  // count is fixed BEFORE any async work lands. Position is updated when
+  // the GLB resolves and per-frame in _updatePickupSkateboardBob.
+  if (!_pickupSkateGlowLight) {
+    _pickupSkateGlowLight = new THREE.PointLight(0x60aaff, 0, 40, 2);
+    _pickupSkateGlowLight.castShadow = false;
+    _scene.add(_pickupSkateGlowLight);
+  }
 
   const loader = new GLTFLoader();
   loader.load('assets/skateboard.glb', (gltf) => {
@@ -2294,17 +2311,21 @@ function _spawnPickupSkateboard() {
     _pickupSkateboardMesh = root;
     _scene.add(root);
 
-    // Sparkle glow — soft point light + orbiting sprite particles
+    // Sparkle glow — orbiting sprite particles. Light is scene-parented
+    // (created above at intensity 0) so we don't add a new active light
+    // here.
     const glowGroup = new THREE.Group();
     glowGroup.position.copy(root.position);
     glowGroup.position.y += 3;
     _scene.add(glowGroup);
     root._glowGroup = glowGroup;
 
-    // Soft blue point light
-    const glow = new THREE.PointLight(0x60aaff, 120, 40, 2);
-    glow.position.set(0, 1, 0);
-    glowGroup.add(glow);
+    // Power on the pre-built scene light at the glow position.
+    if (_pickupSkateGlowLight) {
+      _pickupSkateGlowLight.position.copy(glowGroup.position);
+      _pickupSkateGlowLight.position.y += 1;
+      _pickupSkateGlowLight.intensity = _PICKUP_SKATE_GLOW_INTENSITY;
+    }
 
     // Sparkle sprites
     const sparkleMat = new THREE.SpriteMaterial({
@@ -2364,10 +2385,13 @@ window._collectPickupSkateboard = collectPickupSkateboard;
 function _collectPickupSkateboard() {
   if (skateboardFound || !_pickupSkateboardMesh) return;
 
-  // Remove sparkle glow
+  // Remove sparkle glow group (sprites). The PointLight stays in the
+  // scene at intensity 0 — removing it would change the active light
+  // count and trigger a global PBR shader recompile.
   if (_pickupSkateboardMesh._glowGroup) {
     _scene.remove(_pickupSkateboardMesh._glowGroup);
   }
+  if (_pickupSkateGlowLight) _pickupSkateGlowLight.intensity = 0;
 
   // Remove the larger invisible click hitbox if one was attached.
   if (_pickupSkateboardMesh._hitbox) {
@@ -2472,6 +2496,13 @@ function _updatePickupSkateboardBob(dtSec) {
     g.position.x = _pickupSkateboardMesh.position.x;
     g.position.y = fy + 5;
     g.position.z = _pickupSkateboardMesh.position.z;
+  }
+  // Scene-parented light tracks the glow group so the soft blue
+  // sparkle still lights the floor under the bobbing board.
+  if (_pickupSkateGlowLight) {
+    _pickupSkateGlowLight.position.x = _pickupSkateboardMesh.position.x;
+    _pickupSkateGlowLight.position.y = fy + 6;
+    _pickupSkateGlowLight.position.z = _pickupSkateboardMesh.position.z;
   }
   const sparkles = _pickupSkateboardMesh._sparkles;
   if (sparkles) {

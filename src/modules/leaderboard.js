@@ -1483,6 +1483,29 @@ function _submitPendingFinishRun() {
         // player has time to start typing their name. This is the only
         // delay we add — the actual save already completed.
         await waitForMinSaving();
+        // Server rejections (e.g. coin_count_mismatch) come back as a
+        // sentinel { entryId: '', rejectionCode } — no real entry was
+        // written. Treat as an error so the pending row stays visible
+        // (player keeps their typed name + time + cat) and surfaces an
+        // inline error next to the input. The retry happens when the
+        // player taps Exit / Play again, which both call back into
+        // _submitPendingFinishRun before they navigate away.
+        const gotEntryId = !!(runData && String(runData.entryId || '').trim());
+        if (!gotEntryId) {
+          _finishSubmitting = false;
+          _finishSaveStatus = 'error';
+          _finishNameDirty = true;
+          // Preserve the rejection code on the dialog data so the hint
+          // can include it ("Couldn't save run (code)…"). Keep the
+          // pending run intact — render will continue showing the
+          // optimistic row as long as _finishPendingRun is set.
+          if (runData && runData.rejectionCode) {
+            _finishDialogData = { ...(_finishDialogData || {}), rejectionCode: runData.rejectionCode };
+          }
+          if (input) input.disabled = false;
+          _renderFinishDialog();
+          return null;
+        }
         // Re-read the input now that the user had a chance to type.
         const preTransitionInput = _getFinishRowNameInput();
         const preTransitionTypedName = preTransitionInput ? _sanitizePlayerName(preTransitionInput.value) : '';
@@ -1606,9 +1629,17 @@ function _renderFinishDialog() {
   // slot (visually adjacent to the input) over the top-level hint.
   const hintBusy = pending || _finishSaveStatus === 'saving';
   const hintError = _finishSaveStatus === 'error' || (!pending && _finishSaveStatus === 'saved' && !sharedSaved && !!_finishEditableEntryId === false);
-  let hintHtml = '';  if (pending) {
+  // Saved-success state: show the animated green checkmark in the
+  // hint. Distinguishes a successful shared save from "Saved on this
+  // device only" (offline fallback) and from the rejection error
+  // state. Used by the row-hint CSS to tint the text green.
+  const savedCheckSvg = '<svg class="finishSavedCheck" viewBox="0 0 22 22" aria-hidden="true" focusable="false"><circle class="finishSavedCheck__ring" cx="11" cy="11" r="9" /><path class="finishSavedCheck__tick" d="M6.5 11.5 L9.5 14.5 L15.5 8" /></svg>';
+  let hintSaved = false;
+  let hintHtml = '';
+  if (pending) {
     if (_finishSaveStatus === 'error') {
-      hintHtml = '<i class="ph ph-warning-circle" aria-hidden="true"></i> Save failed. Will retry...';
+      const codeSuffix = rejectionCode ? ` (${_escapeHtml(rejectionCode)})` : '';
+      hintHtml = `<i class="ph ph-warning-circle" aria-hidden="true"></i> Couldn\u2019t save run${codeSuffix}. Tap Play again or Exit to retry.`;
     } else {
       hintHtml = '<span class="finishSavingSpinner" aria-hidden="true"></span> Saving your run — you can type your name now.';
     }
@@ -1622,15 +1653,19 @@ function _renderFinishDialog() {
     } else if (isTestRun) {
       hintHtml = '<i class="ph ph-flask" aria-hidden="true"></i> Test run \u2014 saved but hidden from the public leaderboard. Type above to change your name anytime.';
     } else {
-      hintHtml = 'Saved. Type above to change your name anytime.';
+      hintHtml = `${savedCheckSvg} Saved. Type above to change your name anytime.`;
+      hintSaved = true;
     }
   } else if (rejectionCode) {
     hintHtml = `<i class="ph ph-warning-circle" aria-hidden="true"></i> Server rejected this run (${_escapeHtml(rejectionCode)}).`;
   } else if (Math.floor(Number(data.rank) || 0) > 0 || _finishSaveStatus === 'saved') {
     if (isTestRun) {
       hintHtml = '<i class="ph ph-flask" aria-hidden="true"></i> Test run \u2014 saved but hidden from the public leaderboard.';
+    } else if (sharedSaved) {
+      hintHtml = `${savedCheckSvg} Saved.`;
+      hintSaved = true;
     } else {
-      hintHtml = sharedSaved ? 'Saved.' : 'Saved on this device only.';
+      hintHtml = '<i class="ph ph-cloud-slash" aria-hidden="true"></i> Saved on this device only.';
     }
   }
 
@@ -1665,6 +1700,7 @@ function _renderFinishDialog() {
     // happen in normal flow), still keep the top-level hint honest.
     saveHint.classList.toggle('finishDialogSaveHint--busy', hintBusy);
     saveHint.classList.toggle('finishDialogSaveHint--error', hintError);
+    saveHint.classList.toggle('finishDialogSaveHint--saved', hintSaved);
     saveHint.innerHTML = hintHtml;
     saveHint.style.display = hintHtml ? '' : 'none';
   }
@@ -1770,11 +1806,12 @@ function _renderFinishDialog() {
     if (targetHint) {
       targetHint.classList.toggle('finishDialogSaveHint--busy', hintBusy);
       targetHint.classList.toggle('finishDialogSaveHint--error', hintError);
+      targetHint.classList.toggle('finishDialogSaveHint--saved', hintSaved);
       targetHint.innerHTML = hintHtml;
       targetHint.style.display = hintHtml ? '' : 'none';
     }
     if (rowHintSlot && saveHint) {
-      saveHint.classList.remove('finishDialogSaveHint--busy', 'finishDialogSaveHint--error');
+      saveHint.classList.remove('finishDialogSaveHint--busy', 'finishDialogSaveHint--error', 'finishDialogSaveHint--saved');
       saveHint.textContent = '';
       saveHint.style.display = 'none';
     }
@@ -1786,9 +1823,24 @@ function _renderFinishDialog() {
       // after the save resolves into a renameable entry. We only mark
       // it disabled while a rename pass is mid-flight.
       rowInput.disabled = _finishSubmitting && !pending;
+      // Visual error state on the input itself when the last save
+      // attempt failed. Cleared as soon as the player types or a
+      // retry succeeds (status flips back to 'saving' / 'saved' /
+      // 'idle' on the next render).
+      rowInput.classList.toggle('finishDialogRowNameInput--error', _finishSaveStatus === 'error');
+      if (_finishSaveStatus === 'error') {
+        rowInput.setAttribute('aria-invalid', 'true');
+      } else {
+        rowInput.removeAttribute('aria-invalid');
+      }
       rowInput.addEventListener('input', () => {
         _finishNameDirty = true;
         if (!pending) _finishSaveStatus = 'idle';
+        // Clear the inline error styling as soon as the player edits
+        // the name — they'll trigger a retry on the next blur or on
+        // their next button click.
+        rowInput.classList.remove('finishDialogRowNameInput--error');
+        rowInput.removeAttribute('aria-invalid');
         _finishDialogData = { ...(_finishDialogData || {}), name: rowInput.value };
       });
       rowInput.addEventListener('keydown', e => {

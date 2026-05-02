@@ -2383,7 +2383,11 @@ export function createRoom(scene) {
     _trackRise(roomBox(pcD - 1, 0.12, pcW - 0.6, pcDark,
       pcX, pcBaseY + pcH - 0.08, pcZ, 0, 0, 0));
 
-    // Long side panels — dark vent insets (±Z faces)
+    // Long side panels — dark vent insets (±Z faces).
+    // PlaneGeometry's default normal is +Z; for the +Z face leave it
+    // unrotated, and for the -Z face flip the normal with a Y rotation
+    // of π (NOT ±π/2 — that would put the panel in the YZ plane and
+    // make it stick out along Z past the body of the case).
     for (const side of [-1, 1]) {
       const panel = new THREE.Mesh(
         new THREE.PlaneGeometry(pcD - 2, pcH - 2),
@@ -2391,7 +2395,7 @@ export function createRoom(scene) {
           color: pcDark, roughness: 0.7, metalness: 0.15,
         })
       );
-      panel.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+      if (side < 0) panel.rotation.y = Math.PI;
       panel.position.set(pcX, pcCenterY, pcZ + side * (pcW / 2 - 0.05));
       panel._isRoom = true; panel._isOffice = true; panel._isStandingDesk = true;
       standingDeskRiseParts.push({ mesh: panel, baseY: panel.position.y });
@@ -2413,7 +2417,9 @@ export function createRoom(scene) {
         frontX - 0.08, pcCenterY, pcZ, 0, 0, 0));
     }
 
-    // Back face — dark vent panel (exhaust, faces +X)
+    // Back face — dark vent panel (exhaust, faces +X).
+    // Rotate so the plane lies in the YZ plane (width along Z, normal
+    // along +X) and sits flush with the +X end of the case body.
     {
       const backPanel = new THREE.Mesh(
         new THREE.PlaneGeometry(pcW - 0.8, pcH - 1.5),
@@ -2421,6 +2427,7 @@ export function createRoom(scene) {
           color: pcDark, roughness: 0.7, metalness: 0.15,
         })
       );
+      backPanel.rotation.y = Math.PI / 2;
       backPanel.position.set(pcX + pcD / 2 - 0.05, pcCenterY, pcZ);
       backPanel._isRoom = true; backPanel._isOffice = true; backPanel._isStandingDesk = true;
       standingDeskRiseParts.push({ mesh: backPanel, baseY: backPanel.position.y });

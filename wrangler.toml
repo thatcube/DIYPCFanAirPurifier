@@ -6,7 +6,12 @@ workers_dev = true
 [vars]
 LB_MAX = "25"
 LB_PER_PLAYER = "25"
-COIN_COUNT = "20"
+# Must match the number of non-secret, non-speed-mode coins spawned by
+# src/modules/coins.js (currently 22: 21 inline addCoin calls + the
+# nightstand-drawer coin pushed manually in spawnCoins). If you add or
+# remove a regular coin in the room, bump this and redeploy the worker
+# so /api/run/coin doesn't 400 on coin_<N+1> ids.
+COIN_COUNT = "22"
 SPEED_EXTRA_COIN_COUNT = "12"
 MIN_RUN_MS = "12000"
 MAX_RUN_MS = "1200000"

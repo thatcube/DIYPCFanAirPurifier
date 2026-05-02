@@ -156,6 +156,10 @@ export function handlePosterClick() {
 // handleClickObject when the player aims at the floor fireball.
 export function handlePickupClick() {
   if (_collected) return;
+  // Can't pick it up mid-flight — wait until it lands. The hitbox is
+  // hidden during the drop, but the visible core/haze/sparkle meshes
+  // still intercept clicks via the group's _isPickupFireball tag.
+  if (_dropping) return;
   _collected = true;
   try { localStorage.setItem(PICKUP_COLLECTED_KEY, '1'); } catch (e) { }
   fireball.setUnlocked(true);

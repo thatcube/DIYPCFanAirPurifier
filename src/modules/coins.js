@@ -568,8 +568,14 @@ export function spawnRoomCoins(roomRefs) {
   addCoin(_coinGroup, new THREE.Vector3(-msX_r, msY_r + msH_r / 2 + 2.2, msZ_r), {});
   // 11. On top of TV
   addCoin(_coinGroup, new THREE.Vector3(-tvCenterX, tvCenterY + tvH / 2 + bezel + 2.2, tvZ - tvD / 2 + 1.2), {});
-  // 12. In the far corner of the closet (back wall, TV-wall side)
-  addCoin(_coinGroup, new THREE.Vector3(-(SIDE_WALL_X + CLOSET_DEPTH - 3), fy + 3, CLOSET_Z - CLOSET_INTERIOR_W / 2 + 4), {});
+  // 12. Tucked in the bedroom closet's front-left alcove — behind the
+  //   8" wall stub between the bifold opening (Z=-70..-22) and the
+  //   TV-wall-side closet wall (Z=-78). 3" off the front wall plane
+  //   and 3" off the side wall, sitting right in the inside corner so
+  //   the stub blocks line-of-sight from the bedroom through the
+  //   doorway. You only spot it after stepping into the closet and
+  //   turning back toward the entrance.
+  addCoin(_coinGroup, new THREE.Vector3(-(SIDE_WALL_X + 3), fy + 3, CLOSET_Z - CLOSET_INTERIOR_W / 2 + 3), {});
   // 12b. On the bedroom-closet upper shelf (section 2 of 4 — middle).
   //   Shelf top Y ≈ fy + 56.4 (room.js shelfDrop=24, shelfThk=0.8 → fy+80-24+0.4).
   //   shelfCenterX pre-mirror = SIDE_WALL_X + CLOSET_DEPTH - 0.5 - 0.1 - 14/2 = 79.4 → world -79.4.

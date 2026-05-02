@@ -3821,6 +3821,14 @@ line-height: 1;
   color: #ffb4b4;
 }
 
+/* Saved-success state: tint the hint green so the animated check has
+   matching companion text. Picked to clear AA at 11px against both
+   the dialog body and the gold .own-current row bg. */
+.finishDialogRowSaveHint.finishDialogSaveHint--saved,
+#finishDialogSaveHint.finishDialogSaveHint--saved {
+  color: #b5f0c9;
+}
+
 /* Inside the row, the spinner can stay 12px but we shave a hair so it
    fits the smaller in-row text size. */
 .finishDialogRowSaveHint .finishSavingSpinner {
@@ -3837,6 +3845,89 @@ line-height: 1;
 
 #finishDialogSaveHint.finishDialogSaveHint--error {
   color: #ffb4b4;
+}
+
+/* Animated saved checkmark — drawn with two stroke-dasharray passes
+   (ring then tick) chained off a small pop. Replays cheaply each
+   time the saved hint re-renders, which is what we want as feedback
+   when a rename succeeds. The whole thing is 14×14 in the row hint
+   and scales naturally inside flex. */
+.finishSavedCheck {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  overflow: visible;
+  animation: finishSavedCheckPop 320ms cubic-bezier(.2, .8, .2, 1.2) both;
+}
+
+#finishDialogSaveHint .finishSavedCheck {
+  width: 16px;
+  height: 16px;
+}
+
+.finishSavedCheck__ring {
+  fill: none;
+  stroke: #6cd49a;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  transform-origin: center;
+  animation: finishSavedCheckRingDraw 360ms ease-out 60ms forwards;
+}
+
+.finishSavedCheck__tick {
+  fill: none;
+  stroke: #7ce0a8;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 16;
+  stroke-dashoffset: 16;
+  animation: finishSavedCheckTickDraw 260ms ease-out 220ms forwards;
+}
+
+@keyframes finishSavedCheckPop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+
+  60% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes finishSavedCheckRingDraw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes finishSavedCheckTickDraw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .finishSavedCheck,
+  .finishSavedCheck__ring,
+  .finishSavedCheck__tick {
+    animation: none;
+  }
+
+  .finishSavedCheck__ring,
+  .finishSavedCheck__tick {
+    stroke-dashoffset: 0;
+  }
 }
 
 .finishSavingSpinner {
@@ -4140,6 +4231,49 @@ line-height: 1;
 
 .finishDialogRowNameInput:disabled {
   opacity: 0.72;
+}
+
+/* Save-failed state on the input itself. Red border + soft halo so
+   the player sees the error attached to the field they were editing
+   rather than as a disconnected note elsewhere. Cleared the moment
+   they start typing again (JS removes the class on input). The halo
+   is held back from the focus halo's intensity so a re-focus on the
+   errored field still reads as a focused field, not an alert. */
+.finishDialogRowNameInput--error,
+.finishDialogRowNameInput--error:focus {
+  border-color: rgba(255, 132, 132, 0.78);
+  box-shadow: 0 0 0 3px rgba(255, 132, 132, 0.16);
+  animation: finishDialogRowNameInputErrorShake 320ms cubic-bezier(.36, .07, .19, .97) both;
+}
+
+@keyframes finishDialogRowNameInputErrorShake {
+
+  10%,
+  90% {
+    transform: translate3d(-1px, 0, 0);
+  }
+
+  20%,
+  80% {
+    transform: translate3d(2px, 0, 0);
+  }
+
+  30%,
+  50%,
+  70% {
+    transform: translate3d(-3px, 0, 0);
+  }
+
+  40%,
+  60% {
+    transform: translate3d(3px, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .finishDialogRowNameInput--error {
+    animation: none;
+  }
 }
 
 .finishDialogActions {
