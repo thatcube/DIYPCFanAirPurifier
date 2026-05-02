@@ -2788,28 +2788,50 @@ line-height: 1;
   color: rgba(255, 195, 195, 0.95);
 }
 
-/* Slider row — stack label/value on top, slider on bottom so the
-   track gets the full width of the row's grid cell. The value pill
-   stays inline with the label (right-aligned) and the slider sits
-   directly underneath, aligned with the rest of the cell. */
+/* Slider row — 2-row grid so the label and current value sit on the
+   same top line (label left, value right), and the track spans the
+   full width on the row below. Previously this was a flex-wrap row
+   with the slider forcing `flex: 1 1 100%`; because the source order
+   is label → slider → value, the value got pushed onto a *third*
+   line under the track, leaving a tall hollow row. Grid placement
+   lets us keep markup order and still pin the value to the header. */
 .pause-toggle-row--slider {
-  flex-wrap: wrap;
-  row-gap: 6px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 12px;
+  /* Generous gap between the header line and the track so the thumb
+     never crowds the label text above it. */
+  row-gap: 14px;
+  /* Symmetric horizontal padding keeps the track edges aligned with
+     the label/value columns above; bottom padding gives the thumb
+     (which extends ~5px below the track centerline) breathing room. */
+  padding: 10px 16px 14px;
 }
 
 .pause-toggle-row--slider .pause-toggle-label {
-  flex: 1 1 auto;
+  grid-column: 1;
+  grid-row: 1;
   min-width: 0;
 }
 
 .pause-toggle-row--slider .pause-toggle-state {
-  flex: 0 0 auto;
+  grid-column: 2;
+  grid-row: 1;
   white-space: nowrap;
-  margin-left: auto;
+  /* Numeric values look best tabular so changes don't shift width. */
+  font-variant-numeric: tabular-nums;
+}
+
+.pause-toggle-row--slider .pause-range {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  /* Track spans the full grid cell so its left/right edges line up
+     exactly with the label and value above. The thumb's overhang at
+     min/max is absorbed by the row's 16px horizontal padding. */
 }
 
 .pause-range {
-  flex: 1 1 100%;
   width: 100%;
   min-width: 0;
   height: 4px;
@@ -2938,14 +2960,24 @@ line-height: 1;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: rgba(8, 12, 18, 0.55);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  /* Match the .pause-toggle-row recipe so the search field reads as
+     part of the same glass family as the rows beneath it: a whisper
+     of white tint, the shared --glass-border, and a slim inset top
+     highlight. No backdrop-filter here — the parent glass card is
+     already sampling the scene; stacking another blur creates a
+     darker slab that fights the rest of the panel. */
+  background-color: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--glass-border);
   border-radius: var(--r-sm);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  transition: border-color var(--dur-fast) var(--ease-out-expo),
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: background-color var(--dur-fast) var(--ease-out-expo),
+              border-color var(--dur-fast) var(--ease-out-expo),
               box-shadow var(--dur-fast) var(--ease-out-expo);
+}
+
+.app-search:hover {
+  background-color: rgba(255, 255, 255, 0.07);
+  border-color: var(--glass-border-strong);
 }
 
 .app-search--sticky {
@@ -2955,7 +2987,9 @@ line-height: 1;
 }
 
 .app-search > i {
-  color: rgba(159, 227, 255, 0.85);
+  /* WCAG: this icon is decorative, but bump alpha so it still reads
+     against light scene backdrops behind the glass card. */
+  color: rgba(159, 227, 255, 0.95);
   font-size: 14px;
   flex-shrink: 0;
 }
@@ -2991,15 +3025,19 @@ line-height: 1;
   appearance: none;
 }
 
+/* Placeholder needs to clear WCAG AA (4.5:1) against the glass card
+   even when the scene behind happens to be bright. 0.5 alpha drops
+   to ~2.4:1 on light backdrops; 0.72 holds the line at ~4.5:1 while
+   still reading as muted next to live input text. */
 .app-search__input::placeholder {
-  color: rgba(225, 240, 255, 0.5);
+  color: rgba(225, 240, 255, 0.72);
 }
 
 /* Soft glow whenever the field is focused (mouse or keyboard) so
    users always get feedback. */
 .app-search:focus-within {
   border-color: rgba(159, 227, 255, 0.45);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08),
               0 0 0 4px rgba(159, 227, 255, 0.10);
 }
 
@@ -3008,7 +3046,7 @@ line-height: 1;
    wrapper's border-radius, so it follows the pill shape. */
 .app-search:has(:focus-visible) {
   border-color: rgba(159, 227, 255, 0.7);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08),
               0 0 0 3px rgba(159, 227, 255, 0.32);
 }
 
@@ -3058,7 +3096,10 @@ line-height: 1;
   background: transparent;
   border: none;
   border-radius: var(--r-sm);
-  color: rgba(225, 240, 255, 0.78);
+  /* Inactive tab labels: alpha 0.78 was borderline 3.3:1 against
+     bright scene backdrops. 0.86 keeps the muted-vs-active hierarchy
+     while clearing WCAG AA (~4.5:1) on the worst-case glass surface. */
+  color: rgba(225, 240, 255, 0.86);
   font-family: inherit;
   font-size: 12px;
   font-weight: var(--weight-medium);
@@ -3070,7 +3111,7 @@ line-height: 1;
 
 .settings-tab i {
   font-size: 13px;
-  color: rgba(159, 227, 255, 0.85);
+  color: rgba(159, 227, 255, 0.95);
 }
 
 .settings-tab:hover {
