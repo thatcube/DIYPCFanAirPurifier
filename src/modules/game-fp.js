@@ -4127,6 +4127,9 @@ function _resetRun() {
   // Clear any active death lock first so the respawn sticks and the
   // pointer can re-engage normally.
   if (_deathLocked) setDeathLock(false);
+  // Clear sprint-toggle so the new run doesn't start auto-sprinting
+  // from a stale toggle state.
+  _sprintToggle = false;
   _respawn();
   _resetWorldState();
   coins.fullReset();
@@ -5642,6 +5645,118 @@ let _gamepadLastRepeat = [];     // ts of most recent autorepeat fire
 // Tracks whether the pad was driving WASD last frame, so we don't
 // stomp keyboard input when the player is using both.
 let _gamepadWasMoving = false;
+// Sprint toggle — flipped by the sprintToggle action (default L3),
+// independent of the sprint-hold action (default LT). Either one
+// active = sprinting. Cleared on death/reset/disconnect for safety.
+let _sprintToggle = false;
+
+// ── Rebindable action map ──────────────────────────────────────────
+// Action name → button index. User can reassign in Settings; we
+// persist to localStorage as 'gamepadMap'. Listening mode (claimed
+// by the next button press) is driven by the settings panel via
+// window.__gpBindings.startListen(action, cb).
+const _GP_BTN_NAMES = {
+  0:'A', 1:'B', 2:'X', 3:'Y', 4:'LB', 5:'RB', 6:'LT', 7:'RT',
+  8:'Select', 9:'Start', 10:'L3', 11:'R3',
+  12:'D-Up', 13:'D-Down', 14:'D-Left', 15:'D-Right',
+};
+const _GP_ACTION_LABELS = {
+  jump:'Jump (hold)', sprint:'Sprint (hold)', sprintToggle:'Sprint (toggle)',
+  interact:'Interact', fireball:'Fireball / charge', camera:'Camera',
+  reset:'Reset run', pause:'Pause',
+  skateToggle:'Skateboard on/off', kickflip:'Kickflip', manual:'Manual',
+  spin:'Board spin',
+};
+const _GP_ACTION_GROUPS = {
+  general: ['jump','sprint','sprintToggle','interact','fireball','camera','reset','pause'],
+  skate:   ['skateToggle','kickflip','manual','spin'],
+};
+const _GP_ACTION_ORDER = _GP_ACTION_GROUPS.general.concat(_GP_ACTION_GROUPS.skate);
+const _GP_DEFAULT_MAP = Object.freeze({
+  jump: GP_A,
+  sprint: GP_LT,
+  sprintToggle: GP_L3,
+  interact: GP_X_BTN,
+  fireball: GP_B,
+  camera: GP_Y_BTN,
+  reset: GP_BACK,
+  pause: GP_START,
+  skateToggle: GP_R3,
+  kickflip: GP_LB,
+  manual: GP_RB,
+  spin: GP_RT,
+});
+let _gpMap = { ..._GP_DEFAULT_MAP };
+let _gpListenAction = null;
+let _gpListenCb = null;
+
+function _gpLoadMap() {
+  try {
+    const raw = localStorage.getItem('gamepadMap');
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return;
+    for (const k of _GP_ACTION_ORDER) {
+      const v = parsed[k];
+      if (typeof v === 'number' && v >= 0 && v <= 15) _gpMap[k] = v;
+    }
+  } catch { /* corrupt JSON, ignore */ }
+}
+function _gpSaveMap() {
+  try { localStorage.setItem('gamepadMap', JSON.stringify(_gpMap)); }
+  catch { /* private mode etc. */ }
+}
+function _gpSetMap(action, btnIdx) {
+  if (!(action in _gpMap)) return;
+  if (typeof btnIdx !== 'number' || btnIdx < 0 || btnIdx > 15) return;
+  // Swap with whichever action currently owns btnIdx so nothing
+  // becomes silently unbound (otherwise binding X to jump would
+  // leave interact dead).
+  const prevBtn = _gpMap[action];
+  for (const a of _GP_ACTION_ORDER) {
+    if (a !== action && _gpMap[a] === btnIdx) _gpMap[a] = prevBtn;
+  }
+  _gpMap[action] = btnIdx;
+  _gpSaveMap();
+}
+function _gpResetMap() {
+  _gpMap = { ..._GP_DEFAULT_MAP };
+  _gpSaveMap();
+}
+function _gpStartListen(action, cb) {
+  if (!(action in _gpMap)) return;
+  _gpListenAction = action;
+  _gpListenCb = (typeof cb === 'function') ? cb : null;
+}
+function _gpCancelListen() {
+  _gpListenAction = null;
+  _gpListenCb = null;
+}
+_gpLoadMap();
+// Settings panel may write to 'gamepadMap' from another realm
+// (parent frame in SPA mode). Reload when storage changes.
+try {
+  window.addEventListener('storage', (e) => {
+    if (e && e.key === 'gamepadMap') _gpLoadMap();
+  });
+} catch { /* no window in headless hosts */ }
+
+// Public API for settings UI.
+window.__gpBindings = {
+  get:           () => ({ ..._gpMap }),
+  defaults:      () => ({ ..._GP_DEFAULT_MAP }),
+  set:           _gpSetMap,
+  reset:         _gpResetMap,
+  startListen:   _gpStartListen,
+  cancelListen:  _gpCancelListen,
+  isListening:   () => _gpListenAction != null,
+  listeningFor: () => _gpListenAction,
+  buttonName:    (i) => _GP_BTN_NAMES[i] || `Btn ${i}`,
+  actionLabel:   (a) => _GP_ACTION_LABELS[a] || a,
+  actionOrder:   () => _GP_ACTION_ORDER.slice(),
+  actionGroups:  () => ({ general: _GP_ACTION_GROUPS.general.slice(),
+                          skate:   _GP_ACTION_GROUPS.skate.slice() }),
+};
 
 function _gamepadConnect(idx) {
   _gamepadIndex = idx;
@@ -5675,6 +5790,9 @@ function _gamepadDisconnect(idx) {
   fpKeys.shift = false;
   _trickManualHeld = false;
   _gamepadWasMoving = false;
+  _sprintToggle = false;
+  _gpListenAction = null;
+  _gpListenCb = null;
   if (_showToast) _showToast('Controller disconnected');
 }
 
@@ -5901,9 +6019,29 @@ function _pollGamepad(fpDtMs) {
     return false;
   };
 
+  // Rebind listening: any newly-pressed button claims the active
+  // action and fires the settings-panel callback. Runs even while
+  // paused (the panel is on the pause overlay) and eats the press
+  // so it doesn't double-fire as a gameplay action.
+  if (_gpListenAction) {
+    for (let i = 0; i < curr.length && i < 16; i++) {
+      if (curr[i] && !prev[i]) {
+        const action = _gpListenAction;
+        const cb = _gpListenCb;
+        _gpListenAction = null;
+        _gpListenCb = null;
+        _gpSetMap(action, i);
+        if (cb) { try { cb(action, i); } catch { /* swallow UI errors */ } }
+        break;
+      }
+    }
+    _gamepadPrevButtons = curr;
+    return;
+  }
+
   // Start always works (pause toggle / close skate onboarding) — even
   // while paused, since that's the whole point.
-  if (pressed(GP_START)) {
+  if (pressed(_gpMap.pause)) {
     if (_skateOnboardingOpen) _closeSkateOnboarding();
     else if (!_deathLocked) setPaused(!fpPaused);
   }
@@ -5929,34 +6067,48 @@ function _pollGamepad(fpDtMs) {
   if (!fpPaused && !_deathLocked) {
     // Hold-style: mutate fpKeys / trick flags only when the pad is
     // actively touching that input, so keyboard isn't overwritten.
-    if (curr[GP_A]  || prev[GP_A])  fpKeys.space = !!curr[GP_A];
-    // Sprint on LT (primary, easy to hold while moving) and L3 as a
-    // secondary binding so the standard click-stick muscle memory
-    // still works. Either input held = sprinting.
-    if (curr[GP_LT] || prev[GP_LT] || curr[GP_L3] || prev[GP_L3]) {
-      fpKeys.shift = !!(curr[GP_LT] || curr[GP_L3]);
+    const jumpBtn = _gpMap.jump;
+    if (curr[jumpBtn] || prev[jumpBtn]) fpKeys.space = !!curr[jumpBtn];
+
+    // Sprint hold (default LT) and sprint toggle (default L3) are
+    // independent — either active = sprinting. Toggle persists across
+    // frames until clicked again. While the toggle is on, we keep
+    // writing shift=true so a stray keyboard release can't turn it
+    // off; otherwise we only touch shift when the hold input changed
+    // so keyboard input isn't stomped.
+    const sprintBtn = _gpMap.sprint;
+    const toggleBtn = _gpMap.sprintToggle;
+    const sprintHeld = !!curr[sprintBtn];
+    const sprintHeldPrev = !!prev[sprintBtn];
+    if (curr[toggleBtn] && !prev[toggleBtn]) _sprintToggle = !_sprintToggle;
+    if (_sprintToggle || sprintHeld || sprintHeldPrev) {
+      fpKeys.shift = sprintHeld || _sprintToggle;
     }
-    if (curr[GP_RB] || prev[GP_RB]) _trickManualHeld = !!curr[GP_RB] && skateMode;
+
+    const manualBtn = _gpMap.manual;
+    if (curr[manualBtn] || prev[manualBtn]) {
+      _trickManualHeld = !!curr[manualBtn] && skateMode;
+    }
 
     // Press-style: edge-triggered.
     // Reset run is on Select/Back (not B) so it can't be hit by an
     // accidental thumb-bump on the right action cluster mid-run.
-    if (pressed(GP_BACK))  { _resetRun(); if (_showToast) _showToast('Reset!'); }
-    if (pressed(GP_Y_BTN)) setCamMode();
-    if (pressed(GP_R3)) {
+    if (pressed(_gpMap.reset)) { _resetRun(); if (_showToast) _showToast('Reset!'); }
+    if (pressed(_gpMap.camera)) setCamMode();
+    if (pressed(_gpMap.skateToggle)) {
       if (skateboardFound) setSkateMode(!skateMode);
       else if (_showToast) _showToast('Find the hidden skateboard first!');
     }
-    if (pressed(GP_LB) && skateMode && !_trickKickflipActive) {
+    if (pressed(_gpMap.kickflip) && skateMode && !_trickKickflipActive) {
       _trickKickflipActive = true;
       _trickKickflip = 0;
     }
 
-    // Interact (X / Square). Synthesizes a primary mousedown so the
-    // existing FP screen-center raycast in purifier.js (toggles fans,
-    // opens drawers/doors, picks coins, etc.) runs identically to a
-    // real click. Edge-triggered — no autorepeat.
-    if (pressed(GP_X_BTN)) {
+    // Interact (default X / Square). Synthesizes a primary mousedown
+    // so the existing FP screen-center raycast in purifier.js (toggles
+    // fans, opens drawers/doors, picks coins, etc.) runs identically
+    // to a real click. Edge-triggered — no autorepeat.
+    if (pressed(_gpMap.interact)) {
       try {
         const evt = new MouseEvent('mousedown', {
           button: 0, buttons: 1, bubbles: true, cancelable: true,
@@ -5967,27 +6119,28 @@ function _pollGamepad(fpDtMs) {
       } catch { /* MouseEvent not constructable in unusual hosts */ }
     }
 
-    // Fireball / kamehameha (B / Circle). Press = first hit; held =
-    // autorepeat with repeat=true so SS charge isn't restarted;
-    // release = key-up.
-    if (pressed(GP_B)) {
+    // Fireball / kamehameha (default B / Circle). Press = first hit;
+    // held = autorepeat with repeat=true so SS charge isn't
+    // restarted; release = key-up.
+    const fireballBtn = _gpMap.fireball;
+    if (pressed(fireballBtn)) {
       if (typeof window._fireballKeyDown === 'function') window._fireballKeyDown(false);
       else if (typeof window._shootFireball === 'function') window._shootFireball();
-    } else if (pressedRepeat(GP_B) && typeof window._fireballKeyDown === 'function') {
+    } else if (pressedRepeat(fireballBtn) && typeof window._fireballKeyDown === 'function') {
       window._fireballKeyDown(true);
     }
-    if (released(GP_B) && typeof window._fireballKeyUp === 'function') {
+    if (released(fireballBtn) && typeof window._fireballKeyUp === 'function') {
       window._fireballKeyUp();
     }
 
-    // Skate spin (RT). Tap stacks at the spam-tap cap; autorepeat
-    // while held uses the lower hold cap (mirrors X-key e.repeat).
-    // Was on LT before sprint moved there.
-    if (skateMode && pressedRepeat(GP_RT)) {
+    // Skate spin (default RT). Tap stacks at the spam-tap cap;
+    // autorepeat while held uses the lower hold cap.
+    const spinBtn = _gpMap.spin;
+    if (skateMode && pressedRepeat(spinBtn)) {
       const SPIN_BASE = Math.PI * 2.66;
       const SPIN_CAP = Math.PI * 20;
       const SPIN_HOLD_CAP = SPIN_CAP * 0.6;
-      const isHoldRepeat = curr[GP_RT] && prev[GP_RT];
+      const isHoldRepeat = curr[spinBtn] && prev[spinBtn];
       const cap = isHoldRepeat ? SPIN_HOLD_CAP : SPIN_CAP;
       if (_trickSpinSpeed >= cap) {
         _trickSpinBoost = true;

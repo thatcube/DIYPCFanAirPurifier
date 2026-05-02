@@ -281,25 +281,38 @@ const KEYBOARD_REF_SKATE = [
 
 // Controller reference. Auto-detected on connect; default mapping is
 // Xbox-style (PS layout maps the same physical buttons by position).
-// Order is by priority: movement, then primary actions (jump, sprint,
-// interact), then fireball, then meta controls.
-const CONTROLLER_REF = [
-  { keys: ['L Stick'],   desc: 'Move' },
-  { keys: ['R Stick'],   desc: 'Look' },
-  { keys: ['A'],         desc: 'Jump (hold)' },
-  { keys: ['LT'],        desc: 'Sprint (hold)' },
-  { keys: ['X'],         desc: 'Interact' },
-  { keys: ['B'],         desc: 'Fireball / charge' },
-  { keys: ['Y'],         desc: 'Camera' },
-  { keys: ['Select'],    desc: 'Reset run' },
-  { keys: ['Start'],     desc: 'Pause' },
+// Sticks/d-pad-as-movement aren't rebindable; the buttons listed in
+// _GP_REBIND_GROUPS are. Defaults are mirrored from game-fp.js so we
+// can render the rebind UI before the iframe boots; once it does,
+// window.__gpBindings is the source of truth.
+const CONTROLLER_FIXED_REF = [
+  { keys: ['L Stick'], desc: 'Move' },
+  { keys: ['R Stick'], desc: 'Look' },
+  { keys: ['D-pad'],   desc: 'Move (alt)' },
 ];
 
-const CONTROLLER_REF_SKATE = [
-  { keys: ['R3'], desc: 'Get on / off the board' },
-  { keys: ['LB'], desc: 'Kickflip' },
-  { keys: ['RB'], desc: 'Manual / wheelie' },
-  { keys: ['RT'], desc: 'Board spin' },
+const _GP_BTN_NAMES = {
+  0:'A', 1:'B', 2:'X', 3:'Y', 4:'LB', 5:'RB', 6:'LT', 7:'RT',
+  8:'Select', 9:'Start', 10:'L3', 11:'R3',
+  12:'D-Up', 13:'D-Down', 14:'D-Left', 15:'D-Right',
+};
+const _GP_DEFAULT_MAP = {
+  jump:0, sprint:6, sprintToggle:10, interact:2, fireball:1,
+  camera:3, reset:8, pause:9,
+  skateToggle:11, kickflip:4, manual:5, spin:7,
+};
+const _GP_ACTION_LABELS = {
+  jump:'Jump (hold)', sprint:'Sprint (hold)', sprintToggle:'Sprint (toggle)',
+  interact:'Interact', fireball:'Fireball / charge', camera:'Camera',
+  reset:'Reset run', pause:'Pause',
+  skateToggle:'Skateboard on/off', kickflip:'Kickflip', manual:'Manual',
+  spin:'Board spin',
+};
+const _GP_REBIND_GROUPS = [
+  { title: 'Controller',           icon: 'ph ph-game-controller', sub: false,
+    actions: ['jump','sprint','sprintToggle','interact','fireball','camera','reset','pause'] },
+  { title: 'Skateboard',           emoji: '🛹', sub: true,
+    actions: ['skateToggle','kickflip','manual','spin'] },
 ];
 
 // ────────────────────────────────────────────────────────────────────
@@ -381,25 +394,88 @@ function _renderKbdGroup(entries) {
   }).join('');
 }
 
+// Reads bindings from localStorage so we can render before the game
+// iframe finishes booting; once __gpBindings is live the panel uses
+// it as the authority for set/reset/listen.
+function _gpReadStoredMap() {
+  const map = { ..._GP_DEFAULT_MAP };
+  try {
+    const raw = localStorage.getItem('gamepadMap');
+    if (!raw) return map;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return map;
+    for (const k of Object.keys(_GP_DEFAULT_MAP)) {
+      const v = parsed[k];
+      if (typeof v === 'number' && v >= 0 && v <= 15) map[k] = v;
+    }
+  } catch { /* corrupt JSON, fall back to defaults */ }
+  return map;
+}
+
+// Resolve __gpBindings either locally (we ARE /play) or via the
+// #bgFrame iframe (parent mode on home/settings/etc). Same-origin
+// access is required; on cross-origin the lookup throws and we
+// return null.
+function _gpApi() {
+  try { if (typeof window.__gpBindings !== 'undefined') return window.__gpBindings; } catch {}
+  try {
+    const fr = document.getElementById('bgFrame');
+    if (!fr) return null;
+    const w = fr.contentWindow;
+    if (!w) return null;
+    void w.location.origin; // throws on cross-origin
+    return w.__gpBindings || null;
+  } catch { return null; }
+}
+
+function _renderRebindRow(action, btnIdx) {
+  const label = _GP_ACTION_LABELS[action] || action;
+  const name = _GP_BTN_NAMES[btnIdx] || `Btn ${btnIdx}`;
+  return `
+    <div class="gp-rebind-row" data-action="${_esc(action)}">
+      <span class="gp-rebind-label">${_esc(label)}</span>
+      <button type="button" class="gp-rebind-btn" data-action="${_esc(action)}"
+        aria-label="Rebind ${_esc(label)} (currently ${_esc(name)})">
+        <kbd>${_esc(name)}</kbd>
+      </button>
+    </div>`;
+}
+
+function _renderControllerRebind() {
+  const map = _gpReadStoredMap();
+  const groups = _GP_REBIND_GROUPS.map(g => {
+    const heading = g.sub
+      ? `<h3 class="pause-section-title pause-section-title--sub"><span class="pause-section-emoji" aria-hidden="true">${g.emoji || ''}</span> ${_esc(g.title)}</h3>`
+      : `<h3 class="pause-section-title"><i class="${_esc(g.icon)}"></i> ${_esc(g.title)}</h3>`;
+    const rows = g.actions.map(a => _renderRebindRow(a, map[a])).join('');
+    return `${heading}<div class="gp-rebind-list">${rows}</div>`;
+  }).join('');
+  const fixed = _renderKbdGroup(CONTROLLER_FIXED_REF);
+  return `
+    <div class="gp-rebind-fixed">${fixed}</div>
+    ${groups}
+    <div class="gp-rebind-actions">
+      <button type="button" class="gp-rebind-reset">Reset to defaults</button>
+      <span class="gp-rebind-hint" aria-live="polite"></span>
+    </div>`;
+}
+
 function _renderKeyboardRef() {
   const generalRows = _renderKbdGroup(KEYBOARD_REF);
   const skateRows = _renderKbdGroup(KEYBOARD_REF_SKATE);
-  const padRows = _renderKbdGroup(CONTROLLER_REF);
-  const padSkateRows = _renderKbdGroup(CONTROLLER_REF_SKATE);
-  // Single data-search blob covers the whole keyboard reference (both groups).
-  const allEntries = KEYBOARD_REF.concat(KEYBOARD_REF_SKATE)
-    .concat(CONTROLLER_REF).concat(CONTROLLER_REF_SKATE);
-  const searchBlob = allEntries.map(r => `${r.keys.join(' ')} ${r.desc}`).join(' ').toLowerCase();
+  const controllerHtml = _renderControllerRebind();
+  // Search blob: keyboard rows + controller action labels and button
+  // names so the rebind UI is reachable from settings search.
+  const kbBlob = KEYBOARD_REF.concat(KEYBOARD_REF_SKATE)
+    .map(r => `${r.keys.join(' ')} ${r.desc}`).join(' ');
+  const padBlob = Object.values(_GP_ACTION_LABELS).concat(Object.values(_GP_BTN_NAMES)).join(' ');
   return `
-    <div class="settings-keyboard-ref" data-search="${_esc('keyboard shortcuts skate skateboard controller gamepad xbox playstation ' + searchBlob)}" data-row="keyboard-ref">
+    <div class="settings-keyboard-ref" data-search="${_esc(('keyboard shortcuts skate skateboard controller gamepad xbox playstation rebind remap ' + kbBlob + ' ' + padBlob).toLowerCase())}" data-row="keyboard-ref">
       <h3 class="pause-section-title"><i class="ph ph-keyboard"></i> Keyboard</h3>
       <div class="pause-controls">${generalRows}</div>
       <h3 class="pause-section-title pause-section-title--sub"><span class="pause-section-emoji" aria-hidden="true">🛹</span> Skateboard</h3>
       <div class="pause-controls">${skateRows}</div>
-      <h3 class="pause-section-title"><i class="ph ph-game-controller"></i> Controller</h3>
-      <div class="pause-controls">${padRows}</div>
-      <h3 class="pause-section-title pause-section-title--sub"><span class="pause-section-emoji" aria-hidden="true">🛹</span> Skateboard</h3>
-      <div class="pause-controls">${padSkateRows}</div>
+      ${controllerHtml}
       <button class="pause-link pause-link--footer" type="button"
         onclick="window._enterInspector&&window._enterInspector()">
         <i class="ph ph-magnifying-glass"></i> Inspect air purifier
@@ -807,6 +883,91 @@ export function mountSettings(host) {
   requestAnimationFrame(() => _positionIndicator(false));
   setTimeout(() => _positionIndicator(false), 120);
   window.addEventListener('resize', () => _positionIndicator(false));
+
+  // ── Controller rebind ──────────────────────────────────────────
+  // Delegate clicks on the rebind buttons + reset button. Listening
+  // calls into __gpBindings (local or via #bgFrame) and gets a cb
+  // when a button claims the action; we re-render just the row.
+  function _refreshRebindUi() {
+    const map = _gpReadStoredMap();
+    host.querySelectorAll('.gp-rebind-btn').forEach(btn => {
+      const action = btn.dataset.action;
+      if (!action) return;
+      btn.classList.remove('is-listening');
+      const name = _GP_BTN_NAMES[map[action]] || `Btn ${map[action]}`;
+      btn.innerHTML = `<kbd>${_esc(name)}</kbd>`;
+      const label = _GP_ACTION_LABELS[action] || action;
+      btn.setAttribute('aria-label', `Rebind ${label} (currently ${name})`);
+    });
+    const hint = host.querySelector('.gp-rebind-hint');
+    if (hint) hint.textContent = '';
+  }
+
+  let _rebindListeningBtn = null;
+  function _enterListenMode(btn) {
+    const api = _gpApi();
+    const action = btn.dataset.action;
+    if (!api || !action) return;
+    if (api.isListening()) api.cancelListen();
+    _rebindListeningBtn = btn;
+    btn.classList.add('is-listening');
+    btn.innerHTML = `<kbd>Press a button…</kbd>`;
+    const hint = host.querySelector('.gp-rebind-hint');
+    if (hint) hint.textContent = 'Press any controller button. Esc to cancel.';
+    api.startListen(action, () => {
+      _rebindListeningBtn = null;
+      _refreshRebindUi();
+    });
+  }
+
+  function _cancelListenMode() {
+    const api = _gpApi();
+    if (api && api.isListening()) api.cancelListen();
+    _rebindListeningBtn = null;
+    _refreshRebindUi();
+  }
+
+  host.addEventListener('click', (e) => {
+    const reset = e.target.closest('.gp-rebind-reset');
+    if (reset) {
+      e.preventDefault();
+      const api = _gpApi();
+      if (api) api.reset();
+      else {
+        // Fallback: clear localStorage directly. game-fp.js's storage
+        // listener will pick it up on next external write; on /play
+        // context the api always exists so this branch is a no-op
+        // path for stale iframes.
+        try { localStorage.removeItem('gamepadMap'); } catch {}
+      }
+      _refreshRebindUi();
+      return;
+    }
+    const btn = e.target.closest('.gp-rebind-btn');
+    if (btn) {
+      e.preventDefault();
+      // Clicking the same button while listening cancels.
+      if (_rebindListeningBtn === btn) { _cancelListenMode(); return; }
+      _enterListenMode(btn);
+      return;
+    }
+  });
+
+  // Esc cancels listening. Capture-phase so it runs before the
+  // pause overlay's own Esc handler closes the panel.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && _rebindListeningBtn) {
+      e.stopPropagation();
+      e.preventDefault();
+      _cancelListenMode();
+    }
+  }, true);
+
+  // Refresh on storage events (iframe writes the map after a successful
+  // listen-mode bind in parent-mode setups).
+  window.addEventListener('storage', (e) => {
+    if (e && e.key === 'gamepadMap') _refreshRebindUi();
+  });
 
   // ── Search ──────────────────────────────────────────────────────
   // Always-on input. Empty query → tabbed view. Non-empty → flat

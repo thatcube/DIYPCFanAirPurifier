@@ -3503,6 +3503,104 @@ line-height: 1;
   text-align: left;
 }
 
+/* ── Controller rebind UI ────────────────────────────────────────
+   Lives inside .settings-keyboard-ref. Each row is action label +
+   click-to-listen button showing the current button name. */
+.gp-rebind-fixed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.gp-rebind-fixed > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.gp-rebind-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+.gp-rebind-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 30px;
+}
+.gp-rebind-label {
+  font-size: 13px;
+  color: rgba(225, 240, 255, 0.85);
+}
+.gp-rebind-btn {
+  appearance: none;
+  background: rgba(8, 14, 26, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  color: inherit;
+  min-width: 88px;
+  text-align: center;
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+.gp-rebind-btn:hover {
+  background: rgba(20, 40, 70, 0.55);
+  border-color: rgba(140, 200, 255, 0.35);
+}
+.gp-rebind-btn:focus-visible {
+  outline: 2px solid rgba(140, 200, 255, 0.55);
+  outline-offset: 2px;
+}
+.gp-rebind-btn.is-listening {
+  background: rgba(40, 80, 140, 0.55);
+  border-color: rgba(140, 200, 255, 0.7);
+  animation: gp-rebind-pulse 1.1s ease-in-out infinite;
+}
+.gp-rebind-btn kbd {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+@keyframes gp-rebind-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(140, 200, 255, 0.0); }
+  50%      { box-shadow: 0 0 0 4px rgba(140, 200, 255, 0.15); }
+}
+.gp-rebind-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0 4px;
+}
+.gp-rebind-reset {
+  appearance: none;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: rgba(225, 240, 255, 0.7);
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+.gp-rebind-reset:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: rgba(225, 240, 255, 0.95);
+}
+.gp-rebind-hint {
+  font-size: 11px;
+  color: rgba(225, 240, 255, 0.55);
+  font-style: italic;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gp-rebind-btn.is-listening { animation: none; }
+}
+
 /* Search results — flat list grouped by tab. */
 .settings-search-results {
   display: flex;
@@ -6475,6 +6573,28 @@ input[type=range]:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
+
+/* ─── Gamepad focus ring (always visible while pad is connected) ──
+   public/spa-gamepad-nav.js drives focus via .focus({focusVisible})
+   in response to controller input on the menu pages. Firefox honors
+   the focusVisible option so :focus-visible matches automatically;
+   Chromium ignores it and falls back to its heuristic, which can
+   suppress the ring after a recent mouse click. body.has-gamepad is
+   set the moment a pad is detected and lets us paint the ring on
+   plain :focus too, so the controller user always sees where focus
+   lives regardless of the prior input modality.
+
+   !important is required to override the global
+   :focus:not(:focus-visible) { outline:none !important } above —
+   without it, Chromium's heuristic still wins on a focus() call
+   that didn't originate from a real keydown. */
+body.has-gamepad :focus {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px !important;
+}
+body.has-gamepad .seg button:focus { outline-offset: -2px !important; }
+body.has-gamepad input[type=range]:focus { outline-offset: 4px !important; }
+body.has-gamepad .color-dot:focus { outline-offset: 3px !important; }
 
 /* ── Fireball / Kamehameha label swap ──────────────────────────────── */
 /* The fireball hint contains two icon + label spans. Default state

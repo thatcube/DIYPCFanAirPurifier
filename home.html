@@ -878,6 +878,15 @@
       });
     })();
   </script>
+
+  <!-- Gamepad navigation for the menu chrome. Self-contained,
+       idempotent, lives in /public so Vite copies it as-is. Picks up
+       the first connected pad and lets the d-pad / sticks / A / B / LB
+       / RB / Start drive focus + click() across all four SPA-routed
+       pages. Suspended automatically while body.is-playing (the
+       iframe's own gamepad handler in src/modules/game-fp.js owns
+       input there). -->
+  <script src="/spa-gamepad-nav.js" defer></script>
 </body>
 
 </html>
