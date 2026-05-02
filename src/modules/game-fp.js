@@ -3145,6 +3145,25 @@ function _buildStaticBoxes() {
       { xMin: -gXmax, xMax: -gXmin, zMin: gZmax, zMax: gZmax + 0.5, yTop: fy + wh, room: true }
     );
 
+    // Gyarados painting — framed art on the office +Z wall. Outer frame
+    // (matte + 1.25" wood lip) protrudes 1.1" off the wall toward the
+    // room interior, so without this AABB the player would clip into
+    // the lip when standing close. Mirror of room.js values.
+    {
+      const pCenterX = (gXmin + gXmax) / 2;        // 117 pre-mirror
+      const pCenterY = fy + 50;                    // matches centerY in room.js
+      const pPhotoH = 21.47;                       // source 960×1472 aspect
+      const pOuterW = 14 * 1.4 + 1.25 * 2;          // matteW + frame*2 = 22.1
+      const pOuterH = pPhotoH * 1.4 + 1.25 * 2;     // matteH + frame*2 ≈ 32.56
+      const pLipDepth = 1.1;
+      _staticBoxes.push({
+        xMin: -(pCenterX + pOuterW / 2), xMax: -(pCenterX - pOuterW / 2),
+        zMin: gZmax - pLipDepth, zMax: gZmax,
+        yTop: pCenterY + pOuterH / 2, yBottom: pCenterY - pOuterH / 2,
+        room: true
+      });
+    }
+
     // ── Outdoor terrain (around the entire house) ──
     // Lawn sits ~3' below the office window sill. There is no outer fence;
     // the player can roam to the bounds defined by boundsBase. Slopes are
@@ -3189,6 +3208,26 @@ function _buildStaticBoxes() {
         yTop: bedWinT, yBottom: bedWinB, room: true
       }
     );
+
+    // Avatar painting — framed art on the bedroom window wall, hung in
+    // the bed-clear stretch between the window and the TV wall. Outer
+    // frame protrudes 1.1" toward the room interior (-X in world);
+    // matches room.js placement so the lip can't be clipped through.
+    {
+      const pWallFaceX = -LEFT_WALL_X - 0.25;       // 80.75 (mirrored)
+      const pCenterZ = (OPP_WALL_Z + (BED_Z - BED_L / 2)) / 2 + 6;
+      const pCenterY = fy + 52;
+      const pPhotoH = 12 * (1280 / 930);            // ≈ 16.516
+      const pOuterW = 12 * 1.4 + 1.25 * 2;           // matteW + frame*2 = 19.3
+      const pOuterH = pPhotoH * 1.4 + 1.25 * 2;      // matteH + frame*2 ≈ 25.62
+      const pLipDepth = 1.1;
+      _staticBoxes.push({
+        xMin: pWallFaceX - pLipDepth, xMax: pWallFaceX,
+        zMin: pCenterZ - pOuterW / 2, zMax: pCenterZ + pOuterW / 2,
+        yTop: pCenterY + pOuterH / 2, yBottom: pCenterY - pOuterH / 2,
+        room: true
+      });
+    }
 
     // Exterior sill ledge — small standable box outside the office window
     // for re-entry from the lawn.
@@ -3967,6 +4006,22 @@ function _resetRun() {
 
 let _pauseFocusTrap = null;
 let _pauseSavedFocus = null;
+// Pending pause-overlay close-animation timer. Tracked so a quick
+// re-pause (Esc tapped twice) cancels the in-flight exit before it
+// hides the overlay out from under the new open state.
+let _pauseCloseTimer = null;
+const _PAUSE_CLOSE_MS = 160;
+
+// Drop any in-flight close animation classes/timer and force the
+// overlay to a known visible-or-hidden baseline. Called both before
+// re-opening and from hard-exit paths that bypass the animated close.
+function _resetPauseCloseAnim() {
+  if (_pauseCloseTimer) { clearTimeout(_pauseCloseTimer); _pauseCloseTimer = null; }
+  const ov = document.getElementById('fpPauseOverlay');
+  const host = document.querySelector('.pause-card-host');
+  if (ov) ov.classList.remove('is-closing');
+  if (host) host.classList.remove('is-closing');
+}
 
 // Release pause focus trap without unpausing (for exit flow)
 export function releasePauseFocusTrap() {
@@ -3978,6 +4033,10 @@ export function releasePauseFocusTrap() {
 export function clearPauseState() {
   fpPaused = false;
   _silenceSkateRoll(true);
+  // Hard-exit paths (Exit, Inspector, death) toggle display:none on the
+  // overlay directly — make sure no stale closing class is left behind
+  // for the next open.
+  _resetPauseCloseAnim();
 }
 
 export function setPaused(paused) {
@@ -4006,6 +4065,9 @@ export function setPaused(paused) {
 
     // Show pause overlay (unless finish is showing)
     if (overlay && !finishOpen) {
+      // Cancel any in-flight close animation so the bounceIn restarts
+      // cleanly when the user re-pauses mid-fade.
+      _resetPauseCloseAnim();
       overlay.style.display = 'flex';
       // Focus trap — the .pause-card now lives OUTSIDE #fpPauseOverlay
       // (it's a sibling so its backdrop-filter samples the live canvas
@@ -4039,8 +4101,29 @@ export function setPaused(paused) {
     if (document.pointerLockElement) document.exitPointerLock();
     setTimeout(() => { _fpIgnorePointerUnlock = false; }, 300);
   } else {
-    // Hide overlays
-    if (overlay) overlay.style.display = 'none';
+    // Animated close — fpPaused is already false above, so input/
+    // physics resume immediately. The overlay just plays an exit
+    // animation (~160ms) before being hidden, so it never blocks
+    // movement, kamehameha, or restart.
+    if (overlay && overlay.style.display && overlay.style.display !== 'none') {
+      const host = document.querySelector('.pause-card-host');
+      // Cancel any prior pending close so the timer below is the
+      // single owner of the upcoming display:none.
+      if (_pauseCloseTimer) { clearTimeout(_pauseCloseTimer); _pauseCloseTimer = null; }
+      overlay.classList.add('is-closing');
+      if (host) host.classList.add('is-closing');
+      _pauseCloseTimer = setTimeout(() => {
+        _pauseCloseTimer = null;
+        overlay.classList.remove('is-closing');
+        if (host) host.classList.remove('is-closing');
+        // Only hide if we're still unpaused — a re-pause during the
+        // animation flips fpPaused back to true and the open branch
+        // already cleared the closing state.
+        if (!fpPaused) overlay.style.display = 'none';
+      }, _PAUSE_CLOSE_MS);
+    } else if (overlay) {
+      overlay.style.display = 'none';
+    }
     if (crosshair) crosshair.style.opacity = '';
     // Release focus trap
     if (_pauseFocusTrap) { _pauseFocusTrap.release(); _pauseFocusTrap = null; }
@@ -4102,6 +4185,7 @@ export function setDeathLock(enabled) {
     // physics tick (look pass) running, and only the death scene
     // should be on screen during the dramatic beat.
     fpPaused = false;
+    _resetPauseCloseAnim();
     const pauseOverlay = document.getElementById('fpPauseOverlay');
     if (pauseOverlay) pauseOverlay.style.display = 'none';
     if (_pauseFocusTrap) { _pauseFocusTrap.release(); _pauseFocusTrap = null; }

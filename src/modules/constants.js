@@ -52,7 +52,6 @@ export const CAT_HAIR_PRESETS = {
 // Cat model presets
 export const CAT_MODEL_PRESETS = {
   classic: { label: 'Classic Cat', sources: ['assets/cat.glb'], colorable: false, animSpeed: 0.85, idleLoopPause: 0, sprintAnimMult: 1.0 },
-  toon: { label: 'Toon Cat', sources: ['assets/tooncat.glb', 'assets/toon-cat.glb'], colorable: false, animSpeed: 0.85, idleLoopPause: 0, sprintAnimMult: 2 },
   bababooey: { label: 'Bababooey Cat', sources: ['assets/bababooey_cat.glb'], colorable: false, animSpeed: 0.6, idleLoopPause: 2.2, sprintAnimMult: 1.4 },
   totodile: { label: 'Totodile', sources: ['assets/totodile.glb'], colorable: false, animSpeed: 0.85, idleLoopPause: 0, sprintAnimMult: 1.2 },
   korra: { label: 'Cursed Korra', sources: [], colorable: false, animSpeed: 0.85, idleLoopPause: 0, sprintAnimMult: 1.0, procedural: true }

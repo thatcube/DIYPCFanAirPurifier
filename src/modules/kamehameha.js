@@ -169,6 +169,18 @@ export function isCharging() { return _charging; }
 export function getChargeRatio() { return _chargeRatio; }
 export function isBeamActive() { return _beamActive; }
 
+// Pre-build the orb, beam, kaboom meshes and their lights up front,
+// then compile their shader programs so the first F-hold doesn't
+// stutter on shader compile or material allocation. Safe to call
+// multiple times — _ensureBuilt() is idempotent.
+export function prewarm(renderer) {
+  if (!_scene || !_camera) return;
+  _ensureBuilt();
+  if (renderer && renderer.compile) {
+    try { renderer.compile(_scene, _camera); } catch (e) { }
+  }
+}
+
 export function startCharge() {
   if (!_scene || !_camera) return false;
   if (_charging || _beamActive) return false;

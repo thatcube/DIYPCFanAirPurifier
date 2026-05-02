@@ -219,6 +219,46 @@ h4 {
   filter: brightness(1.12);
 }
 
+/* ── Tile: brighter recipe for buttons sitting INSIDE a glass card.
+   The base .glass-btn paints var(--glass) (the same dark navy used
+   by glass cards) and applies its own backdrop-filter. When such a
+   button sits inside an already-glass surface (.pause-card,
+   #finishDialogCard, future panels) it stacks dark-on-dark and
+   reads as a sunken patch instead of a raised tile.
+
+   --tile overrides three things to fix that:
+     1. background-color: whisper-white tint (~6% white) so the
+        button reads as elevated against the card.
+     2. backdrop-filter: none — the host card already blurs the
+        scene behind it; a per-button blur is redundant AND costs
+        a stacking-context pop-in during view enter animations.
+     3. box-shadow: slim raised-tile recipe instead of the heavier
+        floating-pill ambient shadow.
+
+   Variant gradients (.glass-btn--primary / --danger) still
+   composite on top via background-image, so color hierarchy works
+   on tiles too. --danger pins background-color to the dark
+   --glass-light at the variant level, so we re-pin a brighter
+   tile-danger bg below. */
+.glass-btn--tile {
+  background-color: rgba(255, 255, 255, 0.06);
+  border-color: var(--glass-border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+.glass-btn--tile:hover {
+  background-color: rgba(255, 255, 255, 0.10);
+  border-color: var(--glass-border-strong);
+}
+
+.glass-btn--tile.glass-btn--danger {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    CONTROL PANEL
    ═══════════════════════════════════════════════════════════════════ */
@@ -2318,6 +2358,38 @@ line-height: 1;
   }
 }
 
+/* Pause overlay close animation — sequential to bounceIn/fadeIn used
+   on open. Triggered by JS adding .is-closing on #fpPauseOverlay and
+   .pause-card-host immediately before the overlay is hidden. The
+   underlying paused state (fpPaused, pointer lock) flips back the
+   instant Resume/Esc fires, so this animation never blocks input —
+   it's purely a visual exit so the menu doesn't snap away. Kept
+   short (~160ms) so the overlay clears before the player's next
+   action would feel late. */
+#fpPauseOverlay.is-closing {
+  animation: pauseScrimOut 160ms var(--ease-in-out) forwards;
+}
+
+.pause-card-host.is-closing .pause-card {
+  animation: pauseCardOut 160ms var(--ease-in-out) forwards;
+}
+
+@keyframes pauseScrimOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes pauseCardOut {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+}
+
 .pause-card {
   position: relative;
   pointer-events: auto;
@@ -2426,11 +2498,11 @@ line-height: 1;
    back    = drilling out (settings → launcher):
      outgoing slides RIGHT, incoming enters from LEFT. */
 .pause-view[data-state="exit-back"] {
-  animation: pauseViewExitBack 220ms cubic-bezier(.4,0,.2,1) forwards;
+  animation: pauseViewExitBack 220ms cubic-bezier(.4, 0, .2, 1) forwards;
 }
 
 .pause-view[data-state="exit-forward"] {
-  animation: pauseViewExitForward 220ms cubic-bezier(.4,0,.2,1) forwards;
+  animation: pauseViewExitForward 220ms cubic-bezier(.4, 0, .2, 1) forwards;
 }
 
 .pause-view[data-state="enter-from-forward"] {
@@ -2447,7 +2519,7 @@ line-height: 1;
 }
 
 .pause-view[data-state="enter-active"] {
-  animation: pauseViewEnter 280ms cubic-bezier(.22,1,.36,1) 60ms forwards;
+  animation: pauseViewEnter 280ms cubic-bezier(.22, 1, .36, 1) 60ms forwards;
 }
 
 @keyframes pauseViewExitBack {
@@ -2496,19 +2568,14 @@ line-height: 1;
 
 .pause-launcher__btns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* Hero on row 1 spans full width; Restart / Settings / Exit share
+     row 2 as three equal columns. Eliminates the previous 3-size
+     mishmash (giant hero / half-width pair / full-width Exit). */
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
 
-/* Resume spans the top row as the hero; Exit spans the bottom row;
-   Restart and Settings share the middle row. */
 .pause-launcher__btns .pause-btn--hero {
-  grid-column: 1 / -1;
-  padding: 18px 20px;
-  font-size: 16px;
-}
-
-.pause-launcher__btns .glass-btn--danger {
   grid-column: 1 / -1;
 }
 
@@ -2549,8 +2616,8 @@ line-height: 1;
   font-family: inherit;
   flex-shrink: 0;
   transition: background var(--dur-fast) var(--ease-out-expo),
-              border-color var(--dur-fast) var(--ease-out-expo),
-              transform var(--dur-fast) var(--ease-out-expo);
+    border-color var(--dur-fast) var(--ease-out-expo),
+    transform var(--dur-fast) var(--ease-out-expo);
 }
 
 .pause-back:hover {
@@ -2568,11 +2635,13 @@ line-height: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .pause-card--nav,
   .pause-view {
     transition: none !important;
     animation: none !important;
   }
+
   .pause-view[data-state="enter-from-forward"],
   .pause-view[data-state="enter-from-back"],
   .pause-view[data-state="enter-active"] {
@@ -2691,9 +2760,15 @@ line-height: 1;
   padding-top: 12px;
 }
 
+/* ── Pause-card action buttons ────────────────────────────────────
+   Just sizing/layout here — the brighter tile surface (background,
+   border, backdrop-filter override, raised-tile shadow) lives in
+   .glass-btn--tile, which the markup composes alongside .glass-btn
+   and any color variant (--primary / --danger). See the
+   .glass-btn--tile rules in the GLASS BUTTON SYSTEM block. */
 .pause-btn {
-  padding: 12px 14px;
-  font-size: 13px;
+  padding: 18px 20px;
+  font-size: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2701,6 +2776,20 @@ line-height: 1;
   white-space: nowrap;
   min-width: 0;
 }
+
+/* Hero (Resume): modest size lift + bold weight so the primary
+   action reads first without dwarfing the secondaries. The colored
+   gradient from .glass-btn--primary does the rest of the hierarchy
+   work. */
+.pause-btn--hero {
+  padding: 22px 22px;
+  font-size: 16px;
+  font-weight: var(--weight-bold);
+}
+
+/* (No .pause-btn.glass-btn--danger override needed — the shared
+   .glass-btn--tile.glass-btn--danger rule handles re-pinning the
+   tile background under the red gradient.) */
 
 .pause-btn-key {
   background: rgba(255, 255, 255, 0.2);
@@ -2714,6 +2803,10 @@ line-height: 1;
 }
 
 @media (max-width: 520px) {
+  .pause-launcher__btns {
+    grid-template-columns: 1fr;
+  }
+
   .pause-action-btns {
     grid-template-columns: 1fr;
   }
@@ -2980,8 +3073,8 @@ line-height: 1;
   border-radius: var(--r-sm);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transition: background-color var(--dur-fast) var(--ease-out-expo),
-              border-color var(--dur-fast) var(--ease-out-expo),
-              box-shadow var(--dur-fast) var(--ease-out-expo);
+    border-color var(--dur-fast) var(--ease-out-expo),
+    box-shadow var(--dur-fast) var(--ease-out-expo);
 }
 
 .app-search:hover {
@@ -2995,7 +3088,7 @@ line-height: 1;
   z-index: 2;
 }
 
-.app-search > i {
+.app-search>i {
   /* WCAG: this icon is decorative, but bump alpha so it still reads
      against light scene backdrops behind the glass card. */
   color: rgba(159, 227, 255, 0.95);
@@ -3047,7 +3140,7 @@ line-height: 1;
 .app-search:focus-within {
   border-color: rgba(159, 227, 255, 0.45);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08),
-              0 0 0 4px rgba(159, 227, 255, 0.10);
+    0 0 0 4px rgba(159, 227, 255, 0.10);
 }
 
 /* Stronger, accessible ring for keyboard-only focus — matches the
@@ -3056,7 +3149,7 @@ line-height: 1;
 .app-search:has(:focus-visible) {
   border-color: rgba(159, 227, 255, 0.7);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08),
-              0 0 0 3px rgba(159, 227, 255, 0.32);
+    0 0 0 3px rgba(159, 227, 255, 0.32);
 }
 
 /* Body: rail (left) + pages (right). */
@@ -3090,7 +3183,9 @@ line-height: 1;
   background: rgba(159, 227, 255, 0.16);
   border: 1px solid rgba(159, 227, 255, 0.4);
   border-radius: var(--r-sm);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  /* No inset top highlight: it skewed the pill optically toward the
+     top edge and made the active tab look mis-centered against the
+     label below. The 1px border alone provides enough definition. */
   z-index: 0;
   /* transform/height animations are driven inline by the panel JS. */
 }
@@ -3101,7 +3196,14 @@ line-height: 1;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 10px;
+  /* Fixed whole-pixel height keeps the rail consistent with other
+     32–36px controls and prevents the 36.59px fractional box that
+     the inherited 1.55 line-height + 9px vertical padding produced.
+     line-height: 1 collapses the font's half-leading so flex
+     align-items: center actually centers the glyphs, not a
+     leading-padded line box. */
+  height: 32px;
+  padding: 0 10px;
   background: transparent;
   border: none;
   border-radius: var(--r-sm);
@@ -3111,11 +3213,12 @@ line-height: 1;
   color: rgba(225, 240, 255, 0.86);
   font-family: inherit;
   font-size: 12px;
+  line-height: 1;
   font-weight: var(--weight-medium);
   text-align: left;
   cursor: pointer;
   transition: color var(--dur-fast) var(--ease-out-expo),
-              background-color var(--dur-fast) var(--ease-out-expo);
+    background-color var(--dur-fast) var(--ease-out-expo);
 }
 
 .settings-tab i {
@@ -3276,13 +3379,33 @@ line-height: 1;
   transform: translateY(-14px);
 }
 
-.settings-page[data-state="active"] .pause-toggle-row:nth-child(1) { transition-delay: 70ms; }
-.settings-page[data-state="active"] .pause-toggle-row:nth-child(2) { transition-delay: 95ms; }
-.settings-page[data-state="active"] .pause-toggle-row:nth-child(3) { transition-delay: 120ms; }
-.settings-page[data-state="active"] .pause-toggle-row:nth-child(4) { transition-delay: 145ms; }
-.settings-page[data-state="active"] .pause-toggle-row:nth-child(5) { transition-delay: 170ms; }
-.settings-page[data-state="active"] .pause-toggle-row:nth-child(n+6) { transition-delay: 195ms; }
-.settings-page[data-state="active"] .settings-keyboard-ref { transition-delay: 215ms; }
+.settings-page[data-state="active"] .pause-toggle-row:nth-child(1) {
+  transition-delay: 70ms;
+}
+
+.settings-page[data-state="active"] .pause-toggle-row:nth-child(2) {
+  transition-delay: 95ms;
+}
+
+.settings-page[data-state="active"] .pause-toggle-row:nth-child(3) {
+  transition-delay: 120ms;
+}
+
+.settings-page[data-state="active"] .pause-toggle-row:nth-child(4) {
+  transition-delay: 145ms;
+}
+
+.settings-page[data-state="active"] .pause-toggle-row:nth-child(5) {
+  transition-delay: 170ms;
+}
+
+.settings-page[data-state="active"] .pause-toggle-row:nth-child(n+6) {
+  transition-delay: 195ms;
+}
+
+.settings-page[data-state="active"] .settings-keyboard-ref {
+  transition-delay: 215ms;
+}
 
 /* Keyboard reference block at the bottom of the Controls tab. */
 .settings-keyboard-ref {
@@ -3311,7 +3434,7 @@ line-height: 1;
 }
 
 /* Hide the rail when the search-results pane takes over. */
-.settings-pages.is-searching ~ .settings-rail,
+.settings-pages.is-searching~.settings-rail,
 .settings-body:has(.settings-pages.is-searching) .settings-rail {
   opacity: 0.45;
   pointer-events: none;
@@ -3324,12 +3447,14 @@ line-height: 1;
     transform: none !important;
     filter: none !important;
   }
+
   .settings-page .pause-toggle-row,
   .settings-page .settings-keyboard-ref {
     transition: opacity 120ms ease !important;
     transform: none !important;
     transition-delay: 0ms !important;
   }
+
   .settings-tab-indicator {
     transition: opacity 120ms ease !important;
   }
@@ -3340,17 +3465,20 @@ line-height: 1;
   .settings-body {
     grid-template-columns: 1fr;
   }
+
   .settings-rail {
     flex-direction: row;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
+
   .settings-tab-indicator {
     /* Horizontal mode: the inline-driven transform still works since
        it uses translateY; in horizontal layout we hide the indicator
        to avoid jumpy rendering. The active-tab class still highlights. */
     display: none;
   }
+
   .settings-tab.is-active {
     background: rgba(159, 227, 255, 0.16);
     border: 1px solid rgba(159, 227, 255, 0.4);
@@ -3388,6 +3516,43 @@ line-height: 1;
   border-radius: 50%;
   border: 1px solid rgba(0, 0, 0, 0.45);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+/* Secret-coin badge — mirrors the inline rule in leaderboard.html so
+   the dialog rows surface the same coin info as the standalone
+   leaderboard. is-zero dims out, is-max gets a brighter gold tint. */
+.secretBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 216, 115, 0.10);
+  border: 1px solid rgba(255, 216, 115, 0.32);
+  color: #ffd700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.secretBadge i {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.secretBadge.is-zero {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.55);
+  opacity: 0.6;
+}
+
+.secretBadge.is-max {
+  background: rgba(255, 216, 115, 0.18);
+  border-color: rgba(255, 216, 115, 0.55);
+  box-shadow: 0 0 0 1px rgba(255, 216, 115, 0.18) inset;
 }
 
 /* ─── Name Dialog ────────────────────────────────────────────────── */
@@ -3486,31 +3651,45 @@ line-height: 1;
 }
 
 /* ─── Finish Dialog ──────────────────────────────────────────────── */
+/* Overlay blurs the game scene behind the dialog without darkening
+   it: backdrop-filter only (no background tint). The card's own
+   var(--glass) + var(--glass-blur) recipe still owns the card
+   surface tint identical to .board on /leaderboard. The card sits
+   on top of the overlay, so its backdrop-filter samples through the
+   already-blurred output — that compounds the blur slightly but
+   doesn't add any dimming, which was the previous parity issue. */
 #finishDialogOverlay {
   display: none;
   position: fixed;
   inset: 0;
   z-index: 12500;
-  background: rgba(3, 7, 12, 0.62);
-  backdrop-filter: blur(7px);
+  background: transparent;
+  backdrop-filter: blur(8px) saturate(1.05);
+  -webkit-backdrop-filter: blur(8px) saturate(1.05);
   align-items: center;
   justify-content: center;
   font-family: var(--font-ui);
 }
 
 #finishDialogCard {
-  width: min(94vw, 520px);
+  width: min(94vw, 680px);
   max-height: min(92vh, 780px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
   background-color: var(--glass);
   background-image: var(--glass-specular);
-  border: 1px solid rgba(128, 190, 232, 0.3);
-  border-radius: 22px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4),
+  /* Mirrors .board on /leaderboard so the dialog and the share page
+     read as the same component: white-tinted glass border + the
+     same multi-layer specular/glow stack. */
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    inset 0 0 32px rgba(255, 255, 255, 0.03);
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 32px 0 rgba(255, 255, 255, 0.03),
+    0 30px 80px rgba(0, 0, 0, 0.5),
+    0 1px 0 rgba(0, 0, 0, 0.5);
   color: #e8eef7;
   animation: bounceIn 0.5s var(--spring) both;
   backdrop-filter: var(--glass-blur);
@@ -3528,7 +3707,80 @@ line-height: 1;
   margin-top: 8px;
   min-height: 16px;
   font-size: 11px;
-  color: rgba(220, 238, 255, 0.62);
+  /* WCAG AA needs 4.5:1 at 11px. The hint sits over the dialog's
+     glass surface (which itself blurs the game scene), so the
+     effective background luminance varies. Use a near-solid
+     warm-white tint that clears AA against both the dialog body
+     and the gold-tinted .own-current row bg. */
+  color: rgba(232, 244, 255, 0.92);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Row-attached save hint — sits directly under the editable name
+   input within the same leaderboard row, so the player gets feedback
+   right next to where they're typing. Shares the busy/error modifier
+   classes with the top-level #finishDialogSaveHint. Color matches
+   the top-level hint for AA contrast at 11px against both the
+   dialog body and the gold .own-current row bg. */
+.finishDialogRowSaveHint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  min-height: 14px;
+  font-size: 11px;
+  line-height: 1.25;
+  color: rgba(232, 244, 255, 0.92);
+}
+
+.finishDialogRowSaveHint:empty {
+  display: none;
+}
+
+.finishDialogRowSaveHint.finishDialogSaveHint--busy {
+  font-size: 11px;
+  color: #9fe3ff;
+}
+
+.finishDialogRowSaveHint.finishDialogSaveHint--error {
+  color: #ffb4b4;
+}
+
+/* Inside the row, the spinner can stay 12px but we shave a hair so it
+   fits the smaller in-row text size. */
+.finishDialogRowSaveHint .finishSavingSpinner {
+  width: 11px;
+  height: 11px;
+}
+
+/* While a save is in flight, lift the hint visually so the player
+   notices it next to the disabled action buttons. */
+#finishDialogSaveHint.finishDialogSaveHint--busy {
+  font-size: 12px;
+  color: #9fe3ff;
+}
+
+#finishDialogSaveHint.finishDialogSaveHint--error {
+  color: #ffb4b4;
+}
+
+.finishSavingSpinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(159, 227, 255, 0.22);
+  border-top-color: rgba(159, 227, 255, 0.95);
+  animation: splashSpinnerRotate 0.85s linear infinite;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .finishSavingSpinner {
+    animation: splashSpinnerRotate 2.4s linear infinite;
+  }
 }
 
 #finishDialogSummaryGrid {
@@ -3652,24 +3904,48 @@ line-height: 1;
   color: #9fe3ff;
 }
 
+/* Mirrors the standalone /leaderboard board (.list / .row in
+   leaderboard.html) so the dialog and the share page read as the
+   same component: 38px rank gutter, 10px column gap, 36px row
+   height, 11px side padding. Editable/pending rows extend to two
+   rows so the save-hint can sit beneath the input. */
 #finishDialogList {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  row-gap: 4px;
+  gap: 6px;
 }
 
 #finishDialogList li {
   display: grid;
-  grid-template-columns: 30px 1fr auto auto;
-  gap: 8px;
+  grid-template-columns: 38px 1fr auto auto auto;
+  gap: 10px;
   align-items: center;
-  padding: 6px 8px;
+  height: 36px;
+  padding: 0 11px;
   border-radius: 9px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.05);
   font-size: 13px;
+  line-height: 1.35;
+}
+
+/* Editable/pending rows carry a save-hint sibling that sits on a
+   second grid row beneath the input column. Row 1 stays a fixed
+   36px so the rank, input, cat badge, and time line up exactly
+   like a non-editable row; the hint hangs below in row 2 with a
+   small bottom pad so the row reads as one unit. */
+#finishDialogList li:has(> .finishDialogRowSaveHint:not(:empty)) {
+  height: auto;
+  grid-template-rows: 36px auto;
+  row-gap: 0;
+  padding: 6px 11px 6px;
+}
+
+#finishDialogList li>.finishDialogRowSaveHint {
+  grid-column: 2 / 3;
+  grid-row: 2;
 }
 
 #finishDialogList li.own-history {
@@ -3684,7 +3960,8 @@ line-height: 1;
 }
 
 #finishDialogList li .rk {
-  opacity: 0.66;
+  color: var(--muted);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
@@ -3700,9 +3977,16 @@ line-height: 1;
 }
 
 #finishDialogList li .tm {
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: 0.02em;
   color: #9fe3ff;
+  /* Mono cap-height sits higher in the em-box than the body face;
+     nudge down 2px so the digits visually center against the
+     proportional rank/name on the same row. Matches the standalone
+     /leaderboard .time rule. */
+  padding-top: 2px;
 }
 
 #finishDialogList li.own-history .tm {
@@ -3786,45 +4070,98 @@ line-height: 1;
 }
 
 .finishDialogActions {
+  /* Standard dialog grouping: destructive (Exit) on the far left,
+     affirmative actions (Play again + Copy & share) grouped on the
+     right. The flex spacer between them gives the visual separation
+     that an equal 3-col grid flattens, and makes mis-tapping Exit
+     when reaching for an affirmative action much harder. Buttons
+     size to content so the row reads as two groups rather than
+     three peers. */
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
   gap: 8px;
   padding: 12px 16px 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0.22), transparent);
   flex-wrap: wrap;
 }
 
-.finishDlgBtn {
-  padding: 9px 14px;
-  font-size: 12px;
-  letter-spacing: 0.01em;
-  border-radius: var(--r-sm);
-}
-
-.finishDlgBtn--cta {
+/* Spacer: pushes everything after the destructive button to the
+   right edge. Applied to the first affirmative button (Play again)
+   via the markup. */
+.finishDialogActions__spacer {
   margin-left: auto;
-  padding: 13px 22px;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  border-radius: var(--r-md, 10px);
-  box-shadow:
-    0 0 0 1px rgba(145, 222, 255, 0.45) inset,
-    0 6px 20px rgba(145, 222, 255, 0.28),
-    0 0 24px rgba(145, 222, 255, 0.22);
 }
 
-.finishDlgBtn--cta i {
-  font-size: 1.15em;
+/* Sizing/layout only — surface (light tile vs deep CTA) comes from
+   the shared .glass-btn--tile modifier and the .finishDlgBtn--cta
+   override below. Mirrors the .pause-btn rhythm: 18px 20px / 14px. */
+.finishDlgBtn {
+  padding: 18px 20px;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  border-radius: var(--r-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Disabled state for the finish-screen action buttons while the run
+   save is in flight. Keep them in the layout (so nothing jumps when
+   the save resolves) but make it clear they aren't clickable yet. */
+.finishDlgBtn:disabled,
+.finishDlgBtn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: saturate(0.6);
+}
+
+.finishDlgBtn--busy {
+  pointer-events: none;
+}
+
+/* Copy & share CTA — deep glass tile that reads darker than the
+   sibling Exit / Play-again light tiles so it stands out as the
+   primary post-run action. Keeps the same size/rhythm as the row;
+   only the surface and a subtle cyan halo change. */
+.finishDlgBtn--cta {
+  background-color: rgba(8, 14, 26, 0.55);
+  border-color: rgba(159, 227, 255, 0.32);
+  color: #e6f4ff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.24),
+    0 4px 14px rgba(145, 222, 255, 0.12);
 }
 
 .finishDlgBtn--cta:hover {
+  background-color: rgba(14, 22, 38, 0.62);
+  border-color: rgba(159, 227, 255, 0.5);
   transform: translateY(-1px);
   box-shadow:
-    0 0 0 1px rgba(145, 222, 255, 0.65) inset,
-    0 8px 26px rgba(145, 222, 255, 0.4),
-    0 0 32px rgba(145, 222, 255, 0.32);
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.24),
+    0 6px 18px rgba(145, 222, 255, 0.2);
+}
+
+/* On narrow viewports stack the actions to keep tap targets full
+   width — same breakpoint as the pause launcher's stack rule. The
+   spacer collapses naturally inside a stacked column. */
+@media (max-width: 520px) {
+  .finishDialogActions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .finishDialogActions__spacer {
+    margin-left: 0;
+  }
+
+  .finishDlgBtn {
+    width: 100%;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -3964,6 +4301,7 @@ body.fp-no-cursor #fpHud,
 body.fp-no-cursor #fpCrosshair {
   cursor: none !important;
 }
+
 body.fp-no-cursor:has(#fpPauseOverlay[style*="display: flex"]),
 body.fp-no-cursor:has(.finish-dialog.open),
 body.fp-no-cursor:has(#deathOverlay.open) {
@@ -5203,14 +5541,14 @@ body.is-leaving #charSelect.open .char-select-inner>* {
 
 .char-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 14px;
   margin-bottom: 24px;
 }
 
 @media (max-width: 720px) {
   .char-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
 }
@@ -5226,7 +5564,16 @@ body.is-leaving #charSelect.open .char-select-inner>* {
   padding: 14px 12px 16px;
   cursor: pointer;
   position: relative;
-  transition: all var(--dur-med) var(--spring);
+  /* Per-property timings so colors/borders/shadows don't ride the same
+     overshoot spring as the transform (was `all <spring>`, which made
+     every property wobble on hover and jitter on quick mouse sweeps).
+     Transform uses a gentler overshoot than --spring so the lift settles
+     cleanly within its window. */
+  transition:
+    transform 280ms cubic-bezier(0.22, 1.18, 0.36, 1),
+    box-shadow 220ms var(--ease-out-expo),
+    border-color 160ms var(--ease-in-out),
+    background-color 160ms var(--ease-in-out);
   /* Slim top-edge highlight so the border catches light like the
      other glass surfaces. */
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -5239,7 +5586,7 @@ body.is-leaving #charSelect.open .char-select-inner>* {
 }
 
 .char-card:hover {
-  transform: translateY(-8px) scale(1.09);
+  transform: translateY(-8px) scale(1.06);
   z-index: 3;
   border-color: var(--glass-border-strong);
   background-color: rgba(255, 255, 255, 0.07);
@@ -5250,6 +5597,7 @@ body.is-leaving #charSelect.open .char-select-inner>* {
 
 .char-card:active:not(:has(.color-dot:active)) {
   transform: scale(0.96);
+  transition: transform 90ms var(--ease-in-out);
 }
 
 /* Focus ring via box-shadow since outline is clipped by mask-image */
@@ -5281,7 +5629,7 @@ body.is-leaving #charSelect.open .char-select-inner>* {
    but keep the ring + glow so the active state remains the strongest
    signal on the grid. */
 .char-card.selected:hover {
-  transform: translateY(-10px) scale(1.09);
+  transform: translateY(-10px) scale(1.06);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.38),
     0 0 0 4px rgba(0, 164, 239, 0.24),

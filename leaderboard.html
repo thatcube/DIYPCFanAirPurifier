@@ -107,10 +107,13 @@
       font-weight: var(--weight-regular);
       line-height: 1.45;
       text-rendering: optimizeLegibility;
-      /* Fallback gradient in case the iframe fails to load */
-      background: radial-gradient(1200px 700px at 18% -12%, #244868 0%, transparent 58%),
-        radial-gradient(900px 560px at 110% 10%, #1f3e56 0%, transparent 65%),
-        linear-gradient(180deg, var(--bg1), var(--bg0));
+      /* Visible only during the cold-load gap before #bgFrame becomes
+         opaque (and as a fallback if the iframe ever fails). Tuned to
+         the renderer's day clear color (#d4dce8 — see
+         src/modules/constants.js DAY_CLEAR) plus a hint of warm floor,
+         so the moment the scene snaps in feels like a soft fade-up
+         rather than a cut from black. */
+      background: linear-gradient(180deg, #d4dce8 0%, #c5b8a4 100%);
       padding: 92px 18px 40px;
       position: relative;
       z-index: 0;

@@ -86,6 +86,43 @@ export function init(refs) {
 
 export function isUnlocked() { return _unlocked; }
 
+// Pre-build the entire fireball pool, scorch texture variants, and
+// shared point light up front, then compile their shader programs so
+// the very first shoot() doesn't stall on shader compilation, GPU
+// texture upload, or material/geometry allocation. Safe to call
+// multiple times — _ensurePool() is idempotent.
+export function prewarm(renderer) {
+  if (!_scene || !_camera) return;
+  _ensurePool();
+
+  // Pre-bake scorch textures (procedural canvas draw is the slowest
+  // step) and upload them to the GPU so the first scorch landing
+  // doesn't hitch on texture-upload either.
+  if (!_scorchGeo) _scorchGeo = new THREE.PlaneGeometry(SCORCH_RADIUS * 2, SCORCH_RADIUS * 2);
+  if (!_scorchTexPool) {
+    _scorchTexPool = [];
+    for (let i = 0; i < SCORCH_TEX_VARIANTS; i++) _scorchTexPool.push(_buildScorchTexture());
+  }
+  if (!_laserScorchTexPool) {
+    _laserScorchTexPool = [];
+    for (let i = 0; i < SCORCH_TEX_VARIANTS; i++) _laserScorchTexPool.push(_buildLaserScorchTexture());
+  }
+  if (renderer && renderer.initTexture) {
+    try {
+      for (let i = 0; i < _scorchTexPool.length; i++) renderer.initTexture(_scorchTexPool[i]);
+      for (let i = 0; i < _laserScorchTexPool.length; i++) renderer.initTexture(_laserScorchTexPool[i]);
+    } catch (e) { }
+  }
+
+  // Compile shader programs for all materials currently in the scene
+  // (now including ours). Three.js compiles based on scene contents
+  // regardless of mesh visibility, so the hidden pool entries are
+  // enough to warm the program cache.
+  if (renderer && renderer.compile) {
+    try { renderer.compile(_scene, _camera); } catch (e) { }
+  }
+}
+
 // Allow other ability modules (e.g. kamehameha) to drop scorch marks
 // using the same texture pool & ring buffer the fireballs use, so a
 // single shared cap covers everything.

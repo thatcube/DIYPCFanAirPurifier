@@ -17,7 +17,6 @@
        (not `image`) so the browser reuses the response for our GLTFLoader
        fetches. Order matches relative size so the lightest cats render first. -->
   <link rel="preload" as="fetch" type="model/gltf-binary" crossorigin="anonymous" href="/assets/cat.glb">
-  <link rel="preload" as="fetch" type="model/gltf-binary" crossorigin="anonymous" href="/assets/tooncat.glb">
   <link rel="preload" as="fetch" type="model/gltf-binary" crossorigin="anonymous" href="/assets/totodile.glb">
   <link rel="preload" as="fetch" type="model/gltf-binary" crossorigin="anonymous" href="/assets/bababooey_cat.glb">
   <!-- Tiny inline critical CSS — only the iframe-bg overrides need to be
@@ -149,16 +148,16 @@
               class="ph ph-x"></i></button>
         </div>
         <div class="char-grid">
-          <div class="char-card selected" data-model="classic" role="button" tabindex="0" aria-label="Classic cat"
+          <div class="char-card selected" data-model="korra" role="button" tabindex="0" aria-label="Korra"
+            onclick="window._selectCat&&window._selectCat('korra',this)">
+            <canvas class="char-preview" id="previewKorra"></canvas>
+            <div class="char-name">Cursed Korra</div>
+            <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
+          </div>
+          <div class="char-card" data-model="classic" role="button" tabindex="0" aria-label="Classic cat"
             onclick="window._selectCat&&window._selectCat('classic',this)">
             <canvas class="char-preview" id="previewClassic"></canvas>
             <div class="char-name">Classic</div>
-            <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
-          </div>
-          <div class="char-card" data-model="toon" role="button" tabindex="0" aria-label="Toon cat"
-            onclick="window._selectCat&&window._selectCat('toon',this)">
-            <canvas class="char-preview" id="previewToon"></canvas>
-            <div class="char-name">Toon</div>
             <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
           </div>
           <div class="char-card" data-model="bababooey" role="button" tabindex="0" aria-label="Bababooey cat"
@@ -171,12 +170,6 @@
             onclick="window._selectCat&&window._selectCat('totodile',this)">
             <canvas class="char-preview" id="previewTotodile"></canvas>
             <div class="char-name">Totodile</div>
-            <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
-          </div>
-          <div class="char-card" data-model="korra" role="button" tabindex="0" aria-label="Korra"
-            onclick="window._selectCat&&window._selectCat('korra',this)">
-            <canvas class="char-preview" id="previewKorra"></canvas>
-            <div class="char-name">Cursed Korra</div>
             <div class="char-colors char-colors--spacer" aria-hidden="true"></div>
           </div>
         </div>
@@ -397,15 +390,15 @@
                 <h2>Paused</h2>
               </div>
               <div class="pause-launcher__btns">
-                <button class="pause-btn pause-btn--hero glass-btn glass-btn--primary" id="fpPauseResume"
+                <button class="pause-btn pause-btn--hero glass-btn glass-btn--tile glass-btn--primary" id="fpPauseResume"
                   onclick="window._resumeFP&&window._resumeFP()"><i class="ph-fill ph-play"></i> Resume <kbd
                     class="pause-btn-key">Esc</kbd></button>
-                <button class="pause-btn pause-btn--secondary glass-btn"
+                <button class="pause-btn pause-btn--secondary glass-btn glass-btn--tile"
                   onclick="window._resetFP&&window._resetFP()"><i class="ph ph-arrow-counter-clockwise"></i> Restart
                   <kbd class="pause-btn-key">R</kbd></button>
-                <button class="pause-btn pause-btn--secondary glass-btn" type="button"
+                <button class="pause-btn pause-btn--secondary glass-btn glass-btn--tile" type="button"
                   data-action="pause-settings"><i class="ph ph-gear"></i> Settings</button>
-                <button class="pause-btn pause-btn--secondary glass-btn glass-btn--danger"
+                <button class="pause-btn pause-btn--secondary glass-btn glass-btn--tile glass-btn--danger"
                   onclick="window._exitFP&&window._exitFP()"><i class="ph ph-sign-out"></i> Exit</button>
               </div>
             </div>

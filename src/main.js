@@ -542,6 +542,14 @@ kamehameha.init({
   isFpMode: () => gameFp.fpMode,
   onOvercharge: () => _handleOvercharge()
 });
+// Build the fireball pool, kamehameha orb/beam/kaboom meshes and their
+// scorch textures up front, then compile their shaders. Without this
+// the very first F-press paid the cost of allocating ~640 meshes,
+// baking 12 procedural canvas textures, uploading them, and compiling
+// new shader programs — visible as a noticeable hitch on first charge
+// or fireball. Doing it here moves all that work to load time.
+try { fireball.prewarm(renderer); } catch (e) { }
+try { kamehameha.prewarm(renderer); } catch (e) { }
 // Surface persisted unlock immediately so the HUD/button reflect it
 // on a fresh page load, without waiting for fans to be turned off.
 setTimeout(() => { _updateFireballBtnVisibility(); }, 0);
@@ -606,7 +614,7 @@ if (roomRefs && typeof roomRefs.setMacbookMuted === 'function') {
 // Expose bridge functions for HTML onclick handlers
 
 // Character select screen
-let _selectedModel = 'classic';
+let _selectedModel = 'korra';
 let _selectedMode = gameFp.isSpeedMode() ? 'speed' : (gameFp.isSkateMode() ? 'skate' : 'normal');
 
 // Refresh the speed-mode pill's locked/unlocked state + progress label every
@@ -705,33 +713,16 @@ function _refreshTotodileCardLockState() {
 function _refreshKorraCardLockState() {
   const card = document.querySelector('.char-card[data-model="korra"]');
   if (!card) return;
-  const unlocked = catAppearance.isKorraUnlocked();
-  card.classList.toggle('locked', !unlocked);
-  card.setAttribute('aria-disabled', unlocked ? 'false' : 'true');
+  // Korra is always unlocked — strip any stale lock UI from prior builds.
+  card.classList.remove('locked');
+  card.setAttribute('aria-disabled', 'false');
   const nameEl = card.querySelector('.char-name');
-  if (nameEl) {
-    if (!nameEl.dataset.origName) nameEl.dataset.origName = nameEl.textContent || 'Cursed Korra';
-    nameEl.textContent = unlocked
-      ? nameEl.dataset.origName
-      : 'Beat the game in under 2:00';
+  if (nameEl && nameEl.dataset.origName) {
+    nameEl.textContent = nameEl.dataset.origName;
   }
-  let badge = card.querySelector('.char-card__lock');
-  if (!unlocked) {
-    if (!badge) {
-      badge = document.createElement('div');
-      badge.className = 'char-card__lock';
-      badge.innerHTML = '<i class="ph ph-lock-simple"></i>';
-      card.appendChild(badge);
-    }
-  } else if (badge) {
-    badge.remove();
-  }
-  card.title = unlocked
-    ? 'Cursed Korra'
-    : 'Locked — beat the game in under 2:00 to unlock';
-  if (!unlocked && _selectedModel === 'korra') {
-    _selectedModel = 'classic';
-  }
+  const badge = card.querySelector('.char-card__lock');
+  if (badge) badge.remove();
+  card.title = 'Cursed Korra';
 }
 
 // Refresh the Bababooey char-card's locked state. Unlocks when the
@@ -1059,15 +1050,6 @@ window._selectCat = (model, el) => {
       el.classList.add('shake');
     }
     showToast('Totodile locked — find a hidden item to unlock');
-    return;
-  }
-  if (model === 'korra' && !catAppearance.isKorraUnlocked()) {
-    if (el) {
-      el.classList.remove('shake');
-      void el.offsetWidth;
-      el.classList.add('shake');
-    }
-    showToast('Cursed Korra locked — beat the game in under 2:00 to unlock');
     return;
   }
   if (model === 'bababooey' && !catAppearance.isBababooeyUnlocked()) {
@@ -1960,12 +1942,6 @@ function animate(ts) {
       gameFp.setPaused(true);
       // Hide the regular pause overlay (finish takes precedence)
       if (_elPauseOv) _elPauseOv.style.display = 'none';
-      // Persist the Totodile unlock if this run was under 2:00 — fire a
-      // celebration toast the very first time it triggers so the player
-      // knows there's a new cat waiting in the character select.
-      if (catAppearance.tryUnlockKorra(finalTime)) {
-        showToast('🐈 Cursed Korra unlocked! Pick her from Select a character.');
-      }
       // Open finish screen immediately and let player edit name inline
       // before saving this run.
       leaderboard.openFinishDialogForRun(finalTime, coins.coinTotal, coins.coinSecretScore);

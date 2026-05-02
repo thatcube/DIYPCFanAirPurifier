@@ -257,6 +257,18 @@ function _catBadgeHtml(entry) {
   return `<span class="catBadge" title="${_escapeHtml(label)}"><span class="catEmoji">${emoji}</span><span class="catLabel">${label}</span></span>`;
 }
 
+// Mirrors secretBadgeHtml() in leaderboard.html so the finish-dialog
+// rows surface the same coin info as the standalone /leaderboard
+// page. Goal scales with the highest secretCoins on the board (in
+// case more secrets are added later) but never below TOTAL_SECRETS.
+function _secretBadgeHtml(entry, goal) {
+  const n = Math.max(0, Math.floor(Number(entry && entry.secretCoins) || 0));
+  const total = Math.max(1, Math.floor(Number(goal) || TOTAL_SECRETS));
+  const cls = n === 0 ? ' is-zero' : (n >= total ? ' is-max' : '');
+  const title = `${n} of ${total} secret coin${n === 1 ? '' : 's'} found`;
+  return `<span class="secretBadge${cls}" title="${_escapeHtml(title)}" aria-label="${_escapeHtml(title)}"><i class="ph-fill ph-key"></i>${n}/${total}</span>`;
+}
+
 function _normalizeLeaderboard(rows) {
   const clean = [];
   for (const r of (rows || [])) {
@@ -315,6 +327,14 @@ export function getEntries() { return _leaderboard; }
 // ── Shared API ──────────────────────────────────────────────────────
 
 async function _lbApiRequest(path, body) {
+  // Debug hook: artificially delay every API call so the finish-dialog
+  // "Saving..." state stays visible long enough to test typing.
+  // Set `window._lbDebugSaveDelay = 5000` from the DevTools console.
+  if (typeof window !== 'undefined') {
+    const delayMs = Number(window._lbDebugSaveDelay) || 0;
+    if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs));
+  }
+
   const url = `${LB_API_BASE}/api${path}`;
   const init = body === undefined
     ? { method: 'GET', credentials: 'same-origin' }
@@ -377,6 +397,7 @@ export async function startSharedRun(mode) {
   } catch (e) {
     _sharedOnline = false;
     _statusNote = 'Local fallback';
+    try { console.warn('[leaderboard] /run/start failed; this run will save locally only.', e); } catch (_) { /* ignore */ }
   }
   renderLeaderboardPanel();
 }
@@ -457,13 +478,20 @@ function _recordRunLocal(timeMs, coinTotal, secretCoins, mode) {
     timeMs: entry.timeMs, coins: coinTotal, coinTotal,
     secretCoins: secretCoins || 0,
     catColor: entry.catColor, catHair: entry.catHair, catModel: entry.catModel,
-    mode: runMode
+    mode: runMode,
+    // Local fallback never reaches the shared leaderboard server. The
+    // finish dialog uses this to show an honest "Saved on this device
+    // only" message instead of a misleading "Saved".
+    sharedSaved: false
   };
 }
 
 async function _recordRunShared(timeMs, coinTotal, secretCoins, mode) {
   const runMode = _sanitizeMode(mode || _currentRunMode);
   if (!_sharedRunId || !_sharedOnline) {
+    // Loud diagnostic — silent local fallback is the most common reason a
+    // run "saved" but never shows up on the shared leaderboard.
+    try { console.warn('[leaderboard] save fell back to local-only at start (no shared runId or offline). _sharedRunId=%o _sharedOnline=%o', _sharedRunId, _sharedOnline); } catch (e) { /* ignore */ }
     return _recordRunLocal(timeMs, coinTotal, secretCoins, runMode);
   }
   const runId = _sharedRunId;
@@ -481,6 +509,7 @@ async function _recordRunShared(timeMs, coinTotal, secretCoins, mode) {
     timeMs: Math.max(1, Math.floor(Number(timeMs) || 0)),
     secretCoins: Math.max(0, Math.floor(Number(secretCoins) || 0))
   };
+  const isTestRun = !!finishBody.isTest;
   try {
     const data = await _lbApiRequest('/run/finish', finishBody);
     _sharedRunId = '';
@@ -490,13 +519,39 @@ async function _recordRunShared(timeMs, coinTotal, secretCoins, mode) {
     _sharedOnline = true;
     _statusNote = '';
     const responseMode = _sanitizeMode((data && data.mode) || runMode);
-    const list = _normalizeLeaderboard(Array.isArray(data.leaderboard) ? data.leaderboard : []);
+    const rawList = Array.isArray(data.leaderboard) ? data.leaderboard.slice() : [];
+    const serverEntry = (data && data.entry) ? data.entry : {};
+    const serverEntryId = String(serverEntry.id || '');
+    // Test runs are saved to the DB but excluded from public leaderboard
+    // queries by the worker, so the response leaderboard typically won't
+    // contain the just-inserted row. Splice it in locally so the player
+    // can see their own test result in the finish dialog. The worker
+    // still hides it from everyone else.
+    if (isTestRun && serverEntryId && !rawList.some((r) => String(r && r.id || '') === serverEntryId)) {
+      rawList.push({
+        id: serverEntryId,
+        name: _sanitizePlayerName(serverEntry.name || _playerName || 'Player'),
+        timeMs: Math.floor(Number(serverEntry.timeMs) || Math.floor(timeMs)),
+        at: Math.floor(Number(serverEntry.at) || Date.now()),
+        catColor: sanitizeColorKey(serverEntry.catColor || catColorKey),
+        catHair: sanitizeHairKey(serverEntry.catHair || catHairKey),
+        catModel: sanitizeModelKey(serverEntry.catModel || catModelKey),
+        playerId: _playerId,
+        mode: responseMode
+      });
+      try { console.info('[leaderboard] test run saved to server but hidden from public leaderboard. Showing locally so you can see your time.'); } catch (_) { /* ignore */ }
+    }
+    const list = _normalizeLeaderboard(rawList);
     _leaderboardByMode[responseMode] = list;
     if (_viewMode === responseMode) _leaderboard = list.slice();
-    const serverEntry = (data && data.entry) ? data.entry : {};
+    let resolvedRank = Math.floor(Number(data && data.rank) || 0);
+    if (isTestRun && serverEntryId && resolvedRank === 0) {
+      const idx = list.findIndex((r) => String(r && r.id || '') === serverEntryId);
+      if (idx >= 0) resolvedRank = idx + 1;
+    }
     return {
-      entryId: String(serverEntry.id || ''),
-      rank: Math.floor(Number(data && data.rank) || 0),
+      entryId: serverEntryId,
+      rank: resolvedRank,
       name: _sanitizePlayerName(serverEntry.name || _playerName || 'Player'),
       timeMs: Math.floor(Number(serverEntry.timeMs) || Math.floor(timeMs)),
       coins: coinTotal, coinTotal,
@@ -504,7 +559,9 @@ async function _recordRunShared(timeMs, coinTotal, secretCoins, mode) {
       catColor: sanitizeColorKey(serverEntry.catColor || catColorKey),
       catHair: sanitizeHairKey(serverEntry.catHair || catHairKey),
       catModel: sanitizeModelKey(serverEntry.catModel || catModelKey),
-      mode: responseMode
+      mode: responseMode,
+      sharedSaved: true,
+      isTestRun
     };
   } catch (e) {
     // Retry if incomplete_run (coin claims may have been lost)
@@ -519,13 +576,33 @@ async function _recordRunShared(timeMs, coinTotal, secretCoins, mode) {
         _sharedOnline = true;
         _statusNote = '';
         const responseMode = _sanitizeMode((retryData && retryData.mode) || runMode);
-        const list = _normalizeLeaderboard(Array.isArray(retryData.leaderboard) ? retryData.leaderboard : []);
+        const rawList = Array.isArray(retryData.leaderboard) ? retryData.leaderboard.slice() : [];
+        const retryEntry = (retryData && retryData.entry) ? retryData.entry : {};
+        const retryEntryId = String(retryEntry.id || '');
+        if (isTestRun && retryEntryId && !rawList.some((r) => String(r && r.id || '') === retryEntryId)) {
+          rawList.push({
+            id: retryEntryId,
+            name: _sanitizePlayerName(retryEntry.name || _playerName || 'Player'),
+            timeMs: Math.floor(Number(retryEntry.timeMs) || Math.floor(timeMs)),
+            at: Math.floor(Number(retryEntry.at) || Date.now()),
+            catColor: sanitizeColorKey(retryEntry.catColor || catColorKey),
+            catHair: sanitizeHairKey(retryEntry.catHair || catHairKey),
+            catModel: sanitizeModelKey(retryEntry.catModel || catModelKey),
+            playerId: _playerId,
+            mode: responseMode
+          });
+        }
+        const list = _normalizeLeaderboard(rawList);
         _leaderboardByMode[responseMode] = list;
         if (_viewMode === responseMode) _leaderboard = list.slice();
-        const retryEntry = (retryData && retryData.entry) ? retryData.entry : {};
+        let resolvedRank = Math.floor(Number(retryData && retryData.rank) || 0);
+        if (isTestRun && retryEntryId && resolvedRank === 0) {
+          const idx = list.findIndex((r) => String(r && r.id || '') === retryEntryId);
+          if (idx >= 0) resolvedRank = idx + 1;
+        }
         return {
-          entryId: String(retryEntry.id || ''),
-          rank: Math.floor(Number(retryData && retryData.rank) || 0),
+          entryId: retryEntryId,
+          rank: resolvedRank,
           name: _sanitizePlayerName(retryEntry.name || _playerName || 'Player'),
           timeMs: Math.floor(Number(retryEntry.timeMs) || Math.floor(timeMs)),
           coins: coinTotal, coinTotal,
@@ -533,7 +610,9 @@ async function _recordRunShared(timeMs, coinTotal, secretCoins, mode) {
           catColor: sanitizeColorKey(retryEntry.catColor || catColorKey),
           catHair: sanitizeHairKey(retryEntry.catHair || catHairKey),
           catModel: sanitizeModelKey(retryEntry.catModel || catModelKey),
-          mode: responseMode
+          mode: responseMode,
+          sharedSaved: true,
+          isTestRun
         };
       } catch (_retryErr) {
         // Fall through to local fallback
@@ -548,15 +627,25 @@ async function _recordRunShared(timeMs, coinTotal, secretCoins, mode) {
       _sharedOnline = true;
       _statusNote = `Rejected (${e.apiCode})`;
       void refreshSharedLeaderboard(runMode);
-      return { entryId: '', rank: 0, name: _playerName || 'Player', timeMs: Math.floor(timeMs), coins: coinTotal, coinTotal, secretCoins: secretCoins || 0, catColor: sanitizeColorKey(catColorKey), catHair: sanitizeHairKey(catHairKey), catModel: sanitizeModelKey(catModelKey), mode: runMode };
+      return { entryId: '', rank: 0, name: _playerName || 'Player', timeMs: Math.floor(timeMs), coins: coinTotal, coinTotal, secretCoins: secretCoins || 0, catColor: sanitizeColorKey(catColorKey), catHair: sanitizeHairKey(catHairKey), catModel: sanitizeModelKey(catModelKey), mode: runMode, sharedSaved: false, rejectionCode: e.apiCode };
     }
     _sharedOnline = false;
     _statusNote = 'Local fallback';
+    try { console.warn('[leaderboard] /run/finish failed; saving locally only.', e); } catch (_) { /* ignore */ }
     return _recordRunLocal(timeMs, coinTotal, secretCoins, runMode);
   }
 }
 
 export async function recordRun(timeMs, coinTotal, secretCoins, mode) {
+  // Debug hook: force the next save to fail so the finish-dialog error
+  // UI can be exercised. Set `window._lbDebugForceError = true` from
+  // the DevTools console; it auto-clears after one use so the retry
+  // succeeds. Bypasses the local-fallback path on purpose.
+  if (typeof window !== 'undefined' && window._lbDebugForceError) {
+    window._lbDebugForceError = false;
+    await new Promise(r => setTimeout(r, Number(window._lbDebugSaveDelay) || 0));
+    throw new Error('Forced debug save error');
+  }
   const runMode = _sanitizeMode(mode || _currentRunMode);
   if (LB_SHARED_ENABLED) {
     return _recordRunShared(timeMs, coinTotal, secretCoins, runMode);
@@ -621,6 +710,7 @@ function _renameLatestEntryLocal(entryId, nextName, baseData) {
     catHair: sanitizeHairKey((row && row.catHair) || (baseData && baseData.catHair) || catHairKey),
     catModel: sanitizeModelKey((row && row.catModel) || (baseData && baseData.catModel) || catModelKey),
     mode: targetMode,
+    sharedSaved: false
   };
 }
 
@@ -640,22 +730,47 @@ async function _renameLatestEntryShared(entryId, nextName, baseData) {
     _sharedOnline = true;
     _statusNote = '';
     const responseMode = _sanitizeMode((data && data.mode) || _findEntryMode(cleanId) || _currentRunMode);
+    const serverEntry = (data && data.entry) ? data.entry : {};
+    const wasTestRun = !!(baseData && baseData.isTestRun);
     if (Array.isArray(data.leaderboard)) {
-      const list = _normalizeLeaderboard(data.leaderboard);
+      const rawList = data.leaderboard.slice();
+      // If the renamed entry was a test run it won't come back in the
+      // server's leaderboard (worker hides is_test=1). Splice it in so
+      // the player still sees their entry locally.
+      if (wasTestRun && cleanId && !rawList.some((r) => String(r && r.id || '') === cleanId)) {
+        rawList.push({
+          id: cleanId,
+          name: _sanitizePlayerName(serverEntry.name || cleanName || _playerName || 'Player'),
+          timeMs: Math.floor(Number(serverEntry.timeMs) || Number((baseData && baseData.timeMs) || 0)),
+          at: Math.floor(Number(serverEntry.at) || Date.now()),
+          catColor: sanitizeColorKey(serverEntry.catColor || (baseData && baseData.catColor) || catColorKey),
+          catHair: sanitizeHairKey(serverEntry.catHair || (baseData && baseData.catHair) || catHairKey),
+          catModel: sanitizeModelKey(serverEntry.catModel || (baseData && baseData.catModel) || catModelKey),
+          playerId: _playerId,
+          mode: responseMode
+        });
+      }
+      const list = _normalizeLeaderboard(rawList);
       _leaderboardByMode[responseMode] = list;
       if (_viewMode === responseMode) _leaderboard = list.slice();
     }
-    const serverEntry = (data && data.entry) ? data.entry : {};
+    let resolvedRank = Math.floor(Number(data && data.rank) || 0);
+    if (wasTestRun && cleanId && resolvedRank === 0) {
+      const list = _leaderboardByMode[responseMode] || [];
+      const idx = list.findIndex((r) => String(r && r.id || '') === cleanId);
+      if (idx >= 0) resolvedRank = idx + 1;
+    }
     return {
       ...(baseData || {}),
       entryId: cleanId,
-      rank: Math.floor(Number(data && data.rank) || 0),
+      rank: resolvedRank,
       name: _sanitizePlayerName(serverEntry.name || cleanName || (baseData && baseData.name) || _playerName || 'Player'),
       timeMs: Math.floor(Number(serverEntry.timeMs) || Number((baseData && baseData.timeMs) || 0)),
       catColor: sanitizeColorKey(serverEntry.catColor || (baseData && baseData.catColor) || catColorKey),
       catHair: sanitizeHairKey(serverEntry.catHair || (baseData && baseData.catHair) || catHairKey),
       catModel: sanitizeModelKey(serverEntry.catModel || (baseData && baseData.catModel) || catModelKey),
       mode: responseMode,
+      sharedSaved: true
     };
   } catch (e) {
     if (e && e.apiCode) {
@@ -672,6 +787,7 @@ async function _renameLatestEntryShared(entryId, nextName, baseData) {
     }
     _sharedOnline = false;
     _statusNote = 'Local fallback';
+    try { console.warn('[leaderboard] /run/rename failed; renaming locally only.', e); } catch (_) { /* ignore */ }
     return _renameLatestEntryLocal(cleanId, cleanName, baseData);
   }
 }
@@ -1272,11 +1388,14 @@ export function openFinishDialogForRun(timeMs, coinTotal, secretCoins) {
     catModel: sanitizeModelKey(catModelKey)
   };
 
-  _openFinishDialogOverlay(false);
-  // Save immediately so editable name appears in the final leaderboard row.
-  void _submitPendingFinishRun().then(() => {
-    _focusFinishRowNameInput();
-  });
+  // Open the dialog and focus the name input immediately so the player
+  // can start typing while the save runs in the background. The save
+  // kicks off in parallel; the action buttons are disabled in the
+  // render until it resolves. If the player has typed by the time the
+  // save resolves, _submitPendingFinishRun preserves their value and
+  // schedules a follow-up rename.
+  _openFinishDialogOverlay(true);
+  void _submitPendingFinishRun();
 }
 
 export function closeFinishDialog() {
@@ -1295,7 +1414,7 @@ export function closeFinishDialog() {
   if (_finishFocusTrap) { _finishFocusTrap.release(); _finishFocusTrap = null; }
   if (_finishSavedFocus) { _finishSavedFocus.restore(); _finishSavedFocus = null; }
   const copyBtn = document.getElementById('finishDialogCopy');
-  if (copyBtn) copyBtn.innerHTML = '<i class="ph-fill ph-share-network"></i> Copy &amp; share result';
+  if (copyBtn) copyBtn.innerHTML = '<i class="ph-fill ph-copy"></i> Copy &amp; share result';
 }
 
 function _getFinishRowNameInput() {
@@ -1336,23 +1455,65 @@ function _submitPendingFinishRun() {
   _finishSubmitting = true;
   _finishNameDirty = false;
   _finishSaveStatus = 'saving';
-  if (input) input.disabled = true;
+  // Only disable the input for the (fast) rename pass; keep it editable
+  // during the (slow) initial run save so the player can type their name
+  // while the API call is in flight.
+  if (input && !hasPendingRun) input.disabled = true;
   _renderFinishDialog();
+
+  const submittedName = name;
+  // Minimum time the "Saving…" state stays visible for the initial run
+  // save. If the API (or local fallback) resolves faster than this, we
+  // delay the pending→saved transition so the player has time to see the
+  // spinner and start typing their name. Renames don't get this delay
+  // because they're already a deliberate user action with feedback.
+  const MIN_SAVING_MS = hasPendingRun ? 700 : 0;
+  const savingStartedAt = Date.now();
+  const waitForMinSaving = async () => {
+    const remaining = MIN_SAVING_MS - (Date.now() - savingStartedAt);
+    if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
+  };
 
   const job = (async () => {
     try {
       if (hasPendingRun) {
         const pending = _finishPendingRun;
         const runData = await recordRun(pending.timeMs, pending.coinTotal, pending.secretCoins);
+        // Hold the saving spinner visible for the minimum window so the
+        // player has time to start typing their name. This is the only
+        // delay we add — the actual save already completed.
+        await waitForMinSaving();
+        // Re-read the input now that the user had a chance to type.
+        const preTransitionInput = _getFinishRowNameInput();
+        const preTransitionTypedName = preTransitionInput ? _sanitizePlayerName(preTransitionInput.value) : '';
         _finishPendingRun = null;
         _finishEditableEntryId = String((runData && runData.entryId) || '').trim();
         _finishSubmitting = false;
         _finishSaveStatus = 'saved';
-        _finishDialogData = runData || null;
+
+        // If the player typed something during the save, preserve their
+        // value (don't clobber with the server response) and schedule a
+        // follow-up rename so the leaderboard ends up with their name.
+        const liveTypedName = preTransitionTypedName;
+        let resolvedData = runData || null;
+        let needsRename = false;
+        if (resolvedData && liveTypedName && liveTypedName !== submittedName) {
+          resolvedData = { ...resolvedData, name: liveTypedName };
+          _finishNameDirty = true;
+          _finishSaveStatus = 'idle';
+          needsRename = true;
+        }
+        _finishDialogData = resolvedData;
         renderLeaderboardPanel();
         showShareButton(runData);
         _renderFinishDialog();
-        _focusFinishRowNameInput();
+        if (needsRename) {
+          // Defer so the just-rendered input is in the DOM before the
+          // rename pass reads its value.
+          setTimeout(() => { void _submitPendingFinishRun(); }, 0);
+        } else {
+          _focusFinishRowNameInput();
+        }
         return runData;
       }
 
@@ -1428,34 +1589,111 @@ function _renderFinishDialog() {
     sanitizeHairKey(data.catHair || catHairKey)
   );
 
-  if (saveHint) {
-    if (pending) {
-      if (_finishSaveStatus === 'error') saveHint.textContent = 'Save failed. Please wait and it will retry.';
-      else saveHint.textContent = 'Saving run...';
-    } else if (canRenameSavedEntry) {
-      if (_finishSaveStatus === 'saving') saveHint.textContent = 'Saving...';
-      else if (_finishSaveStatus === 'error') saveHint.textContent = 'Save failed. Leave the field again to retry.';
-      else saveHint.textContent = 'Saved. Edit and leave your leaderboard row to update this run.';
-    } else if (Math.floor(Number(data.rank) || 0) > 0 || _finishSaveStatus === 'saved') {
-      saveHint.textContent = 'Saved.';
+  // Whether the latest save actually reached the shared leaderboard
+  // server. Set by recordRun / renameLatestEntry. Falls through silent
+  // local-only saves so the hint can be honest about offline state.
+  const sharedSaved = !!(data && data.sharedSaved);
+  const rejectionCode = data && data.rejectionCode ? String(data.rejectionCode) : '';
+  // Test runs (Quick Coin Mode while developing locally) ARE saved on
+  // the server but flagged is_test=1; the worker hides them from the
+  // public leaderboard. We splice them into the local view so the
+  // player sees their own time, but we should tell them why their entry
+  // won't show up for anyone else.
+  const isTestRun = !!(data && data.isTestRun);
+
+  // Compute the save-hint state up front. The actual DOM write happens
+  // after the list renders below, so we can prefer the row-attached
+  // slot (visually adjacent to the input) over the top-level hint.
+  const hintBusy = pending || _finishSaveStatus === 'saving';
+  const hintError = _finishSaveStatus === 'error' || (!pending && _finishSaveStatus === 'saved' && !sharedSaved && !!_finishEditableEntryId === false);
+  let hintHtml = '';  if (pending) {
+    if (_finishSaveStatus === 'error') {
+      hintHtml = '<i class="ph ph-warning-circle" aria-hidden="true"></i> Save failed. Will retry...';
     } else {
-      saveHint.textContent = '';
+      hintHtml = '<span class="finishSavingSpinner" aria-hidden="true"></span> Saving your run — you can type your name now.';
+    }
+  } else if (canRenameSavedEntry) {
+    if (_finishSaveStatus === 'saving') {
+      hintHtml = '<span class="finishSavingSpinner" aria-hidden="true"></span> Saving name…';
+    } else if (_finishSaveStatus === 'error') {
+      hintHtml = '<i class="ph ph-warning-circle" aria-hidden="true"></i> Save failed. Leave the field again to retry.';
+    } else if (!sharedSaved) {
+      hintHtml = '<i class="ph ph-cloud-slash" aria-hidden="true"></i> Saved on this device only — couldn\u2019t reach the leaderboard server. Edit your name above to retry.';
+    } else if (isTestRun) {
+      hintHtml = '<i class="ph ph-flask" aria-hidden="true"></i> Test run \u2014 saved but hidden from the public leaderboard. Type above to change your name anytime.';
+    } else {
+      hintHtml = 'Saved. Type above to change your name anytime.';
+    }
+  } else if (rejectionCode) {
+    hintHtml = `<i class="ph ph-warning-circle" aria-hidden="true"></i> Server rejected this run (${_escapeHtml(rejectionCode)}).`;
+  } else if (Math.floor(Number(data.rank) || 0) > 0 || _finishSaveStatus === 'saved') {
+    if (isTestRun) {
+      hintHtml = '<i class="ph ph-flask" aria-hidden="true"></i> Test run \u2014 saved but hidden from the public leaderboard.';
+    } else {
+      hintHtml = sharedSaved ? 'Saved.' : 'Saved on this device only.';
     }
   }
-  if (copyBtn) copyBtn.style.display = pending ? 'none' : '';
+
+  // Action buttons stay visible the entire time so the layout doesn't
+  // jump when the save resolves; they are disabled while the run is
+  // still being saved (pending) so the player can't navigate away mid-
+  // save. If the save errored, re-enable them so clicking acts as a
+  // retry trigger (their click handlers call _submitPendingFinishRun).
+  const buttonsBusy = pending && _finishSaveStatus !== 'error';
+  const exitBtn = document.getElementById('finishDialogExit');
+  const againBtn = document.getElementById('finishDialogAgain');
+  const setBtnBusy = (btn) => {
+    if (!btn) return;
+    btn.disabled = buttonsBusy;
+    btn.setAttribute('aria-disabled', buttonsBusy ? 'true' : 'false');
+    btn.classList.toggle('finishDlgBtn--busy', buttonsBusy);
+  };
+  setBtnBusy(exitBtn);
+  setBtnBusy(againBtn);
+  if (copyBtn) {
+    copyBtn.style.display = '';
+    setBtnBusy(copyBtn);
+  }
 
   if (coinBadge) {
     const c = Math.floor(Number(data.coins) || Number(data.coinTotal) || Number(_finishPendingRun?.coinTotal) || 0);
     const t = Math.floor(Number(data.coinTotal) || Number(_finishPendingRun?.coinTotal) || 0);
     coinBadge.textContent = `${c} / ${t}`;
   }
+  if (!list && saveHint) {
+    // Defensive fallback: if the list isn't in the DOM (shouldn't
+    // happen in normal flow), still keep the top-level hint honest.
+    saveHint.classList.toggle('finishDialogSaveHint--busy', hintBusy);
+    saveHint.classList.toggle('finishDialogSaveHint--error', hintError);
+    saveHint.innerHTML = hintHtml;
+    saveHint.style.display = hintHtml ? '' : 'none';
+  }
   if (list) {
+    // Capture focus + selection on the row name input so we can restore
+    // them after the list is rebuilt (rebuild creates a fresh <input>
+    // node, which would otherwise drop focus while the player is typing
+    // through the pending→saved transition).
+    const activeEl = document.activeElement;
+    const wasNameInputFocused = !!(
+      activeEl &&
+      activeEl.classList &&
+      activeEl.classList.contains('finishDialogRowNameInput')
+    );
+    const prevSelStart = wasNameInputFocused && typeof activeEl.selectionStart === 'number' ? activeEl.selectionStart : null;
+    const prevSelEnd = wasNameInputFocused && typeof activeEl.selectionEnd === 'number' ? activeEl.selectionEnd : null;
+
     const ownId = String(data.entryId || '');
     const editableEntryId = canRenameSavedEntry ? _finishEditableEntryId : '';
     const rows = [];
 
     const finishMode = _sanitizeMode((data && data.mode) || _currentRunMode);
     const finishBoard = _leaderboardByMode[finishMode] || [];
+    // Match the standalone /leaderboard board: scale the secret-coin
+    // goal up if any row exceeds TOTAL_SECRETS, but never below it.
+    const secretGoal = finishBoard.reduce((max, row) => {
+      const n = Math.max(0, Math.floor(Number(row && row.secretCoins) || 0));
+      return Math.max(max, n);
+    }, TOTAL_SECRETS);
     if (finishBoard.length || pending) {
       // Build an optimistic "pending" row (own-current + pending) so the
       // player can see where their entry is going while the API save is
@@ -1468,10 +1706,12 @@ function _renderFinishDialog() {
           _finishDialogData?.name || _readPlayerName() || _playerName || 'Player'
         ) || 'Player';
         const pendingTimeMs = Math.floor(Number(_finishPendingRun?.timeMs) || Number(data.timeMs) || 0);
+        const pendingSecretCoins = Math.max(0, Math.floor(Number(_finishPendingRun?.secretCoins ?? data.secretCoins) || 0));
         const pendingEntry = {
           catModel: data.catModel || catModelKey,
           catColor: data.catColor || catColorKey,
-          catHair: data.catHair || catHairKey
+          catHair: data.catHair || catHairKey,
+          secretCoins: pendingSecretCoins
         };
         pendingInsertAt = finishBoard.length;
         for (let i = 0; i < finishBoard.length; i++) {
@@ -1482,10 +1722,12 @@ function _renderFinishDialog() {
             <span class="finishRankSkel finishRankSkel--row" aria-hidden="true"></span>
           </span>
           <span class="nm nm-edit">
-            <input type="text" class="finishDialogRowNameInput" maxlength="24" value="${_escapeHtml(pendingName)}" autocomplete="off" spellcheck="false" disabled aria-label="Your name (saving)" />
+            <input type="text" class="finishDialogRowNameInput" maxlength="24" value="${_escapeHtml(pendingName)}" autocomplete="off" spellcheck="false" aria-label="Your name" />
           </span>
           ${_catBadgeHtml(pendingEntry)}
+          ${_secretBadgeHtml(pendingEntry, secretGoal)}
           <span class="tm">${formatRunTime(pendingTimeMs, true)}</span>
+          <span class="finishDialogRowSaveHint" data-finish-row-hint></span>
         </li>`;
       }
 
@@ -1508,7 +1750,9 @@ function _renderFinishDialog() {
             : _escapeHtml(r.name)
           }</span>
           ${_catBadgeHtml(r)}
+          ${_secretBadgeHtml(r, secretGoal)}
           <span class="tm">${formatRunTime(r.timeMs, true)}</span>
+          ${editable ? '<span class="finishDialogRowSaveHint" data-finish-row-hint></span>' : ''}
         </li>`);
       }
       if (pending && pendingInsertAt >= finishBoard.length) rows.push(pendingHtml);
@@ -1518,12 +1762,33 @@ function _renderFinishDialog() {
 
     list.innerHTML = rows.join('');
 
+    // Place the save hint into the editable row's name cell when one
+    // exists (visually adjacent to the input). Otherwise fall back to
+    // the top-level hint slot in the summary section.
+    const rowHintSlot = list.querySelector('[data-finish-row-hint]');
+    const targetHint = rowHintSlot || saveHint;
+    if (targetHint) {
+      targetHint.classList.toggle('finishDialogSaveHint--busy', hintBusy);
+      targetHint.classList.toggle('finishDialogSaveHint--error', hintError);
+      targetHint.innerHTML = hintHtml;
+      targetHint.style.display = hintHtml ? '' : 'none';
+    }
+    if (rowHintSlot && saveHint) {
+      saveHint.classList.remove('finishDialogSaveHint--busy', 'finishDialogSaveHint--error');
+      saveHint.textContent = '';
+      saveHint.style.display = 'none';
+    }
+
     const rowInput = _getFinishRowNameInput();
     if (rowInput) {
-      rowInput.disabled = _finishSubmitting || !canRenameSavedEntry;
+      // The input is editable in two states: while the initial save is
+      // pending (so the player can type during the network call), and
+      // after the save resolves into a renameable entry. We only mark
+      // it disabled while a rename pass is mid-flight.
+      rowInput.disabled = _finishSubmitting && !pending;
       rowInput.addEventListener('input', () => {
         _finishNameDirty = true;
-        _finishSaveStatus = 'idle';
+        if (!pending) _finishSaveStatus = 'idle';
         _finishDialogData = { ...(_finishDialogData || {}), name: rowInput.value };
       });
       rowInput.addEventListener('keydown', e => {
@@ -1534,8 +1799,18 @@ function _renderFinishDialog() {
         e.stopPropagation();
       });
       rowInput.addEventListener('blur', () => {
+        // During the initial pending save, blur shouldn't trigger a
+        // rename request — the in-flight save will pick up the typed
+        // value and a follow-up rename is scheduled if it differs.
+        if (pending) return;
         void _submitPendingFinishRun();
       });
+      if (wasNameInputFocused) {
+        rowInput.focus();
+        if (prevSelStart !== null && typeof rowInput.setSelectionRange === 'function') {
+          try { rowInput.setSelectionRange(prevSelStart, prevSelEnd); } catch (e) { /* ignore */ }
+        }
+      }
     }
 
     setTimeout(() => {
@@ -1668,9 +1943,9 @@ function _createFinishDialogDOM() {
         <ol id="finishDialogList"></ol>
       </div>
       <div class="finishDialogActions">
-        <button type="button" class="finishDlgBtn glass-btn glass-btn--danger" id="finishDialogExit"><i class="ph ph-sign-out"></i> Exit</button>
-        <button type="button" class="finishDlgBtn glass-btn glass-btn--secondary" id="finishDialogAgain"><i class="ph-fill ph-play"></i> Play again</button>
-        <button type="button" class="finishDlgBtn finishDlgBtn--cta glass-btn glass-btn--primary" id="finishDialogCopy"><i class="ph-fill ph-share-network"></i> Copy &amp; share result</button>
+        <button type="button" class="finishDlgBtn glass-btn glass-btn--tile glass-btn--danger" id="finishDialogExit"><i class="ph ph-sign-out"></i> Exit</button>
+        <button type="button" class="finishDlgBtn finishDialogActions__spacer glass-btn glass-btn--tile" id="finishDialogAgain"><i class="ph-fill ph-play"></i> Play again</button>
+        <button type="button" class="finishDlgBtn finishDlgBtn--cta glass-btn glass-btn--tile" id="finishDialogCopy"><i class="ph-fill ph-copy"></i> Copy &amp; share</button>
       </div>
     </div>
   `;
@@ -1691,7 +1966,7 @@ function _createFinishDialogDOM() {
   document.getElementById('finishDialogCopy').addEventListener('click', async () => {
     if (!_finishDialogData) return;
     const btn = document.getElementById('finishDialogCopy');
-    const defaultHtml = '<i class="ph-fill ph-share-network"></i> Copy &amp; share result';
+    const defaultHtml = '<i class="ph-fill ph-copy"></i> Copy &amp; share';
     try {
       await _copyTextToClipboard(_buildShareText(_finishDialogData));
       if (btn) btn.innerHTML = '<i class="ph ph-check"></i> Copied!';
@@ -1709,6 +1984,9 @@ function _createFinishDialogDOM() {
     if (!_finishDialogOpen) return;
     if (e.key === 'Escape') {
       e.preventDefault();
+      // Block escape while the run save is pending so the dialog can't
+      // be dismissed mid-save (matches the disabled action buttons).
+      if (_finishPendingRun) return;
       void (async () => {
         await _submitPendingFinishRun();
         if (_finishPendingRun || (_finishNameDirty && _finishSaveStatus === 'error')) return;

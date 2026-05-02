@@ -139,6 +139,11 @@ const korraBones = {
 };
 const korraBase = {};
 for (const k in korraBones) korraBase[k] = null;
+// Rest position for tail1, captured at bind time. The cast animation
+// rotates the spine to arch the body — since the body mesh is parented
+// to spine but the tail is parented to hips, we slide the tail base
+// down each frame so it tracks the dropping body rear.
+const korraTail1RestPos = new THREE.Vector3();
 let _korraRunPhase = 0;
 let _korraRunLastTs = -1;
 
@@ -739,6 +744,7 @@ function _collectIdleBones(model) {
     for (const k in korraMap) {
       if (korraBones[k] == null && korraMap[k].test(n)) {
         korraBones[k] = o; korraBase[k] = o.quaternion.clone();
+        if (k === 'tail1') korraTail1RestPos.copy(o.position);
       }
     }
   });
@@ -1389,6 +1395,11 @@ export function applyClickNod(ts, modelKey) {
  */
 export function applyCastAnimation(ts, modelKey) {
   if (!catModel) return 0;
+  // Tail1's position is displaced during the korra cast (see below) so
+  // its base tracks the arching body rear. Always restore the rest
+  // position at the top of the frame; the active branch reapplies the
+  // offset, and the early-return branches naturally land back at rest.
+  if (korraBones.tail1) korraBones.tail1.position.copy(korraTail1RestPos);
   const elapsed = ts - castStartTs;
   let t;
   if (castHoldActive) {
@@ -1414,16 +1425,53 @@ export function applyCastAnimation(ts, modelKey) {
   }
 
   if (modelKey === 'korra') {
+    // Kamehameha holds the pose at curve=1.0 indefinitely, while a
+    // fireball only blips through the peak before springing back.
+    // The full-amplitude peak reads fine for a flash, but sustained
+    // it looks unnatural — front legs bend past horizontal and the
+    // head tips way back. Dampen amplitudes during the hold only so
+    // the held pose is a relaxed power-up stance, while the fireball
+    // animation is unchanged.
+    const holdK = castHoldActive ? 0.55 : 1.0;
     // Rear up + throw front paws forward. Negative X rotation lifts
     // the front legs (they point down by default).
-    const lift = -curve * 1.55;          // up to ~88° lift
-    const spineArch = -curve * 0.35;     // small back arch
+    const lift = -curve * 1.55 * holdK;          // up to ~88° lift
+    // Big dramatic arch: rotate the spine itself (which carries the
+    // body mesh) so the whole torso visibly rears. Add a smaller chest
+    // arch on top so the head/neck push further forward without making
+    // the body look bent in half.
+    const spineArch = -curve * 0.40 * holdK;
+    const chestArch = -curve * 0.25 * holdK;
     const targets = [];
     if (korraBones.lfLeg) targets.push({ bone: korraBones.lfLeg, weight: 1 });
     if (korraBones.rfLeg) targets.push({ bone: korraBones.rfLeg, weight: 1 });
     if (targets.length) _applyWeightedBonePitchAbsolute(lift, targets);
     if (korraBones.spine) _applyWeightedBonePitchAbsolute(spineArch, [{ bone: korraBones.spine, weight: 1 }]);
-    if (korraBones.chest) _applyWeightedBonePitchAbsolute(spineArch * 0.6, [{ bone: korraBones.chest, weight: 1 }]);
+    if (korraBones.chest) _applyWeightedBonePitchAbsolute(chestArch, [{ bone: korraBones.chest, weight: 1 }]);
+
+    // The tail bone is parented to the hips, but the body mesh is on
+    // the spine. When the spine arches, the body's rear drops below
+    // the (stationary) tail base, leaving the tail visibly floating.
+    // Translate tail1's bone position so its base tracks where the
+    // body rear ends up. Geometry: body rear sits at spine-local
+    // (0, ~0.01, -0.22); rotating the spine by `spineArch` moves it
+    // by (Δy, Δz) relative to the spine origin. We push tail1 by that
+    // same delta so the tail base stays glued to the rear.
+    if (korraBones.tail1) {
+      const bodyRearY = 0.01;
+      const bodyRearZ = -0.30;
+      const cs = Math.cos(spineArch);
+      const sn = Math.sin(spineArch);
+      const newRearY = bodyRearY * cs - bodyRearZ * sn;
+      const newRearZ = bodyRearY * sn + bodyRearZ * cs;
+      const dy = newRearY - bodyRearY;
+      const dz = newRearZ - bodyRearZ;
+      korraBones.tail1.position.set(
+        korraTail1RestPos.x,
+        korraTail1RestPos.y + dy * 1.35,
+        korraTail1RestPos.z + dz
+      );
+    }
   } else if (modelKey === 'totodile') {
     // Big overhand cast — arms swing all the way overhead.
     // Mirrors how the skate code drives toto arm bones: snap to
