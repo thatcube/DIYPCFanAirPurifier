@@ -21,3 +21,6 @@ Thumbs.db
 !.env.example
 *.log
 npm-debug.log*
+
+# Unused large GLB (kept locally if regenerated)
+assets/munchkin_cat.glb
