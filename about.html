@@ -1071,13 +1071,19 @@
         swap(location.pathname + location.search + location.hash);
       });
       window.addEventListener('pageshow', (e) => {
+        // Only reset transition state on bfcache restores — see
+        // home.html for the full rationale. On a fresh load the body
+        // starts clean, but `pageshow` can fire AFTER an early Play
+        // CTA click on a slow first load, which would undo the
+        // chrome-out animation if we cleared is-leaving here.
+        if (!e.persisted) return;
         document.body.classList.remove('is-leaving', 'page-fade');
         const m = document.querySelector('main.page');
         if (m) m.classList.remove('is-entering', 'is-leaving');
         // bfcache restore: the bg scene is already painted, so the
         // tabs should be back immediately rather than re-running the
         // "wait for scene" delay.
-        if (e.persisted) document.body.classList.add('tabs-revealed');
+        document.body.classList.add('tabs-revealed');
       });
     })();
   </script>

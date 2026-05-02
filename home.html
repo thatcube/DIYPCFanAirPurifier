@@ -854,6 +854,16 @@
         swap(location.pathname + location.search + location.hash);
       });
       window.addEventListener('pageshow', (e) => {
+        // Only reset transition state on bfcache restores. On a FIRST
+        // load, `pageshow` fires after the parent's `load` event —
+        // which waits for the iframe's full `load` and can fire AFTER
+        // the iframe has already posted bg-scene-ready and the user
+        // has clicked the Play CTA. In that race window the click set
+        // `is-leaving` (chrome fading out) and an unconditional reset
+        // here would clear it, leaving the splash card visible behind
+        // the freshly-opened char-select. On a fresh load the body
+        // starts clean anyway, so there's nothing to reset.
+        if (!e.persisted) return;
         document.body.classList.remove('is-leaving', 'page-fade');
         const m = document.querySelector('main.page');
         if (m) m.classList.remove('is-entering', 'is-leaving');
@@ -863,10 +873,8 @@
         // — when we navigated away (typically Play → /play), boot had
         // already ended; on restore the body should not be stuck back
         // in the boot state if the browser snapshotted it mid-load.
-        if (e.persisted) {
-          document.body.classList.remove('is-booting');
-          document.body.classList.add('tabs-revealed');
-        }
+        document.body.classList.remove('is-booting');
+        document.body.classList.add('tabs-revealed');
       });
     })();
   </script>

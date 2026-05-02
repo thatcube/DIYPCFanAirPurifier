@@ -1656,6 +1656,12 @@
         swap(location.pathname + location.search + location.hash);
       });
       window.addEventListener('pageshow', (e) => {
+        // Only reset transition state on bfcache restores — see
+        // home.html for the full rationale. On a fresh load the body
+        // starts clean, but `pageshow` can fire AFTER an early Play
+        // CTA click on a slow first load, which would undo the
+        // chrome-out animation if we cleared is-leaving here.
+        if (!e.persisted) return;
         document.body.classList.remove('is-leaving', 'page-fade');
         const m = document.querySelector('main.page');
         if (m) m.classList.remove('is-entering', 'is-leaving');
@@ -1663,10 +1669,8 @@
         // tabs should be back immediately rather than re-running the
         // "wait for scene" delay. Also drop the boot/loading state
         // so the board doesn't re-morph from opaque on restore.
-        if (e.persisted) {
-          document.body.classList.remove('is-booting');
-          document.body.classList.add('tabs-revealed');
-        }
+        document.body.classList.remove('is-booting');
+        document.body.classList.add('tabs-revealed');
       });
     })();
   </script>
