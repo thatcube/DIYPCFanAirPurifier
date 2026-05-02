@@ -26,21 +26,19 @@
 // To add a new setting later: add one entry here. Done.
 
 const TABS = [
-  { id: 'display',  label: 'Display',  icon: 'ph ph-monitor' },
-  { id: 'audio',    label: 'Audio',    icon: 'ph ph-speaker-high' },
-  { id: 'controls', label: 'Controls', icon: 'ph ph-mouse' },
+  { id: 'display',     label: 'Display',     icon: 'ph ph-monitor' },
+  { id: 'audio',       label: 'Audio',       icon: 'ph ph-speaker-high' },
+  { id: 'controls',    label: 'Controls',    icon: 'ph ph-mouse' },
+  { id: 'performance', label: 'Performance', icon: 'ph ph-lightning' },
+  { id: 'diagnostics', label: 'Diagnostics', icon: 'ph ph-bug' },
 ];
 
 const CONTROLS = [
   // ── Display ──────────────────────────────────────────────────────
-  {
-    id: 'fpPauseShowFps', tabs: ['display'], type: 'toggle',
-    label: 'Show FPS', icon: 'ph ph-gauge',
-    keywords: 'frames per second performance counter overlay',
-    swId: 'fpPauseShowFps', stateId: 'fpPauseShowFpsState',
-    onclick: '_toggleFps',
-    initialOn: false,
-  },
+  // Atmosphere / viewing rows that affect the look of the scene.
+  // Pure perf knobs (resolution scaler, runtime profile, content sim
+  // toggles) live on the Performance tab. Debug-only rows (FPS,
+  // input HUD, wall labels) live on the Diagnostics tab.
   {
     id: 'fpPauseShowMphRow', tabs: ['display'], type: 'toggle',
     label: 'Show MPH', icon: 'ph ph-speedometer',
@@ -75,44 +73,6 @@ const CONTROLS = [
     onclick: '_togglePerfFog',
     initialOn: true,
   },
-  {
-    id: 'fpPausePerfResolution', tabs: ['display'], type: 'toggle',
-    label: 'Resolution scaler', icon: 'ph ph-arrows-out',
-    hint: 'Independent resolution scaler for first-person gameplay.',
-    keywords: 'render resolution dpr pixel ratio sharpness blur',
-    swId: 'fpPausePerfResolution', stateId: 'fpPausePerfResolutionState',
-    onclick: '_toggleFpPerfResolution',
-    initialOn: true,
-  },
-  {
-    id: 'fpPausePerfResolutionScale', tabs: ['display'], type: 'slider',
-    label: 'Render scale', icon: 'ph ph-crop',
-    keywords: 'resolution dpr quality sharpness percent',
-    rangeId: 'fpPausePerfResolutionScale', valId: 'fpPausePerfResolutionScaleVal',
-    min: 0.35, max: 1.2, step: 0.01, value: 0.68,
-    aria: 'Render scale',
-    oninput: '_setFpPerfResolutionScale',
-    initialLabel: '68%',
-  },
-  {
-    id: 'fpPausePerfFpProfile', tabs: ['display'], type: 'toggle',
-    label: 'Runtime perf knobs', icon: 'ph ph-rocket-launch',
-    hint: 'Non-resolution runtime knobs for first-person mode.',
-    keywords: 'performance budget shadow cadence quality',
-    swId: 'fpPausePerfFpProfile', stateId: 'fpPausePerfFpProfileState',
-    onclick: '_toggleFpPerfProfile',
-    initialOn: true,
-  },
-  {
-    id: 'fpPausePerfShadowCadence', tabs: ['display'], type: 'slider',
-    label: 'Shadow cadence', icon: 'ph ph-clock-countdown',
-    keywords: 'shadow update interval frames performance fp',
-    rangeId: 'fpPausePerfShadowCadence', valId: 'fpPausePerfShadowCadenceVal',
-    min: 0, max: 120, step: 1, value: 0,
-    aria: 'Shadow cadence',
-    oninput: '_setFpPerfShadowCadence',
-    initialLabel: 'Every frame',
-  },
   // FOV mirror — canonical row is in Controls. Hidden from search
   // results so the same setting doesn't appear twice when filtering.
   {
@@ -127,65 +87,115 @@ const CONTROLS = [
     hideInSearch: true,
     initialLabel: '85°',
   },
+
+  // ── Performance ─────────────────────────────────────────────────
   {
-    id: 'fpPausePerfCatAnim', tabs: ['display'], type: 'toggle',
+    id: 'fpPausePerfResolution', tabs: ['performance'], type: 'toggle',
+    label: 'Resolution scaler', icon: 'ph ph-arrows-out',
+    hint: 'Independent resolution scaler for first-person gameplay.',
+    keywords: 'render resolution dpr pixel ratio sharpness blur performance',
+    swId: 'fpPausePerfResolution', stateId: 'fpPausePerfResolutionState',
+    onclick: '_toggleFpPerfResolution',
+    initialOn: true,
+  },
+  {
+    id: 'fpPausePerfResolutionScale', tabs: ['performance'], type: 'slider',
+    label: 'Render scale', icon: 'ph ph-crop',
+    keywords: 'resolution dpr quality sharpness percent performance',
+    rangeId: 'fpPausePerfResolutionScale', valId: 'fpPausePerfResolutionScaleVal',
+    min: 0.35, max: 1.2, step: 0.01, value: 0.68,
+    aria: 'Render scale',
+    oninput: '_setFpPerfResolutionScale',
+    initialLabel: '68%',
+  },
+  {
+    id: 'fpPausePerfFpProfile', tabs: ['performance'], type: 'toggle',
+    label: 'Runtime perf knobs', icon: 'ph ph-rocket-launch',
+    hint: 'Non-resolution runtime knobs for first-person mode.',
+    keywords: 'performance budget shadow cadence quality',
+    swId: 'fpPausePerfFpProfile', stateId: 'fpPausePerfFpProfileState',
+    onclick: '_toggleFpPerfProfile',
+    initialOn: true,
+  },
+  {
+    id: 'fpPausePerfShadowCadence', tabs: ['performance'], type: 'slider',
+    label: 'Shadow cadence', icon: 'ph ph-clock-countdown',
+    keywords: 'shadow update interval frames performance fp',
+    rangeId: 'fpPausePerfShadowCadence', valId: 'fpPausePerfShadowCadenceVal',
+    min: 0, max: 120, step: 1, value: 0,
+    aria: 'Shadow cadence',
+    oninput: '_setFpPerfShadowCadence',
+    initialLabel: 'Every frame',
+  },
+  {
+    id: 'fpPausePerfCatAnim', tabs: ['performance'], type: 'toggle',
     label: 'Cat animation stack', icon: 'ph ph-cat',
-    keywords: 'animation procedural cat character',
+    keywords: 'animation procedural cat character performance',
     swId: 'fpPausePerfCatAnim', stateId: 'fpPausePerfCatAnimState',
     onclick: '_togglePerfCatAnim',
     initialOn: true,
   },
   {
-    id: 'fpPausePerfCoins', tabs: ['display'], type: 'toggle',
+    id: 'fpPausePerfCoins', tabs: ['performance'], type: 'toggle',
     label: 'Coin simulation', icon: 'ph ph-coins',
-    keywords: 'coin physics collectible',
+    keywords: 'coin physics collectible performance',
     swId: 'fpPausePerfCoins', stateId: 'fpPausePerfCoinsState',
     onclick: '_togglePerfCoins',
     initialOn: true,
   },
   {
-    id: 'fpPausePerfPurifier', tabs: ['display'], type: 'toggle',
+    id: 'fpPausePerfPurifier', tabs: ['performance'], type: 'toggle',
     label: 'Purifier animation', icon: 'ph ph-fan',
-    keywords: 'fan air purifier animation',
+    keywords: 'fan air purifier animation performance',
     swId: 'fpPausePerfPurifier', stateId: 'fpPausePerfPurifierState',
     onclick: '_togglePerfPurifier',
     initialOn: true,
   },
   {
-    id: 'fpPausePerfAbilities', tabs: ['display'], type: 'toggle',
+    id: 'fpPausePerfAbilities', tabs: ['performance'], type: 'toggle',
     label: 'Ability effects', icon: 'ph ph-sparkle',
-    keywords: 'fireball kamehameha particles vfx',
+    keywords: 'fireball kamehameha particles vfx performance',
     swId: 'fpPausePerfAbilities', stateId: 'fpPausePerfAbilitiesState',
     onclick: '_togglePerfAbilities',
     initialOn: true,
   },
   {
-    id: 'fpPausePerfRaycast', tabs: ['display'], type: 'toggle',
+    id: 'fpPausePerfRaycast', tabs: ['performance'], type: 'toggle',
     label: 'Interaction raycast', icon: 'ph ph-crosshair',
-    keywords: 'pick interact raycast',
+    keywords: 'pick interact raycast performance',
     swId: 'fpPausePerfRaycast', stateId: 'fpPausePerfRaycastState',
     onclick: '_togglePerfRaycast',
     initialOn: true,
   },
+
+  // ── Diagnostics ─────────────────────────────────────────────────
   {
-    id: 'fpPauseShowInputDiag', tabs: ['display'], type: 'toggle',
-    label: 'Input diagnostic HUD', icon: 'ph ph-bug',
+    id: 'fpPauseShowFps', tabs: ['diagnostics'], type: 'toggle',
+    label: 'Show FPS', icon: 'ph ph-gauge',
+    keywords: 'frames per second performance counter overlay diagnostic',
+    swId: 'fpPauseShowFps', stateId: 'fpPauseShowFpsState',
+    onclick: '_toggleFps',
+    initialOn: false,
+  },
+  {
+    id: 'fpPauseShowInputDiag', tabs: ['diagnostics'], type: 'toggle',
+    label: 'Input diagnostic HUD', icon: 'ph ph-cursor-click',
     hint: 'Tiny debug strip showing pointer-lock, camera, and input mode.',
     keywords: 'debug diagnostic input pointer lock camera mode hud overlay',
     swId: 'fpPauseShowInputDiag', stateId: 'fpPauseShowInputDiagState',
     onclick: '_toggleInputDiag',
     initialOn: false,
   },
-  // Localhost-only debug — game-fp.js shows/hides the row.
+  // Localhost-only debug. CSS hides .pause-toggle-row--localhost
+  // unless the panel host has the .settings-panel--localhost class.
   {
-    id: 'fpPauseDebugWallsRow', tabs: ['display'], type: 'toggle',
+    id: 'fpPauseDebugWallsRow', tabs: ['diagnostics'], type: 'toggle',
     label: 'Wall labels', icon: 'ph ph-walls',
     keywords: 'debug wall label diagnostic',
-    rowId: 'fpPauseDebugWallsRow',
-    rowHidden: true,
     swId: 'fpPauseDebugWalls', stateId: 'fpPauseDebugWallsState',
     onclick: '_toggleDebugWallLabels',
     initialOn: false,
+    localhostOnly: true,
   },
 
   // ── Audio ────────────────────────────────────────────────────────
@@ -283,8 +293,14 @@ function _renderToggleRow(c) {
     : `window.${c.onclick}&&window.${c.onclick}()`;
   const rowIdAttr = c.rowId ? ` id="${_esc(c.rowId)}"` : '';
   const rowStyle = c.rowHidden ? ' style="display:none"' : '';
+  // Optional gating classes. CSS rules in main.css hide rows when
+  // the panel host is missing the matching enabling class.
+  const extraClasses = [
+    c.localhostOnly ? 'pause-toggle-row--localhost' : '',
+  ].filter(Boolean).join(' ');
+  const classAttr = extraClasses ? ` ${extraClasses}` : '';
   return `
-    <div class="pause-toggle-row"${rowIdAttr}${rowStyle} ${_searchAttrs(c)}>
+    <div class="pause-toggle-row${classAttr}"${rowIdAttr}${rowStyle} ${_searchAttrs(c)}>
       <span class="pause-toggle-label"${labelTitle}><i class="${_esc(c.icon)}"></i> ${_esc(c.label)}</span>
       <div class="toggle-sw${onAttr}" id="${_esc(c.swId)}" role="switch" aria-checked="${c.initialOn ? 'true' : 'false'}"
         onclick="${onclick}"></div>
@@ -645,6 +661,13 @@ export function mountSettings(host) {
   if (_mountedHost) return;
   _mountedHost = host;
   host.classList.add('settings-panel');
+  // Tag for localhost-gated rows (e.g. wall labels). CSS rule hides
+  // .pause-toggle-row--localhost unless this class is present.
+  try {
+    if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+      host.classList.add('settings-panel--localhost');
+    }
+  } catch { /* no window.location in some hosts */ }
   host.innerHTML = _renderShell();
 
   const rail = host.querySelector('.settings-rail');

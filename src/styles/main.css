@@ -2873,6 +2873,15 @@ line-height: 1;
   border-color: var(--glass-border-strong);
 }
 
+/* ── Settings panel: localhost-only rows ──────────────────────────
+   `.pause-toggle-row--localhost` is hidden unless the host also has
+   `.settings-panel--localhost` (set by mountSettings when
+   location.hostname is localhost / 127.0.0.1). Keeps Wall labels off
+   production builds entirely. */
+.settings-panel:not(.settings-panel--localhost) .pause-toggle-row--localhost {
+  display: none;
+}
+
 .pause-toggle-label {
   display: inline-flex;
   align-items: center;
@@ -5705,6 +5714,38 @@ body.is-leaving #charSelect.open .char-select-inner>* {
     transform: none;
     filter: none;
     transition-delay: 0ms !important;
+  }
+}
+
+/* Mobile-only advisory inside the character select. Desktop hides it
+   entirely (still occupies a child slot in nth-child stagger but gets
+   no transition-delay, since it's the 5th child where the rule is
+   `n+5` 400ms — kept consistent for when it's visible on mobile). */
+.char-mobile-note {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .char-mobile-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 16px 0 0;
+    padding: 12px 14px;
+    border-radius: var(--r-md);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: left;
+  }
+
+  .char-mobile-note i {
+    font-size: 18px;
+    color: rgba(255, 255, 255, 0.6);
+    flex-shrink: 0;
+    margin-top: 1px;
   }
 }
 

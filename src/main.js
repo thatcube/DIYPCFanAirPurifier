@@ -2150,7 +2150,14 @@ function animate(ts) {
       if (!Number.isFinite(st._korraRunBlend)) st._korraRunBlend = 0;
       let korraRunBlend = 0;
       if (!skateIdleOnly) {
-        const korraRunTarget = Math.min(1, svel / 15) * moveBlend;
+        // Airborne: cut the run target so legs stop walking in mid-air.
+        // Same vy threshold the jump deform uses for grounded — must
+        // exceed the -0.05 "planted" sentinel to count as airborne,
+        // otherwise the walk cycle never plays on the ground.
+        const fpAirborne = gameFp.fpMode && Math.abs(gameFp.fpVy) >= 0.1;
+        const korraRunTarget = fpAirborne
+          ? 0
+          : Math.min(1, svel / 15) * moveBlend;
         const korraRunEaseUp = 1 - Math.exp(-dtSec * 4.0);
         const korraRunEaseDown = 1 - Math.exp(-dtSec * 8.0);
         const korraRunEase = korraRunTarget > st._korraRunBlend ? korraRunEaseUp : korraRunEaseDown;

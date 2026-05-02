@@ -138,7 +138,15 @@ export function setSkateMode(enabled, opts = {}) {
   // legs don't start the eased lerp at y=0 (which causes a few frames of
   // visible clipping through the board). The per-frame foot-anchor sampler
   // takes over from here and eases naturally to the correct target.
-  if (skateMode) _skateModelLift = _getSkateLiftTrimForModel();
+  // Invalidate the fit cache too so _fitSkateboardToCat (called per-frame
+  // without force=true) actually recomputes the target lift on this
+  // transition — otherwise once a model has been fit, the per-frame call
+  // bails on cache hit and the eased lift never picks up the floorDeficit
+  // term, leaving the legs penetrating the board on K-toggle.
+  if (skateMode) {
+    _skateModelLift = _getSkateLiftTrimForModel();
+    _skateboardFitCatModel = null;
+  }
   // Reset trick state
   _trickManual = 0; _trickManualHeld = false;
   _trickKickflip = 0; _trickKickflipActive = false;
@@ -2132,6 +2140,12 @@ function _getSkateLiftTrimForModel() {
     case 'toon': return 0;
     case 'totodile': return 0.44;
     case 'bababooey': return 0.9;
+    // Korra: 0. Her rig has paw-named bones at the actual paw bottom,
+    // so _sampleSkateFootAnchor lands the board top exactly under the
+    // paws — any positive trim here just floats the model above it.
+    // Other models hit the default and keep the empirical 1.0 lift
+    // tuned against their own rig topology.
+    case 'korra': return 0;
     default: return 1.0;
   }
 }
@@ -2146,33 +2160,55 @@ function _getSkateBoardZTrimForModel() {
 
 function _sampleSkateFootAnchor(out = _skateFootAnchor) {
   if (!_catGroup || !catAnimation.catModel) return false;
-  const primary = [];
-  const secondary = [];
+  // Bone-name buckets, in priority order:
+  //   paws  → bones at the actual paw-bottom (lowest contact)
+  //   feet  → bones named "*Foot*" that are NOT also paws. In Korra's
+  //           rig "Foot" is the KNEE joint (top of the lower leg), so
+  //           if we mix paws + feet the anchor lands mid-shin and the
+  //           board floats above the actual paws. Other rigs only
+  //           have foot-named bones, so feet are still a valid
+  //           fallback when no paws exist.
+  //   toes  → toe-only fallback (used by some imported rigs).
+  const paws = [];
+  const feet = [];
+  const toes = [];
   _skateFootPoints.length = 0;
 
   catAnimation.catModel.updateMatrixWorld(true);
   catAnimation.catModel.traverse((o) => {
     if (!o || !o.isBone) return;
     const name = String(o.name || '');
-    const isPrimary = /foot|paw/i.test(name);
-    const isSecondary = /toe/i.test(name);
-    if (!isPrimary && !isSecondary) return;
+    const isPaw  = /paw/i.test(name);
+    const isFoot = !isPaw && /foot/i.test(name);
+    const isToe  = !isPaw && !isFoot && /toe/i.test(name);
+    if (!isPaw && !isFoot && !isToe) return;
     o.getWorldPosition(_skateFootTmp);
     _catGroup.worldToLocal(_skateFootTmp);
     const p = _skateFootTmp.clone();
-    if (isPrimary) primary.push(p);
-    else secondary.push(p);
+    if (isPaw) paws.push(p);
+    else if (isFoot) feet.push(p);
+    else toes.push(p);
   });
 
-  if (primary.length >= 2) _skateFootPoints.push(...primary);
-  else _skateFootPoints.push(...primary, ...secondary);
+  // Prefer paws; if a rig has no paw bones (most non-Korra models),
+  // fall back to feet; toes are a last resort.
+  let usingPaws = false;
+  if (paws.length >= 2) { _skateFootPoints.push(...paws); usingPaws = true; }
+  else if (feet.length >= 2) _skateFootPoints.push(...feet);
+  else _skateFootPoints.push(...paws, ...feet, ...toes);
 
   if (_skateFootPoints.length < 2) return false;
 
   _skateFootPoints.sort((a, b) => a.y - b.y);
   const midIdx = Math.floor((_skateFootPoints.length - 1) * 0.5);
   const refY = _skateFootPoints[midIdx].y;
-  const footY = refY + 0.055;
+  // Bone-center vs paw-bottom offset. Foot/toe-named bones in most
+  // rigs sit slightly above the visible paw bottom, so we lift by
+  // 0.055 so the board doesn't clip into the paw mesh. Korra's
+  // paw-named bones are placed AT the paw bottom — no offset needed
+  // (and adding one would float the board ~0.33 world units above
+  // the paws after the ~6× model scale).
+  const footY = refY + (usingPaws ? 0 : 0.055);
 
   const yBand = 0.42;
   let sumX = 0;
@@ -4943,7 +4979,14 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   // Consecutive wall jumps make gravity heavier to prevent infinite climbing
   const SS_GRAV_MUL = isSuperSaiyanActive() ? 0.55 : 1.0; // SS mode: floatier jumps
   const gravScale = 1 + _consecutiveWallJumps * WALL_JUMP_GRAV_EXTRA;
-  const g = (fpVy > 0 ? GRAVITY_RISE : GRAVITY_FALL) * gravScale * SS_GRAV_MUL;
+  // Spin-flight gravity boost: while a board spin is active in skate
+  // mode, gravity hits harder so the X-spam lift mechanic has a real
+  // cost when the player stops tapping. Ground spin-decay (further
+  // below) zeroes _trickSpinSpeed on landing within a fraction of a
+  // second, so this is effectively airborne-only without needing the
+  // grounded flag (which isn't computed yet at this point).
+  const SPIN_AIR_GRAV_MUL = (skateMode && _trickSpinSpeed > 0) ? 0.88 : 1.0;
+  const g = (fpVy > 0 ? GRAVITY_RISE : GRAVITY_FALL) * gravScale * SS_GRAV_MUL * SPIN_AIR_GRAV_MUL;
   fpVy -= g * frameScale;
   let newY = fpPos.y + fpVy * frameScale;
 
@@ -5345,14 +5388,26 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
             _trickSpinAngle += (target - _trickSpinAngle) * easeAlpha(11, dtSec);
             if (Math.abs(target - _trickSpinAngle) < 0.005) _trickSpinAngle = 0;
           }
+        } else {
+          // Mild air decay — runs the spin (and the gravity boost it
+          // gates below) down a few seconds after the player stops
+          // tapping X. Without this the spin would persist forever
+          // mid-air and gravity would stay elevated through the whole
+          // descent.
+          const SPIN_AIR_DECAY = Math.PI * 1.5;
+          const sgn = Math.sign(_trickSpinSpeed) || 1;
+          _trickSpinSpeed = sgn * Math.max(0, Math.abs(_trickSpinSpeed) - SPIN_AIR_DECAY * dtSec);
         }
         spinExtra = _trickSpinAngle;
       }
       // Apply per-press upward impulse (deferred from keydown).
-      // Air taps give a clean fixed kick. Grounded taps still lift,
-      // but only once spin has built up — below ~40% of max spin the
-      // floor wins, above that each tap delivers a partial kick that
-      // ramps up. Combined with ground-friction decay, this means a
+      // Air taps stack ADDITIVELY so spamming X climbs higher each
+      // press. Combined with the spin-air gravity multiplier in the
+      // gravity section, this gives a Tony-Hawk-flight feel: tap
+      // hard to fly, let go and gravity pulls you down faster than
+      // a normal jump. Grounded taps still lift, but only once spin
+      // has built up — below ~40% of max spin the floor wins, above
+      // that each tap delivers a partial kick that ramps up. So a
       // couple of seconds of fast X-spamming is the cost of lifting
       // off from a dead stop, where in the air a single tap is enough.
       // Dampened near ceiling so you can't get stuck up there.
@@ -5362,16 +5417,19 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
         const headroom = _ceilY - fpPos.y;
         const HOVER_MARGIN = 10;
         const ceilDamp = headroom < HOVER_MARGIN ? Math.max(0, headroom / HOVER_MARGIN) : 1;
-        let kick;
         if (!grounded) {
-          kick = 0.22 * ceilDamp;
+          // Per-tap impulse stacks on top of current vy, capped so a
+          // long combo doesn't reach escape velocity.
+          const AIR_TAP_KICK = 0.32;
+          const STACK_CAP = 1.1;
+          fpVy = Math.min(fpVy + AIR_TAP_KICK * ceilDamp, STACK_CAP);
         } else {
           const SPIN_CAP_LOCAL = Math.PI * 20;
           const ratio = Math.min(1, Math.abs(_trickSpinSpeed) / SPIN_CAP_LOCAL);
           const lift = Math.max(0, (ratio - 0.4) / 0.6);
-          kick = 0.22 * 0.6 * lift * ceilDamp;
+          const kick = 0.22 * 0.6 * lift * ceilDamp;
+          if (kick > 0) fpVy = Math.max(fpVy, kick);
         }
-        if (kick > 0) fpVy = Math.max(fpVy, kick);
         _trickSpinBoost = false;
       }
 

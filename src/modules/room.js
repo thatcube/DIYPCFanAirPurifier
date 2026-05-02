@@ -2367,7 +2367,7 @@ export function createRoom(scene) {
     const pcSilver = 0xd4d6d9;   // light silver aluminum
     const pcDark = 0x333333;   // dark vent insets
     const pcWood = 0x6b4226;   // walnut wood slats
-    const pcX = deskX + deskD / 2 - pcD / 2 - 1;  // pushed near wall edge of desk
+    const pcX = deskX + deskD / 2 - pcD / 2;  // flush against wall edge of desk
     const pcZ = deskZ + monW + 6;
     const pcBaseY = deskTopY + deskTopH / 2;
     const pcCenterY = pcBaseY + pcH / 2;

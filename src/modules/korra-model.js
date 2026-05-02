@@ -388,53 +388,38 @@ function _sculptEar() {
   return geo;
 }
 
-// ── Vertex-sculpted leg ────────────────────────────────────────────
+// ── Continuous tapered leg ─────────────────────────────────────────
+//
+// Upper leg — tapered cylinder. Bottom radius equals _kneeR so the
+// upper leg, knee sphere, and lower leg all share the same radius
+// at the joint and read as one continuous limb instead of stacked
+// segments.
+
+// Shared knee radius — bottom of upper leg = top of lower leg = knee
+// sphere R. Front legs are slightly thinner than back.
+const _kneeR  = (isBack) => isBack ? 0.025 : 0.024;
+const _hipR   = (isBack) => isBack ? 0.036 : 0.033;
+const _ankleR = (isBack) => isBack ? 0.023 : 0.022;
+const LEG_H   = 0.10;   // upper leg length (was 0.20 → 0.13 → 0.10)
+const LOWER_H = 0.08;   // lower leg length (was 0.12 → 0.10 → 0.08)
 
 function _sculptLeg(isBack) {
-  const R = isBack ? 0.032 : 0.030;
-  const H = 0.20;
-  const geo = new THREE.BoxGeometry(R * 2, H, R * 2, 6, 10, 6);
+  const topR = _hipR(isBack);
+  const botR = _kneeR(isBack);
+  const geo = new THREE.CylinderGeometry(topR, botR, LEG_H, 10, 5, false);
   const pp = geo.attributes.position;
 
+  // Subtle thigh bulge — push verts radially out near the upper third
+  // so the leg isn't a perfect cone.
   for (let i = 0; i < pp.count; i++) {
-    let x = pp.getX(i), y = pp.getY(i), z = pp.getZ(i);
-    const ny = y / (H / 2);
-
-    // Round into a cylinder shape
-    const rDist = Math.sqrt(x * x + z * z);
-    const maxR = R * (1.0 + 0.15 * Math.max(0, -ny)); // slightly thicker at top
-    if (rDist > maxR) {
-      const s = maxR / rDist;
-      x *= s; z *= s;
-    }
-
-    // Round top and bottom caps
-    const capR = R * 0.4;
-    const topY = H / 2, botY = -H / 2;
-    if (y > topY - capR) {
-      const ey = y - (topY - capR);
-      const er = Math.sqrt(x * x + z * z);
-      const d = Math.sqrt(ey * ey + er * er);
-      if (d > capR) {
-        const s = capR / d;
-        y = topY - capR + ey * s;
-        x *= er > 0 ? (er * s) / er : 1;
-        z *= er > 0 ? (er * s) / er : 1;
-      }
-    }
-    if (y < botY + capR) {
-      const ey = Math.abs(y - (botY + capR));
-      const er = Math.sqrt(x * x + z * z);
-      const d = Math.sqrt(ey * ey + er * er);
-      if (d > capR) {
-        const s = capR / d;
-        y = botY + capR - ey * s;
-        x *= er > 0 ? (er * s) / er : 1;
-        z *= er > 0 ? (er * s) / er : 1;
-      }
-    }
-
-    pp.setX(i, x); pp.setY(i, y); pp.setZ(i, z);
+    const x = pp.getX(i), y = pp.getY(i), z = pp.getZ(i);
+    const r = Math.sqrt(x * x + z * z);
+    if (r <= 0) continue;
+    const t = (y + LEG_H / 2) / LEG_H; // 0=bot, 1=top
+    const bulge = Math.sin(Math.max(0, Math.min(1, t)) * Math.PI) * 0.003;
+    const s = (r + bulge) / r;
+    pp.setX(i, x * s);
+    pp.setZ(i, z * s);
   }
 
   // Paint: all white — Korra's legs are fully white
@@ -541,34 +526,35 @@ export function buildKorraModel() {
   // Whiskers
   _addWhiskers(bones.head);
 
-  // ── Legs — sculpted ──
+  // ── Legs — continuous taper from hip → knee → ankle ──
   for (const [bone, foot, back] of [
     [bones.lfLeg, bones.lfFoot, false],
     [bones.rfLeg, bones.rfFoot, false],
     [bones.lbLeg, bones.lbFoot, true],
     [bones.rbLeg, bones.rbFoot, true],
   ]) {
-    const legH = 0.20; // matches _sculptLeg actual height
+    // Upper leg — tapered cylinder, hip→knee
     const legMesh = new THREE.Mesh(_sculptLeg(back), vcMat);
-    legMesh.position.set(0, -legH / 2, 0);
+    legMesh.position.set(0, -LEG_H / 2, 0);
     bone.add(legMesh);
 
-    // Knee joint sphere to bridge upper and lower leg
-    const kneeR = back ? 0.034 : 0.032;
-    const knee = new THREE.Mesh(_sphere(kneeR, 7, 5), whiteMat);
+    // Knee sphere — same radius as the matched knee point so it sits
+    // flush against both cylinders rather than bulging outside them.
+    const knee = new THREE.Mesh(_sphere(_kneeR(back), 8, 6), whiteMat);
     knee.position.set(0, 0, 0); // foot bone origin = the knee
     foot.add(knee);
 
-    // Lower leg (white)
-    const lowerR = back ? 0.028 : 0.026;
-    const lowerH = 0.12;
-    const lower = new THREE.Mesh(_cylinder(lowerR, lowerR * 1.05, lowerH, 8), whiteMat);
-    lower.position.set(0, -lowerH / 2, 0);
+    // Lower leg — tapered cylinder, knee→ankle (top R matches knee R)
+    const lower = new THREE.Mesh(
+      _cylinder(_kneeR(back), _ankleR(back), LOWER_H, 10),
+      whiteMat
+    );
+    lower.position.set(0, -LOWER_H / 2, 0);
     foot.add(lower);
 
     // Paw
     const pawMesh = new THREE.Mesh(_sculptPaw(), whiteMat);
-    pawMesh.position.set(0, -lowerH, 0.008);
+    pawMesh.position.set(0, -LOWER_H, 0.008);
     foot.add(pawMesh);
   }
 
@@ -661,20 +647,24 @@ function _buildSkeleton() {
 
   // Front legs attach via chest (hips→spine→chest adds +0.08 Y),
   // so front leg bones sit lower to compensate. All foot bones equal.
-  lfLeg.position.set(0.08, -0.10, 0.02);
-  rfLeg.position.set(-0.08, -0.10, 0.02);
-  lbLeg.position.set(0.07, -0.02, 0.02);
-  rbLeg.position.set(-0.07, -0.02, 0.02);
-  // Foot bones = knee joints, at bottom of upper leg (H=0.20)
-  lfFoot.position.set(0, -0.20, 0);
-  rfFoot.position.set(0, -0.20, 0);
-  lbFoot.position.set(0, -0.20, 0);
-  rbFoot.position.set(0, -0.20, 0);
+  // X offsets pulled inward (was 0.08 / 0.07) so the legs read as
+  // tucked under the body instead of splayed at the hips.
+  // Back legs sit a touch behind hip-center so they read as anchored
+  // under the haunches, not mid-belly.
+  lfLeg.position.set(0.06, -0.10, 0.02);
+  rfLeg.position.set(-0.06, -0.10, 0.02);
+  lbLeg.position.set(0.05, -0.02, -0.04);
+  rbLeg.position.set(-0.05, -0.02, -0.04);
+  // Foot bones = knee joints, at bottom of upper leg (H=LEG_H=0.13)
+  lfFoot.position.set(0, -LEG_H, 0);
+  rfFoot.position.set(0, -LEG_H, 0);
+  lbFoot.position.set(0, -LEG_H, 0);
+  rbFoot.position.set(0, -LEG_H, 0);
 
   // Invisible paw-ground markers — _centerAndGround matches /paw/i
   // and uses the lowest such bone for grounding. These sit at the
-  // actual ground contact point (lowerLeg 0.12 + paw halfH 0.015).
-  const pawDrop = -(0.12 + 0.015);
+  // actual ground contact point (lower-leg LOWER_H + paw halfH 0.015).
+  const pawDrop = -(LOWER_H + 0.015);
   for (const fb of [lfFoot, rfFoot, lbFoot, rbFoot]) {
     const marker = b(fb.name.replace('Foot', 'Paw'));
     marker.position.set(0, pawDrop, 0);

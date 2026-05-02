@@ -194,6 +194,10 @@
         </div>
         <button class="char-start glass-btn glass-btn--primary" onclick="window._startGame&&window._startGame()">Start
           run</button>
+        <p class="char-mobile-note" role="note">
+          <i class="ph ph-device-mobile" aria-hidden="true"></i>
+          <span>Heads up — this game isn't optimized for mobile. Controls and performance work best on a desktop with a keyboard and mouse.</span>
+        </p>
       </div>
     </div>
 
@@ -432,13 +436,6 @@
        via inline style during the exit sequence. -->
   <div id="sceneFade" aria-hidden="true"></div>
 
-  <script>
-    // Show debug wall-label toggle only on localhost
-    if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
-      var r = document.getElementById('fpPauseDebugWallsRow');
-      if (r) r.style.display = '';
-    }
-  </script>
   <script type="module" src="/src/main.js"></script>
   <!-- Pause-card drill-down nav (Launcher ↔ Settings). Mounts the
        schema-driven settings panel into #pauseSettingsHost on first

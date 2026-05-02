@@ -985,29 +985,71 @@ export function applyGameplayJumpDeform({ dtSec, vy, holdFrames, modelKey }) {
   if (!catModel || !catMixer) return;
   const st = catMixer.userData || (catMixer.userData = {});
   if (!Number.isFinite(st._squashBlend)) st._squashBlend = 0;
+  if (!Number.isFinite(st._chargeBias)) st._chargeBias = 0;
 
   const vY = Number(vy) || 0;
   const held = Math.max(0, Number(holdFrames) || 0);
-  const grounded = Math.abs(vY) < 0.01;
+  // Threshold is wider than the literal 0 because game-fp.js parks
+  // fpVy at -0.05 as the "planted on ground" sentinel. Anything
+  // tighter than 0.1 reads that sentinel as a fall and would hold
+  // Korra in a permanent landing-flex pose at ~0.35 blend (other
+  // models squashed via body scale, which barely showed; Korra
+  // bends her legs visibly). Real falls hit |vY| >> 0.1 instantly.
+  const grounded = Math.abs(vY) < 0.1;
   const chargeN = Math.min(1, held / 60);
   const isBaba = modelKey === 'bababooey';
   const isToon = modelKey === 'toon';
   const isToto = modelKey === 'totodile';
+  const isKorra = modelKey === 'korra';
   const isSquishy = isBaba || isToto;
 
   let target = 0;
+  // chargeBias: 1 = jump-charge crouch (rear-end dip + back-heavy
+  // spring), 0 = anything else (landing impact, airborne, idle).
+  // Default to 0 every frame and let only the explicit charge branch
+  // raise it to 1 — otherwise the rising-airborne branch (which
+  // doesn't reassign this) would inherit the previous frame's value
+  // and keep the hip dip applied through the entire jump arc, which
+  // reads as "back stays angled up while legs bend" mid-air.
+  let chargeBiasTarget = 0;
   if (grounded && held > 0) {
     target = (isToon ? 1.0 : 0.55) * chargeN;
+    chargeBiasTarget = 1;
   } else if (vY > 0.05) {
     target = Math.max(-0.45, -vY * 3.2);
-  } else if (vY < -0.03 && !isToon) {
+  } else if (vY < -0.1 && !isToon) {
+    // Symmetric with the grounded threshold above. -0.05 is the
+    // grounded sentinel; only treat it as a fall when we exceed it.
     const k = isSquishy ? 11 : 7;
     target = Math.min(1, (-vY) * k);
   }
 
   const ease = 1 - Math.exp(-Math.max(0, dtSec) * 14);
   st._squashBlend += (target - st._squashBlend) * ease;
+  // Charge bias must SNAP to 0 the instant we're not actively charging
+  // — easing it through launch/landing lets the rear-end-dip (-0.30 X
+  // on hips) bleed into both the airborne pose and the landing-flex,
+  // which pitches the whole body upward at the shoulders for ~70 ms
+  // after liftoff and again on touchdown. The crouch only happens on
+  // the ground before launch, so an instant snap to 0 outside that
+  // explicit state can never miss a frame of valid charge animation.
+  if (chargeBiasTarget === 0) {
+    st._chargeBias = 0;
+  } else {
+    st._chargeBias += (chargeBiasTarget - st._chargeBias) * ease;
+  }
   const s = st._squashBlend;
+  const bias = st._chargeBias;
+
+  // Korra (quadruped) bends her legs on jump instead of squishing the
+  // body — a body axis-scale on a four-legged silhouette reads as the
+  // model getting fatter/thinner, not as a coiled spring. The leg
+  // bend is applied below; the body keeps its rest scale.
+  if (isKorra) {
+    catModel.scale.copy(baseScale);
+    _applyKorraJumpLegs(s, bias);
+    return;
+  }
 
   const syK = isSquishy ? 0.55 : (isToon ? 0.60 : 0.35);
   const sxzK = isSquishy ? 0.40 : (isToon ? 0.30 : 0.22);
@@ -1786,6 +1828,112 @@ function _korraApply(bone, base, pitch, yaw, roll, slerp) {
   bone.quaternion.slerp(tmpQuatB, slerp);
 }
 
+// Jump bend — replaces the body axis-scale "squish" used by other
+// Jump bend — replaces the body axis-scale "squish" used by other
+// models. Real cats coil the back legs into a deep spring on jump
+// charge (knees fold forward, hocks drop, hindquarters and tail dip
+// down) and keep the front legs lightly bent. On landing all four
+// legs bend together to absorb the impact. After the launch the
+// legs only UNFOLD back to rest — they never bend the opposite
+// direction in mid-air — so we clamp the squash factor to >= 0.
+//
+// `bias` (0..1) crossfades between landing-flex (uniform across all
+// four legs, no rear-end dip) and charge-coil (back-heavy spring +
+// rear/tail dip). Set by applyGameplayJumpDeform from the input
+// phase so the same `s` reads correctly in both contexts.
+//
+// IMPORTANT: this runs AFTER applyKorraProceduralRun in the frame,
+// so the leg bones already hold a walk-cycle pose. We slerp from
+// that pose toward the bend target by an amount that grows with
+// `s` (0 = pure walk, 1 = full bend). That gives a seamless blend:
+// at low charge the cat keeps walking with a slight lean, at full
+// charge the bend dominates and overwrites the walk swing.
+function _applyKorraJumpLegs(sIn, biasIn) {
+  const K = korraBones;
+  const B = korraBase;
+  if (!K.lfLeg && !K.rfLeg && !K.lbLeg && !K.rbLeg) return;
+  const s = Math.max(0, Math.min(1, sIn)); // single-direction bend only
+  const bias = Math.max(0, Math.min(1, biasIn || 0));
+  if (s < 0.001) return; // nothing to do — let the walk pose stand
+
+  // Slerp the current bone (walk-driven) toward (base ⨯ jumpEuler)
+  // by `weight`. Walk pose dominates at low weight, bend at high.
+  const blend = (bone, baseQ, p, weight) => {
+    if (!bone || !baseQ) return;
+    tmpEuler.set(p, 0, 0);
+    tmpQuat.setFromEuler(tmpEuler);
+    tmpQuatB.copy(baseQ).multiply(tmpQuat);
+    bone.quaternion.slerp(tmpQuatB, weight);
+  };
+
+  // Charge-coil targets: deep back-leg spring, light front bend.
+  const upperBackC  = -1.45;
+  const lowerBackC  =  2.20;
+  const upperFrontC = -0.40;
+  const lowerFrontC =  0.70;
+  // Landing-flex targets: uniform across all four legs.
+  const upperLand = -0.95;
+  const lowerLand =  1.45;
+
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const upperBack  = lerp(upperLand, upperBackC,  bias);
+  const lowerBack  = lerp(lowerLand, lowerBackC,  bias);
+  const upperFront = lerp(upperLand, upperFrontC, bias);
+  const lowerFront = lerp(lowerLand, lowerFrontC, bias);
+
+  blend(K.lfLeg,  B.lfLeg,  upperFront, s);
+  blend(K.rfLeg,  B.rfLeg,  upperFront, s);
+  blend(K.lfFoot, B.lfFoot, lowerFront, s);
+  blend(K.rfFoot, B.rfFoot, lowerFront, s);
+  blend(K.lbLeg,  B.lbLeg,  upperBack,  s);
+  blend(K.rbLeg,  B.rbLeg,  upperBack,  s);
+  blend(K.lbFoot, B.lbFoot, lowerBack,  s);
+  blend(K.rbFoot, B.rbFoot, lowerBack,  s);
+
+  // Rear-end dip — charge only. Hips pitch up at the shoulders so
+  // the spine sinks toward the haunches. Tail bones are CHILDREN of
+  // hips and inherit that rotation, so on charge the whole tail
+  // travels down with the haunches. We deliberately do NOT pitch the
+  // tail bones here — the previous +0.85/+0.55 on tail1/tail2 made
+  // the tail tip point straight up at random during a jump, which
+  // looked like a flag waving rather than an anatomical motion. The
+  // idle pass owns tail expression; jump just lets it ride along.
+  // Landing keeps the body level (impact is absorbed by the legs).
+  const dipW = s * bias;
+  blend(K.hips,  B.hips,  -0.30, dipW);
+
+  // Keep paws on the ground. Bending the leg about the hip pivot
+  // raises the paw — without compensation, the model floats above
+  // the floor (very visible on the skateboard, where there's no
+  // shadow contact). We drop the model Y by the rise of the LOWEST
+  // paw so it stays planted; deeper-bent paws (back legs in charge
+  // mode) read as haunches lifting off the floor, which matches the
+  // coiled-spring silhouette anyway.
+  //
+  // Geometry: hip→knee = LEG_H (0.10), knee→paw-bottom ≈ 0.095.
+  // Rest paw drop = 0.195 below hip. After bending upper by θ_u and
+  // foot by θ_f (relative to upper), paw drop = LEG_H·cos(θ_u) +
+  // 0.095·cos(θ_u + θ_f).
+  //
+  // The drop is computed in catModel-LOCAL units. catModel itself is
+  // uniformly scaled (~6× to hit TARGET_HEIGHT inches), so we have
+  // to multiply by baseScale.y when shifting catModel.position.y —
+  // otherwise the compensation is ~6× too small and the paws still
+  // visibly float above the board on the skateboard.
+  const _LEG_H = 0.10;
+  const _LOWER = 0.095;
+  const _yRest = _LEG_H + _LOWER;
+  const _angUF = s * upperFront;
+  const _angFF = s * lowerFront;
+  const _angUB = s * upperBack;
+  const _angFB = s * lowerBack;
+  const _yFront = _LEG_H * Math.cos(_angUF) + _LOWER * Math.cos(_angUF + _angFF);
+  const _yBack  = _LEG_H * Math.cos(_angUB) + _LOWER * Math.cos(_angUB + _angFB);
+  // Drop by the rise of the most-grounded paw so it sits on the floor.
+  const _yDrop = _yRest - Math.max(_yFront, _yBack);
+  if (_yDrop > 0) catModel.position.y -= _yDrop * baseScale.y;
+}
+
 /**
  * Korra idle — the generic applyGameplayProceduralIdle() handles tail,
  * head, and spine sway via the auto-detected idle bone arrays.
@@ -1812,6 +1960,26 @@ export function applyKorraProceduralIdle(ts, intensity) {
   _korraApply(korraBones.rbLeg, korraBase.rbLeg, shift, 0, 0, 0.3);
   _korraApply(korraBones.rfLeg, korraBase.rfLeg, -shift, 0, 0, 0.3);
   _korraApply(korraBones.lbLeg, korraBase.lbLeg, -shift, 0, 0, 0.3);
+  // Recover the knee/foot bones toward base. The jump deform bends
+  // BOTH upper legs and foot (knee) bones; without a reset here the
+  // foot bones keep their last bend after `s` decays to 0 and Korra
+  // visibly hovers in a half-landed pose until walking re-targets
+  // them. Walk does retarget all four foot bones (see
+  // applyKorraProceduralRun) so this only matters in the idle path.
+  _korraApply(korraBones.lfFoot, korraBase.lfFoot, 0, 0, 0, 0.3);
+  _korraApply(korraBones.rfFoot, korraBase.rfFoot, 0, 0, 0, 0.3);
+  _korraApply(korraBones.lbFoot, korraBase.lbFoot, 0, 0, 0, 0.3);
+  _korraApply(korraBones.rbFoot, korraBase.rbFoot, 0, 0, 0, 0.3);
+  // Same story for hips. The jump-charge phase pitches hips by -0.30
+  // X (rear-end dip) via _applyKorraJumpLegs. Korra has no baked
+  // clips, so the mixer never resets hips between frames; once the
+  // dip is applied the bone holds that pose forever. Walk recovers it
+  // (applyKorraProceduralRun slerps hips by 0.45 each frame), but in
+  // skate mode the walk pass is gated off — so on the skateboard the
+  // back stays angled up at the shoulders for the rest of the run.
+  // Pull hips toward base here so idle restores it after every jump.
+  // Jump-deform runs after this, so an active charge still wins.
+  _korraApply(korraBones.hips, korraBase.hips, 0, 0, 0, 0.3);
 }
 
 /** Korra breathing squish — gentle chest expansion. */
