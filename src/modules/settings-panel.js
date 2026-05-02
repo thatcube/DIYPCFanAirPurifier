@@ -240,17 +240,22 @@ const CONTROLS = [
 ];
 
 // Keyboard reference (read-only) — sits at the bottom of the Controls tab.
+// Split into general and skate-specific sections so the skate group mirrors
+// the in-game skate onboarding dialog (Get on/off, Kickflip, Manual, Spin).
 const KEYBOARD_REF = [
   { keys: ['W','A','S','D'], desc: 'Move' },
   { keys: ['Space'], desc: 'Jump (hold)' },
   { keys: ['Shift'], desc: 'Sprint' },
   { keys: ['V'], desc: 'Camera' },
-  { keys: ['K'], desc: 'Skate mode' },
-  { keys: ['Q'], desc: 'Kickflip (skate)' },
-  { keys: ['E'], desc: 'Manual (skate)' },
-  { keys: ['F'], desc: 'Helicopter (skate)' },
   { keys: ['R'], desc: 'Reset run' },
   { keys: ['Esc'], desc: 'Resume' },
+];
+
+const KEYBOARD_REF_SKATE = [
+  { keys: ['K'], desc: 'Get on / off the board' },
+  { keys: ['Q'], desc: 'Kickflip' },
+  { keys: ['E'], desc: 'Manual / wheelie' },
+  { keys: ['F'], desc: 'Board spin' },
 ];
 
 // ────────────────────────────────────────────────────────────────────
@@ -318,17 +323,25 @@ function _renderRow(c) {
   return '';
 }
 
-function _renderKeyboardRef() {
-  const rows = KEYBOARD_REF.map(({ keys, desc }) => {
+function _renderKbdGroup(entries) {
+  return entries.map(({ keys, desc }) => {
     const kbds = keys.map(k => `<kbd>${_esc(k)}</kbd>`).join('');
     return `<div>${kbds} ${_esc(desc)}</div>`;
   }).join('');
-  // Single data-search blob covers the whole keyboard reference.
-  const searchBlob = KEYBOARD_REF.map(r => `${r.keys.join(' ')} ${r.desc}`).join(' ').toLowerCase();
+}
+
+function _renderKeyboardRef() {
+  const generalRows = _renderKbdGroup(KEYBOARD_REF);
+  const skateRows = _renderKbdGroup(KEYBOARD_REF_SKATE);
+  // Single data-search blob covers the whole keyboard reference (both groups).
+  const allEntries = KEYBOARD_REF.concat(KEYBOARD_REF_SKATE);
+  const searchBlob = allEntries.map(r => `${r.keys.join(' ')} ${r.desc}`).join(' ').toLowerCase();
   return `
-    <div class="settings-keyboard-ref" data-search="${_esc('keyboard shortcuts ' + searchBlob)}" data-row="keyboard-ref">
+    <div class="settings-keyboard-ref" data-search="${_esc('keyboard shortcuts skate skateboard ' + searchBlob)}" data-row="keyboard-ref">
       <h3 class="pause-section-title"><i class="ph ph-keyboard"></i> Keyboard</h3>
-      <div class="pause-controls">${rows}</div>
+      <div class="pause-controls">${generalRows}</div>
+      <h3 class="pause-section-title pause-section-title--sub"><span class="pause-section-emoji" aria-hidden="true">🛹</span> Skateboard</h3>
+      <div class="pause-controls">${skateRows}</div>
       <button class="pause-link pause-link--footer" type="button"
         onclick="window._enterInspector&&window._enterInspector()">
         <i class="ph ph-magnifying-glass"></i> Inspect air purifier
@@ -350,12 +363,20 @@ function _renderTabPage(tab) {
 }
 
 function _renderRail() {
-  const tabs = TABS.map((t, i) => `
+  const tabs = TABS.map((t, i) => {
+    // Render both regular + fill icon variants and let CSS pick the
+    // matching one for active state — same pattern as site-tab on
+    // home/about/leaderboard so the fill glyph's optical alignment
+    // doesn't shift the label on tab change.
+    const iconBase = String(t.icon).replace(/^ph(-fill)?\s+/, '');
+    return `
     <button class="settings-tab${i === 0 ? ' is-active' : ''}" role="tab"
       aria-selected="${i === 0 ? 'true' : 'false'}" data-tab="${_esc(t.id)}">
-      <i class="${_esc(t.icon)}" aria-hidden="true"></i>
+      <i class="settings-tab__icon settings-tab__icon--regular ph ${_esc(iconBase)}" aria-hidden="true"></i>
+      <i class="settings-tab__icon settings-tab__icon--fill ph-fill ${_esc(iconBase)}" aria-hidden="true"></i>
       <span>${_esc(t.label)}</span>
-    </button>`).join('');
+    </button>`;
+  }).join('');
   return `
     <nav class="settings-rail" role="tablist" aria-orientation="vertical">
       <div class="settings-tab-indicator" aria-hidden="true"></div>

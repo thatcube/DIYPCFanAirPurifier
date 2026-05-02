@@ -762,6 +762,18 @@ export function spawnSecretMiniSplitCoin() {
     new THREE.Vector3(-17, fy + 53, -55), {});
 }
 
+// Spawned the first time the player turns every individual fan off.
+// Sits on top of the Nintendo Switch tablet docked above the air
+// purifier. Purifier world center (45, 0, -68) rotated 90° on Y; the
+// Switch group is at local z=-6 → world X=39. Tablet top Y in world =
+// state.H/2 + state.ply + (notch 0.75) + swH (4.7) ≈ 15.795. Coin
+// floats 2.5" above the tablet so it reads as resting on it.
+export function spawnSecretFansOffCoin() {
+  const swTopY = state.H / 2 + state.ply + 0.75 + 4.7;
+  _spawnSecretIfUntriggered('fansOff', _coinGroup,
+    new THREE.Vector3(39, swTopY + 2.5, -68), {});
+}
+
 // Shift basePos.y of every active coin tagged onStandingDesk. Called from
 // the standing-desk raise/lower lerp so the coin rides on the desktop.
 export function nudgeStandingDeskCoins(deltaY) {

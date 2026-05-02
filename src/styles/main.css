@@ -2719,7 +2719,7 @@ line-height: 1;
 
 .pause-link--footer {
   margin-top: 10px;
-  font-size: 10px;
+  font-size: 11px;
   color: rgba(220, 240, 255, 0.65);
 }
 
@@ -2739,7 +2739,7 @@ line-height: 1;
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: var(--weight-bold);
   letter-spacing: var(--type-tracking-wide);
   text-transform: uppercase;
@@ -2751,8 +2751,20 @@ line-height: 1;
 }
 
 .pause-section-title i {
-  font-size: 12px;
+  font-size: 13px;
   color: rgba(159, 227, 255, 0.95);
+}
+
+.pause-section-title .pause-section-emoji {
+  font-size: 15px;
+  line-height: 1;
+}
+
+/* Sub-section header inside the keyboard reference (e.g. Skate group
+   under the main Keyboard header). Adds breathing room above so the
+   group reads as distinct without introducing a second card. */
+.pause-section-title--sub {
+  margin-top: 20px;
 }
 
 .pause-section--kbd {
@@ -2819,7 +2831,14 @@ line-height: 1;
 /* ─── Toggle rows (audio + display) ─── */
 .pause-toggles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  /* Bumped min from 170→220px after the label bump to 13px. At the
+     pause card's max-width (680px), the prior 170px min squeezed labels
+     into 3 narrow columns where 13px copy wrapped to 2–3 lines
+     ("Outside window sunlight", "Cat animation stack"). 220px min
+     gives the auto-fit layout enough headroom to land on 2 wider
+     columns at typical card widths, so most labels fit on a single
+     line; 3-col only kicks in on ultra-wide viewports. */
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 8px;
 }
 
@@ -2827,15 +2846,15 @@ line-height: 1;
   display: flex;
   align-items: center;
   gap: 8px;
-  /* Light, mostly transparent surface \u2014 same recipe as the unselected
+  /* Light, mostly transparent surface — same recipe as the unselected
      .char-card tiles on the character picker: a whisper of white tint
      and a slim inset top highlight so each row reads as its own glass
      pane on the card without flattening into a dark slab. */
   background-color: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--glass-border);
   border-radius: var(--r-sm);
-  padding: 6px 12px;
-  font-size: 11px;
+  padding: 8px 12px;
+  font-size: 13px;
   color: rgba(225, 240, 255, 0.95);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   min-width: 0;
@@ -2852,7 +2871,11 @@ line-height: 1;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 13px;
+  /* Tighten leading so the occasional 2-line wrap (e.g. "Cat animation
+     stack") reads as a deliberate two-liner instead of a tall hollow
+     row. Default 1.45 was too airy for a settings grid. */
+  line-height: 1.25;
   color: rgba(225, 240, 255, 0.95);
 }
 
@@ -2871,7 +2894,7 @@ line-height: 1;
 .pause-toggle-state {
   /* Sit flush against the toggle/slider — no padded text box. */
   text-align: right;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: var(--weight-semibold);
   letter-spacing: 0.02em;
   color: rgba(225, 240, 255, 0.98);
@@ -2906,15 +2929,14 @@ line-height: 1;
   grid-column: 1;
   grid-row: 1;
   min-width: 0;
-  /* Keep the label on a single line when there's room — wrapping
-     into two lines (which used to happen for "FP shadow cadence" +
-     "Every 84 ms") makes the row look jank. If the label genuinely
-     can't fit, ellipsize instead so the value column never gets
-     pushed off-center. The tooltip/aria-label still carries the
-     full text. */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Allow long slider labels (e.g. "FP shadow cadence") to wrap to a
+     second line rather than ellipsizing. After the row label bump to
+     13px and the grid widen to minmax(220px), most labels fit on one
+     line; the rare 2-liner reads cleanly thanks to the 1.25 leading
+     on .pause-toggle-label. The previous nowrap+ellipsis approach
+     truncated "Shadow cadence" mid-word, which is worse than wrap. */
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .pause-toggle-row--slider .pause-toggle-state {
@@ -3009,8 +3031,11 @@ line-height: 1;
 .pause-controls {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  font-size: 10px;
+  /* row-gap × column-gap. Vertical was 4px which crowded the kbd
+     glyphs against neighbouring rows; 8px gives the keys room to
+     breathe without making the section feel sparse. */
+  gap: 8px 16px;
+  font-size: 12px;
   /* Bumped from 0.45 → 0.82 — the keyboard reference was nearly
      invisible against the live scene. Same contrast push as
      #fpChargeBar's hint labels. */
@@ -3022,10 +3047,27 @@ line-height: 1;
   background: rgba(255, 255, 255, 0.14);
   border-radius: 3px;
   padding: 1px 5px;
-  font-size: 9px;
+  font-size: 11px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   color: rgba(225, 240, 255, 0.98);
   font-weight: var(--weight-semibold);
+  /* Single-letter keys (W, R, V, K, E, Q, F …) render at slightly
+     different widths because the body font is proportional. A
+     min-width with center-aligned text gives every 1-char kbd the
+     same visual footprint, so the W A S D run reads as a row of
+     equal tiles instead of an irregular ladder. Multi-char keys
+     (Shift, Space, Esc) auto-grow past the min-width. */
+  min-width: 18px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* Adjacent <kbd> siblings (W A S D) render with no whitespace
+   between them, so they touched edge-to-edge. A small left margin
+   on every kbd-after-kbd separates the glyphs without affecting the
+   kbd→label spacing (handled by the literal space in row markup). */
+.pause-controls kbd + kbd {
+  margin-left: 3px;
 }
 
 /* ─── Settings panel (shared between pause + home) ──────────────── */
@@ -3092,7 +3134,7 @@ line-height: 1;
   /* WCAG: this icon is decorative, but bump alpha so it still reads
      against light scene backdrops behind the glass card. */
   color: rgba(159, 227, 255, 0.95);
-  font-size: 14px;
+  font-size: 15px;
   flex-shrink: 0;
 }
 
@@ -3109,7 +3151,7 @@ line-height: 1;
   box-shadow: none;
   color: rgba(225, 240, 255, 0.98);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   padding: 2px 0;
   caret-color: var(--accent);
 }
@@ -3155,7 +3197,7 @@ line-height: 1;
 /* Body: rail (left) + pages (right). */
 .settings-body {
   display: grid;
-  grid-template-columns: 132px 1fr;
+  grid-template-columns: 144px 1fr;
   gap: 12px;
   min-height: 0;
   align-items: start;
@@ -3202,8 +3244,8 @@ line-height: 1;
      line-height: 1 collapses the font's half-leading so flex
      align-items: center actually centers the glyphs, not a
      leading-padded line box. */
-  height: 32px;
-  padding: 0 10px;
+  height: 36px;
+  padding: 0 12px;
   background: transparent;
   border: none;
   border-radius: var(--r-sm);
@@ -3212,9 +3254,13 @@ line-height: 1;
      while clearing WCAG AA (~4.5:1) on the worst-case glass surface. */
   color: rgba(225, 240, 255, 0.86);
   font-family: inherit;
-  font-size: 12px;
+  /* Rail tabs are navigation — they should read as the loudest text on
+     the rail. After the option-label bump to 13px, 12px tabs felt
+     drowned out by the dense toggle grid. Bump to 14px semibold so
+     the rail's hierarchy survives next to a busy options column. */
+  font-size: 14px;
   line-height: 1;
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-semibold);
   text-align: left;
   cursor: pointer;
   transition: color var(--dur-fast) var(--ease-out-expo),
@@ -3222,8 +3268,32 @@ line-height: 1;
 }
 
 .settings-tab i {
-  font-size: 13px;
+  font-size: 15px;
   color: rgba(159, 227, 255, 0.95);
+}
+
+/* Nudge the label text down 3px so it sits visually centered against
+   the icon — Phosphor glyphs render slightly above their baseline at
+   this size, leaving the label looking top-heavy without the offset. */
+.settings-tab > span {
+  padding-top: 3px;
+}
+
+/* Each tab renders both icon variants (regular + fill); CSS picks the
+   one that matches the active state. Stacking both glyphs in the same
+   inline slot avoids the tiny optical jiggle Phosphor's fill weight
+   has against its regular weight on certain icons. Same pattern as
+   .site-tab on the top-level pages. */
+.settings-tab .settings-tab__icon--fill {
+  display: none;
+}
+
+.settings-tab.is-active .settings-tab__icon--regular {
+  display: none;
+}
+
+.settings-tab.is-active .settings-tab__icon--fill {
+  display: inline-block;
 }
 
 .settings-tab:hover {
@@ -3410,7 +3480,10 @@ line-height: 1;
 /* Keyboard reference block at the bottom of the Controls tab. */
 .settings-keyboard-ref {
   margin-top: 14px;
-  padding-top: 12px;
+  /* 20px above the Keyboard header matches the breathing room added
+     above the Skateboard sub-header (.pause-section-title--sub), so
+     both groups read with the same vertical rhythm. */
+  padding-top: 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   text-align: left;
 }

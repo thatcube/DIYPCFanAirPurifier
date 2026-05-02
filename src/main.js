@@ -25,6 +25,7 @@ import * as spatial from './modules/spatial.js';
 import * as gameFp from './modules/game-fp.js';
 import * as fireball from './modules/fireball.js';
 import * as kamehameha from './modules/kamehameha.js';
+import * as posterFireball from './modules/poster-fireball.js';
 import { createRoom } from './modules/room.js';
 import * as purifier from './modules/purifier.js';
 import { createPurifier } from './modules/purifier.js';
@@ -550,6 +551,21 @@ kamehameha.init({
 // or fireball. Doing it here moves all that work to load time.
 try { fireball.prewarm(renderer); } catch (e) { }
 try { kamehameha.prewarm(renderer); } catch (e) { }
+
+// Poster-fireball — clicking the avatar painting drops a literal
+// fireball that the player picks up to unlock the F-key ability.
+// Built at load time so the first drop animation has zero compile hitch.
+posterFireball.init({
+  scene,
+  camera,
+  roomRefs,
+  floorY: spatial.getFloorY(),
+  showToast: (msg) => { try { showToast(msg); } catch (e) { console.log(msg); } }
+});
+try { posterFireball.prewarm(renderer); } catch (e) { }
+window._handleAvatarPosterClick = () => posterFireball.handlePosterClick();
+window._collectPickupFireball = () => posterFireball.handlePickupClick();
+window._posterFireball = posterFireball;
 // Surface persisted unlock immediately so the HUD/button reflect it
 // on a fresh page load, without waiting for fans to be turned off.
 setTimeout(() => { _updateFireballBtnVisibility(); }, 0);
@@ -1330,24 +1346,21 @@ window._exitInspector = () => {
 let _inspectorTick = null;
 
 
-// ── Fireball unlock ─────────────────────────────────────────────────
-// Unlocks ONLY when every visible fan rotor has been individually
-// toggled off (click each fan in the 3D scene). The global spin
-// toggle / speed slider are deliberately ignored.
+// ── Fans-off secret coin spawn ───────────────────────────────────────
+// Turning every visible fan rotor off used to unlock the fireball, but
+// it's such an obscure interaction that almost no one discovered it.
+// Now it just spawns a hidden blue coin on top of the Switch dock —
+// still a wink for fan-tinkerers, but no longer the only path to the
+// fireball ability (the avatar poster drops one when interacted with).
 function _checkFanOffUnlock() {
-  if (fireball.isUnlocked()) {
-    _updateFireballBtnVisibility();
-    return;
-  }
   if (purifierRefs.areAllFansIndividuallyOff && purifierRefs.areAllFansIndividuallyOff()) {
-    fireball.setUnlocked(true);
-    showToast('🔥 Fireball unlocked! Press F (or tap the button) in game mode.');
-    _updateFireballBtnVisibility();
+    coins.spawnSecretFansOffCoin();
   }
+  _updateFireballBtnVisibility();
 }
 
-// Poll for unlock — fans are toggled by clicking individual rotors in
-// the 3D scene, which doesn't go through any of our window wrappers.
+// Poll for the trigger — fans are toggled by clicking individual rotors
+// in the 3D scene, which doesn't go through any of our window wrappers.
 setInterval(_checkFanOffUnlock, 500);
 
 // Expose for debugging from the console.
@@ -2199,6 +2212,9 @@ function animate(ts) {
     fireball.update(dtSec);
     kamehameha.update(dtSec);
   }
+  // Poster-fireball drop animation + idle bob — cheap; runs unconditionally
+  // so the dropped pickup keeps glowing even when abilities are paused.
+  posterFireball.update(dtSec);
 
   // Shadow throttle — update on dirty flag OR periodically.
   // In FP (game) mode: update EVERY frame. Throttling at 8 Hz while

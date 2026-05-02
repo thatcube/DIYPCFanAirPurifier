@@ -2450,6 +2450,187 @@ export function createRoom(scene) {
       // World-space (post-mirror) desktop top surface; coin uses this.
       getDeskTopWorldY() { return deskTopY + deskTopH / 2 + this.rise; },
     };
+
+    // ── Herman Miller Aeron chair (Size B, Graphite) ──────────────
+    // Graphite finish: ENTIRE frame (base, yokes, arms, tilt housing)
+    // is matte black plastic — only the gas-lift cylinder shows metal.
+    // Pre-mirror, chair sits in front of the desk facing +X. The
+    // backrest curves around the user (concave toward +X) using 3
+    // angled mesh segments; the iconic Y-frame yoke sits behind it.
+    {
+      const chairX = deskX - deskD / 2 - 22;        // 22" between desk front and seat center
+      const chairZ = deskZ;                          // centered on desk
+      const frameBlack   = 0x16181c;                 // graphite frame/base/arms
+      const meshGraphite = 0x2c2e32;                 // pellicle mesh
+      const aluminum     = 0xb4b7bb;                 // gas-lift cylinder only
+      const casterRubber = 0x111114;
+
+      // Aeron Size B-ish proportions — narrower than v1.
+      const seatTopY  = floorY + 19;
+      const seatThick = 1.6;
+      const seatDepth = 17;                          // X axis (front-back)
+      const seatWidth = 19;                          // Z axis (side-to-side)
+      const backH     = 22;                          // backrest height above seat
+
+      // ─ 5-star black plastic base + casters ─
+      const starArmLen = 11;
+      const starInnerR = 2.4;
+      const baseBottomY = floorY + 2.4;              // top of casters
+      const baseTopY = baseBottomY + 1.4;
+      const baseMat = new THREE.MeshStandardMaterial({ color: frameBlack, roughness: 0.55, metalness: 0.18 });
+      // Hub
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(starInnerR, starInnerR + 0.6, 2.4, 18), baseMat);
+      hub.position.set(chairX, baseBottomY + 1.2, chairZ);
+      hub.castShadow = true; hub.receiveShadow = true;
+      hub._isRoom = true; hub._isOffice = true;
+      addRoom(hub);
+      // 5 tapered arms at 72° intervals (offset so no arm points along ±X)
+      for (let i = 0; i < 5; i++) {
+        const ang = i * (Math.PI * 2 / 5) + Math.PI / 5;
+        const arm = new THREE.Mesh(
+          new THREE.BoxGeometry(starArmLen, 1.4, 2.0),
+          baseMat.clone()
+        );
+        arm.position.set(
+          chairX + Math.cos(ang) * (starInnerR + starArmLen / 2 - 0.6),
+          baseBottomY + 0.7,
+          chairZ + Math.sin(ang) * (starInnerR + starArmLen / 2 - 0.6)
+        );
+        arm.rotation.y = -ang;
+        arm.castShadow = true; arm.receiveShadow = true;
+        arm._isRoom = true; arm._isOffice = true;
+        addRoom(arm);
+        // Caster (rubber tire on its side)
+        const tipX = chairX + Math.cos(ang) * (starInnerR + starArmLen - 0.4);
+        const tipZ = chairZ + Math.sin(ang) * (starInnerR + starArmLen - 0.4);
+        const caster = new THREE.Mesh(
+          new THREE.CylinderGeometry(1.1, 1.1, 1.4, 12),
+          new THREE.MeshStandardMaterial({ color: casterRubber, roughness: 0.6, metalness: 0.2 })
+        );
+        caster.rotation.x = Math.PI / 2;
+        caster.rotation.z = -ang;
+        caster.position.set(tipX, floorY + 1.1, tipZ);
+        caster.castShadow = true; caster.receiveShadow = true;
+        caster._isRoom = true; caster._isOffice = true;
+        addRoom(caster);
+      }
+
+      // ─ Pneumatic gas-lift cylinder (only visible metal) ─
+      const liftBotY = baseTopY;
+      const liftTopY = seatTopY - seatThick - 3.2;
+      const lift = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.85, 1.0, liftTopY - liftBotY, 14),
+        new THREE.MeshStandardMaterial({ color: aluminum, roughness: 0.28, metalness: 0.88 })
+      );
+      lift.position.set(chairX, (liftBotY + liftTopY) / 2, chairZ);
+      lift.castShadow = true; lift.receiveShadow = true;
+      lift._isRoom = true; lift._isOffice = true;
+      addRoom(lift);
+
+      // ─ Tilt mechanism / control housing — black plastic ─
+      const tiltH = 3.2;
+      const tiltY = seatTopY - seatThick - tiltH / 2;
+      roomBox(seatDepth - 4, tiltH, seatWidth - 6, frameBlack,
+        chairX, tiltY, chairZ, 0, 0, 0)._isOffice = true;
+      // Forward control levers (small black bumps under the seat front)
+      for (const sideL of [-1, 1]) {
+        roomBox(2.6, 0.9, 0.9, frameBlack,
+          chairX + 4.5, tiltY - 0.4, chairZ + sideL * 4.5, 0, 0, 0)._isOffice = true;
+      }
+
+      // ─ Seat pan — curved waterfall via 3 forward-tilting mesh segments ─
+      // Black perimeter trim wraps the mesh.
+      const seatSegCount = 3;
+      const segDX = seatDepth / seatSegCount;
+      for (let i = 0; i < seatSegCount; i++) {
+        const t = i / (seatSegCount - 1);             // 0=back, 1=front
+        const downTilt = t * 0.18;                    // forward droop
+        const segCX = chairX - seatDepth / 2 + segDX / 2 + i * segDX;
+        const segCY = seatTopY - seatThick / 2 - t * 0.45;
+        const seg = roomBox(segDX, seatThick, seatWidth - 0.6, meshGraphite,
+          segCX, segCY, chairZ, 0, 0, downTilt);
+        seg._isOffice = true;
+        seg.material.roughness = 0.92;
+      }
+      // Seat perimeter — black trim
+      const trimT = 0.5;
+      // back lip
+      roomBox(trimT, seatThick + 0.4, seatWidth + 0.2, frameBlack,
+        chairX - seatDepth / 2 + trimT / 2, seatTopY - seatThick / 2, chairZ, 0, 0, 0)._isOffice = true;
+      // front lip (drooped, matches waterfall)
+      roomBox(trimT * 1.4, seatThick + 0.5, seatWidth + 0.2, frameBlack,
+        chairX + seatDepth / 2 - trimT / 2, seatTopY - seatThick / 2 - 0.45, chairZ, 0, 0, 0.18)._isOffice = true;
+      // side rails
+      for (const sideS of [-1, 1]) {
+        roomBox(seatDepth, seatThick + 0.4, trimT, frameBlack,
+          chairX, seatTopY - seatThick / 2 - 0.2,
+          chairZ + sideS * (seatWidth / 2 + trimT / 2 - 0.3), 0, 0, 0)._isOffice = true;
+      }
+
+      // ─ Curved backrest — 3 angled mesh segments (concave toward +X) ─
+      const backX = chairX - seatDepth / 2 + 1;
+      const backThick = 1.0;
+      const backW = seatWidth - 0.6;
+      const backCY = seatTopY + backH / 2 + 1;
+      const backSegCount = 3;
+      const backSegW = backW / backSegCount;
+      for (let i = 0; i < backSegCount; i++) {
+        const tZ = i - 1;                              // -1, 0, 1
+        const segZ = chairZ + tZ * backSegW;
+        // Outer segments yaw inward; pushed back so the curve isn't flat.
+        const yaw = tZ * 0.18;
+        const xOffset = Math.abs(tZ) * 0.7;
+        const seg = roomBox(backThick, backH, backSegW + 0.15, meshGraphite,
+          backX - xOffset, backCY, segZ, 0, yaw, 0);
+        seg._isOffice = true;
+        seg.material.roughness = 0.94;
+      }
+
+      // ─ Iconic Y-frame yoke (visible from rear) — all black plastic ─
+      // Two side rails come up from the bottom yoke and splay outward at
+      // the top, joined by a top yoke. A center vertical spine bisects
+      // the back, forming the recognizable "Y" silhouette.
+      const yokeFront = backThick + 1.0;              // protrudes back from mesh
+      const yokeX = backX - backThick / 2 - yokeFront / 2 + 0.2;
+      // Bottom yoke
+      roomBox(yokeFront, 1.3, backW + 1.6, frameBlack,
+        yokeX, seatTopY + 0.7, chairZ, 0, 0, 0)._isOffice = true;
+      // Top yoke — slightly wider for the splay
+      roomBox(yokeFront, 1.4, backW + 3.2, frameBlack,
+        yokeX, seatTopY + backH + 0.8, chairZ, 0, 0, 0)._isOffice = true;
+      // Side rails — lower (vertical) + upper (splayed outward)
+      for (const sideR of [-1, 1]) {
+        const lowerH = backH * 0.5;
+        roomBox(yokeFront * 0.8, lowerH, 1.3, frameBlack,
+          yokeX + 0.2, seatTopY + 1.4 + lowerH / 2,
+          chairZ + sideR * (backW / 2 - 0.6), 0, 0, 0)._isOffice = true;
+        const upperH = backH * 0.5;
+        const upperZ = chairZ + sideR * (backW / 2 + 1.0);
+        roomBox(yokeFront * 0.8, upperH, 1.3, frameBlack,
+          yokeX + 0.2, seatTopY + 1.4 + lowerH + upperH / 2 - 1.2,
+          upperZ, 0, 0, sideR * -0.06)._isOffice = true;
+      }
+      // Center vertical spine — the Y-stem
+      roomBox(yokeFront * 0.7, backH * 0.55, 1.6, frameBlack,
+        yokeX + 0.3, seatTopY + 1.4 + backH * 0.275, chairZ, 0, 0, 0)._isOffice = true;
+
+      // ─ Armrests ─
+      // Vertical post + L-bend + horizontal pad. All black.
+      const armPostBottomY = seatTopY - seatThick - tiltH;
+      const armPadY = seatTopY + 7.5;
+      for (const sideA of [-1, 1]) {
+        const armZ = chairZ + sideA * (seatWidth / 2 + 1.4);
+        // Vertical post — pulled toward back of seat
+        roomBox(1.6, armPadY - armPostBottomY, 1.4, frameBlack,
+          chairX - 3, (armPostBottomY + armPadY) / 2, armZ, 0, 0, 0)._isOffice = true;
+        // L-bend connector
+        roomBox(2.4, 1.3, 1.4, frameBlack,
+          chairX - 1.8, armPadY - 0.65, armZ, 0, 0, 0)._isOffice = true;
+        // Pad
+        roomBox(8, 1.0, 2.4, frameBlack,
+          chairX, armPadY + 0.5, armZ, 0, 0, 0)._isOffice = true;
+      }
+    }
   }
 
   // Book stack — between mug and lamp
@@ -4066,6 +4247,7 @@ export function createRoom(scene) {
   // is 930×1280 (portrait, ~0.726:1). Matte and photo sit flat against
   // the wall; the wood frame is a raised lip around them. Mirrors the
   // Gyarados painting in the office, but oriented to face +X.
+  let _avatarPosterCenter = null;  // pre-mirror local pos; mirrored when read
   {
     const photoW = 12;
     const photoH = 12 * (1280 / 930);   // matches source aspect ratio (~16.52)
@@ -4094,7 +4276,7 @@ export function createRoom(scene) {
         frameMat);
       m.position.set(lipX, centerY + matteH / 2 + frameBorder / 2, centerZ);
       m.castShadow = true; m.receiveShadow = true;
-      m._isRoom = true; addRoom(m);
+      m._isRoom = true; m._isAvatarPoster = true; addRoom(m);
     }
     // Bottom lip
     {
@@ -4103,7 +4285,7 @@ export function createRoom(scene) {
         frameMat);
       m.position.set(lipX, centerY - matteH / 2 - frameBorder / 2, centerZ);
       m.castShadow = true; m.receiveShadow = true;
-      m._isRoom = true; addRoom(m);
+      m._isRoom = true; m._isAvatarPoster = true; addRoom(m);
     }
     // -Z lip
     {
@@ -4112,7 +4294,7 @@ export function createRoom(scene) {
         frameMat);
       m.position.set(lipX, centerY, centerZ - matteW / 2 - frameBorder / 2);
       m.castShadow = true; m.receiveShadow = true;
-      m._isRoom = true; addRoom(m);
+      m._isRoom = true; m._isAvatarPoster = true; addRoom(m);
     }
     // +Z lip
     {
@@ -4121,7 +4303,7 @@ export function createRoom(scene) {
         frameMat);
       m.position.set(lipX, centerY, centerZ + matteW / 2 + frameBorder / 2);
       m.castShadow = true; m.receiveShadow = true;
-      m._isRoom = true; addRoom(m);
+      m._isRoom = true; m._isAvatarPoster = true; addRoom(m);
     }
 
     // White matte — sits ~0.05" off the wall, fills the inside of the lip.
@@ -4135,7 +4317,7 @@ export function createRoom(scene) {
     matte.rotation.y = Math.PI / 2;   // face +X (room interior)
     matte.position.set(wallFaceX + 0.05, centerY, centerZ);
     matte.receiveShadow = true;
-    matte._isRoom = true;
+    matte._isRoom = true; matte._isAvatarPoster = true;
     addRoom(matte);
 
     // Photo — smaller plane just in front of the matte; matte border
@@ -4150,7 +4332,7 @@ export function createRoom(scene) {
     photo.rotation.y = Math.PI / 2;   // face +X (room interior)
     photo.position.set(wallFaceX + 0.07, centerY, centerZ);
     photo.receiveShadow = true;
-    photo._isRoom = true;
+    photo._isRoom = true; photo._isAvatarPoster = true;
     addRoom(photo);
 
     new THREE.TextureLoader().load(
@@ -4183,8 +4365,27 @@ export function createRoom(scene) {
     );
     sheen.rotation.y = Math.PI / 2;   // face +X (room interior)
     sheen.position.set(wallFaceX + 0.09, centerY, centerZ);
-    sheen._isRoom = true;
+    sheen._isRoom = true; sheen._isAvatarPoster = true;
     addRoom(sheen);
+
+    // Capture poster position so external systems (poster-fireball drop
+    // animation, label tooltip) know where the painting hangs without
+    // re-deriving the math. Stored in WORLD (post-mirror) coords because
+    // the room's _isRoom X-flip happens later in this function and
+    // readers expect world positions.
+    _avatarPosterCenter = {
+      // World (post-mirror) center of the framed photo. The painting
+      // faces -X (interior) once mirrored, so spawn things slightly in
+      // front of `x` along -X.
+      x: -(wallFaceX + 0.5),                  // ≈ +80.25
+      y: centerY,
+      z: centerZ,
+      // Front face X (just outside the wood lip) for spawn anchoring.
+      faceX: -(wallFaceX + lipDepth + 0.05),  // ≈ +79.6
+      // Painting bounding box (world Y/Z) for sizing the click hitbox.
+      halfH: matteH / 2 + frameBorder,
+      halfZ: matteW / 2 + frameBorder
+    };
   }
 
   // Ceiling light fixture — flush-mount dome with warm SpotLight
@@ -5093,6 +5294,10 @@ export function createRoom(scene) {
     grWinTop: typeof grWinTop !== 'undefined' ? grWinTop : 0,
     grWinLeft: typeof grWinLeft !== 'undefined' ? grWinLeft : 0,
     grWinRight: typeof grWinRight !== 'undefined' ? grWinRight : 0,
-    standingDesk: _standingDeskRef
+    standingDesk: _standingDeskRef,
+    // Avatar painting (window-wall) — poster-fireball reads this to know
+    // where to spawn its drop animation. Pre-mirror Y/Z; X is mirrored
+    // by main.js / readers (the room's parent group flips X).
+    avatarPoster: _avatarPosterCenter
   };
 }

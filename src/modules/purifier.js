@@ -2016,7 +2016,7 @@ export function createPurifier(scene) {
   function getInteractiveTarget(obj){
     let p=obj;
     while(p){
-      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isBypassPanel||p._isCornerDoorHandle||p._isCornerDoor||p._isGuestDoor||p._isGuestDoorHandle||p._isMacbook||p._isWindow||p._isWindowPane||p._isTV||p._isFoodBowl||p._isPickupSkateboard||p._isPokemonBinder||p._isStandingDesk||p._isMiniSplit) return p;
+      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isBypassPanel||p._isCornerDoorHandle||p._isCornerDoor||p._isGuestDoor||p._isGuestDoorHandle||p._isMacbook||p._isWindow||p._isWindowPane||p._isTV||p._isFoodBowl||p._isPickupSkateboard||p._isPickupFireball||p._isAvatarPoster||p._isPokemonBinder||p._isStandingDesk||p._isMiniSplit) return p;
       p=p.parent;
     }
     return null;
@@ -2247,6 +2247,17 @@ export function createPurifier(scene) {
     // Clicked pickup skateboard
     if(obj._isPickupSkateboard){
       if(window._collectPickupSkateboard) window._collectPickupSkateboard();
+      return;
+    }
+    // Clicked the floor fireball pickup (dropped from the avatar poster)
+    if(obj._isPickupFireball){
+      if(typeof window._collectPickupFireball === 'function') window._collectPickupFireball();
+      return;
+    }
+    // Clicked the avatar painting — first click drops a literal fireball
+    // out of the canvas; subsequent clicks deflect with quirky messages.
+    if(obj._isAvatarPoster){
+      if(typeof window._handleAvatarPosterClick === 'function') window._handleAvatarPosterClick();
       return;
     }
     // Clicked corner door (handle or panel — the whole leaf opens/closes)

@@ -59,16 +59,17 @@ export const CAT_MODEL_PRESETS = {
 
 // Canonical secret-coin IDs used by unlock/progress checks.
 //
-// `secret_pb3` is a placeholder left over from the retired ceiling-light
-// Power BI trio. It will be reassigned to a new interaction trigger
-// (alongside `secret_minisplit` and `secret_windowOpen`) in a future
-// session; until then it's intentionally unobtainable.
+// `secret_fansOff` spawns on top of the Switch dock (atop the air
+// purifier) the first time the player turns every individual fan off
+// — the old fireball-unlock trigger, repurposed into a discoverable
+// secret coin since the fireball ability now drops from the avatar
+// poster instead.
 export const SECRET_COIN_IDS = Object.freeze([
   'secret_binder',
   'secret_lamp',
   'secret_minisplit',
   'secret_windowOpen',
-  'secret_pb3',
+  'secret_fansOff',
   'secret_window',
   'secret_drawer',
   'secret_macbook',

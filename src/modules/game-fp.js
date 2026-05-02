@@ -1591,7 +1591,9 @@ function _findInteractiveAncestor(obj) {
       p._isCornerDoorHandle || p._isCornerDoor ||
       p._isGuestDoor || p._isGuestDoorHandle ||
       p._isMacbook || p._isWindow || p._isWindowPane || p._isTV || p._isFoodBowl ||
-      p._isPickupSkateboard || p._isPokemonBinder || p._isStandingDesk || p._isMiniSplit) return p;
+      p._isPickupSkateboard || p._isPickupFireball ||
+      p._isAvatarPoster ||
+      p._isPokemonBinder || p._isStandingDesk || p._isMiniSplit) return p;
   }
   return null;
 }
@@ -1658,6 +1660,8 @@ function _labelForInteractable(target) {
     if (p._isTV) return { verb: 'Toggle', noun: 'TV' };
     if (p._isFoodBowl) return { verb: 'Fill', noun: 'Food Bowl' };
     if (p._isPickupSkateboard) return { verb: 'Pick up', noun: 'Skateboard' };
+    if (p._isPickupFireball) return { verb: 'Pick up', noun: 'Fireball' };
+    if (p._isAvatarPoster) return { verb: 'Inspect', noun: 'Painting' };
     if (p._isPokemonBinder) {
       const isOpen = !!(p._pokemonBinderState && p._pokemonBinderState.open);
       return { verb: isOpen ? 'Close' : 'Open', noun: 'Pokémon Binder' };
@@ -2327,6 +2331,26 @@ function _spawnPickupSkateboard() {
     root.traverse((o) => {
       if (o.isMesh) _interactiveObjects.push(o);
     });
+
+    // Larger invisible click hitbox so the pickup is forgiving — the
+    // skateboard mesh itself is thin and easy to miss. The proxy is
+    // transparent (opacity 0) so _isOccluder() rejects it as a wall
+    // for other ray queries, but the click raycaster still hits it
+    // and resolves to _isPickupSkateboard via the ancestor walk.
+    const hitMat = new THREE.MeshBasicMaterial({
+      transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide
+    });
+    const skateHitbox = new THREE.Mesh(
+      new THREE.BoxGeometry(14, 8, 14),
+      hitMat
+    );
+    skateHitbox._isPickupSkateboard = true;
+    skateHitbox.userData.clickPassthrough = true;
+    skateHitbox.position.copy(root.position);
+    skateHitbox.position.y += 2;
+    _scene.add(skateHitbox);
+    root._hitbox = skateHitbox;
+    _interactiveObjects.push(skateHitbox);
   }, undefined, (err) => {
     console.warn('[game-fp] Pickup skateboard failed to load', err);
   });
@@ -2343,6 +2367,14 @@ function _collectPickupSkateboard() {
   // Remove sparkle glow
   if (_pickupSkateboardMesh._glowGroup) {
     _scene.remove(_pickupSkateboardMesh._glowGroup);
+  }
+
+  // Remove the larger invisible click hitbox if one was attached.
+  if (_pickupSkateboardMesh._hitbox) {
+    const hb = _pickupSkateboardMesh._hitbox;
+    const idx = _interactiveObjects.indexOf(hb);
+    if (idx >= 0) _interactiveObjects.splice(idx, 1);
+    _scene.remove(hb);
   }
 
   // Remove from interactive objects
@@ -2535,7 +2567,9 @@ export function init(refs) {
     if (obj._isLamp || obj._isCeilLight || obj._isFan || obj._isFilterL || obj._isFilterR ||
       obj._isDrawer || obj._isBifoldLeaf || obj._isBypassPanel || obj._isCornerDoorHandle || obj._isCornerDoor || obj._isWindow || obj._isWindowPane ||
       obj._isMacbook || obj._isTV || obj._isFoodBowl ||
-      obj._isGuestDoor || obj._isGuestDoorHandle || obj._isPickupSkateboard || obj._isPokemonBinder || obj._isMiniSplit) {
+      obj._isGuestDoor || obj._isGuestDoorHandle || obj._isPickupSkateboard || obj._isPickupFireball ||
+      obj._isAvatarPoster ||
+      obj._isPokemonBinder || obj._isMiniSplit) {
       _interactiveObjects.push(obj);
     }
   });
@@ -3235,6 +3269,42 @@ function _buildStaticBoxes() {
       xMin: -(gXmax + 2), xMax: -(gXmax), zMin: gwL, zMax: gwR,
       yTop: gwB, yBottom: gwB - 1, room: true
     });
+  }
+
+  // Aeron office chair in front of the desk. Pre-mirror (chairX=127, chairZ=27);
+  // world X is mirrored. Two boxes: a base/seat slab the player can stand
+  // on (yTop = seat top), and a thin backrest slab above it.
+  {
+    const chairX = 127, chairZ = 27;
+    const seatTopY = fy + 19;
+    const backTopY = fy + 19 + 22 + 1.5;
+    // Base + seat — covers 5-star base footprint, gas lift, seat, armrests,
+    // and trim. Seat is 17"D × 19"W; arms add ~3" to each side.
+    _staticBoxes.push({
+      xMin: -(chairX + 11), xMax: -(chairX - 10),
+      zMin: chairZ - 13, zMax: chairZ + 13,
+      yTop: seatTopY, yBottom: fy, room: true
+    });
+    // Backrest slab + Y-frame yoke (sticks back ~2" behind mesh).
+    const backX = chairX - 17 / 2 + 1; // matches room.js: chairX - seatDepth/2 + 1
+    _staticBoxes.push({
+      xMin: -(backX + 1) , xMax: -(backX - 2.5),
+      zMin: chairZ - 11, zMax: chairZ + 11,
+      yTop: backTopY, yBottom: seatTopY, room: true
+    });
+    // Armrests — one slab per side covering the vertical post + horizontal
+    // pad above the seat. Pad spans X = chairX±4, Z center = chairZ ±
+    // (seatWidth/2 + 1.4) = chairZ ± 10.9, depth 2.4. Block from seat
+    // surface up to top of pad so the player can't walk between seat and
+    // arm.
+    for (const sideA of [-1, 1]) {
+      const armCZ = chairZ + sideA * 10.9;
+      _staticBoxes.push({
+        xMin: -(chairX + 4), xMax: -(chairX - 4),
+        zMin: armCZ - 1.2, zMax: armCZ + 1.2,
+        yTop: seatTopY + 8, yBottom: seatTopY, room: true
+      });
+    }
   }
 }
 
