@@ -1,8 +1,8 @@
 {
-  "name": "diypcfanairpurifier",
+  "name": "zoomies",
   "version": "1.0.0",
   "private": true,
-  "description": "DIY PC fan air purifier interactive model with shared leaderboard backend",
+  "description": "Zoomies — three.js cat speedrun game with shared leaderboard backend",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
