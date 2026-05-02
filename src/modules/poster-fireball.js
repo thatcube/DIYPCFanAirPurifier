@@ -234,9 +234,16 @@ function _ensureBuilt() {
   _pickupGroup.add(_hazeMesh);
 
   // ── Soft point light so the pickup actually lights the floor ──────
-  _glowLight = new THREE.PointLight(0xff6a20, 90, 30, 1.8);
+  // Parented to the SCENE (not _pickupGroup) and kept always-visible
+  // with intensity=0 until the fireball actually drops. Toggling a
+  // light's effective visibility (via parent .visible) changes the
+  // active-light count, which forces three.js to recompile every PBR
+  // material in the room — a multi-frame hitch the user sees as the
+  // drop "lagging". Same trick fireball.js uses for its shared light.
+  _glowLight = new THREE.PointLight(0xff6a20, 0, 30, 1.8);
   _glowLight.castShadow = false;
-  _pickupGroup.add(_glowLight);
+  _glowLight.position.copy(_pickupTarget);
+  _scene.add(_glowLight);
 
   // ── Orbiting sparkle sprites (purely visual) ──────────────────────
   const sparkleMat = new THREE.SpriteMaterial({
@@ -292,6 +299,11 @@ function _startDrop() {
   _dropTo.copy(_pickupTarget);
   _pickupGroup.position.copy(_dropFrom);
   _pickupGroup.visible = true;
+  // Light is scene-parented; sync its position and turn it on.
+  if (_glowLight) {
+    _glowLight.position.copy(_dropFrom);
+    _glowLight.intensity = 90;
+  }
   // Smaller during flight, scales up as it lands so the impact feels
   // like the fireball "settles" once it touches the floor.
   _pickupGroup.scale.setScalar(0.7);
@@ -311,12 +323,15 @@ function _tickDrop(dtSec) {
   const linY = _dropFrom.y + (_dropTo.y - _dropFrom.y) * t;
   const arc = Math.sin(t * Math.PI) * DROP_PEAK_LIFT;
   _pickupGroup.position.set(x, linY + arc, z);
+  // Track the light to the group during flight.
+  if (_glowLight) _glowLight.position.copy(_pickupGroup.position);
   // Grow during flight, hit full size at landing.
   const s = 0.7 + (1 - 0.7) * t;
   _pickupGroup.scale.setScalar(s);
   if (t >= 1) {
     _dropping = false;
     _pickupGroup.position.copy(_dropTo);
+    if (_glowLight) _glowLight.position.copy(_dropTo);
     _pickupGroup.scale.setScalar(1);
     if (_hitbox) _hitbox.visible = true;
     _playLandingChime();
@@ -329,6 +344,8 @@ function _tickIdle(dtSec) {
   _pickupGroup.position.y = _pickupTarget.y +
     Math.sin(tNow * IDLE_BOB_SPEED) * IDLE_BOB_AMP;
   _pickupGroup.rotation.y += dtSec * IDLE_SPIN_SPEED;
+  // Track the scene-parented light to the bobbing group.
+  if (_glowLight) _glowLight.position.copy(_pickupGroup.position);
   // Sparkle orbit.
   for (const s of _sparkles) {
     s._phase += dtSec * s._speed;
@@ -346,13 +363,19 @@ function _syncPickupVisibility() {
   if (!_pickupGroup) return;
   if (_collected) {
     _pickupGroup.visible = false;
+    if (_glowLight) _glowLight.intensity = 0;
   } else if (_hasDropped) {
     _pickupGroup.visible = true;
     _pickupGroup.position.copy(_pickupTarget);
     _pickupGroup.scale.setScalar(1);
     if (_hitbox) _hitbox.visible = true;
+    if (_glowLight) {
+      _glowLight.position.copy(_pickupTarget);
+      _glowLight.intensity = 90;
+    }
   } else {
     _pickupGroup.visible = false;
+    if (_glowLight) _glowLight.intensity = 0;
   }
 }
 
