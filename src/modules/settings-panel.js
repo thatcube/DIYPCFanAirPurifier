@@ -105,11 +105,11 @@ const CONTROLS = [
   },
   {
     id: 'fpPausePerfShadowCadence', tabs: ['display'], type: 'slider',
-    label: 'FP shadow cadence', icon: 'ph ph-clock-countdown',
-    keywords: 'shadow update interval frames performance',
+    label: 'Shadow cadence', icon: 'ph ph-clock-countdown',
+    keywords: 'shadow update interval frames performance fp',
     rangeId: 'fpPausePerfShadowCadence', valId: 'fpPausePerfShadowCadenceVal',
     min: 0, max: 120, step: 1, value: 0,
-    aria: 'FP shadow cadence',
+    aria: 'Shadow cadence',
     oninput: '_setFpPerfShadowCadence',
     initialLabel: 'Every frame',
   },
@@ -541,7 +541,7 @@ function _refreshPanelFromStorage(host) {
   if (shR) { shR.value = String(sh); shR.disabled = !profOn; }
   if (shV) {
     shV.textContent = profOn
-      ? (sh <= 0 ? 'Every frame' : `Every ${Math.round(sh)} ms`)
+      ? (sh <= 0 ? 'Every frame' : `${Math.round(sh)} ms`)
       : 'Bypassed';
     shV.classList.toggle('off', !profOn);
   }

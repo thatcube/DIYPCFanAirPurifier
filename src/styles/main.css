@@ -2813,6 +2813,15 @@ line-height: 1;
   grid-column: 1;
   grid-row: 1;
   min-width: 0;
+  /* Keep the label on a single line when there's room — wrapping
+     into two lines (which used to happen for "FP shadow cadence" +
+     "Every 84 ms") makes the row look jank. If the label genuinely
+     can't fit, ellipsize instead so the value column never gets
+     pushed off-center. The tooltip/aria-label still carries the
+     full text. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pause-toggle-row--slider .pause-toggle-state {
