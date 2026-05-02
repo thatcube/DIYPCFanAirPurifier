@@ -3903,8 +3903,6 @@ export function toggleFirstPerson() {
   if (crosshair) crosshair.style.display = fpMode ? 'block' : 'none';
 
   if (fpMode) {
-    // Reset help panel state on new run for a cleaner HUD start.
-    _toggleHelp(false);
     _wasAimingAtInteractable = false;
     _wasGroundedLast = true;
     _lastFootstepTs = 0;
@@ -3997,7 +3995,6 @@ export function toggleFirstPerson() {
     _playModeCue(true);
     if (_showToast) _showToast('Game mode! WASD to move, Space to jump (wall jump too!)');
   } else {
-    _toggleHelp(false);
     _wasAimingAtInteractable = false;
     _wasGroundedLast = true;
     _lastFootstepTs = 0;
@@ -4351,23 +4348,6 @@ export function setDeathLock(enabled) {
 }
 
 export function isDeathLocked() { return _deathLocked; }
-
-// ── Help panel toggle ───────────────────────────────────────────────
-
-let _helpOpen = false;
-function _toggleHelp(open) {
-  if (typeof open === 'boolean') _helpOpen = open;
-  else _helpOpen = !_helpOpen;
-
-  const panel = document.getElementById('fpControlsPanel');
-  const hint = document.getElementById('fpControlsHint');
-  const quickHelp = document.getElementById('fpQuickHelpBtn');
-  if (panel) panel.style.display = _helpOpen ? 'block' : 'none';
-  if (hint) hint.style.display = _helpOpen ? 'none' : '';
-  if (quickHelp) quickHelp.classList.toggle('on', _helpOpen);
-}
-// Expose for HTML onclick
-window._toggleHelp = _toggleHelp;
 
 // ── Set cam mode ────────────────────────────────────────────────────
 
@@ -5655,11 +5635,60 @@ let _sprintToggle = false;
 // persist to localStorage as 'gamepadMap'. Listening mode (claimed
 // by the next button press) is driven by the settings panel via
 // window.__gpBindings.startListen(action, cb).
-const _GP_BTN_NAMES = {
+// Button labels per controller family. The W3C Standard Gamepad
+// layout fixes index → physical position; what changes between
+// vendors is what the cap is *printed with*. Detection uses
+// gamepad.id heuristics on connect; default = xbox.
+const _GP_BTN_NAMES_XBOX = {
   0:'A', 1:'B', 2:'X', 3:'Y', 4:'LB', 5:'RB', 6:'LT', 7:'RT',
-  8:'Select', 9:'Start', 10:'L3', 11:'R3',
+  8:'View', 9:'Menu', 10:'L3', 11:'R3',
   12:'D-Up', 13:'D-Down', 14:'D-Left', 15:'D-Right',
 };
+const _GP_BTN_NAMES_PS = {
+  0:'Cross', 1:'Circle', 2:'Square', 3:'Triangle',
+  4:'L1', 5:'R1', 6:'L2', 7:'R2',
+  8:'Share', 9:'Options', 10:'L3', 11:'R3',
+  12:'D-Up', 13:'D-Down', 14:'D-Left', 15:'D-Right',
+};
+// Nintendo Standard Mapping is by physical position, so button 0
+// (south) prints as 'B' on a Switch Pro Controller, button 1 (east)
+// prints as 'A', etc.
+const _GP_BTN_NAMES_NINTENDO = {
+  0:'B', 1:'A', 2:'Y', 3:'X',
+  4:'L', 5:'R', 6:'ZL', 7:'ZR',
+  8:'-', 9:'+', 10:'L3', 11:'R3',
+  12:'D-Up', 13:'D-Down', 14:'D-Left', 15:'D-Right',
+};
+const _GP_BTN_NAMES_BY_TYPE = {
+  xbox: _GP_BTN_NAMES_XBOX,
+  playstation: _GP_BTN_NAMES_PS,
+  nintendo: _GP_BTN_NAMES_NINTENDO,
+};
+let _gpControllerType = 'xbox';
+// Detect from gamepad.id (vendor name + USB IDs). Sony's USB vendor
+// ID is 054c, Nintendo's is 057e. Falls back to 'xbox' for anything
+// else (Xbox controllers, generic pads, unknown strings).
+function _gpDetectType(idStr) {
+  if (!idStr) return 'xbox';
+  const s = String(idStr).toLowerCase();
+  if (s.includes('054c') || s.includes('sony') || s.includes('playstation')
+      || s.includes('dualshock') || s.includes('dualsense')
+      || s.includes('ps3') || s.includes('ps4') || s.includes('ps5')) {
+    return 'playstation';
+  }
+  if (s.includes('057e') || s.includes('nintendo') || s.includes('joy-con')
+      || s.includes('joycon') || s.includes('switch pro')
+      || s.includes('pro controller')) {
+    return 'nintendo';
+  }
+  return 'xbox';
+}
+function _gpBtnNameFor(idx, type) {
+  const map = _GP_BTN_NAMES_BY_TYPE[type] || _GP_BTN_NAMES_XBOX;
+  return map[idx] || `Btn ${idx}`;
+}
+// Back-compat alias used by older code paths.
+const _GP_BTN_NAMES = _GP_BTN_NAMES_XBOX;
 const _GP_ACTION_LABELS = {
   jump:'Jump (hold)', sprint:'Sprint (hold)', sprintToggle:'Sprint (toggle)',
   interact:'Interact', fireball:'Fireball / charge', camera:'Camera',
@@ -5718,10 +5747,12 @@ function _gpSetMap(action, btnIdx) {
   }
   _gpMap[action] = btnIdx;
   _gpSaveMap();
+  if (typeof _updateHudGlyphs === 'function') _updateHudGlyphs();
 }
 function _gpResetMap() {
   _gpMap = { ..._GP_DEFAULT_MAP };
   _gpSaveMap();
+  if (typeof _updateHudGlyphs === 'function') _updateHudGlyphs();
 }
 function _gpStartListen(action, cb) {
   if (!(action in _gpMap)) return;
@@ -5733,13 +5764,91 @@ function _gpCancelListen() {
   _gpListenCb = null;
 }
 _gpLoadMap();
+// Restore last-known controller type so the rebind UI shows the
+// right glyphs even before the pad's gamepadconnected event fires
+// (e.g. settings opened on cold load with the controller already
+// plugged in but idle).
+try {
+  const _t = localStorage.getItem('gamepadType');
+  if (_t === 'xbox' || _t === 'playstation' || _t === 'nintendo') {
+    _gpControllerType = _t;
+  }
+} catch { /* private mode etc. */ }
+function _gpSetControllerType(type) {
+  const next = (type === 'playstation' || type === 'nintendo') ? type : 'xbox';
+  if (next === _gpControllerType) return;
+  _gpControllerType = next;
+  try { localStorage.setItem('gamepadType', next); } catch {}
+  // Same-window listeners (settings panel rendered inside the play
+  // iframe) — storage events don't fire in the writing window, so
+  // notify them via a custom event.
+  try {
+    window.dispatchEvent(new CustomEvent('gamepadtypechange', { detail: { type: next } }));
+  } catch {}
+  if (typeof _updateHudGlyphs === 'function') _updateHudGlyphs();
+}
 // Settings panel may write to 'gamepadMap' from another realm
 // (parent frame in SPA mode). Reload when storage changes.
 try {
   window.addEventListener('storage', (e) => {
-    if (e && e.key === 'gamepadMap') _gpLoadMap();
+    if (!e) return;
+    if (e.key === 'gamepadMap') {
+      _gpLoadMap();
+      if (typeof _updateHudGlyphs === 'function') _updateHudGlyphs();
+    } else if (e.key === 'gamepadType') {
+      // Mirror parent-window writes (rare, but possible if the SPA
+      // shell ever persists this directly).
+      if (typeof _updateHudGlyphs === 'function') _updateHudGlyphs();
+    }
   });
 } catch { /* no window in headless hosts */ }
+
+// ── Last-input-device tracking ─────────────────────────────────────
+// Steam-style "last input wins": every keyboard press flips us to
+// 'kb', every gamepad button / non-trivial stick deflection flips
+// us to 'gp'. The HUD's data-action <kbd> elements get rewritten on
+// every flip so the player always sees the glyph for the device
+// they just used.
+let _lastInputDevice = 'kb';
+function _setLastInputDevice(d) {
+  if (d !== 'kb' && d !== 'gp') return;
+  if (d === _lastInputDevice) return;
+  _lastInputDevice = d;
+  _updateHudGlyphs();
+}
+// Global keydown listener for device tracking only — uses capture
+// phase so a focused dialog handler can't swallow the event before
+// we record it. Doesn't interfere with any gameplay routing.
+try {
+  window.addEventListener('keydown', () => _setLastInputDevice('kb'), true);
+} catch {}
+
+function _updateHudGlyphs() {
+  if (typeof document === 'undefined') return;
+  const nodes = document.querySelectorAll('[data-action]');
+  if (!nodes.length) return;
+  const useGp = (_lastInputDevice === 'gp');
+  nodes.forEach(el => {
+    const action = el.getAttribute('data-action');
+    if (!action) return;
+    let text;
+    if (useGp && (action in _gpMap)) {
+      text = _gpBtnNameFor(_gpMap[action], _gpControllerType);
+    } else {
+      // Keyboard fallback. Prefer the explicit data-kb-key attribute
+      // (set in markup) so we don't have to mirror keyboard bindings
+      // here. Falls back to the action name as a last resort.
+      text = el.getAttribute('data-kb-key') || action;
+    }
+    if (el.textContent !== text) el.textContent = text;
+  });
+}
+// Defer the first paint a tick so the HUD HTML is in the DOM by then.
+try {
+  if (typeof window !== 'undefined' && typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(_updateHudGlyphs);
+  }
+} catch {}
 
 // Public API for settings UI.
 window.__gpBindings = {
@@ -5751,7 +5860,10 @@ window.__gpBindings = {
   cancelListen:  _gpCancelListen,
   isListening:   () => _gpListenAction != null,
   listeningFor: () => _gpListenAction,
-  buttonName:    (i) => _GP_BTN_NAMES[i] || `Btn ${i}`,
+  buttonName:    (i) => _gpBtnNameFor(i, _gpControllerType),
+  controllerType: () => _gpControllerType,
+  buttonNamesFor: (type) => ({ ...(_GP_BTN_NAMES_BY_TYPE[type] || _GP_BTN_NAMES_XBOX) }),
+  refreshHud:    () => _updateHudGlyphs(),
   actionLabel:   (a) => _GP_ACTION_LABELS[a] || a,
   actionOrder:   () => _GP_ACTION_ORDER.slice(),
   actionGroups:  () => ({ general: _GP_ACTION_GROUPS.general.slice(),
@@ -5764,15 +5876,25 @@ function _gamepadConnect(idx) {
   _gamepadHoldStart = [];
   _gamepadLastRepeat = [];
   _gamepadWasMoving = false;
-  if (_showToast) {
-    let label = 'Controller';
-    try {
-      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-      const p = pads && pads[idx];
-      if (p && p.id) label = String(p.id).split('(')[0].trim() || 'Controller';
-    } catch { /* navigator may not exist in unusual hosts */ }
-    _showToast(`${label} connected`);
-  }
+  let label = 'Controller';
+  let padId = '';
+  try {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    const p = pads && pads[idx];
+    if (p && p.id) {
+      padId = String(p.id);
+      label = padId.split('(')[0].trim() || 'Controller';
+    }
+  } catch { /* navigator may not exist in unusual hosts */ }
+  _gpSetControllerType(_gpDetectType(padId));
+  // Connect itself doesn't necessarily mean the player is using the
+  // pad right now (Chrome fires gamepadconnected on first input but
+  // some platforms fire it on enumerate). Don't flip the device yet
+  // — the poll's edge detection will flip on the first real press.
+  // We DO refresh the HUD glyphs here so when the device flag flips
+  // later, the cached map/type are already correct for the rewrite.
+  _updateHudGlyphs();
+  if (_showToast) _showToast(`${label} connected`);
 }
 
 function _gamepadDisconnect(idx) {
@@ -5793,6 +5915,10 @@ function _gamepadDisconnect(idx) {
   _sprintToggle = false;
   _gpListenAction = null;
   _gpListenCb = null;
+  // Pad gone → assume the player is back on keyboard. The next real
+  // keydown would flip us anyway, but flipping immediately keeps the
+  // HUD honest in the gap before that happens.
+  _setLastInputDevice('kb');
   if (_showToast) _showToast('Controller disconnected');
 }
 
@@ -5817,7 +5943,16 @@ const _gpNavLastRepeat = { up: 0, down: 0, left: 0, right: 0 };
 
 function _menuNavActive() {
   if (!fpMode) return false;
-  if (_deathLocked) return false;
+  // The death overlay opens ~5s into the death lock; before that the
+  // cinematic plays with no buttons on screen and we don't want stick
+  // jitter to focus anything. Once the overlay's visible (display:flex),
+  // its Revive / Reset Run buttons need pad nav even though _deathLocked
+  // is still true.
+  if (_deathLocked) {
+    const death = document.getElementById('fpDeathOverlay');
+    if (death && death.style.display && death.style.display !== 'none') return true;
+    return false;
+  }
   if (fpPaused) return true;
   if (_skateOnboardingOpen) return true;
   try {
@@ -5830,7 +5965,11 @@ function _menuNavActive() {
 function _findActiveModal() {
   // Priority order: topmost / most-modal first. We pick the first
   // visible candidate; the rest are either hidden or layered beneath.
+  // Note: each candidate must be the inner card (statically positioned)
+  // not the fixed-positioned wrapper, because the visibility filter
+  // below uses offsetParent which is null for position:fixed elements.
   const candidates = [
+    document.querySelector('#fpDeathOverlay .death-card'),
     document.getElementById('fpSkateOnboarding'),
     document.querySelector('.name-dialog-card'),
     document.getElementById('finishDialogCard'),
@@ -5922,6 +6061,69 @@ function _navCancel() {
   document.dispatchEvent(evt);
 }
 
+// Right-stick Y scrolls the focused element's nearest scrollable
+// ancestor inside the active modal. Lets the player browse a tall
+// pause-settings page or a long finish-dialog leaderboard without
+// moving focus. Falls back to the modal itself, then the document.
+const _GP_SCROLL_DEADZONE = 0.20;
+const _GP_SCROLL_PX_PER_SEC = 1400;
+function _navFindScroller(modal) {
+  const focused = document.activeElement;
+  let node = (focused && modal && modal.contains(focused)) ? focused : modal;
+  while (node && node !== document.body) {
+    if (node.scrollHeight - node.clientHeight > 1) {
+      const cs = getComputedStyle(node);
+      if (/(auto|scroll)/.test(cs.overflowY)) return node;
+    }
+    node = node.parentElement;
+  }
+  // Last resort: the modal itself if it overflows, else document.
+  if (modal && modal.scrollHeight - modal.clientHeight > 1) return modal;
+  return document.scrollingElement || document.documentElement;
+}
+function _navScroll(stickY, dtMs) {
+  if (Math.abs(stickY) < _GP_SCROLL_DEADZONE) return;
+  const modal = _findActiveModal();
+  if (!modal) return;
+  const scroller = _navFindScroller(modal);
+  if (!scroller) return;
+  // Re-shape past the deadzone: the curve hits 1.0 at full deflection,
+  // 0 right at the deadzone, scaled cubically so a small push barely
+  // creeps and full push slams.
+  const sign = Math.sign(stickY);
+  const norm = (Math.abs(stickY) - _GP_SCROLL_DEADZONE) / (1 - _GP_SCROLL_DEADZONE);
+  const shaped = sign * Math.min(1, Math.max(0, norm)) ** 3;
+  const dy = shaped * _GP_SCROLL_PX_PER_SEC * (dtMs / 1000);
+  if (dy === 0) return;
+  if (typeof scroller.scrollBy === 'function') scroller.scrollBy(0, dy);
+  else scroller.scrollTop += dy;
+}
+
+// LB / RB cycle the most-relevant tab group inside the modal:
+// settings-tabs (pause settings drilldown) > modeTabs > site-tabs.
+function _navCycleTab(delta) {
+  const modal = _findActiveModal();
+  const root = modal || document;
+  const groups = [
+    { container: '.settings-tabs', tab: '.settings-tab' },
+    { container: '.modeTabs',      tab: '.modeTab' },
+    { container: '.site-tabs',     tab: '.site-tab' },
+  ];
+  for (const g of groups) {
+    const tabs = Array.from(root.querySelectorAll(`${g.container} ${g.tab}`))
+      .filter((t) => t.offsetParent !== null);
+    if (tabs.length === 0) continue;
+    let idx = tabs.findIndex((t) =>
+      t.classList.contains('is-active')
+      || t.classList.contains('active')
+      || t.getAttribute('aria-selected') === 'true');
+    if (idx < 0) idx = 0;
+    const next = tabs[((idx + delta) % tabs.length + tabs.length) % tabs.length];
+    if (next) next.click();
+    return;
+  }
+}
+
 function _navDirEdge(active, key, now) {
   // Returns true on the initial latch AND on autorepeat ticks while held.
   const wasLatched = _gpNavLatch[key];
@@ -5998,6 +6200,25 @@ function _pollGamepad(fpDtMs) {
 
   const pressed  = (i) => !!curr[i] && !prev[i];
   const released = (i) => !curr[i] && !!prev[i];
+
+  // Last-input-device tracking: any new button press OR appreciable
+  // stick deflection counts as gamepad input. We require an edge on
+  // buttons (so a button held since last frame doesn't keep us pinned
+  // to 'gp' if the player switches to keyboard mid-hold) and a non-
+  // trivial stick magnitude (the curve already deadzones, but we want
+  // a slightly higher floor here so micro-drift doesn't flip the HUD).
+  {
+    let touched = false;
+    for (let i = 0; i < curr.length && i < 16 && !touched; i++) {
+      if (curr[i] && !prev[i]) touched = true;
+    }
+    if (!touched) {
+      const stickMag = Math.max(Math.abs(lx), Math.abs(ly), Math.abs(rx), Math.abs(ry));
+      if (stickMag > 0.4) touched = true;
+    }
+    if (touched) _setLastInputDevice('gp');
+  }
+
   // Returns true on initial press AND on autorepeat ticks while held —
   // mirrors the keyboard's KeyDown autorepeat for X/F.
   const pressedRepeat = (i) => {
@@ -6060,6 +6281,12 @@ function _pollGamepad(fpDtMs) {
     if (_navDirEdge(navRt, 'right', now)) _navMove('right');
     if (pressed(GP_A)) _navActivate();
     if (pressed(GP_B)) _navCancel();
+    // LB/RB cycle the active tab group (e.g. pause-settings sections).
+    if (pressed(GP_LB)) _navCycleTab(-1);
+    if (pressed(GP_RB)) _navCycleTab(+1);
+    // Right-stick Y scrolls the focused modal region without moving
+    // focus — useful on the tall settings drilldown / finish board.
+    _navScroll(ry, fpDtMs || 16);
     _gamepadPrevButtons = curr;
     return;
   }
@@ -6439,9 +6666,6 @@ function _bindInputs() {
         break;
       case 'KeyG':
         toggleFirstPerson();
-        break;
-      case 'KeyH':
-        _toggleHelp();
         break;
       case 'KeyK':
         if (skateboardFound) setSkateMode(!skateMode);

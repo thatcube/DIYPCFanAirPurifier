@@ -209,11 +209,40 @@
   }
 
   // ── Tab cycling (LB / RB) ───────────────────────────────────────
+  // Detects three tab groups so LB/RB cycles whichever set the user is
+  // currently working with: top-level page tabs, leaderboard mode tabs
+  // (Normal/Speed/100%), and the settings-panel section tabs. Priority
+  // when nothing's focused: most-specific (settings/mode) before the
+  // global site nav.
+  const TAB_GROUPS = [
+    { container: '.settings-tabs', tab: '.settings-tab' },
+    { container: '.modeTabs',     tab: '.modeTab' },
+    { container: '.site-tabs',    tab: '.site-tab' },
+  ];
   function cycleTab(delta) {
-    const tabs = Array.from(document.querySelectorAll('.site-tabs .site-tab'))
+    const focused = document.activeElement;
+    let group = null;
+    if (focused) {
+      for (const g of TAB_GROUPS) {
+        const inGroup = (typeof focused.closest === 'function')
+          ? focused.closest(g.container)
+          : null;
+        if (inGroup) { group = g; break; }
+      }
+    }
+    if (!group) {
+      for (const g of TAB_GROUPS) {
+        if (document.querySelector(`${g.container} ${g.tab}`)) { group = g; break; }
+      }
+    }
+    if (!group) return;
+    const tabs = Array.from(document.querySelectorAll(`${group.container} ${group.tab}`))
       .filter(isVisible);
     if (tabs.length === 0) return;
-    let idx = tabs.findIndex((t) => t.classList.contains('is-active'));
+    let idx = tabs.findIndex((t) =>
+      t.classList.contains('is-active')
+      || t.classList.contains('active')
+      || t.getAttribute('aria-selected') === 'true');
     if (idx < 0) idx = 0;
     const next = tabs[((idx + delta) % tabs.length + tabs.length) % tabs.length];
     if (next) next.click();
@@ -242,17 +271,60 @@
   }
 
   // ── Polling ─────────────────────────────────────────────────────
+  // Cache one lookup per poll — getElementById is cheap but called
+  // every animation frame, so memoize the handle we keep checking.
+  let _fpHud = null;
+  function getFpHud() {
+    if (!_fpHud || !_fpHud.isConnected) _fpHud = document.getElementById('fpHud');
+    return _fpHud;
+  }
+
   function shouldPoll() {
     if (activeIdx < 0) return false;
-    // While the iframe is in play mode the iframe's own gamepad
-    // handler owns input — don't double-process.
+    // While the parent has promoted the iframe into play, the parent
+    // copy of this script must yield: char-select runs in the iframe,
+    // and the iframe's own copy will handle it.
     if (document.body.classList.contains('is-playing')) return false;
+    // When the iframe is mounted as the home/about/leaderboard
+    // background, its UI is hidden (`html.is-bg .panel,...{display:none}`)
+    // and the parent owns nav. Don't double-handle.
+    if (document.documentElement.classList.contains('is-bg')) return false;
+    // When fpMode is active (in-game), game-fp.js's own _pollGamepad
+    // owns input. We use #fpHud's display state as the proxy because
+    // it's the single inline style that flips with fpMode and is
+    // safely observable from this isolated script.
+    const hud = getFpHud();
+    if (hud && hud.style.display === 'block') return false;
     return true;
   }
 
+  // The about / leaderboard / settings pages set
+  //   html { overflow:hidden; height:100% }  body { overflow-y:auto }
+  // so the body is the scrolling element, not documentElement.
+  // window.scrollBy() ends up scrolling whichever
+  // document.scrollingElement points at, and Firefox returns body in
+  // that layout while Chrome returns html. Pick the actual scroller
+  // ourselves so right-stick scroll works the same in both browsers.
+  function getScroller() {
+    const candidates = [
+      document.scrollingElement,
+      document.body,
+      document.documentElement,
+    ];
+    for (const el of candidates) {
+      if (el && el.scrollHeight > el.clientHeight + 1) return el;
+    }
+    return null;
+  }
+
   function poll() {
+    if (!shouldPoll()) {
+      // Idle — don't keep a rAF burning. attachPad() restarts the
+      // loop the moment a pad reconnects or play exits.
+      rafId = 0;
+      return;
+    }
     rafId = requestAnimationFrame(poll);
-    if (!shouldPoll()) return;
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     const pad = pads && pads[activeIdx];
     if (!pad || !pad.connected) return;
@@ -291,8 +363,11 @@
     // run list and the settings panel. Skipped while a range is
     // focused so a slider's natural thumb glide doesn't fight scroll.
     if (Math.abs(ry) > SCROLL_DEADZONE) {
-      const dy = ry * SCROLL_PX_PER_SEC * (dt / 1000);
-      window.scrollBy(0, dy);
+      const scroller = getScroller();
+      if (scroller) {
+        const dy = ry * SCROLL_PX_PER_SEC * (dt / 1000);
+        scroller.scrollTop += dy;
+      }
     }
 
     const pressed = (i) => btn(i) && !prevPressed[i];
@@ -335,6 +410,7 @@
     // Reset latches so a reconnect doesn't think a button is held.
     for (const k in dirLatch) dirLatch[k] = false;
     for (const k in prevPressed) prevPressed[k] = false;
+    if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
   }
 
   window.addEventListener('gamepadconnected', (e) => {
@@ -362,4 +438,46 @@
       sweep();
     }, { once: true });
   });
+
+  // The iframe posts `play-exited` when the user closes /play in
+  // place (Esc → exit). At that moment body.is-playing is dropped
+  // by the parent's promotion handler, but our poll loop has been
+  // idling since promotion started. Kick it back on so the pad keeps
+  // working without forcing the user to press a button first.
+  window.addEventListener('message', (e) => {
+    if (e.origin !== location.origin) return;
+    if (!e.data || typeof e.data !== 'object') return;
+    if (e.data.type !== 'play-exited') return;
+    if (activeIdx >= 0 && !rafId) rafId = requestAnimationFrame(poll);
+  });
+
+  // Wake the loop whenever any of the suspend conditions flip off
+  // without firing an event we already listen to. Two cases this
+  // matters for, both inside the iframe:
+  //   1. html.is-bg removed when the parent promotes /play into the
+  //      foreground (char-select opens — we need to start handling
+  //      input there).
+  //   2. #fpHud display flipped from block → none when the user
+  //      exits a run back to char-select / splash without a full
+  //      page navigation (game-fp's pollGamepad goes silent; we
+  //      need to take over again).
+  // A single MutationObserver on <html> + <body> covers both via
+  // attribute changes; #fpHud's inline style change is observed by
+  // watching the body subtree for style attribute mutations.
+  if (typeof MutationObserver !== 'undefined') {
+    const wake = () => {
+      if (activeIdx >= 0 && !rafId && shouldPoll()) {
+        rafId = requestAnimationFrame(poll);
+      }
+    };
+    const mo = new MutationObserver(wake);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    mo.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    // Watch #fpHud's style attribute once it exists. The element is
+    // present in vite-index.html from the start, but in the menu
+    // pages it doesn't exist at all — querySelector returns null,
+    // observer.observe(null) would throw, so guard.
+    const hud = document.getElementById('fpHud');
+    if (hud) mo.observe(hud, { attributes: true, attributeFilter: ['style'] });
+  }
 })();

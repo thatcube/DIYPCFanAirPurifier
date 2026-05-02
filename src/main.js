@@ -154,7 +154,7 @@ function ensureGlassBlurCompat() {
     .trim() || 'blur(24px)';
   // Keep key control surfaces blurred even if production CSS processing
   // collapses vendor-prefixed declarations differently.
-  const els = document.querySelectorAll('.panel, .panel-fab, #fpControlsPanel');
+  const els = document.querySelectorAll('.panel, .panel-fab');
   els.forEach((el) => {
     el.style.setProperty('backdrop-filter', blur);
     el.style.setProperty('-webkit-backdrop-filter', blur);

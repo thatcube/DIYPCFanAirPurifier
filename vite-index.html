@@ -233,28 +233,6 @@
     </div>
     <div id="fpCrosshair"></div>
     <div id="fpCrosshairTooltip"></div>
-    <div id="fpControlsHint">Press <kbd>H</kbd> for controls</div>
-    <div id="fpControlsPanel" role="dialog" aria-label="Controls" style="display:none">
-      <div class="fp-panel-header"><span>Controls</span><button onclick="window._toggleHelp&&window._toggleHelp()"
-          class="fp-panel-close" aria-label="Close controls panel">&times;</button></div>
-      <div class="fp-panel-grid">
-        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
-        <div><kbd>Space</kbd> Jump (hold to charge)</div>
-        <div><kbd>Shift</kbd> Sprint</div>
-        <div><kbd>V</kbd> Toggle first/third person</div>
-        <div><kbd>K</kbd> Toggle skate mode</div>
-        <div><kbd>Q</kbd> Kickflip (skate)</div>
-        <div><kbd>E</kbd> Manual / wheelie (skate)</div>
-        <div><kbd>F</kbd> Fireball / Kamehameha <span class="kbd-hint-note">(Super Saiyan)</span></div>
-        <div><kbd>X</kbd> Board spin (skate)</div>
-        <div><kbd>R</kbd> Reset run</div>
-        <div><kbd>H</kbd> Toggle this panel</div>
-        <div><kbd>G</kbd> Exit game</div>
-        <div><kbd>Esc</kbd> Pause / resume</div>
-        <div>Click interactive objects</div>
-        <div>Crosshair turns blue on hover</div>
-      </div>
-    </div>
     <div id="fpChargeBar" aria-label="Jump charge">
       <div id="fpBarLightning" aria-hidden="true">
         <span class="bolt bolt-1"></span>
@@ -270,28 +248,28 @@
       <div id="fpBarTopRow">
         <div id="fpUnlocksCluster">
           <div id="skateUnlockHint" aria-label="Skateboard unlocked">
-            <span class="skate-icon">🛹</span> <kbd>K</kbd> Skateboard
+            <span class="skate-icon">🛹</span> <kbd data-action="skateToggle" data-kb-key="K">K</kbd> Skateboard
           </div>
           <div id="fireballUnlockHint" aria-label="Fireball unlocked">
             <span class="fb-hint-icon">🔥</span>
             <span class="fb-hint-icon fb-hint-icon-ss">⚡</span>
-            <kbd>F</kbd>
+            <kbd data-action="fireball" data-kb-key="F">F</kbd>
             <span class="fb-hint-label">Fireball</span>
             <span class="fb-hint-label fb-hint-label-ss">Kamehameha</span>
           </div>
         </div>
         <div id="pauseHint" onclick="window._pauseFP&&window._pauseFP()">
-          <kbd>Esc</kbd> Pause
+          <kbd data-action="pause" data-kb-key="Esc">Esc</kbd> Pause
         </div>
       </div>
       <div id="skateTrickHints" aria-label="Skate trick controls">
-        <span><kbd>Q</kbd> Kickflip</span>
-        <span><kbd>E</kbd> Manual</span>
-        <span><kbd>X</kbd> Spin</span>
+        <span><kbd data-action="kickflip" data-kb-key="Q">Q</kbd> Kickflip</span>
+        <span><kbd data-action="manual" data-kb-key="E">E</kbd> Manual</span>
+        <span><kbd data-action="spin" data-kb-key="X">X</kbd> Spin</span>
       </div>
       <div id="fpBarDivider"></div>
       <div class="fp-charge-head">
-        <span class="fp-charge-label"><kbd>Space</kbd> <span id="fpChargeLabel">Jump
+        <span class="fp-charge-label"><kbd data-action="jump" data-kb-key="Space">Space</kbd> <span id="fpChargeLabel">Jump
             charge</span></span>
         <span id="fpChargeValue">Ready</span>
       </div>
@@ -441,6 +419,14 @@
        schema-driven settings panel into #pauseSettingsHost on first
        drill-in and animates the .pause-card between views. -->
   <script type="module" src="/src/modules/pause-nav.js"></script>
+  <!-- Same gamepad navigation script the menu pages use. In this
+       document it covers the gap states where game-fp.js's in-game
+       handler isn't active yet — most importantly the character-
+       select dialog (fpMode is still false there) and the splash
+       screen. The script self-suspends while html.is-bg (parent
+       owns nav) and while #fpHud is visible (game-fp.js's own pad
+       handler owns nav). Lives in /public so Vite ships it as-is. -->
+  <script src="/spa-gamepad-nav.js" defer></script>
 </body>
 
 </html>

@@ -291,11 +291,34 @@ const CONTROLLER_FIXED_REF = [
   { keys: ['D-pad'],   desc: 'Move (alt)' },
 ];
 
-const _GP_BTN_NAMES = {
+const _GP_BTN_NAMES_XBOX = {
   0:'A', 1:'B', 2:'X', 3:'Y', 4:'LB', 5:'RB', 6:'LT', 7:'RT',
-  8:'Select', 9:'Start', 10:'L3', 11:'R3',
+  8:'View', 9:'Menu', 10:'L3', 11:'R3',
   12:'D-Up', 13:'D-Down', 14:'D-Left', 15:'D-Right',
 };
+const _GP_BTN_NAMES_PS = {
+  0:'Cross', 1:'Circle', 2:'Square', 3:'Triangle',
+  4:'L1', 5:'R1', 6:'L2', 7:'R2',
+  8:'Share', 9:'Options', 10:'L3', 11:'R3',
+  12:'D-Up', 13:'D-Down', 14:'D-Left', 15:'D-Right',
+};
+// Nintendo Standard Mapping is by physical position, so button 0
+// (south) prints as 'B' on a Switch Pro Controller, button 1 (east)
+// prints as 'A', etc.
+const _GP_BTN_NAMES_NINTENDO = {
+  0:'B', 1:'A', 2:'Y', 3:'X',
+  4:'L', 5:'R', 6:'ZL', 7:'ZR',
+  8:'-', 9:'+', 10:'L3', 11:'R3',
+  12:'D-Up', 13:'D-Down', 14:'D-Left', 15:'D-Right',
+};
+const _GP_BTN_NAMES_BY_TYPE = {
+  xbox: _GP_BTN_NAMES_XBOX,
+  playstation: _GP_BTN_NAMES_PS,
+  nintendo: _GP_BTN_NAMES_NINTENDO,
+};
+// Back-compat for the search blob below (xbox is the safe default
+// for surfacing 'A B X Y LB RB' query terms).
+const _GP_BTN_NAMES = _GP_BTN_NAMES_XBOX;
 const _GP_DEFAULT_MAP = {
   jump:0, sprint:6, sprintToggle:10, interact:2, fireball:1,
   camera:3, reset:8, pause:9,
@@ -428,9 +451,32 @@ function _gpApi() {
   } catch { return null; }
 }
 
-function _renderRebindRow(action, btnIdx) {
+// Resolve the active controller family. Live API wins; otherwise
+// fall back to the last persisted type the iframe wrote, then
+// default to xbox so the rebind UI shows *something* on first load.
+function _gpReadType() {
+  try {
+    const api = _gpApi();
+    if (api && typeof api.controllerType === 'function') {
+      const t = api.controllerType();
+      if (t === 'playstation' || t === 'nintendo' || t === 'xbox') return t;
+    }
+  } catch {}
+  try {
+    const t = localStorage.getItem('gamepadType');
+    if (t === 'playstation' || t === 'nintendo' || t === 'xbox') return t;
+  } catch {}
+  return 'xbox';
+}
+function _gpBtnName(btnIdx, type) {
+  const t = type || _gpReadType();
+  const map = _GP_BTN_NAMES_BY_TYPE[t] || _GP_BTN_NAMES_XBOX;
+  return map[btnIdx] || `Btn ${btnIdx}`;
+}
+
+function _renderRebindRow(action, btnIdx, type) {
   const label = _GP_ACTION_LABELS[action] || action;
-  const name = _GP_BTN_NAMES[btnIdx] || `Btn ${btnIdx}`;
+  const name = _gpBtnName(btnIdx, type);
   return `
     <div class="gp-rebind-row" data-action="${_esc(action)}">
       <span class="gp-rebind-label">${_esc(label)}</span>
@@ -443,11 +489,12 @@ function _renderRebindRow(action, btnIdx) {
 
 function _renderControllerRebind() {
   const map = _gpReadStoredMap();
+  const type = _gpReadType();
   const groups = _GP_REBIND_GROUPS.map(g => {
     const heading = g.sub
       ? `<h3 class="pause-section-title pause-section-title--sub"><span class="pause-section-emoji" aria-hidden="true">${g.emoji || ''}</span> ${_esc(g.title)}</h3>`
       : `<h3 class="pause-section-title"><i class="${_esc(g.icon)}"></i> ${_esc(g.title)}</h3>`;
-    const rows = g.actions.map(a => _renderRebindRow(a, map[a])).join('');
+    const rows = g.actions.map(a => _renderRebindRow(a, map[a], type)).join('');
     return `${heading}<div class="gp-rebind-list">${rows}</div>`;
   }).join('');
   const fixed = _renderKbdGroup(CONTROLLER_FIXED_REF);
@@ -468,9 +515,13 @@ function _renderKeyboardRef() {
   // names so the rebind UI is reachable from settings search.
   const kbBlob = KEYBOARD_REF.concat(KEYBOARD_REF_SKATE)
     .map(r => `${r.keys.join(' ')} ${r.desc}`).join(' ');
-  const padBlob = Object.values(_GP_ACTION_LABELS).concat(Object.values(_GP_BTN_NAMES)).join(' ');
+  const padBlob = Object.values(_GP_ACTION_LABELS)
+    .concat(Object.values(_GP_BTN_NAMES_XBOX))
+    .concat(Object.values(_GP_BTN_NAMES_PS))
+    .concat(Object.values(_GP_BTN_NAMES_NINTENDO))
+    .join(' ');
   return `
-    <div class="settings-keyboard-ref" data-search="${_esc(('keyboard shortcuts skate skateboard controller gamepad xbox playstation rebind remap ' + kbBlob + ' ' + padBlob).toLowerCase())}" data-row="keyboard-ref">
+    <div class="settings-keyboard-ref" data-search="${_esc(('keyboard shortcuts skate skateboard controller gamepad xbox playstation nintendo switch dualsense dualshock rebind remap ' + kbBlob + ' ' + padBlob).toLowerCase())}" data-row="keyboard-ref">
       <h3 class="pause-section-title"><i class="ph ph-keyboard"></i> Keyboard</h3>
       <div class="pause-controls">${generalRows}</div>
       <h3 class="pause-section-title pause-section-title--sub"><span class="pause-section-emoji" aria-hidden="true">🛹</span> Skateboard</h3>
@@ -890,11 +941,12 @@ export function mountSettings(host) {
   // when a button claims the action; we re-render just the row.
   function _refreshRebindUi() {
     const map = _gpReadStoredMap();
+    const type = _gpReadType();
     host.querySelectorAll('.gp-rebind-btn').forEach(btn => {
       const action = btn.dataset.action;
       if (!action) return;
       btn.classList.remove('is-listening');
-      const name = _GP_BTN_NAMES[map[action]] || `Btn ${map[action]}`;
+      const name = _gpBtnName(map[action], type);
       btn.innerHTML = `<kbd>${_esc(name)}</kbd>`;
       const label = _GP_ACTION_LABELS[action] || action;
       btn.setAttribute('aria-label', `Rebind ${label} (currently ${name})`);
@@ -964,10 +1016,22 @@ export function mountSettings(host) {
   }, true);
 
   // Refresh on storage events (iframe writes the map after a successful
-  // listen-mode bind in parent-mode setups).
+  // listen-mode bind in parent-mode setups). Also fires when the iframe
+  // detects a controller connect/disconnect and updates 'gamepadType'.
   window.addEventListener('storage', (e) => {
-    if (e && e.key === 'gamepadMap') _refreshRebindUi();
+    if (e && (e.key === 'gamepadMap' || e.key === 'gamepadType')) _refreshRebindUi();
   });
+  // Same-window: when settings is rendered inside the play iframe,
+  // storage events don't fire. game-fp.js dispatches this CustomEvent
+  // on connect/disconnect so the rebind glyphs swap to PS/Nintendo
+  // labels live.
+  window.addEventListener('gamepadtypechange', _refreshRebindUi);
+  // Also refresh on raw connect/disconnect — covers the parent-frame
+  // case where someone hot-plugs a different brand of pad while the
+  // settings panel is already open. _gpReadType() pulls the live
+  // value from __gpBindings via the iframe.
+  window.addEventListener('gamepadconnected', _refreshRebindUi);
+  window.addEventListener('gamepaddisconnected', _refreshRebindUi);
 
   // ── Search ──────────────────────────────────────────────────────
   // Always-on input. Empty query → tabbed view. Non-empty → flat
