@@ -4550,8 +4550,8 @@ html.is-bg .site-tabs-pill {
    blur intact from frame 1. */
 main.page {
   transition:
-    opacity 0.18s cubic-bezier(0.32, 0.72, 0, 1),
-    transform 0.22s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 220ms ease,
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
     /* Filter is included on the base rule (not just on the
        is-leaving rule) so the 10px exit blur RAMPS BACK OFF when
        is-leaving is removed by demoteFromPlay — without this
@@ -4560,10 +4560,52 @@ main.page {
     filter 0.4s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* SPA page swap — direction-aware horizontal slide. The router sets
+   data-direction="forward" when navigating later in tab order
+   (Home → Leaderboard → About → Settings) and "back" otherwise.
+   The exit and entry happen sequentially: the leaving <main>
+   slides + fades out, then is removed, then the incoming <main>
+   slides into rest.
+
+   TRADEOFF on the entry: any transform/opacity/filter/clip-path on
+   <main> creates a stacking context, which breaks backdrop-filter
+   sampling on the glass cards inside (they sample <main>'s own
+   contents instead of the iframe behind <body>) until the animation
+   ends and the stacking context dissolves. There's no CSS workaround.
+   So we keep the entry SHORT (~140ms) and translate-only — no
+   opacity fade, no filter — to minimize the duration of the
+   unblurred flash. The exit is longer so the eye is still tracking
+   outgoing motion when the new page lands. */
 main.page.is-leaving {
-  opacity: 0;
-  transform: translateY(-6px);
   pointer-events: none;
+  opacity: 0;
+  transition:
+    opacity 280ms ease,
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+main.page.is-leaving[data-direction="forward"] {
+  transform: translateX(-44px);
+}
+
+main.page.is-leaving[data-direction="back"] {
+  transform: translateX(44px);
+}
+
+main.page.is-entering {
+  /* Translate-only, no opacity. Short duration so the
+     backdrop-filter "unblurred flash" on glass cards is at the edge
+     of perceptible. */
+  transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+main.page.is-entering[data-direction="forward"] {
+  transform: translateX(28px);
+}
+
+main.page.is-entering[data-direction="back"] {
+  transform: translateX(-28px);
 }
 
 /* Play CTA exit — body.is-leaving is set by fullNav() right before we
@@ -4655,6 +4697,14 @@ main.page>*:nth-child(5):not(#titleSplash):not(.title-splash-card) {
 
 main.page>*:nth-child(n+6):not(#titleSplash):not(.title-splash-card) {
   animation-delay: 170ms;
+}
+
+/* SPA-inserted <main> elements use the parent slide as the entire
+   transition — no need to also stagger the children fading in over
+   it. Direct loads (no data-spa) still get the boot-time stagger so
+   the first paint of any page on a fresh visit feels rich. */
+main.page[data-spa="1"]>*:not(#titleSplash):not(.title-splash-card) {
+  animation: none;
 }
 
 /* The home splash treatment (#titleSplash + .title-splash-card) keeps

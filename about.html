@@ -788,11 +788,24 @@
         setTimeout(() => { location.href = href; }, 160);
       }
 
+      // Tab order drives slide direction. Going from an earlier tab
+      // to a later one (e.g. home → leaderboard) slides forward; the
+      // reverse slides back. Used by swap() below.
+      const TAB_ORDER = ['home', 'leaderboard', 'about', 'settings'];
+
       async function swap(href) {
         const targetView = viewFor(href);
         if (!targetView || targetView === 'play') { fullNav(href); return; }
 
         const oldMain = document.querySelector('main.page');
+
+        // Read the source view from the current main's data-view
+        // rather than location.pathname — popstate calls swap() AFTER
+        // the URL has already moved, so the URL is the destination.
+        const fromView = oldMain ? oldMain.dataset.view : null;
+        const fi = TAB_ORDER.indexOf(fromView);
+        const ti = TAB_ORDER.indexOf(targetView);
+        const direction = (fi < 0 || ti < 0 || ti >= fi) ? 'forward' : 'back';
 
         // Start the fetch immediately so it overlaps with the exit
         // animation (saves a noticeable amount of perceived latency
@@ -802,11 +815,13 @@
           return r.text();
         });
 
-        // Exit: animate the OLD <main> out via .is-leaving on the
-        // element itself. Each direction owning its own class is what
-        // makes the entrance work cleanly — see CSS comment.
-        if (oldMain && !reduced) oldMain.classList.add('is-leaving');
-        const exitWait = reduced ? 0 : 120;
+        // Exit slide: tag the leaving <main> with direction + class.
+        // CSS handles the actual translateX/opacity transition.
+        if (oldMain && !reduced) {
+          oldMain.dataset.direction = direction;
+          oldMain.classList.add('is-leaving');
+        }
+        const exitWait = reduced ? 0 : 260;
 
         let html;
         try {
@@ -822,10 +837,10 @@
         const doc = new DOMParser().parseFromString(html, 'text/html');
         document.title = doc.title || document.title;
 
-        // Replace page-local styles. The shared stylesheet (main.css)
-        // is loaded via <link> with the same href in both pages, so we
-        // leave <link> elements alone — only swap <style> blocks that
-        // we tagged with data-view.
+        // Now that the leaving page has finished its exit, swap the
+        // page-local <style data-view> blocks. Doing this AFTER the
+        // exit (not during) avoids a brief flash where both pages'
+        // main.page rules fight each other.
         document.querySelectorAll('head > style[data-view]').forEach(s => s.remove());
         doc.querySelectorAll('head > style').forEach(s => {
           const clone = s.cloneNode(true);
@@ -837,17 +852,16 @@
         const currentOldMain = document.querySelector('main.page');
         if (newMain && currentOldMain) {
           newMain.dataset.view = targetView;
-          // Mark this main as SPA-inserted so CSS can suppress any
-          // inner keyframe animations (see the data-spa rule in
-          // main.css) that would otherwise blink on top of our outer
-          // page transition.
+          // Mark this main as SPA-inserted so CSS can suppress the
+          // per-child stagger fade-in — the parent slide IS the
+          // transition, no need to stack a second animation on top.
           newMain.dataset.spa = '1';
-          if (!reduced) newMain.classList.add('is-entering');
+          // Short translate-only entry — see comment in home.html.
+          if (!reduced) {
+            newMain.dataset.direction = direction;
+            newMain.classList.add('is-entering');
+          }
           currentOldMain.replaceWith(newMain);
-          // Force a layout read so the entering state is committed to
-          // the style cache before we remove the class. Without this
-          // the browser folds the from/to into one paint and the
-          // entrance is skipped (the stuttery "blink in" we're fixing).
           if (!reduced) {
             void newMain.offsetWidth;
             requestAnimationFrame(() => newMain.classList.remove('is-entering'));
@@ -857,11 +871,19 @@
         history.pushState({ view: targetView }, '', href);
         setActiveTab(targetView);
 
-        // Re-run the leaderboard's init logic now that its DOM is back.
-        // (about has no init function — its <main> is fully static.)
-        if (targetView === 'leaderboard' && typeof window.__initLeaderboard === 'function') {
-          window.__initLeaderboard();
-        }
+        // Re-execute any <script data-spa-init> blocks from the swapped
+        // page. DOMParser leaves them inert and cloneNode() of a script
+        // doesn't execute, so we recreate fresh <script> nodes. The
+        // leaderboard's view-init script lives behind this marker and
+        // self-invokes its __initLeaderboard at the tail — without this
+        // step, navigating about → leaderboard via SPA leaves the
+        // skeleton rows on screen forever.
+        doc.querySelectorAll('script[data-spa-init]').forEach((oldScript) => {
+          const fresh = document.createElement('script');
+          for (const attr of oldScript.attributes) fresh.setAttribute(attr.name, attr.value);
+          fresh.textContent = oldScript.textContent;
+          document.body.appendChild(fresh);
+        });
 
         // Settings page: Vite bundles inline <script type="module">
         // blocks to external chunks at build time, and modules only

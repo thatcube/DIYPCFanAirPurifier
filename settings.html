@@ -349,19 +349,35 @@
         setTimeout(() => { location.href = href; }, 160);
       }
 
+      // Tab order drives slide direction. Going from an earlier tab
+      // to a later one (e.g. home → leaderboard) slides forward; the
+      // reverse slides back.
+      const TAB_ORDER = ['home', 'leaderboard', 'about', 'settings'];
+
       async function swap(href) {
         const targetView = viewFor(href);
         if (!targetView || targetView === 'play') { fullNav(href); return; }
 
         const oldMain = document.querySelector('main.page');
 
+        // Read the source view from the current main's data-view
+        // rather than location.pathname — popstate calls swap() AFTER
+        // the URL has already moved.
+        const fromView = oldMain ? oldMain.dataset.view : null;
+        const fi = TAB_ORDER.indexOf(fromView);
+        const ti = TAB_ORDER.indexOf(targetView);
+        const direction = (fi < 0 || ti < 0 || ti >= fi) ? 'forward' : 'back';
+
         const fetchPromise = fetch(href, { credentials: 'same-origin' }).then(r => {
           if (!r.ok) throw new Error('HTTP ' + r.status);
           return r.text();
         });
 
-        if (oldMain && !reduced) oldMain.classList.add('is-leaving');
-        const exitWait = reduced ? 0 : 120;
+        if (oldMain && !reduced) {
+          oldMain.dataset.direction = direction;
+          oldMain.classList.add('is-leaving');
+        }
+        const exitWait = reduced ? 0 : 260;
 
         let html;
         try {
@@ -387,7 +403,11 @@
         if (newMain && currentOldMain) {
           newMain.dataset.view = targetView;
           newMain.dataset.spa = '1';
-          if (!reduced) newMain.classList.add('is-entering');
+          // Short translate-only entry — see comment in home.html.
+          if (!reduced) {
+            newMain.dataset.direction = direction;
+            newMain.classList.add('is-entering');
+          }
           currentOldMain.replaceWith(newMain);
           if (!reduced) {
             void newMain.offsetWidth;
@@ -398,9 +418,17 @@
         history.pushState({ view: targetView }, '', href);
         setActiveTab(targetView);
 
-        if (targetView === 'leaderboard' && typeof window.__initLeaderboard === 'function') {
-          window.__initLeaderboard();
-        }
+        // Re-execute any <script data-spa-init> blocks from the swapped
+        // page. DOMParser leaves them inert and cloneNode() of a script
+        // doesn't execute, so we recreate fresh <script> nodes. The
+        // leaderboard's view-init script lives behind this marker and
+        // self-invokes its __initLeaderboard at the tail.
+        doc.querySelectorAll('script[data-spa-init]').forEach((oldScript) => {
+          const fresh = document.createElement('script');
+          for (const attr of oldScript.attributes) fresh.setAttribute(attr.name, attr.value);
+          fresh.textContent = oldScript.textContent;
+          document.body.appendChild(fresh);
+        });
 
         // Settings page: Vite bundles inline <script type="module">
         // blocks to external chunks at build time, and modules only
