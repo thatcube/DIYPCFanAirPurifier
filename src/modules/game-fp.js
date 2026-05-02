@@ -5930,7 +5930,12 @@ function _pollGamepad(fpDtMs) {
     // Hold-style: mutate fpKeys / trick flags only when the pad is
     // actively touching that input, so keyboard isn't overwritten.
     if (curr[GP_A]  || prev[GP_A])  fpKeys.space = !!curr[GP_A];
-    if (curr[GP_L3] || prev[GP_L3]) fpKeys.shift = !!curr[GP_L3];
+    // Sprint on LT (primary, easy to hold while moving) and L3 as a
+    // secondary binding so the standard click-stick muscle memory
+    // still works. Either input held = sprinting.
+    if (curr[GP_LT] || prev[GP_LT] || curr[GP_L3] || prev[GP_L3]) {
+      fpKeys.shift = !!(curr[GP_LT] || curr[GP_L3]);
+    }
     if (curr[GP_RB] || prev[GP_RB]) _trickManualHeld = !!curr[GP_RB] && skateMode;
 
     // Press-style: edge-triggered.
@@ -5975,13 +5980,14 @@ function _pollGamepad(fpDtMs) {
       window._fireballKeyUp();
     }
 
-    // Skate spin (LT). Tap stacks at the spam-tap cap; autorepeat
+    // Skate spin (RT). Tap stacks at the spam-tap cap; autorepeat
     // while held uses the lower hold cap (mirrors X-key e.repeat).
-    if (skateMode && pressedRepeat(GP_LT)) {
+    // Was on LT before sprint moved there.
+    if (skateMode && pressedRepeat(GP_RT)) {
       const SPIN_BASE = Math.PI * 2.66;
       const SPIN_CAP = Math.PI * 20;
       const SPIN_HOLD_CAP = SPIN_CAP * 0.6;
-      const isHoldRepeat = curr[GP_LT] && prev[GP_LT];
+      const isHoldRepeat = curr[GP_RT] && prev[GP_RT];
       const cap = isHoldRepeat ? SPIN_HOLD_CAP : SPIN_CAP;
       if (_trickSpinSpeed >= cap) {
         _trickSpinBoost = true;

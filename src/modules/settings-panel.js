@@ -281,14 +281,16 @@ const KEYBOARD_REF_SKATE = [
 
 // Controller reference. Auto-detected on connect; default mapping is
 // Xbox-style (PS layout maps the same physical buttons by position).
+// Order is by priority: movement, then primary actions (jump, sprint,
+// interact), then fireball, then meta controls.
 const CONTROLLER_REF = [
   { keys: ['L Stick'],   desc: 'Move' },
   { keys: ['R Stick'],   desc: 'Look' },
   { keys: ['A'],         desc: 'Jump (hold)' },
-  { keys: ['L3'],        desc: 'Sprint' },
-  { keys: ['Y'],         desc: 'Camera' },
+  { keys: ['LT'],        desc: 'Sprint (hold)' },
   { keys: ['X'],         desc: 'Interact' },
   { keys: ['B'],         desc: 'Fireball / charge' },
+  { keys: ['Y'],         desc: 'Camera' },
   { keys: ['Select'],    desc: 'Reset run' },
   { keys: ['Start'],     desc: 'Pause' },
 ];
@@ -297,7 +299,7 @@ const CONTROLLER_REF_SKATE = [
   { keys: ['R3'], desc: 'Get on / off the board' },
   { keys: ['LB'], desc: 'Kickflip' },
   { keys: ['RB'], desc: 'Manual / wheelie' },
-  { keys: ['LT'], desc: 'Board spin' },
+  { keys: ['RT'], desc: 'Board spin' },
 ];
 
 // ────────────────────────────────────────────────────────────────────
