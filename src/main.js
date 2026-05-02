@@ -1168,6 +1168,9 @@ window._resumeFP = () => gameFp.setPaused(false);
 window._resetFP = () => {
   leaderboard.closeFinishDialog();
   leaderboard.hideShareButton();
+  // Force the cached HUD strings to repaint on next frame.
+  _lastTimerText = '';
+  _lastMphText = '';
   // If not in FP yet, fall back to the character-select entry path.
   if (!gameFp.fpMode) {
     leaderboard.resetTimer();
@@ -1883,6 +1886,7 @@ let _lastCoinDomUpdate = 0;
 const _elRunTimer = document.getElementById('runTimerText');
 const _elMphValue = document.getElementById('mphValue');
 let _lastMphText = '';
+let _lastTimerText = '';
 const _elFps = document.getElementById('fpsInline');
 const _elPauseOv = document.getElementById('fpPauseOverlay');
 
@@ -1920,7 +1924,16 @@ function animate(ts) {
     }
     // Timer tick
     leaderboard.tickTimer(ts);
-    if (_elRunTimer) _elRunTimer.textContent = leaderboard.formatRunTime(leaderboard.getElapsed());
+    if (_elRunTimer) {
+      // textContent writes are layout-invalidating in aggregate at high
+      // refresh rates. The HUD shows tenths of a second, so the rendered
+      // string only changes ~10×/sec — no need to write 240×/sec.
+      const txt = leaderboard.formatRunTime(leaderboard.getElapsed());
+      if (txt !== _lastTimerText) {
+        _elRunTimer.textContent = txt;
+        _lastTimerText = txt;
+      }
+    }
     // MPH speedometer — update every frame (cheap: one hypot + DOM write)
     if (_elMphValue && gameFp.mphVisible && gameFp.skateboardFound) {
       // getHorizSpeed() returns inches/second; scale so base skate sprint ≈ 25 MPH
