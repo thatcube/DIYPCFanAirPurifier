@@ -5451,8 +5451,19 @@ body.play-mode #titleSplash+.title-splash-card {
   inset: 0;
   z-index: 500;
   display: flex;
-  align-items: center;
+  /* `safe center` keeps the panel vertically centered when it fits,
+     but flips to top-aligned (no clipping) when the panel is taller
+     than the viewport — required so the Start-run button at the
+     bottom of the panel stays reachable on phones in portrait. */
+  align-items: safe center;
   justify-content: center;
+  /* Allow vertical scroll when the panel exceeds the viewport
+     (mobile portrait, very short windows). Padding gives the panel
+     breathing room from the edges while scrolling. */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 16px 0;
   /* Vignette-only scrim — same gradient as #bgScrim on the menu pages.
      The atmospheric backdrop-blur lives on #charSelect::before below
      (NOT directly on this wrapper). A backdrop-filter on the wrapper
