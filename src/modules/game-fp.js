@@ -68,6 +68,7 @@ const SPEED_MODE_KEY = 'diy_air_purifier_speed_mode_v1';
 const SKATE_MODE_KEY = 'diy_air_purifier_skate_mode_v1';
 const SKATEBOARD_FOUND_KEY = 'diy_air_purifier_skateboard_found_v1';
 const MPH_VIS_KEY = 'diy_air_purifier_mph_visible_v1';
+const INPUT_DIAG_VIS_KEY = 'diy_air_purifier_input_diag_visible_v1';
 const FF_MAC_LOOK_HZ_KEY = 'diy_air_purifier_ff_mac_look_hz_v1';
 const FF_MAC_POINTER_MODE_KEY = 'diy_air_purifier_ff_mac_pointer_mode_v1';
 const FF_MAC_VIEW_MODE_KEY = 'diy_air_purifier_ff_mac_view_mode_v1';
@@ -239,6 +240,34 @@ function _syncMphHud() {
 }
 
 export function syncMphHud() { _syncMphHud(); }
+
+// ── Input diagnostic HUD visibility ────────────────────────────────
+// Tiny "lock:on | cam:third | …" debug strip under the FPS counter.
+// Off by default; togglable from the Display settings tab.
+export let inputDiagVisible = false;
+try { inputDiagVisible = localStorage.getItem(INPUT_DIAG_VIS_KEY) === '1'; } catch (e) { }
+
+export function isInputDiagVisible() { return inputDiagVisible; }
+export function setInputDiagVisible(v) {
+  inputDiagVisible = !!v;
+  try { localStorage.setItem(INPUT_DIAG_VIS_KEY, inputDiagVisible ? '1' : '0'); } catch (e) { }
+  _syncInputDiagUi();
+}
+
+function _syncInputDiagUi() {
+  const sw = document.getElementById('fpPauseShowInputDiag');
+  const st = document.getElementById('fpPauseShowInputDiagState');
+  if (sw) { sw.classList.toggle('on', inputDiagVisible); sw.setAttribute('aria-checked', String(inputDiagVisible)); }
+  if (st) { st.textContent = inputDiagVisible ? 'On' : 'Off'; st.classList.toggle('off', !inputDiagVisible); }
+  // Hide immediately when turned off; the per-frame HUD update handles
+  // the on case (it has the live values).
+  if (!inputDiagVisible) {
+    const diag = document.getElementById('fpInputDiag');
+    if (diag) { diag.hidden = true; diag.textContent = ''; }
+  }
+}
+
+export function syncInputDiagUi() { _syncInputDiagUi(); }
 
 export function setInteractionRaycastEnabled(enabled) {
   _interactionRaycastEnabled = !!enabled;
@@ -5042,7 +5071,19 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       const cyMinFloor = inOutdoor ? (fpPos.y - EYE_H - 20) : (floorY + 0.5);
       const cyMin = Math.max(cyMinFloor, fpPos.y - EYE_H + 1.5);
       // Outdoors uses the same expanded ceiling as physics (floorY + 200).
-      const cyMax = inOutdoor ? (floorY + 200) - 2 : (floorY + 80) - 2;
+      let cyMax = inOutdoor ? (floorY + 200) - 2 : (floorY + 80) - 2;
+      // Under-bed clamp: when the player's feet are inside the bed footprint
+      // and below slat level, keep the third-person camera tucked under the
+      // mattress so it doesn't pop above the bed and start looking through
+      // it. World bed X is mirrored (-BED_X). Slat top minus a small margin
+      // gives the camera a tiny gap from the underside of the platform.
+      const _slatY = floorY + BED_SLATS_FROM_FLOOR;
+      const _bedXW = -BED_X;
+      const _underBed =
+        (fpPos.y - EYE_H) < _slatY &&
+        Math.abs(focal.x - _bedXW) < BED_W / 2 + 4 &&
+        Math.abs(focal.z - BED_Z) < BED_L / 2 + 4;
+      if (_underBed) cyMax = Math.min(cyMax, _slatY - 1.5);
       const maxDX = dxC > 0 ? (camWallXMax - focal.x) : (focal.x - camWallXMin);
       const maxDY = dyC > 0 ? (cyMax - focal.y) : (focal.y - cyMin);
       const maxDZ = dzC > 0 ? (camWallZMax - focal.z) : (focal.z - camWallZMin);
@@ -5297,7 +5338,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
 
   const inputDiag = document.getElementById('fpInputDiag');
   if (inputDiag) {
-    if (fpMode) {
+    if (fpMode && inputDiagVisible) {
       const lockState = _useUnlockedLook
         ? (document.fullscreenElement ? 'lock:fs-unlocked' : 'lock:unlocked')
         : (document.pointerLockElement ? 'lock:on' : 'lock:off');

@@ -50,6 +50,28 @@ import {
   QUALITY_DPR_TIERS_MOBILE, QUALITY_DPR_TIERS_DESKTOP
 } from './modules/constants.js';
 
+// Settings panel mounting is handled lazily:
+//   • In-game pause: pause-nav.js mounts it into #pauseSettingsHost
+//     the first time the user drills into the Settings sub-view.
+//   • Static shell pages: /settings is its own SPA route; the panel
+//     mounts on page load (or on SPA-swap into the route).
+//
+// When the panel mounts (in either context) it dispatches
+// `settings-panel:mounted`. We re-run every sync function so the
+// freshly-rendered toggles, sliders, and value labels reflect the
+// live state instead of the schema's hardcoded defaults.
+document.addEventListener('settings-panel:mounted', () => {
+  // Re-run any sync that updates a control inside the settings panel.
+  // Each sync function uses `if (el)` guards, so calling them here is
+  // safe even if some IDs aren't part of the schema.
+  try { _syncPausePerfToggleUi(); } catch (e) { }
+  try { _applyFpsVisibility(); } catch (e) { }
+  try { gameFp.syncFovUi(); } catch (e) { }
+  try { gameFp.syncMouseSensUi(); } catch (e) { }
+  try { gameFp.syncAudioToggleUi(); } catch (e) { }
+  try { gameFp.syncSkateToggleUi(); } catch (e) { }
+});
+
 // ── Utilities (must be defined before wiring) ───────────────────────
 
 // Toast notifications
@@ -1800,6 +1822,11 @@ _applyPausePerfToggles({ refreshTod: true });
 // MPH HUD toggle
 window._toggleMph = () => {
   gameFp.setMphVisible(!gameFp.mphVisible);
+};
+
+// Input diagnostic HUD toggle (the "lock:on | cam:third | …" strip)
+window._toggleInputDiag = () => {
+  gameFp.setInputDiagVisible(!gameFp.isInputDiagVisible());
 };
 
 // Debug wall labels (localhost only)

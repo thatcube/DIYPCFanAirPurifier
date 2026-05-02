@@ -288,6 +288,10 @@
       <i class="site-tab__icon site-tab__icon--regular ph ph-info"></i><i
         class="site-tab__icon site-tab__icon--fill ph-fill ph-info"></i><span>About</span>
     </a>
+    <a class="site-tab" href="/settings" data-tab="settings">
+      <i class="site-tab__icon site-tab__icon--regular ph ph-gear"></i><i
+        class="site-tab__icon site-tab__icon--fill ph-fill ph-gear"></i><span>Settings</span>
+    </a>
   </nav>
 
   <!-- Page scrim — same div pattern as about / leaderboard so all
@@ -425,6 +429,7 @@
         if (path === '/' || path === '/home' || path === '/home.html') return 'home';
         if (path === '/about' || path === '/about.html') return 'about';
         if (path === '/leaderboard' || path === '/leaderboard.html' || path.startsWith('/leaderboard')) return 'leaderboard';
+        if (path === '/settings' || path === '/settings.html') return 'settings';
         if (path === '/play' || path === '/vite-index.html' || path === '/index.html') return 'play';
         return null;
       }
@@ -491,8 +496,23 @@
         if (nav) nav.classList.add('pill-ready');
       });
       window.addEventListener('resize', updatePill);
-      // Webfonts can resize the tab labels after first paint; re-measure
-      // when they're ready so the pill snaps to the final width.
+      // Late layout/font shifts can resize the active tab AFTER the
+      // initial measurement (Phosphor-Fill resolving later than the
+      // regular face, the leaderboard table reflow on direct loads,
+      // scrollbar appearance, etc.) and the one-shot fonts.ready hook
+      // alone misses those. A ResizeObserver on every tab keeps the
+      // pill snapped to the active tab through any of those shifts.
+      if (typeof ResizeObserver !== 'undefined') {
+        const nav = document.querySelector('.site-tabs');
+        if (nav) {
+          const ro = new ResizeObserver(() => updatePill());
+          nav.querySelectorAll('.site-tab').forEach(t => ro.observe(t));
+        }
+      }
+      // Final safety net — re-measure once everything (including any
+      // late-arriving stylesheets, icon fonts, and images that affect
+      // tab metrics) has finished loading.
+      window.addEventListener('load', updatePill);
       if (document.fonts && document.fonts.ready) {
         document.fonts.ready.then(updatePill).catch(() => { });
       }
@@ -526,7 +546,7 @@
         // element itself. Each direction owning its own class is what
         // makes the entrance work cleanly — see CSS comment.
         if (oldMain && !reduced) oldMain.classList.add('is-leaving');
-        const exitWait = reduced ? 0 : 200;
+        const exitWait = reduced ? 0 : 120;
 
         let html;
         try {
@@ -573,6 +593,17 @@
 
         if (targetView === 'leaderboard' && typeof window.__initLeaderboard === 'function') {
           window.__initLeaderboard();
+        }
+
+        // Settings page: Vite bundles inline <script type="module">
+        // blocks to external chunks at build time, and modules only
+        // execute once per URL. So we can't rely on re-injecting the
+        // page's own mount script — explicitly mount here on swap-in.
+        if (targetView === 'settings') {
+          import('/src/modules/settings-panel.js').then(({ mountSettings }) => {
+            const host = document.getElementById('settingsHost');
+            if (host) mountSettings(host);
+          });
         }
 
         window.scrollTo(0, 0);

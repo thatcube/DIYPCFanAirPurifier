@@ -76,7 +76,7 @@ function sanitizeMode(value) {
 let dbInitPromise = null;
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     try {
       if (!env.LB_DB) {
         return jsonResponse(500, { ok: false, code: 'missing_db', message: 'D1 binding LB_DB is missing' });
@@ -95,7 +95,7 @@ export default {
       }
 
       if (url.pathname === '/api/leaderboard' && request.method === 'GET') {
-        return withCors(await handleGetLeaderboard(request, env, cfg));
+        return withCors(await handleGetLeaderboard(request, env, cfg, ctx));
       }
 
       if (url.pathname === '/api/run/start' && request.method === 'POST') {
@@ -107,11 +107,11 @@ export default {
       }
 
       if (url.pathname === '/api/run/finish' && request.method === 'POST') {
-        return withCors(await handleRunFinish(request, env, cfg));
+        return withCors(await handleRunFinish(request, env, cfg, ctx));
       }
 
       if (url.pathname === '/api/run/rename' && request.method === 'POST') {
-        return withCors(await handleRunRename(request, env, cfg));
+        return withCors(await handleRunRename(request, env, cfg, ctx));
       }
 
       if (url.pathname === '/api/admin/leaderboard' && request.method === 'GET') {
@@ -119,15 +119,15 @@ export default {
       }
 
       if (url.pathname === '/api/admin/delete' && request.method === 'POST') {
-        return withCors(await handleAdminDelete(request, env, cfg));
+        return withCors(await handleAdminDelete(request, env, cfg, ctx));
       }
 
       if (url.pathname === '/api/admin/delete-tests' && request.method === 'POST') {
-        return withCors(await handleAdminDeleteTests(request, env, cfg));
+        return withCors(await handleAdminDeleteTests(request, env, cfg, ctx));
       }
 
       if (url.pathname === '/api/admin/reset' && request.method === 'POST') {
-        return withCors(await handleAdminReset(request, env));
+        return withCors(await handleAdminReset(request, env, ctx));
       }
 
       return withCors(jsonResponse(404, { ok: false, code: 'not_found', message: 'Route not found' }));
@@ -250,23 +250,47 @@ function getConfig(env) {
   };
 }
 
-async function handleGetLeaderboard(request, env, cfg) {
-  const now = Date.now();
-  const ipHash = await getRequestIpHash(request, env);
-  const allowed = await rateLimit(env.LB_DB, ipHash, 'lb_get', 120, 60 * 1000, now);
-  if (!allowed) return apiError(429, 'rate_limited', 'Too many requests');
-
+async function handleGetLeaderboard(request, env, cfg, ctx) {
   const url = new URL(request.url);
   // "100% / all secret coins" virtual view. When set, we don't filter
   // by mode — any run (normal or speed) where the player found every
   // secret coin qualifies, ranked together by time.
   const onlyAllSecrets = url.searchParams.get('onlyAllSecrets') === '1';
   const mode = onlyAllSecrets ? null : sanitizeMode(url.searchParams.get('mode'));
+
+  // ── Edge cache (Cloudflare colo-local) ───────────────────────────
+  // The leaderboard is read-mostly (~thousands of GETs per write), so
+  // serving from the colo cache turns the common case into a sub-50ms
+  // hit instead of a D1 query. Each of the 3 public variants
+  // (mode=normal, mode=speed, onlyAllSecrets=1) is a separate cache
+  // entry; writes (run/finish, rename, admin) purge all 3.
+  //
+  // The cache key is canonical — built from the sanitized (mode,
+  // onlyAllSecrets) tuple, NOT the raw request URL — so an attacker
+  // can't fragment the cache by appending junk query params to bypass
+  // the hit and hammer D1.
+  const cache = caches.default;
+  const cacheKey = leaderboardCacheKey(request, { mode, onlyAllSecrets });
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    // Cache hit bypasses the per-IP rate limit on purpose: a hit costs
+    // us nothing (no D1, no compute beyond stream-back), so rate-
+    // limiting it would just add a needless DB round-trip on the hot
+    // path. The cache TTL itself bounds origin work.
+    return cached;
+  }
+
+  // Cache miss — rate-limit and query D1.
+  const now = Date.now();
+  const ipHash = await getRequestIpHash(request, env);
+  const allowed = await rateLimit(env.LB_DB, ipHash, 'lb_get', 120, 60 * 1000, now);
+  if (!allowed) return apiError(429, 'rate_limited', 'Too many requests');
+
   const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg, {
     mode,
     onlyAllSecrets,
   });
-  return jsonResponse(200, {
+  const payload = {
     ok: true,
     shared: true,
     mode,
@@ -277,7 +301,29 @@ async function handleGetLeaderboard(request, env, cfg) {
     perPlayer: cfg.LB_PER_PLAYER,
     requiredCoinCount: onlyAllSecrets ? null : cfg.COIN_IDS_BY_MODE[mode].length,
     minRunMs: cfg.MIN_RUN_MS,
+  };
+
+  // Build a cacheable response. s-maxage=15 keeps the edge fresh for
+  // 15s; stale-while-revalidate=60 lets the edge serve a stale copy
+  // for up to 60s after expiry while it refreshes in the background,
+  // so a write that races a read never causes a user-visible blip.
+  // Writes purge the cache explicitly via waitUntil (see
+  // purgeLeaderboardCache), so the SWR window is just a safety net,
+  // not the primary freshness mechanism.
+  const response = new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'public, s-maxage=15, stale-while-revalidate=60',
+    },
   });
+
+  // Stash a clone in the edge cache. cache.put is fire-and-forget via
+  // waitUntil so it doesn't add latency to the miss-path response.
+  if (ctx && typeof ctx.waitUntil === 'function') {
+    ctx.waitUntil(cache.put(cacheKey, response.clone()));
+  }
+  return response;
 }
 
 async function handleRunStart(request, env, cfg) {
@@ -368,7 +414,7 @@ async function handleRunCoin(request, env, cfg) {
   return jsonResponse(200, { ok: true, coinCount, requiredCoinCount });
 }
 
-async function handleRunFinish(request, env, cfg) {
+async function handleRunFinish(request, env, cfg, ctx) {
   const now = Date.now();
   const ipHash = await getRequestIpHash(request, env);
   const allowed = await rateLimit(env.LB_DB, ipHash, 'run_finish', 40, 10 * 60 * 1000, now);
@@ -455,6 +501,10 @@ async function handleRunFinish(request, env, cfg) {
 
   const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg, { mode: runMode });
   await pruneLeaderboard(env.LB_DB, cfg);
+  // The board changed — purge the edge cache so the next GET hits
+  // origin and the new entry appears immediately for everyone (incl.
+  // the share link the player is about to send).
+  purgeLeaderboardCache(request, ctx);
 
   const rank = leaderboard.findIndex((row) => row.id === entryId) + 1;
   const entry = leaderboard.find((row) => row.id === entryId) || {
@@ -480,7 +530,7 @@ async function handleRunFinish(request, env, cfg) {
   });
 }
 
-async function handleRunRename(request, env, cfg) {
+async function handleRunRename(request, env, cfg, ctx) {
   const now = Date.now();
   const ipHash = await getRequestIpHash(request, env);
   const allowed = await rateLimit(env.LB_DB, ipHash, 'run_rename', 120, 10 * 60 * 1000, now);
@@ -520,6 +570,7 @@ async function handleRunRename(request, env, cfg) {
     .prepare(`UPDATE leaderboard_entries SET name = ? WHERE id = ?`)
     .bind(name, entryId)
     .run();
+  purgeLeaderboardCache(request, ctx);
 
   const targetMode = sanitizeMode(target.mode);
   const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg, { mode: targetMode });
@@ -561,7 +612,7 @@ async function handleAdminLeaderboard(request, env, cfg) {
   });
 }
 
-async function handleAdminDelete(request, env, cfg) {
+async function handleAdminDelete(request, env, cfg, ctx) {
   const auth = await requireAdmin(request, env);
   if (auth) return auth;
 
@@ -574,21 +625,23 @@ async function handleAdminDelete(request, env, cfg) {
   if (deleted < 1) return apiError(404, 'not_found', 'Entry not found');
 
   await pruneLeaderboard(env.LB_DB, cfg);
+  purgeLeaderboardCache(request, ctx);
   const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg);
   return jsonResponse(200, { ok: true, deletedId: id, leaderboardSize: leaderboard.length });
 }
 
-async function handleAdminDeleteTests(request, env, cfg) {
+async function handleAdminDeleteTests(request, env, cfg, ctx) {
   const auth = await requireAdmin(request, env);
   if (auth) return auth;
 
   const result = await env.LB_DB.prepare(`DELETE FROM leaderboard_entries WHERE is_test = 1`).run();
   const deleted = Number(result.meta?.changes || 0);
+  purgeLeaderboardCache(request, ctx);
   const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg);
   return jsonResponse(200, { ok: true, deletedCount: deleted, leaderboardSize: leaderboard.length });
 }
 
-async function handleAdminReset(request, env) {
+async function handleAdminReset(request, env, ctx) {
   const auth = await requireAdmin(request, env);
   if (auth) return auth;
 
@@ -603,6 +656,7 @@ async function handleAdminReset(request, env) {
     env.LB_DB.prepare(`DELETE FROM run_claims`),
     env.LB_DB.prepare(`DELETE FROM run_sessions`),
   ]);
+  purgeLeaderboardCache(request, ctx);
   return jsonResponse(200, { ok: true, leaderboardSize: 0 });
 }
 
@@ -866,6 +920,47 @@ function jsonResponse(status, body) {
       'cache-control': 'no-store',
     },
   });
+}
+
+// ── Edge-cache helpers ──────────────────────────────────────────────
+// All public leaderboard reads collapse to one of three canonical
+// variants. Keep them in a single list so the read path (cache key
+// build) and the write path (purge) can never drift out of sync —
+// adding a new variant here automatically purges it on every write.
+const LB_CACHE_VARIANTS = [
+  { mode: 'normal', onlyAllSecrets: false },
+  { mode: 'speed', onlyAllSecrets: false },
+  { mode: null, onlyAllSecrets: true },
+];
+
+function leaderboardCacheKey(request, { mode, onlyAllSecrets }) {
+  // Build the cache key off the request's origin (so the URL is
+  // valid for the runtime's cache API) but on a synthetic path
+  // (`/__cache/...`) that no real request can ever hit. This keeps
+  // the cache namespace isolated from any future route shuffling
+  // and ensures only canonicalized (mode, onlyAllSecrets) tuples
+  // become cache entries — query-param fuzzing can't fragment it.
+  const url = new URL(request.url);
+  url.search = '';
+  url.pathname = '/__cache/leaderboard';
+  if (onlyAllSecrets) url.searchParams.set('onlyAllSecrets', '1');
+  else url.searchParams.set('mode', mode || 'normal');
+  return url.toString();
+}
+
+function purgeLeaderboardCache(request, ctx) {
+  // Fire-and-forget: cache.delete() can be slow under load and we
+  // don't want write responses (run/finish, rename, admin) to wait
+  // on it. waitUntil keeps the worker alive past the response so the
+  // purges still complete. If ctx isn't available (shouldn't happen
+  // in production, but just in case), silently skip — the SWR window
+  // (60s) will catch it eventually.
+  if (!ctx || typeof ctx.waitUntil !== 'function') return;
+  const cache = caches.default;
+  const keys = LB_CACHE_VARIANTS.map((v) => leaderboardCacheKey(request, v));
+  ctx.waitUntil(
+    Promise.all(keys.map((k) => cache.delete(k))).catch(() => { /* best-effort */ })
+  );
 }
 
 function withCors(response) {

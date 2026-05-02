@@ -45,6 +45,16 @@
   status = 200
 
 [[redirects]]
+  from = "/settings"
+  to = "/settings.html"
+  status = 200
+
+[[redirects]]
+  from = "/settings/"
+  to = "/settings.html"
+  status = 200
+
+[[redirects]]
   from = "/play"
   to = "/vite-index.html"
   status = 200

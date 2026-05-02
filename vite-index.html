@@ -377,204 +377,53 @@
          Visibility is driven from CSS by the overlay's inline display
          style (see #fpPauseOverlay[style*="display"] + .pause-card-host). -->
     <div class="pause-card-host">
-      <div class="pause-card" role="dialog" aria-modal="true" aria-label="Pause menu">
+      <div class="pause-card pause-card--nav" role="dialog" aria-modal="true" aria-label="Pause menu"
+        data-pause-view="launcher">
 
-        <!-- Action zone: Resume / Reset / Exit — prominent top band -->
-        <div class="pause-action-zone">
-          <div class="pause-action-header">
-            <h2>Paused</h2>
-          </div>
-          <div class="pause-action-btns">
-            <button class="pause-btn pause-btn--hero glass-btn glass-btn--primary" id="fpPauseResume"
-              onclick="window._resumeFP&&window._resumeFP()"><i class="ph-fill ph-play"></i> Resume <kbd
-                class="pause-btn-key">Esc</kbd></button>
-            <button class="pause-btn pause-btn--secondary glass-btn" onclick="window._resetFP&&window._resetFP()"><i
-                class="ph ph-arrow-counter-clockwise"></i> Reset run <kbd class="pause-btn-key">R</kbd></button>
-            <button class="pause-btn pause-btn--secondary glass-btn glass-btn--danger"
-              onclick="window._exitFP&&window._exitFP()"><i class="ph ph-sign-out"></i> Exit</button>
-          </div>
-        </div>
+        <!-- Two-view container: Launcher (Resume/Restart/Settings/Exit)
+             and Settings (drill-down). Both views live in the same
+             grid cell so the card auto-sizes to whichever is active.
+             pause-nav.js animates between the two with a measured
+             FLIP-style morph: card width/height interpolate, outgoing
+             content slides + fades + blurs out, incoming slides in
+             from the opposite side. The Back button on the Settings
+             view returns to Launcher with the reverse direction. -->
+        <div class="pause-views">
 
-        <!-- Body: settings -->
-        <div class="pause-body">
-
-          <!-- Audio -->
-          <section class="pause-section">
-            <h3 class="pause-section-title"><i class="ph ph-speaker-high"></i> Audio</h3>
-            <div class="pause-toggles">
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph-fill ph-speaker-high"></i> SFX</span>
-                <div class="toggle-sw on" id="fpPauseMuteSfx" role="switch" aria-checked="true"
-                  onclick="this.classList.toggle('on');window._toggleMuteSfx&&window._toggleMuteSfx(!this.classList.contains('on'))">
-                </div>
-                <span class="pause-toggle-state" id="fpPauseMuteSfxState">On</span>
+          <!-- View 1: launcher -->
+          <section class="pause-view pause-view--launcher" data-view="launcher" aria-label="Pause menu">
+            <div class="pause-launcher">
+              <div class="pause-launcher__head">
+                <h2>Paused</h2>
               </div>
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph-fill ph-music-notes"></i> Music</span>
-                <div class="toggle-sw on" id="fpPauseMuteMusic" role="switch" aria-checked="true"
-                  onclick="this.classList.toggle('on');window._toggleMuteMusic&&window._toggleMuteMusic(!this.classList.contains('on'))">
-                </div>
-                <span class="pause-toggle-state" id="fpPauseMuteMusicState">On</span>
+              <div class="pause-launcher__btns">
+                <button class="pause-btn pause-btn--hero glass-btn glass-btn--primary" id="fpPauseResume"
+                  onclick="window._resumeFP&&window._resumeFP()"><i class="ph-fill ph-play"></i> Resume <kbd
+                    class="pause-btn-key">Esc</kbd></button>
+                <button class="pause-btn pause-btn--secondary glass-btn"
+                  onclick="window._resetFP&&window._resetFP()"><i class="ph ph-arrow-counter-clockwise"></i> Restart
+                  <kbd class="pause-btn-key">R</kbd></button>
+                <button class="pause-btn pause-btn--secondary glass-btn" type="button"
+                  data-action="pause-settings"><i class="ph ph-gear"></i> Settings</button>
+                <button class="pause-btn pause-btn--secondary glass-btn glass-btn--danger"
+                  onclick="window._exitFP&&window._exitFP()"><i class="ph ph-sign-out"></i> Exit</button>
               </div>
             </div>
           </section>
 
-          <!-- Display -->
-          <section class="pause-section">
-            <h3 class="pause-section-title"><i class="ph ph-monitor"></i> Display</h3>
-            <div class="pause-toggles">
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph ph-camera-rotate"></i> Camera</span>
-                <button type="button" class="pause-inline-btn"
-                  onclick="window._switchCamFP&&window._switchCamFP()"><span id="fpPauseCamLabel">Third person</span>
-                  <kbd>V</kbd></button>
-              </div>
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph ph-gauge"></i> Show FPS</span>
-                <div class="toggle-sw" id="fpPauseShowFps" role="switch" aria-checked="false"
-                  onclick="window._toggleFps&&window._toggleFps()"></div>
-                <span class="pause-toggle-state off" id="fpPauseShowFpsState">Off</span>
-              </div>
-              <div class="pause-toggle-row" id="fpPauseShowMphRow" style="display:none">
-                <span class="pause-toggle-label"><i class="ph ph-speedometer"></i> Show MPH</span>
-                <div class="toggle-sw on" id="fpPauseShowMph" role="switch" aria-checked="true"
-                  onclick="window._toggleMph&&window._toggleMph()"></div>
-                <span class="pause-toggle-state" id="fpPauseShowMphState">On</span>
-              </div>
-              <div class="pause-toggle-row" id="fpPauseDebugWallsRow" style="display:none">
-                <span class="pause-toggle-label"><i class="ph ph-walls"></i> Wall labels</span>
-                <div class="toggle-sw" id="fpPauseDebugWalls" role="switch" aria-checked="false"
-                  onclick="window._toggleDebugWallLabels&&window._toggleDebugWallLabels()"></div>
-                <span class="pause-toggle-state off" id="fpPauseDebugWallsState">Off</span>
-              </div>
-            </div>
+          <!-- View 2: settings (drill-down). Hidden until the user
+               clicks Settings; pause-nav.js mounts the schema panel
+               into #pauseSettingsHost on first reveal. -->
+          <section class="pause-view pause-view--settings" data-view="settings" aria-label="Settings" hidden>
+            <header class="pause-settings__head">
+              <button class="pause-back" type="button" data-action="pause-back" aria-label="Back to pause menu">
+                <i class="ph ph-arrow-left" aria-hidden="true"></i>
+              </button>
+              <h2>Settings</h2>
+            </header>
+            <div id="pauseSettingsHost"></div>
           </section>
 
-          <!-- Performance test -->
-          <section class="pause-section">
-            <h3 class="pause-section-title"><i class="ph ph-gauge"></i> Performance Test</h3>
-            <div class="pause-toggles">
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph ph-sun"></i> Outside window sunlight</span>
-                <div class="toggle-sw on" id="fpPausePerfWindowSun" role="switch" aria-checked="true"
-                  onclick="window._togglePerfWindowSun&&window._togglePerfWindowSun()"></div>
-                <span class="pause-toggle-state" id="fpPausePerfWindowSunState">On</span>
-              </div>
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph ph-sun-dim"></i> Shadows</span>
-                <div class="toggle-sw on" id="fpPausePerfShadows" role="switch" aria-checked="true"
-                  onclick="window._togglePerfShadows&&window._togglePerfShadows()"></div>
-                <span class="pause-toggle-state" id="fpPausePerfShadowsState">On</span>
-              </div>
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph ph-cloud"></i> Fog</span>
-                <div class="toggle-sw on" id="fpPausePerfFog" role="switch" aria-checked="true"
-                  onclick="window._togglePerfFog&&window._togglePerfFog()"></div>
-                <span class="pause-toggle-state" id="fpPausePerfFogState">On</span>
-              </div>
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label" title="Independent resolution scaler for first-person gameplay."><i class="ph ph-arrows-out"></i> Resolution scaler</span>
-                <div class="toggle-sw on" id="fpPausePerfResolution" role="switch" aria-checked="true"
-                  onclick="window._toggleFpPerfResolution&&window._toggleFpPerfResolution()"></div>
-                <span class="pause-toggle-state" id="fpPausePerfResolutionState">On</span>
-              </div>
-              <div class="pause-toggle-row pause-toggle-row--slider">
-                <span class="pause-toggle-label"><i class="ph ph-crop"></i> Render scale</span>
-                <input type="range" id="fpPausePerfResolutionScale" class="pause-range" min="0.35" max="1.2" step="0.01"
-                  value="0.68" aria-label="Render scale"
-                  oninput="window._setFpPerfResolutionScale&&window._setFpPerfResolutionScale(this.value)">
-                <span class="pause-toggle-state" id="fpPausePerfResolutionScaleVal">68%</span>
-              </div>
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label" title="Non-resolution runtime knobs for first-person mode."><i class="ph ph-rocket-launch"></i> Runtime perf knobs</span>
-                <div class="toggle-sw on" id="fpPausePerfFpProfile" role="switch" aria-checked="true"
-                  onclick="window._toggleFpPerfProfile&&window._toggleFpPerfProfile()"></div>
-                <span class="pause-toggle-state" id="fpPausePerfFpProfileState">On</span>
-              </div>
-              <div class="pause-toggle-row pause-toggle-row--slider">
-                <span class="pause-toggle-label"><i class="ph ph-clock-countdown"></i> FP shadow cadence</span>
-                <input type="range" id="fpPausePerfShadowCadence" class="pause-range" min="0" max="120" step="1"
-                  value="0" aria-label="FP shadow cadence"
-                  oninput="window._setFpPerfShadowCadence&&window._setFpPerfShadowCadence(this.value)">
-                <span class="pause-toggle-state" id="fpPausePerfShadowCadenceVal">Every frame</span>
-              </div>
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph ph-cat"></i> Cat animation stack</span>
-                <div class="toggle-sw on" id="fpPausePerfCatAnim" role="switch" aria-checked="true"
-                  onclick="window._togglePerfCatAnim&&window._togglePerfCatAnim()"></div>
-                <span class="pause-toggle-state" id="fpPausePerfCatAnimState">On</span>
-              </div>
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph ph-coins"></i> Coin simulation</span>
-                <div class="toggle-sw on" id="fpPausePerfCoins" role="switch" aria-checked="true"
-                  onclick="window._togglePerfCoins&&window._togglePerfCoins()"></div>
-                <span class="pause-toggle-state" id="fpPausePerfCoinsState">On</span>
-              </div>
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph ph-fan"></i> Purifier animation</span>
-                <div class="toggle-sw on" id="fpPausePerfPurifier" role="switch" aria-checked="true"
-                  onclick="window._togglePerfPurifier&&window._togglePerfPurifier()"></div>
-                <span class="pause-toggle-state" id="fpPausePerfPurifierState">On</span>
-              </div>
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph ph-sparkle"></i> Ability effects</span>
-                <div class="toggle-sw on" id="fpPausePerfAbilities" role="switch" aria-checked="true"
-                  onclick="window._togglePerfAbilities&&window._togglePerfAbilities()"></div>
-                <span class="pause-toggle-state" id="fpPausePerfAbilitiesState">On</span>
-              </div>
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph ph-crosshair"></i> Interaction raycast</span>
-                <div class="toggle-sw on" id="fpPausePerfRaycast" role="switch" aria-checked="true"
-                  onclick="window._togglePerfRaycast&&window._togglePerfRaycast()"></div>
-                <span class="pause-toggle-state" id="fpPausePerfRaycastState">On</span>
-              </div>
-            </div>
-          </section>
-
-          <!-- Controls -->
-          <section class="pause-section">
-            <h3 class="pause-section-title"><i class="ph ph-mouse"></i> Controls</h3>
-            <div class="pause-toggles">
-              <div class="pause-toggle-row pause-toggle-row--slider">
-                <span class="pause-toggle-label"><i class="ph ph-arrows-out-cardinal"></i> Mouse sensitivity</span>
-                <input type="range" id="fpPauseMouseSens" class="pause-range" min="0.25" max="2.5" step="0.05" value="1"
-                  aria-label="Mouse sensitivity" oninput="window._setMouseSens&&window._setMouseSens(this.value)">
-                <span class="pause-toggle-state" id="fpPauseMouseSensVal">1.00×</span>
-              </div>
-              <div class="pause-toggle-row pause-toggle-row--slider">
-                <span class="pause-toggle-label"><i class="ph ph-binoculars"></i> Field of view</span>
-                <input type="range" id="fpPauseFov" class="pause-range" min="55" max="130" step="1" value="85"
-                  aria-label="Field of view" oninput="window._setFov&&window._setFov(this.value)">
-                <span class="pause-toggle-state" id="fpPauseFovVal">85°</span>
-              </div>
-              <div class="pause-toggle-row">
-                <span class="pause-toggle-label"><i class="ph ph-sneaker-move"></i> Skate mode</span>
-                <div class="toggle-sw" id="fpPauseSkateMode" role="switch" aria-checked="false"
-                  onclick="window._toggleSkateMode&&window._toggleSkateMode()"></div>
-                <span class="pause-toggle-state off" id="fpPauseSkateModeState">Off</span>
-              </div>
-            </div>
-          </section>
-
-          <!-- Keyboard shortcuts -->
-          <section class="pause-section pause-section--kbd">
-            <h3 class="pause-section-title"><i class="ph ph-keyboard"></i> Keyboard</h3>
-            <div class="pause-controls">
-              <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
-              <div><kbd>Space</kbd> Jump (hold)</div>
-              <div><kbd>Shift</kbd> Sprint</div>
-              <div><kbd>V</kbd> Camera</div>
-              <div><kbd>K</kbd> Skate mode</div>
-              <div><kbd>Q</kbd> Kickflip (skate)</div>
-              <div><kbd>E</kbd> Manual (skate)</div>
-              <div><kbd>F</kbd> Helicopter (skate)</div>
-              <div><kbd>R</kbd> Reset run</div>
-              <div><kbd>Esc</kbd> Resume</div>
-            </div>
-            <button class="pause-link pause-link--footer" type="button"
-              onclick="window._enterInspector&&window._enterInspector()"><i class="ph ph-magnifying-glass"></i>
-              Inspect air purifier</button>
-          </section>
         </div>
       </div>
     </div>
@@ -607,6 +456,10 @@
     }
   </script>
   <script type="module" src="/src/main.js"></script>
+  <!-- Pause-card drill-down nav (Launcher ↔ Settings). Mounts the
+       schema-driven settings panel into #pauseSettingsHost on first
+       drill-in and animates the .pause-card between views. -->
+  <script type="module" src="/src/modules/pause-nav.js"></script>
 </body>
 
 </html>

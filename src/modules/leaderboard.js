@@ -1151,9 +1151,39 @@ function _setFinishPreviewModel(modelKey, colorKey, hairKey) {
   _clearFinishPreviewModel();
 
   const preset = CAT_MODEL_PRESETS[safeModel] || CAT_MODEL_PRESETS.classic;
-  const sources = (preset.sources && preset.sources.length ? preset.sources : ['assets/cat.glb']).slice();
   const token = ++_finishPreviewLoadToken;
   _finishPreviewLoading = true;
+
+  const installModel = (model) => {
+    if (token !== _finishPreviewLoadToken) {
+      _disposeFinishPreviewModel(model);
+      return;
+    }
+    if (safeModel === 'bababooey') _stripFinishPreviewBackdrop(model);
+    _placeFinishPreviewModel(model, safeModel);
+    _tintFinishPreviewModel(model, safeModel, safeColor);
+    _finishPreviewScene.add(model);
+    _finishPreviewModel = model;
+    _finishPreviewLoading = false;
+    _startFinishPreviewLoop();
+  };
+
+  // Procedural models (e.g. Korra) are built in code rather than loaded
+  // from a GLB. Without this branch the preview silently falls back to
+  // the classic cat glb and shows the wrong character.
+  if (preset.procedural) {
+    import('./korra-model.js').then(({ buildKorraModel }) => {
+      if (token !== _finishPreviewLoadToken) return;
+      const result = buildKorraModel();
+      installModel(result.scene);
+    }).catch(err => {
+      if (token === _finishPreviewLoadToken) _finishPreviewLoading = false;
+      console.warn('[leaderboard] procedural finish preview failed', err);
+    });
+    return;
+  }
+
+  const sources = (preset.sources && preset.sources.length ? preset.sources : ['assets/cat.glb']).slice();
 
   const tryLoad = (idx) => {
     if (idx >= sources.length || !_finishPreviewLoader) {
@@ -1161,15 +1191,7 @@ function _setFinishPreviewModel(modelKey, colorKey, hairKey) {
       return;
     }
     _finishPreviewLoader.load(sources[idx], (gltf) => {
-      if (token !== _finishPreviewLoadToken) return;
-      const model = gltf.scene;
-      if (safeModel === 'bababooey') _stripFinishPreviewBackdrop(model);
-      _placeFinishPreviewModel(model, safeModel);
-      _tintFinishPreviewModel(model, safeModel, safeColor);
-      _finishPreviewScene.add(model);
-      _finishPreviewModel = model;
-      _finishPreviewLoading = false;
-      _startFinishPreviewLoop();
+      installModel(gltf.scene);
     }, undefined, () => {
       tryLoad(idx + 1);
     });

@@ -4270,6 +4270,19 @@ export function createRoom(scene) {
   rod.castShadow = false; rod._isRoom = true; addRoom(rod);
 
   // Mark only wall meshes that actually fade as transparent (keeps other room objects in fast opaque pass)
+  // Bed parts get tagged with userData.bedPart so the FP-mode click
+  // raycast can treat them as passthrough only when the player is
+  // actually under the bed (feet below slat level). Otherwise it's hard
+  // to click the pokémon binder under the bed: in third-person the
+  // camera floats above/behind the cat and clips through the mattress,
+  // and even in first-person the side rails or footboard can sit
+  // between the camera and the binder. We can't use the global
+  // clickPassthrough flag here because fireball and kamehameha damage
+  // rays also honor it — that would let attacks pass through the bed.
+  // Headboard is intentionally left untagged since the binder sits in
+  // front of it; preserves the "can't click through the back wall"
+  // expectation. Rendering and physics are unchanged.
+  const _bedPass = (m) => { if (m) m.userData.bedPart = true; return m; };
   // Upholstered headboard (full height, at back of bed)
   const hbThick = 3, hbH = bedH - bedClearance, hbW = bedW;
   const headboard = roomRoundBox(hbW, hbH, hbThick, 2, 0x4a4a55,
@@ -4282,25 +4295,25 @@ export function createRoom(scene) {
   const railThick = 1.5;
   const railY = floorY + bedClearance + railH / 2;
   // Left rail
-  const lRail = roomRoundBox(railThick, railH, bedL, 1, 0x4a4a55,
-    bedX - bedW / 2 + railThick / 2, railY, bedZ, 0, 0, 0);
+  const lRail = _bedPass(roomRoundBox(railThick, railH, bedL, 1, 0x4a4a55,
+    bedX - bedW / 2 + railThick / 2, railY, bedZ, 0, 0, 0));
   lRail.material.roughness = 0.95;
   // Right rail
-  const rRail = roomRoundBox(railThick, railH, bedL, 1, 0x4a4a55,
-    bedX + bedW / 2 - railThick / 2, railY, bedZ, 0, 0, 0);
+  const rRail = _bedPass(roomRoundBox(railThick, railH, bedL, 1, 0x4a4a55,
+    bedX + bedW / 2 - railThick / 2, railY, bedZ, 0, 0, 0));
   rRail.material.roughness = 0.95;
 
   // Footboard — lower profile
   const fbH = railH, fbThick = 2;
-  const footboard = roomRoundBox(bedW, fbH, fbThick, 1.5, 0x4a4a55,
-    bedX, railY, bedZ - bedL / 2 + fbThick / 2, 0, 0, 0);
+  const footboard = _bedPass(roomRoundBox(bedW, fbH, fbThick, 1.5, 0x4a4a55,
+    bedX, railY, bedZ - bedL / 2 + fbThick / 2, 0, 0, 0));
   footboard.material.roughness = 0.95;
 
   // Slat platform (at 14" from floor)
 
   const slatY = floorY + bedSlatsFromFloor;
-  roomBox(bedW - 2 * railThick, 1.0, bedL - hbThick - fbThick, 0x3a3a44,
-    bedX, slatY, bedZ + (hbThick - fbThick) / 2, 0, 0, 0);
+  _bedPass(roomBox(bedW - 2 * railThick, 1.0, bedL - hbThick - fbThick, 0x3a3a44,
+    bedX, slatY, bedZ + (hbThick - fbThick) / 2, 0, 0, 0));
 
   // Legs — cylinders at corners reaching from floor to slat platform
   const legBedH = bedSlatsFromFloor, legBedR = 1.2;
@@ -4316,6 +4329,7 @@ export function createRoom(scene) {
     const lmesh = new THREE.Mesh(lg, lm);
     lmesh.position.set(lx, floorY + legBedH / 2, lz);
     lmesh.castShadow = false; lmesh.receiveShadow = true; lmesh._isRoom = true;
+    _bedPass(lmesh);
     addRoom(lmesh);
   }
 
@@ -4324,24 +4338,24 @@ export function createRoom(scene) {
   // Center rail running length of bed
   const centerRailW = 2, centerRailH = 1.5;
   const innerL = bedL - hbThick - fbThick;
-  roomBox(centerRailW, centerRailH, innerL, 0x2a2a2a,
-    bedX, bedFrameY - centerRailH / 2, bedZ + (hbThick - fbThick) / 2, 0, 0, 0);
+  _bedPass(roomBox(centerRailW, centerRailH, innerL, 0x2a2a2a,
+    bedX, bedFrameY - centerRailH / 2, bedZ + (hbThick - fbThick) / 2, 0, 0, 0));
   // Cross supports (4 evenly spaced)
   const innerW = bedW - 2 * railThick - 2;
   const crossH = 1.2, crossD = 2;
   for (let i = 0; i < 4; i++) {
     const t = (i + 1) / 5;
     const cz = bedZ - innerL / 2 + innerL * t + (hbThick - fbThick) / 2;
-    roomBox(innerW, crossH, crossD, 0x2a2a2a,
-      bedX, bedFrameY - crossH / 2, cz, 0, 0, 0);
+    _bedPass(roomBox(innerW, crossH, crossD, 0x2a2a2a,
+      bedX, bedFrameY - crossH / 2, cz, 0, 0, 0));
   }
 
   // Mattress (approx 60"×80"×10")
   const mattW = 58, mattL = 78, mattH = 10;
   const mattY = slatY + 1 + mattH / 2;
   const mattCenterZ = bedZ + (hbThick - fbThick) / 2;
-  const mattress = roomRoundBox(mattW, mattH, mattL, 3, 0xd4cdc0,
-    bedX, mattY, mattCenterZ, 0, 0, 0);
+  const mattress = _bedPass(roomRoundBox(mattW, mattH, mattL, 3, 0xd4cdc0,
+    bedX, mattY, mattCenterZ, 0, 0, 0));
   mattress.material.roughness = 0.92;
   mattress.material.color.set(0xd4cdc0);
 
@@ -4383,6 +4397,7 @@ export function createRoom(scene) {
     pillow.position.set(bedX + px, pillowY + pillowH / 2, pillowBaseZ);
     pillow.rotation.set(0, px > 0 ? 0.05 : -0.05, px > 0 ? -0.03 : 0.03);
     pillow.castShadow = true; pillow.receiveShadow = true; pillow._isRoom = true;
+    _bedPass(pillow);
     addRoom(pillow);
     pillows.push(pillow);
   }
@@ -4463,6 +4478,7 @@ export function createRoom(scene) {
   const duvet = new THREE.Mesh(blanketGeo, stdMat({ color: 0x6e6e78, roughness: 1.0, metalness: 0.0, map: duvetTex, bumpMap: duvetBump, bumpScale: 0.1 }));
   duvet.position.set(bedX, mattY + mattH / 2 + duvetH / 2, duvetZ);
   duvet.castShadow = true; duvet.receiveShadow = true; duvet._isRoom = true;
+  _bedPass(duvet);
   addRoom(duvet);
 
   // ── Items under the bed ────────────────────────────────────────────

@@ -60,6 +60,7 @@ export default defineConfig({
         admin: 'admin.html',
         leaderboard: 'leaderboard.html',
         about: 'about.html',
+        settings: 'settings.html',
         old: 'index.html'
       },
       output: {

@@ -7,6 +7,41 @@
   <title>Zoomies — Speedrun Leaderboard</title>
   <meta name="description"
     content="Zoomies — a first-person coin-collecting speedrun in a tiny bedroom. Can you beat the time?" />
+  <script>
+    // ── Pre-boot leaderboard fetch ───────────────────────────────────
+    // Kick off the /api/leaderboard request as early as the parser
+    // sees this <head> — BEFORE the inline <style> block, the SPA
+    // router script, the iframe creation, etc. all have a chance to
+    // push it back. loadLeaderboard() below consumes this in-flight
+    // promise via window.__lbBootFetch instead of starting a fresh
+    // fetch, so the round-trip overlaps with HTML parse + first paint
+    // instead of running serially after them. Saves ~50–300ms of
+    // user-perceived "skeleton → real rows" time on first load.
+    //
+    // This is best-effort; any failure here just falls through to the
+    // normal fetch path in __initLeaderboard().
+    (function () {
+      try {
+        var qs = new URLSearchParams(location.search);
+        var raw = String(qs.get('mode') || '').trim().toLowerCase();
+        var valid = ['normal', 'speed', 'allsecrets'];
+        var mode = valid.indexOf(raw) >= 0 ? raw : 'normal';
+        var url = mode === 'allsecrets'
+          ? '/api/leaderboard?onlyAllSecrets=1'
+          : '/api/leaderboard?mode=' + encodeURIComponent(mode);
+        window.__lbBootFetch = {
+          mode: mode,
+          promise: fetch(url, { credentials: 'same-origin' }).then(function (r) {
+            return r.json().then(function (j) {
+              return { ok: r.ok, status: r.status, data: j };
+            });
+          }).catch(function () {
+            return { ok: false, status: 0, data: null };
+          })
+        };
+      } catch (_) { /* perf nicety, not load-bearing */ }
+    })();
+  </script>
   <!-- Share the same stylesheet (and design tokens) the in-game UI uses -->
   <link rel="stylesheet" href="./src/styles/main.css" />
   <!-- Phosphor icon CSS is deferred via preload+onload so it never
@@ -708,6 +743,10 @@
       <i class="site-tab__icon site-tab__icon--regular ph ph-info"></i><i
         class="site-tab__icon site-tab__icon--fill ph-fill ph-info"></i><span>About</span>
     </a>
+    <a class="site-tab" href="/settings" data-tab="settings">
+      <i class="site-tab__icon site-tab__icon--regular ph ph-gear"></i><i
+        class="site-tab__icon site-tab__icon--fill ph-fill ph-gear"></i><span>Settings</span>
+    </a>
   </nav>
 
   <main class="page">
@@ -934,13 +973,21 @@
       }
     })();
   </script>
-  <script>
+  <script data-spa-init="leaderboard">
     // ── Leaderboard view init ────────────────────────────────────────
     // Wrapped as a single re-entrant function so the cross-page SPA
     // router can call it again after swapping <main class="page"> in
     // place. Each call re-grabs fresh DOM nodes, re-binds listeners,
     // and re-loads from the API based on the current URL — no
     // top-level `const` declarations that would clash on re-execution.
+    //
+    // The data-spa-init="leaderboard" attribute marks this <script>
+    // for the cross-page SPA router (in home.html / about.html) to
+    // re-execute when SPA-swapping into /leaderboard. Without that,
+    // arriving at the leaderboard via tab click from another view
+    // leaves __initLeaderboard undefined and the skeleton rows in
+    // the markup never get replaced — "loading forever" until the
+    // user hard-refreshes.
     window.__initLeaderboard = function __initLeaderboard() {
       const rowsEl = document.getElementById('rows');
       const emptyEl = document.getElementById('empty');
@@ -1118,9 +1165,27 @@
           const apiUrl = mode === 'allsecrets'
             ? '/api/leaderboard?onlyAllSecrets=1'
             : `/api/leaderboard?mode=${encodeURIComponent(mode)}`;
-          const res = await fetch(apiUrl, { credentials: 'same-origin' });
-          const data = await res.json();
-          if (!res.ok || data.ok === false) throw new Error((data && data.message) || `API ${res.status}`);
+          // Reuse the pre-boot fetch kicked off at top of <head> if
+          // it matches the mode the user actually landed on — saves
+          // the parse+paint+iframe-create delay that would otherwise
+          // sit in front of this network call. Consume-once so the
+          // SWR revalidate path (mode-tab switches, second visits)
+          // always hits the network fresh.
+          let res, data;
+          if (window.__lbBootFetch && window.__lbBootFetch.mode === mode) {
+            const preboot = window.__lbBootFetch;
+            window.__lbBootFetch = null;
+            const result = await preboot.promise;
+            if (!result || !result.ok || !result.data) {
+              throw new Error((result && result.data && result.data.message) || `API ${result ? result.status : 0}`);
+            }
+            data = result.data;
+            if (data.ok === false) throw new Error(data.message || 'API error');
+          } else {
+            res = await fetch(apiUrl, { credentials: 'same-origin' });
+            data = await res.json();
+            if (!res.ok || data.ok === false) throw new Error((data && data.message) || `API ${res.status}`);
+          }
           rows = Array.isArray(data.leaderboard) ? data.leaderboard : [];
         } catch (err) {
           rows = [];
@@ -1205,6 +1270,7 @@
         if (path === '/' || path === '/home' || path === '/home.html') return 'home';
         if (path === '/about' || path === '/about.html') return 'about';
         if (path === '/leaderboard' || path === '/leaderboard.html' || path.startsWith('/leaderboard')) return 'leaderboard';
+        if (path === '/settings' || path === '/settings.html') return 'settings';
         if (path === '/play' || path === '/vite-index.html' || path === '/index.html') return 'play';
         return null;
       }
@@ -1265,8 +1331,23 @@
         if (nav) nav.classList.add('pill-ready');
       });
       window.addEventListener('resize', updatePill);
-      // Webfonts can resize the tab labels after first paint; re-measure
-      // when they're ready so the pill snaps to the final width.
+      // Late layout/font shifts can resize the active tab AFTER the
+      // initial measurement (Phosphor-Fill resolving later than the
+      // regular face, the leaderboard table reflow on direct loads,
+      // scrollbar appearance, etc.) and the one-shot fonts.ready hook
+      // alone misses those. A ResizeObserver on every tab keeps the
+      // pill snapped to the active tab through any of those shifts.
+      if (typeof ResizeObserver !== 'undefined') {
+        const nav = document.querySelector('.site-tabs');
+        if (nav) {
+          const ro = new ResizeObserver(() => updatePill());
+          nav.querySelectorAll('.site-tab').forEach(t => ro.observe(t));
+        }
+      }
+      // Final safety net — re-measure once everything (including any
+      // late-arriving stylesheets, icon fonts, and images that affect
+      // tab metrics) has finished loading.
+      window.addEventListener('load', updatePill);
       if (document.fonts && document.fonts.ready) {
         document.fonts.ready.then(updatePill).catch(() => { });
       }
@@ -1303,7 +1384,7 @@
         // element itself. Each direction owning its own class is what
         // makes the entrance work cleanly — see CSS comment.
         if (oldMain && !reduced) oldMain.classList.add('is-leaving');
-        const exitWait = reduced ? 0 : 200;
+        const exitWait = reduced ? 0 : 120;
 
         let html;
         try {
@@ -1350,6 +1431,17 @@
 
         if (targetView === 'leaderboard' && typeof window.__initLeaderboard === 'function') {
           window.__initLeaderboard();
+        }
+
+        // Settings page: Vite bundles inline <script type="module">
+        // blocks to external chunks at build time, and modules only
+        // execute once per URL. So we can't rely on re-injecting the
+        // page's own mount script — explicitly mount here on swap-in.
+        if (targetView === 'settings') {
+          import('/src/modules/settings-panel.js').then(({ mountSettings }) => {
+            const host = document.getElementById('settingsHost');
+            if (host) mountSettings(host);
+          });
         }
 
         window.scrollTo(0, 0);

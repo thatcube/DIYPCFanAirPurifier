@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { state } from './state.js';
 import { stdMat } from './materials.js';
 import { fpMode as _fpMode, sfxMuted as _sfxMuted, fpPos as _fpPos } from './game-fp.js';
+import { BED_SLATS_FROM_FLOOR, PLAYER_EYE_H, getFloorY } from './spatial.js';
 import {
   spawnSecretBinderCoin,
   spawnSecretLampCoin,
@@ -1940,6 +1941,13 @@ export function createPurifier(scene) {
       // In FP mode, raycast from screen center to find interactive target
       _raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
       const fpHits = _raycaster.intersectObjects(scene.children, true);
+      // Bed parts (mattress, rails, slats, duvet, etc.) only block clicks
+      // when the player is standing above the bed — otherwise the bed
+      // would eat clicks aimed at the pokémon binder tucked under it
+      // (camera floats through the mattress in third-person; rails/duvet
+      // can sit between camera and binder in first-person).
+      const _playerFeetY = _fpPos.y - PLAYER_EYE_H;
+      const _bedPartsBlock = _playerFeetY >= getFloorY() + BED_SLATS_FROM_FLOOR;
       let fpTarget = null;
       for (const h of fpHits) {
         if (!isAncestorVisible(h.object)) continue;
@@ -1950,8 +1958,9 @@ export function createPurifier(scene) {
         // through walls, furniture, etc.
         const m = h.object && h.object.isMesh ? h.object.material : null;
         const passthrough = h.object && h.object.userData && h.object.userData.clickPassthrough;
+        const isBedPart = h.object && h.object.userData && h.object.userData.bedPart;
         const transparent = m && !Array.isArray(m) && m.transparent && (m.opacity == null || m.opacity < 0.05);
-        if (m && !passthrough && !transparent) break;
+        if (m && !passthrough && !transparent && !(isBedPart && !_bedPartsBlock)) break;
       }
       if (fpTarget) {
         handleClickObject(fpTarget);

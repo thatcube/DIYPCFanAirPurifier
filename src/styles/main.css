@@ -2367,6 +2367,221 @@ line-height: 1;
   padding: 16px 24px 20px;
 }
 
+/* ─── Pause card: drill-down nav (Launcher ↔ Settings) ───────────── */
+/* The pause card hosts a two-view stack:
+     1. Launcher — Resume / Restart / Settings / Exit
+     2. Settings — back button + the schema-driven settings panel
+   pause-nav.js animates the .pause-card's box (width + height) and
+   cross-fades the two views with a directional slide. The card auto-
+   sizes to whichever view is active in its rest state — the inline
+   width/height set by JS is only present mid-transition. */
+
+.pause-card--nav {
+  /* Card shrink-wraps to whichever .pause-view is currently in DOM-
+     flow. Per-view widths live on the views themselves (see below)
+     so the card's measured size in any state — resting, mid-morph,
+     or post-morph — always matches the active view's natural size.
+     This is what lets the FLIP morph in pause-nav.js land precisely
+     instead of snapping at the end. */
+  width: max-content;
+  max-width: min(840px, 96vw);
+  will-change: width, height;
+}
+
+.pause-views {
+  position: relative;
+  /* During the morph we promote the outgoing view to absolute
+     positioning so it overlays the incoming one for the cross-fade
+     while the incoming one alone determines the card's natural
+     size. In the rest state, only the active view is in DOM-flow
+     (the other has hidden=true) so this just behaves like a normal
+     block container. */
+}
+
+.pause-view {
+  width: 100%;
+}
+
+/* Per-view widths. Because the card uses width:max-content, whichever
+   view is in flow drives the card's box. */
+.pause-view--launcher {
+  width: min(460px, 92vw);
+}
+
+.pause-view--settings {
+  width: min(840px, 96vw);
+}
+
+/* During a morph, the outgoing view is taken out of flow so the card
+   can shrink-wrap to the incoming view's box for measurement. */
+.pause-view.is-out-of-flow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Cross-fade + slide direction states.
+   forward = drilling deeper (launcher → settings):
+     outgoing slides LEFT, incoming enters from RIGHT.
+   back    = drilling out (settings → launcher):
+     outgoing slides RIGHT, incoming enters from LEFT. */
+.pause-view[data-state="exit-back"] {
+  animation: pauseViewExitBack 220ms cubic-bezier(.4,0,.2,1) forwards;
+}
+
+.pause-view[data-state="exit-forward"] {
+  animation: pauseViewExitForward 220ms cubic-bezier(.4,0,.2,1) forwards;
+}
+
+.pause-view[data-state="enter-from-forward"] {
+  /* Pre-position; no animation — JS flips to enter-active on next frame. */
+  opacity: 0;
+  transform: translateX(28px);
+  filter: blur(6px);
+}
+
+.pause-view[data-state="enter-from-back"] {
+  opacity: 0;
+  transform: translateX(-28px);
+  filter: blur(6px);
+}
+
+.pause-view[data-state="enter-active"] {
+  animation: pauseViewEnter 280ms cubic-bezier(.22,1,.36,1) 60ms forwards;
+}
+
+@keyframes pauseViewExitBack {
+  to {
+    opacity: 0;
+    transform: translateX(-28px);
+    filter: blur(6px);
+  }
+}
+
+@keyframes pauseViewExitForward {
+  to {
+    opacity: 0;
+    transform: translateX(28px);
+    filter: blur(6px);
+  }
+}
+
+@keyframes pauseViewEnter {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+    filter: blur(0);
+  }
+}
+
+/* ─── Launcher view content ──────────────────────────────────────── */
+
+.pause-launcher {
+  padding: 26px 26px 22px;
+}
+
+.pause-launcher__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.pause-launcher__head h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: 0.01em;
+}
+
+.pause-launcher__btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Resume spans the top row as the hero; Exit spans the bottom row;
+   Restart and Settings share the middle row. */
+.pause-launcher__btns .pause-btn--hero {
+  grid-column: 1 / -1;
+  padding: 18px 20px;
+  font-size: 16px;
+}
+
+.pause-launcher__btns .glass-btn--danger {
+  grid-column: 1 / -1;
+}
+
+/* ─── Settings drill-down view content ───────────────────────────── */
+
+.pause-view--settings {
+  padding: 18px 20px 20px;
+}
+
+.pause-settings__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.pause-settings__head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.01em;
+  color: rgba(225, 240, 255, 0.98);
+}
+
+/* Top-left circular icon button, glass-tinted to match the rest of
+   the UI. Tactile press + focus ring. */
+.pause-back {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border);
+  color: rgba(225, 240, 255, 0.95);
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+  transition: background var(--dur-fast) var(--ease-out-expo),
+              border-color var(--dur-fast) var(--ease-out-expo),
+              transform var(--dur-fast) var(--ease-out-expo);
+}
+
+.pause-back:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--glass-border-strong);
+}
+
+.pause-back:active {
+  transform: scale(0.94);
+}
+
+.pause-back:focus-visible {
+  outline: 2px solid rgba(159, 227, 255, 0.55);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pause-card--nav,
+  .pause-view {
+    transition: none !important;
+    animation: none !important;
+  }
+  .pause-view[data-state="enter-from-forward"],
+  .pause-view[data-state="enter-from-back"],
+  .pause-view[data-state="enter-active"] {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
 /* ─── Action zone (top band with the 3 big buttons) ─── */
 .pause-action-zone {
   padding: 22px 24px 20px;
@@ -2561,7 +2776,7 @@ line-height: 1;
 }
 
 .pause-toggle-state {
-  min-width: 42px;
+  /* Sit flush against the toggle/slider — no padded text box. */
   text-align: right;
   font-size: 10px;
   font-weight: var(--weight-semibold);
@@ -2573,16 +2788,30 @@ line-height: 1;
   color: rgba(255, 195, 195, 0.95);
 }
 
-/* Slider row (mouse sensitivity) */
+/* Slider row — stack label/value on top, slider on bottom so the
+   track gets the full width of the row's grid cell. The value pill
+   stays inline with the label (right-aligned) and the slider sits
+   directly underneath, aligned with the rest of the cell. */
 .pause-toggle-row--slider {
   flex-wrap: wrap;
   row-gap: 6px;
 }
 
-.pause-range {
-  flex: 1 1 120px;
+.pause-toggle-row--slider .pause-toggle-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pause-toggle-row--slider .pause-toggle-state {
+  flex: 0 0 auto;
+  white-space: nowrap;
   margin-left: auto;
-  min-width: 100px;
+}
+
+.pause-range {
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
   height: 4px;
   -webkit-appearance: none;
   appearance: none;
@@ -2673,6 +2902,409 @@ line-height: 1;
   border: 1px solid rgba(255, 255, 255, 0.22);
   color: rgba(225, 240, 255, 0.98);
   font-weight: var(--weight-semibold);
+}
+
+/* ─── Settings panel (shared between pause + home) ──────────────── */
+/* Schema-rendered tabbed settings UI with always-on search and a
+   vertical animated rail. Lives inside .pause-body in the pause card
+   and (later) inside the home page. The row markup reuses the
+   existing .pause-toggle-row classes so look & feel is consistent. */
+
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+/* ─── Reusable search field (.app-search) ─────────────────────────
+   Pill-shaped search input with a leading icon. The wrapper IS the
+   focus surface: the <input> inside is transparent and never shows
+   its own focus ring, so the visible focus state always follows the
+   wrapper's rounded shape. Drop in anywhere a filter/search field
+   is needed.
+
+   Markup:
+     <div class="app-search">
+       <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+       <input class="app-search__input" type="search" aria-label="…">
+     </div>
+
+   Variants: add .app-search--sticky to pin to the top of a scroll
+   container. The settings panel keeps .settings-search-wrap /
+   .settings-search-input as JS hooks alongside the new classes. */
+.app-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(8, 12, 18, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-sm);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: border-color var(--dur-fast) var(--ease-out-expo),
+              box-shadow var(--dur-fast) var(--ease-out-expo);
+}
+
+.app-search--sticky {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.app-search > i {
+  color: rgba(159, 227, 255, 0.85);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.app-search__input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  /* The wrapper renders the focus state. Suppress the input's own
+     outline in every state so the global :focus-visible rule (which
+     would otherwise paint a sharp rectangle inside the rounded pill)
+     never wins here. */
+  outline: none;
+  box-shadow: none;
+  color: rgba(225, 240, 255, 0.98);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 2px 0;
+  caret-color: var(--accent);
+}
+
+.app-search__input:focus,
+.app-search__input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Hide the WebKit search clear button so the field stays consistent
+   across browsers; Esc clears via our keydown handler. */
+.app-search__input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.app-search__input::placeholder {
+  color: rgba(225, 240, 255, 0.5);
+}
+
+/* Soft glow whenever the field is focused (mouse or keyboard) so
+   users always get feedback. */
+.app-search:focus-within {
+  border-color: rgba(159, 227, 255, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+              0 0 0 4px rgba(159, 227, 255, 0.10);
+}
+
+/* Stronger, accessible ring for keyboard-only focus — matches the
+   rest of the :focus-visible system. The shadow is rounded by the
+   wrapper's border-radius, so it follows the pill shape. */
+.app-search:has(:focus-visible) {
+  border-color: rgba(159, 227, 255, 0.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+              0 0 0 3px rgba(159, 227, 255, 0.32);
+}
+
+/* Body: rail (left) + pages (right). */
+.settings-body {
+  display: grid;
+  grid-template-columns: 132px 1fr;
+  gap: 12px;
+  min-height: 0;
+  align-items: start;
+}
+
+/* Vertical tab rail. */
+.settings-rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-sm);
+}
+
+.settings-tab-indicator {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 0;
+  height: 0;
+  pointer-events: none;
+  background: rgba(159, 227, 255, 0.16);
+  border: 1px solid rgba(159, 227, 255, 0.4);
+  border-radius: var(--r-sm);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  z-index: 0;
+  /* transform/height animations are driven inline by the panel JS. */
+}
+
+.settings-tab {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-sm);
+  color: rgba(225, 240, 255, 0.78);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out-expo),
+              background-color var(--dur-fast) var(--ease-out-expo);
+}
+
+.settings-tab i {
+  font-size: 13px;
+  color: rgba(159, 227, 255, 0.85);
+}
+
+.settings-tab:hover {
+  color: rgba(225, 240, 255, 0.98);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.settings-tab.is-active {
+  color: rgba(225, 240, 255, 1);
+}
+
+.settings-tab:focus-visible {
+  outline: 2px solid rgba(159, 227, 255, 0.55);
+  outline-offset: 1px;
+}
+
+/* Pages container — right side. Pages stack and are toggled visible.
+   Fixed-height window with internal scroll: switching tabs (Display
+   ↔ Audio ↔ Controls) keeps the surrounding card a stable size, so
+   the user never sees the dialog jump. The clamp scales the window
+   sensibly across viewport heights. Anything taller than the window
+   scrolls inside this box rather than resizing the parent. */
+.settings-pages {
+  /* Single-cell grid: every .settings-page lives in row 1, column 1
+     so the outgoing + incoming pages overlap during a tab swap
+     instead of stacking vertically (which read as a vertical jump
+     rather than a cross-fade). The grid row sizes to the tallest
+     visible child; with [hidden] applied to inactive pages only the
+     active page contributes to the height at rest. */
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto;
+  position: relative;
+  height: clamp(340px, 52vh, 520px);
+  overflow-y: auto;
+  /* Tiny inset so focus rings on the inner controls aren't clipped
+     by the scroll container's edges. */
+  padding: 2px 4px;
+  /* Match the dark UI scrollbar style used elsewhere in the panel. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.settings-pages::-webkit-scrollbar {
+  width: 8px;
+}
+
+.settings-pages::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+}
+
+.settings-page {
+  /* All pages share the same grid cell so they overlap during the
+     transition. The active page's [hidden]-cleared sibling sits on
+     top during the swap; once the outgoing page transitions out it
+     gets [hidden] again and stops painting. */
+  grid-column: 1;
+  grid-row: 1;
+  /* Direction-aware enter/exit animation. The panel JS sets data-state
+     to one of: active, inactive, enter-from-below, enter-from-above,
+     exit-up, exit-down. Incoming uses an ease-out curve so it settles
+     in smoothly; outgoing uses an ease-in curve (overridden below) so
+     it accelerates away — the asymmetric pacing reads as "this page
+     is leaving" / "this one is arriving" rather than a flat crossfade. */
+  transition:
+    transform 380ms cubic-bezier(.22, 1, .36, 1),
+    opacity 260ms ease-out,
+    filter 260ms ease-out;
+  will-change: transform, opacity, filter;
+}
+
+.settings-page[data-state="active"] {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  filter: none;
+  /* Active page sits above any still-fading-out sibling so the swap
+     reads as new content arriving over the old, not a crossfade. */
+  z-index: 1;
+}
+
+.settings-page[data-state="inactive"] {
+  /* hidden via [hidden] attribute; this rule just ensures no leftover transform. */
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  filter: none;
+}
+
+.settings-page[data-state="enter-from-below"],
+.settings-page[data-state="enter-from-above"] {
+  /* Incoming page is already on top before its transition kicks in,
+     so the user only ever sees the outgoing page through a clean
+     fade rather than a paint-order flicker. */
+  z-index: 1;
+}
+
+.settings-page[data-state="exit-up"],
+.settings-page[data-state="exit-down"] {
+  z-index: 0;
+  /* Outgoing accelerates away (ease-in) and clears faster than the
+     incoming page settles, so the user reads it as "leaving" rather
+     than dissolving in place. */
+  transition:
+    transform 220ms cubic-bezier(.4, 0, 1, 1),
+    opacity 180ms ease-in,
+    filter 180ms ease-in;
+}
+
+.settings-page[data-state="enter-from-below"] {
+  transform: translateY(32px) scale(.96);
+  opacity: 0;
+  filter: blur(8px);
+}
+
+.settings-page[data-state="enter-from-above"] {
+  transform: translateY(-32px) scale(.96);
+  opacity: 0;
+  filter: blur(8px);
+}
+
+.settings-page[data-state="exit-up"] {
+  transform: translateY(-24px) scale(.98);
+  opacity: 0;
+  filter: blur(6px);
+}
+
+.settings-page[data-state="exit-down"] {
+  transform: translateY(24px) scale(.98);
+  opacity: 0;
+  filter: blur(6px);
+}
+
+/* Row-level stagger on the incoming page: rows start slightly offset
+   and invisible, then cascade into place once the page becomes active.
+   Transitions don't fire on initial mount (rows already match the
+   active defaults), so this only runs on tab swaps. */
+.settings-page .pause-toggle-row,
+.settings-page .settings-keyboard-ref {
+  transition:
+    opacity 300ms ease-out,
+    transform 360ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.settings-page[data-state="enter-from-below"] .pause-toggle-row,
+.settings-page[data-state="enter-from-below"] .settings-keyboard-ref {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+.settings-page[data-state="enter-from-above"] .pause-toggle-row,
+.settings-page[data-state="enter-from-above"] .settings-keyboard-ref {
+  opacity: 0;
+  transform: translateY(-14px);
+}
+
+.settings-page[data-state="active"] .pause-toggle-row:nth-child(1) { transition-delay: 70ms; }
+.settings-page[data-state="active"] .pause-toggle-row:nth-child(2) { transition-delay: 95ms; }
+.settings-page[data-state="active"] .pause-toggle-row:nth-child(3) { transition-delay: 120ms; }
+.settings-page[data-state="active"] .pause-toggle-row:nth-child(4) { transition-delay: 145ms; }
+.settings-page[data-state="active"] .pause-toggle-row:nth-child(5) { transition-delay: 170ms; }
+.settings-page[data-state="active"] .pause-toggle-row:nth-child(n+6) { transition-delay: 195ms; }
+.settings-page[data-state="active"] .settings-keyboard-ref { transition-delay: 215ms; }
+
+/* Keyboard reference block at the bottom of the Controls tab. */
+.settings-keyboard-ref {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: left;
+}
+
+/* Search results — flat list grouped by tab. */
+.settings-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-search-group .pause-section-title {
+  margin-bottom: 6px;
+}
+
+.settings-search-empty {
+  padding: 24px 8px;
+  text-align: center;
+  font-size: 12px;
+  color: rgba(225, 240, 255, 0.6);
+}
+
+/* Hide the rail when the search-results pane takes over. */
+.settings-pages.is-searching ~ .settings-rail,
+.settings-body:has(.settings-pages.is-searching) .settings-rail {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Reduced motion: kill page slides + indicator slides. Fade only. */
+@media (prefers-reduced-motion: reduce) {
+  .settings-page {
+    transition: opacity 120ms ease;
+    transform: none !important;
+    filter: none !important;
+  }
+  .settings-page .pause-toggle-row,
+  .settings-page .settings-keyboard-ref {
+    transition: opacity 120ms ease !important;
+    transform: none !important;
+    transition-delay: 0ms !important;
+  }
+  .settings-tab-indicator {
+    transition: opacity 120ms ease !important;
+  }
+}
+
+/* Mobile: collapse rail to a horizontal strip. */
+@media (max-width: 600px) {
+  .settings-body {
+    grid-template-columns: 1fr;
+  }
+  .settings-rail {
+    flex-direction: row;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .settings-tab-indicator {
+    /* Horizontal mode: the inline-driven transform still works since
+       it uses translateY; in horizontal layout we hide the indicator
+       to avoid jumpy rendering. The active-tab class still highlights. */
+    display: none;
+  }
+  .settings-tab.is-active {
+    background: rgba(159, 227, 255, 0.16);
+    border: 1px solid rgba(159, 227, 255, 0.4);
+  }
 }
 
 /* ─── Leaderboard mode tabs ──────────────────────────────────────── */
@@ -3918,8 +4550,8 @@ html.is-bg .site-tabs-pill {
    blur intact from frame 1. */
 main.page {
   transition:
-    opacity 0.24s cubic-bezier(0.32, 0.72, 0, 1),
-    transform 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 0.18s cubic-bezier(0.32, 0.72, 0, 1),
+    transform 0.22s cubic-bezier(0.32, 0.72, 0, 1),
     /* Filter is included on the base rule (not just on the
        is-leaving rule) so the 10px exit blur RAMPS BACK OFF when
        is-leaving is removed by demoteFromPlay — without this
@@ -3998,7 +4630,7 @@ body.is-leaving main.page {
 }
 
 main.page>*:not(#titleSplash):not(.title-splash-card) {
-  animation: pageContentIn 0.7s cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: pageContentIn 0.42s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 main.page>*:nth-child(1):not(#titleSplash):not(.title-splash-card) {
@@ -4006,23 +4638,23 @@ main.page>*:nth-child(1):not(#titleSplash):not(.title-splash-card) {
 }
 
 main.page>*:nth-child(2):not(#titleSplash):not(.title-splash-card) {
-  animation-delay: 70ms;
+  animation-delay: 36ms;
 }
 
 main.page>*:nth-child(3):not(#titleSplash):not(.title-splash-card) {
-  animation-delay: 140ms;
+  animation-delay: 72ms;
 }
 
 main.page>*:nth-child(4):not(#titleSplash):not(.title-splash-card) {
-  animation-delay: 210ms;
+  animation-delay: 108ms;
 }
 
 main.page>*:nth-child(5):not(#titleSplash):not(.title-splash-card) {
-  animation-delay: 280ms;
+  animation-delay: 144ms;
 }
 
 main.page>*:nth-child(n+6):not(#titleSplash):not(.title-splash-card) {
-  animation-delay: 320ms;
+  animation-delay: 170ms;
 }
 
 /* The home splash treatment (#titleSplash + .title-splash-card) keeps
