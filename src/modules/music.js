@@ -14,6 +14,7 @@ export const PLAYLIST = [
   { kind: 'audio', name: 'Escape from the City', src: 'assets/songs/Escape From The City ... for City Escape.mp3', volume: 0.22 },
   { kind: 'audio', name: 'Warthog Run',          src: 'assets/songs/H3 Warthog Run OST - Copyright Free.mp3',      volume: 0.22 },
   { kind: 'audio', name: 'Gerudo Valley',        src: 'assets/songs/Gerudo Valley - The Legend of Zelda_ Ocarina Of Time Copyright free.mp3', volume: 0.22 },
+  { kind: 'audio', name: 'Through the Fire and Flames', src: 'assets/songs/Through The Fire And Flames.mp3', volume: 0.24 },
 ];
 
 // ── State ───────────────────────────────────────────────────────────
@@ -95,6 +96,34 @@ export function skipPrev() {
   _stopCurrent();
   _queueIdx = Math.max(0, _queueIdx - 2);
   playNext();
+}
+
+/**
+ * Force playback to a specific playlist song by name.
+ * Useful for world interactions that should trigger a named track.
+ */
+export function playSongByName(name, opts = {}) {
+  const target = String(name || '').trim().toLowerCase();
+  if (!target) return false;
+
+  const song = PLAYLIST.find((s) => String(s?.name || '').toLowerCase() === target);
+  if (!song) return false;
+
+  _ensureAC();
+
+  const startIfStopped = opts.startIfStopped !== false;
+  if (!_on && startIfStopped) _on = true;
+  if (!_on) return false;
+
+  const restart = opts.restart !== false;
+  if (!restart && _currentSong && _currentSong.name === song.name) return true;
+
+  _stopCurrent();
+  _currentSong = song;
+  _lastPlayed = song.name;
+  if (song.kind === 'audio') _playAudio(song);
+  else _playChiptune(song);
+  return true;
 }
 
 /** Mute/unmute music (separate from SFX) */

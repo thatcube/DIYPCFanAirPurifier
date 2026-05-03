@@ -2016,13 +2016,14 @@ export function createRoom(scene) {
     }
 
     // ── Massive grass field surrounding the entire house ──────────
-    // ~10× the original ±300 lawn, wrapping the house on all sides so the
-    // player can roam freely. Sits at the same Y as the front-yard lawn
-    // slab so the visible grass top is one consistent height (flatY + 1)
-    // everywhere outdoors — that exact Y is what _sampleOutdoorGroundY
-    // in game-fp.js returns, so the player's feet land flush on grass.
+    // Keep this larger than the movement bounds so the player never reaches
+    // a visible grass edge before hitting the world clamp.
+    // Sits at the same Y as the front-yard lawn slab so the visible grass
+    // top is one consistent height (flatY + 1) everywhere outdoors — that
+    // exact Y is what _sampleOutdoorGroundY in game-fp.js returns, so the
+    // player's feet land flush on grass.
     {
-      const fieldSize = 6000;
+      const fieldSize = 13000;
       const fieldCenterX = 51;     // pre-mirror house center X (≈ midpoint of -81..183)
       const fieldCenterZ = 105;    // pre-mirror house center Z (≈ midpoint of -78..289)
       const field = new THREE.Mesh(

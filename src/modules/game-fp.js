@@ -1653,7 +1653,7 @@ function _findInteractiveAncestor(obj) {
       p._isCornerDoorHandle || p._isCornerDoor ||
       p._isGuestDoor || p._isGuestDoorHandle ||
       p._isMacbook || p._isWindow || p._isWindowPane || p._isTV || p._isFoodBowl ||
-      p._isPickupSkateboard || p._isPickupFireball ||
+      p._isPickupSkateboard || p._isPickupFireball || p._isOfficeGuitar ||
       p._isAvatarPoster ||
       p._isPokemonBinder || p._isStandingDesk || p._isMiniSplit) return p;
   }
@@ -1723,6 +1723,7 @@ function _labelForInteractable(target) {
     if (p._isFoodBowl) return { verb: 'Fill', noun: 'Food Bowl' };
     if (p._isPickupSkateboard) return { verb: 'Pick up', noun: 'Skateboard' };
     if (p._isPickupFireball) return { verb: 'Pick up', noun: 'Fireball' };
+    if (p._isOfficeGuitar) return { verb: 'Play', noun: 'Guitar' };
     if (p._isAvatarPoster) return { verb: 'Inspect', noun: 'Painting' };
     if (p._isPokemonBinder) {
       const isOpen = !!(p._pokemonBinderState && p._pokemonBinderState.open);
@@ -2357,6 +2358,8 @@ let _pickupBobPhase = 0;
 // load + collect, never .visible, never scene.add/remove.
 let _pickupSkateGlowLight = null;
 const _PICKUP_SKATE_GLOW_INTENSITY = 120;
+let _officeGuitarMesh = null;
+let _officeGuitarLoaded = false;
 
 function _spawnPickupSkateboard() {
   if (_pickupSkateboardLoaded || skateboardFound || !_scene) return;
@@ -2610,6 +2613,64 @@ function _updatePickupSkateboardBob(dtSec) {
   }
 }
 
+function _spawnOfficeGuitar() {
+  if (_officeGuitarLoaded || !_scene) return;
+  _officeGuitarLoaded = true;
+
+  const loader = new GLTFLoader();
+  loader.load('assets/guitar_hero_guitar.glb', (gltf) => {
+    const root = gltf?.scene;
+    if (!root) return;
+
+    root.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = true;
+      o.receiveShadow = true;
+      o._isOfficeGuitar = true;
+      if (o.material && o.material.map) o.material.map.colorSpace = THREE.SRGBColorSpace;
+    });
+
+    const fitBox = new THREE.Box3().setFromObject(root);
+    const fitSize = new THREE.Vector3();
+    fitBox.getSize(fitSize);
+    if (fitSize.y > 0.001) {
+      const uniformScale = 40 / fitSize.y;
+      root.scale.multiplyScalar(uniformScale);
+    }
+
+    // Office back wall is around Z=-78. Slightly tilt the guitar so it
+    // reads as leaning against the wall instead of perfectly upright.
+    root.rotation.set(-0.14, Math.PI * 0.96, 0);
+
+    const floorY = getFloorY();
+    const placeX = -122;
+    const placeZ = -76.4;
+    const placeBox = new THREE.Box3().setFromObject(root);
+    root.position.set(placeX, floorY + 0.4 - placeBox.min.y, placeZ);
+    root._isOfficeGuitar = true;
+
+    _officeGuitarMesh = root;
+    _scene.add(root);
+
+    root.traverse((o) => {
+      if (o.isMesh) _interactiveObjects.push(o);
+    });
+
+    const hitMat = new THREE.MeshBasicMaterial({
+      transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide
+    });
+    const guitarHitbox = new THREE.Mesh(new THREE.BoxGeometry(16, 42, 10), hitMat);
+    guitarHitbox._isOfficeGuitar = true;
+    guitarHitbox.userData.clickPassthrough = true;
+    guitarHitbox.position.set(placeX, floorY + 21, placeZ + 0.8);
+    _scene.add(guitarHitbox);
+    root._hitbox = guitarHitbox;
+    _interactiveObjects.push(guitarHitbox);
+  }, undefined, (err) => {
+    console.warn('[game-fp] Office guitar failed to load', err);
+  });
+}
+
 function _initSkateboard() {
   if (_skateboardLoadStarted) return;
   _skateboardLoadStarted = true;
@@ -2688,7 +2749,7 @@ export function init(refs) {
     if (obj._isLamp || obj._isCeilLight || obj._isFan || obj._isFilterL || obj._isFilterR ||
       obj._isDrawer || obj._isBifoldLeaf || obj._isBypassPanel || obj._isCornerDoorHandle || obj._isCornerDoor || obj._isWindow || obj._isWindowPane ||
       obj._isMacbook || obj._isTV || obj._isFoodBowl ||
-      obj._isGuestDoor || obj._isGuestDoorHandle || obj._isPickupSkateboard || obj._isPickupFireball ||
+      obj._isGuestDoor || obj._isGuestDoorHandle || obj._isPickupSkateboard || obj._isPickupFireball || obj._isOfficeGuitar ||
       obj._isAvatarPoster ||
       obj._isPokemonBinder || obj._isMiniSplit) {
       _interactiveObjects.push(obj);
@@ -2701,6 +2762,7 @@ export function init(refs) {
   _syncSkateToggleUi();
   _initSkateboard();
   _spawnPickupSkateboard();
+  _spawnOfficeGuitar();
   _syncSkateboardVisualState();
 }
 
@@ -5313,8 +5375,8 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       const inHallway = focal.z > 49 - 1 && !inGuestDoorway && !inGuestRoom && !inOutdoor;
       let camWallXMin, camWallXMax;
       if (inOutdoor) {
-        camWallXMin = -3000;
-        camWallXMax = 3000;
+        camWallXMin = boundsBase.xMin;
+        camWallXMax = boundsBase.xMax;
       } else if (inGuestRoom || inGuestDoorway) {
         camWallXMin = -183 + 1;
         camWallXMax = -LEFT_WALL_X - 1;
@@ -5341,8 +5403,8 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       // Outdoors: the lawn extends far in every direction with no walls, so
       // open up the Z clamp to match and let the camera follow the cat freely.
       if (inOutdoor) {
-        camWallZMin = -3000;
-        camWallZMax = 3000;
+        camWallZMin = boundsBase.zMin;
+        camWallZMax = boundsBase.zMax;
       }
       // Camera Y min tracks the player's current ground, not the room floor,
       // so on elevated surfaces (bed, nightstand) it doesn't clip below them.

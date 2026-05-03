@@ -25,9 +25,11 @@ import {
 } from './coins.js';
 import { triggerNod as _triggerCatNod } from './cat-animation.js';
 import { isTotodileUnlocked, setTotodileUnlocked } from './cat-appearance.js';
+import { playSongByName } from './music.js';
 
 let _showToast = null;
 export function setToastFn(fn) { _showToast = fn; }
+const OFFICE_GUITAR_TRACK = 'Through the Fire and Flames';
 
 export function createPurifier(scene) {
   const canvas = document.getElementById('c');
@@ -2016,7 +2018,7 @@ export function createPurifier(scene) {
   function getInteractiveTarget(obj){
     let p=obj;
     while(p){
-      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isBypassPanel||p._isCornerDoorHandle||p._isCornerDoor||p._isGuestDoor||p._isGuestDoorHandle||p._isMacbook||p._isWindow||p._isWindowPane||p._isTV||p._isFoodBowl||p._isPickupSkateboard||p._isPickupFireball||p._isAvatarPoster||p._isPokemonBinder||p._isStandingDesk||p._isMiniSplit) return p;
+      if(p._isLamp||p._isCeilLight||p._isFan||p._isFilterL||p._isFilterR||p._isDrawer||p._isBifoldLeaf||p._isBypassPanel||p._isCornerDoorHandle||p._isCornerDoor||p._isGuestDoor||p._isGuestDoorHandle||p._isMacbook||p._isWindow||p._isWindowPane||p._isTV||p._isFoodBowl||p._isPickupSkateboard||p._isPickupFireball||p._isOfficeGuitar||p._isAvatarPoster||p._isPokemonBinder||p._isStandingDesk||p._isMiniSplit) return p;
       p=p.parent;
     }
     return null;
@@ -2252,6 +2254,11 @@ export function createPurifier(scene) {
     // Clicked the floor fireball pickup (dropped from the avatar poster)
     if(obj._isPickupFireball){
       if(typeof window._collectPickupFireball === 'function') window._collectPickupFireball();
+      return;
+    }
+    if(obj._isOfficeGuitar){
+      const played = playSongByName(OFFICE_GUITAR_TRACK, { startIfStopped: true, restart: true });
+      if(_showToast) _showToast(played ? 'Now playing: Through the Fire and Flames' : 'Guitar track unavailable');
       return;
     }
     // Clicked the avatar painting — first click drops a literal fireball
