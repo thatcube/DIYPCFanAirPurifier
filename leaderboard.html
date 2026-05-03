@@ -68,8 +68,6 @@
        in-game pause + finish-dialog leaderboards use as hardcoded hex,
        so the share page reads as the same surface treatment. */
     :root {
-      --bg0: #07121d;
-      --bg1: #122637;
       --muted: #a8c0d6;
       --lb-accent: #9fe3ff;
       /* matches #fpLeaderboardList .tm + finish-dialog accent */
@@ -224,14 +222,15 @@
         border-color 0.5s ease-out;
     }
 
-    /* Boot state — opaque dark fill replaces var(--glass). The
-       backdrop-filter and specular gradient stay set (they're
-       invisible against an opaque bg-color), so the morph is a
-       single property transition: no composite-layer churn, no
-       flash. */
+    /* Boot state — paint as glass from frame 1. The body fallback
+       gradient (light) sits behind the card before the iframe scene
+       loads, so the previous dark opaque fill (#0e2034) read as
+       jarring against the warm-gray fallback. The skeleton rows
+       below carry the loading affordance; the card itself stays on
+       the same liquid-glass surface as about.html / home.html
+       throughout boot. */
     body.is-booting main.page>.board {
-      background-color: #0e2034;
-      border-color: rgba(255, 255, 255, 0.06);
+      border-color: var(--glass-border);
     }
 
     /* While booting, the rows haven't loaded yet (the API fetch is
@@ -412,7 +411,7 @@
       appearance: none;
       background: transparent;
       border: 0;
-      color: rgba(255, 255, 255, 0.62);
+      color: rgba(255, 255, 255, 0.72);
       font: inherit;
       font-size: 13px;
       font-weight: 600;
@@ -471,9 +470,9 @@
          vertically centers any child regardless of its own height. */
       height: 36px;
       padding: 0 11px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 9px;
-      background: rgba(255, 255, 255, 0.03);
+      background: rgba(255, 255, 255, 0.05);
       font-size: 13px;
       line-height: 1.35;
       scroll-margin-top: 22px;
@@ -688,6 +687,56 @@
       }
     }
 
+    /* "Show more" button: lazy-loads the next page of leaderboard
+     * entries (default 50 per page, up to 1000 total). Sits below
+     * the rows list with breathing room so it never crowds the
+     * #1 entry above. Matches the cyan-accent palette and the
+     * liquid-glass surface treatment used on the modeTabs. */
+    .showMoreWrap {
+      display: flex;
+      justify-content: center;
+      padding: 18px 12px 8px;
+    }
+
+    .showMoreBtn {
+      appearance: none;
+      -webkit-appearance: none;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: var(--lb-accent);
+      background: var(--glass);
+      backdrop-filter: blur(var(--glass-blur, 12px));
+      -webkit-backdrop-filter: blur(var(--glass-blur, 12px));
+      border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.18));
+      border-radius: 999px;
+      padding: 10px 22px;
+      cursor: pointer;
+      min-height: 40px;
+      min-width: 140px;
+      transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+    }
+
+    .showMoreBtn:hover:not([disabled]) {
+      color: #fff;
+      background: rgba(159, 227, 255, 0.14);
+      border-color: rgba(159, 227, 255, 0.5);
+    }
+
+    .showMoreBtn:focus-visible {
+      outline: 2px solid var(--lb-accent);
+      outline-offset: 2px;
+    }
+
+    .showMoreBtn:active:not([disabled]) {
+      transform: translateY(1px);
+    }
+
+    .showMoreBtn[disabled] {
+      opacity: 0.6;
+      cursor: progress;
+    }
     .footnote {
       text-align: center;
       font-size: 11px;
@@ -903,6 +952,11 @@
         </li>
       </ol>
       <div id="empty" class="empty" style="display:none" hidden></div>
+      <div id="showMoreWrap" class="showMoreWrap" hidden>
+        <button id="showMoreBtn" class="showMoreBtn" type="button" aria-label="Load more leaderboard entries">
+          <span id="showMoreLabel">Show more</span>
+        </button>
+      </div>
     </section>
 
     <p class="footnote">Created by <a href="https://brandonmoore.design" target="_blank" rel="noopener">Brandon</a>.</p>
@@ -1107,7 +1161,10 @@
         emptyEl.offsetWidth;
       }
 
-      function renderRows(rows) {
+      function renderRows(rows, opts) {
+        const append = !!(opts && opts.append);
+        const startIndex = (opts && Number.isFinite(opts.startIndex)) ? Math.max(0, Math.floor(opts.startIndex)) : 0;
+
         emptyEl.hidden = true;
         emptyEl.style.display = 'none';
 
@@ -1116,17 +1173,20 @@
           return Math.max(max, n);
         }, BASE_TOTAL_SECRETS);
 
-        rowsEl.innerHTML = rows.map((r, i) => {
+        const html = rows.map((r, i) => {
           const rowId = String(r.id || '');
           const hit = hitId && rowId === hitId;
           return `<li class="row${hit ? ' hit' : ''}" data-entry-id="${escapeHtml(rowId)}">
-            <div class="rank">#${i + 1}</div>
+            <div class="rank">#${startIndex + i + 1}</div>
             <div class="name">${escapeHtml(r.name)}</div>
             ${catBadgeHtml(r)}
             ${secretBadgeHtml(r, secretGoal)}
             <div class="time">${fmtRun(r.timeMs)}</div>
           </li>`;
         }).join('');
+
+        if (append) rowsEl.insertAdjacentHTML('beforeend', html);
+        else rowsEl.innerHTML = html;
 
         // Auto-scroll to the highlighted run only the first time we
         // see it on screen — if SWR painted from cache and the fresh
@@ -1158,6 +1218,8 @@
 
         // 2. Always revalidate against the server.
         let rows = [];
+        let hasMoreFromServer = false;
+        let totalFromServer = 0;
         let errorMsg = '';
         try {
           // The 'allsecrets' virtual tab filters cross-mode for runs
@@ -1190,6 +1252,8 @@
             if (!res.ok || data.ok === false) throw new Error((data && data.message) || `API ${res.status}`);
           }
           rows = Array.isArray(data.leaderboard) ? data.leaderboard : [];
+          hasMoreFromServer = !!data.hasMore;
+          totalFromServer = Number.isFinite(data && data.total) ? Number(data.total) : 0;
         } catch (err) {
           rows = [];
           errorMsg = 'connection';
@@ -1212,6 +1276,9 @@
           // Cache the empty result too, so the empty state paints
           // instantly next visit instead of flashing shimmer.
           writeCache(mode, []);
+          loadedRows = [];
+          hasMore = false;
+          autoLoadCount = 0;
           return;
         }
 
@@ -1229,6 +1296,101 @@
           renderRows(rows);
           writeCache(mode, rows);
         }
+
+        // Reset pagination state to match what the first page returned.
+        loadedRows = rows.slice();
+        hasMore = hasMoreFromServer;
+        autoLoadCount = 0;
+        triggerScrollObserver();
+      }
+
+      // ── Infinite scroll: auto-load next page ───────────────────────
+      // Automatically load the next page when user scrolls near the
+      // bottom of the list. After 2 auto-loads, show a manual button
+      // as a fallback for users who've scrolled all the way.
+      let loadedRows = [];
+      let hasMore = false;
+      let loadingMore = false;
+      let autoLoadCount = 0;
+      const PAGE_SIZE = 50;
+      const MAX_AUTO_LOADS = 2;
+      const showMoreWrap = document.getElementById('showMoreWrap');
+      const showMoreBtn = document.getElementById('showMoreBtn');
+      const showMoreLabel = document.getElementById('showMoreLabel');
+      let scrollObserver = null;
+      let sentinel = null;
+
+      function triggerScrollObserver() {
+        // Create/reconnect the sentinel element for scroll detection.
+        if (!sentinel) {
+          sentinel = document.createElement('div');
+          sentinel.style.height = '1px';
+          sentinel.setAttribute('aria-hidden', 'true');
+          rowsEl.parentNode.insertBefore(sentinel, rowsEl.nextSibling);
+        }
+
+        if (!scrollObserver) {
+          scrollObserver = new IntersectionObserver((entries) => {
+            const entry = entries[0];
+            // Trigger load when sentinel becomes visible in viewport
+            // (user scrolled down) and we have more rows to load.
+            if (entry.isIntersecting && hasMore && !loadingMore && autoLoadCount < MAX_AUTO_LOADS) {
+              loadMore();
+            }
+          }, { rootMargin: '200px' });
+        }
+
+        scrollObserver.observe(sentinel);
+      }
+
+      function updateShowMore() {
+        if (!showMoreWrap || !showMoreBtn) return;
+        // Show manual button only after we've auto-loaded enough times.
+        const visible = hasMore && autoLoadCount >= MAX_AUTO_LOADS;
+        showMoreWrap.hidden = !visible;
+        if (visible) {
+          showMoreBtn.disabled = loadingMore;
+          if (showMoreLabel) showMoreLabel.textContent = loadingMore ? 'Loading…' : 'Load more';
+        }
+      }
+
+      async function loadMore() {
+        if (loadingMore || !hasMore) return;
+        const mode = currentMode;
+        const offset = loadedRows.length;
+        loadingMore = true;
+
+        try {
+          const base = mode === 'allsecrets'
+            ? '/api/leaderboard?onlyAllSecrets=1'
+            : `/api/leaderboard?mode=${encodeURIComponent(mode)}`;
+          const apiUrl = `${base}&limit=${PAGE_SIZE}&offset=${offset}`;
+          const res = await fetch(apiUrl, { credentials: 'same-origin' });
+          const data = await res.json();
+          if (!res.ok || data.ok === false) throw new Error((data && data.message) || `API ${res.status}`);
+          // Mode might have changed while we were fetching.
+          if (mode !== currentMode) return;
+          const newRows = Array.isArray(data.leaderboard) ? data.leaderboard : [];
+          if (newRows.length) {
+            renderRows(newRows, { append: true, startIndex: loadedRows.length });
+            loadedRows = loadedRows.concat(newRows);
+          }
+          hasMore = !!data.hasMore;
+          if (autoLoadCount < MAX_AUTO_LOADS) {
+            autoLoadCount++;
+          }
+        } catch (err) {
+          // Silently fail; observer will retry on next scroll.
+          console.warn('[leaderboard] auto-load failed', err);
+        } finally {
+          loadingMore = false;
+        }
+
+        updateShowMore();
+      }
+
+      if (showMoreBtn) {
+        showMoreBtn.addEventListener('click', loadMore);
       }
 
       function syncModeTabsUI() {
@@ -1251,6 +1413,7 @@
         else url.searchParams.set('mode', currentMode);
         history.replaceState(null, '', url.toString());
         syncModeTabsUI();
+        autoLoadCount = 0; // Reset auto-load counter for new mode
         loadLeaderboard();
       });
 

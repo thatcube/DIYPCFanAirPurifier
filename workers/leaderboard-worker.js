@@ -52,8 +52,19 @@ const SCHEMA_STATEMENTS = [
 
 const DEFAULTS = {
   MAX_NAME_LEN: 24,
-  LB_MAX: 25,
-  LB_PER_PLAYER: 25,
+  // Default page size returned by /api/leaderboard when no `limit` is
+  // provided. The public leaderboard page lazy-loads additional pages
+  // up to LB_HARD_MAX. Smaller default = faster cold paint + smaller
+  // payload for the in-game pause panel.
+  LB_MAX: 50,
+  // Hard upper bound: max rows kept per mode in D1, and max value
+  // accepted for `?limit=`. Beyond this we'd be paginating into runs
+  // nobody scrolls to anyway, so we drop the slowest entries.
+  LB_HARD_MAX: 1000,
+  // Per-player cap on both the displayed board AND DB retention. A
+  // single player's 11th-best run gets pruned, so the board stays
+  // varied across players instead of being dominated by one person.
+  LB_PER_PLAYER: 10,
   RUN_TTL_MS: 15 * 60 * 1000,
   MIN_RUN_MS: 12000,
   MAX_RUN_MS: 20 * 60 * 1000,
@@ -235,6 +246,7 @@ function getConfig(env) {
   return {
     MAX_NAME_LEN: readNum(env, 'MAX_NAME_LEN', DEFAULTS.MAX_NAME_LEN),
     LB_MAX: readNum(env, 'LB_MAX', DEFAULTS.LB_MAX),
+    LB_HARD_MAX: readNum(env, 'LB_HARD_MAX', DEFAULTS.LB_HARD_MAX),
     LB_PER_PLAYER: readNum(env, 'LB_PER_PLAYER', DEFAULTS.LB_PER_PLAYER),
     RUN_TTL_MS: readNum(env, 'RUN_TTL_MS', DEFAULTS.RUN_TTL_MS),
     MIN_RUN_MS: readNum(env, 'MIN_RUN_MS', DEFAULTS.MIN_RUN_MS),
@@ -258,26 +270,43 @@ async function handleGetLeaderboard(request, env, cfg, ctx) {
   const onlyAllSecrets = url.searchParams.get('onlyAllSecrets') === '1';
   const mode = onlyAllSecrets ? null : sanitizeMode(url.searchParams.get('mode'));
 
+  // Pagination: `limit` (1..LB_HARD_MAX) and `offset` (>=0) let the
+  // public page lazy-load past the default first page. Any non-default
+  // page bypasses the edge cache (see below) so we don't blow up the
+  // cache key space — those clicks are rare.
+  const rawLimit = Number(url.searchParams.get('limit'));
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0
+    ? Math.min(Math.floor(rawLimit), cfg.LB_HARD_MAX)
+    : cfg.LB_MAX;
+  const rawOffset = Number(url.searchParams.get('offset'));
+  const offset = Number.isFinite(rawOffset) && rawOffset > 0
+    ? Math.min(Math.floor(rawOffset), cfg.LB_HARD_MAX)
+    : 0;
+
   // ── Edge cache (Cloudflare colo-local) ───────────────────────────
   // The leaderboard is read-mostly (~thousands of GETs per write), so
   // serving from the colo cache turns the common case into a sub-50ms
-  // hit instead of a D1 query. Each of the 3 public variants
-  // (mode=normal, mode=speed, onlyAllSecrets=1) is a separate cache
-  // entry; writes (run/finish, rename, admin) purge all 3.
+  // hit instead of a D1 query. Only the default first page (offset=0
+  // and limit=LB_MAX) is cached — that's the canonical view 99% of
+  // visitors hit. "Show more" pagination clicks always go to origin so
+  // we don't have to track and purge an unbounded set of cache keys.
   //
   // The cache key is canonical — built from the sanitized (mode,
   // onlyAllSecrets) tuple, NOT the raw request URL — so an attacker
   // can't fragment the cache by appending junk query params to bypass
   // the hit and hammer D1.
+  const isCacheable = offset === 0 && limit === cfg.LB_MAX;
   const cache = caches.default;
-  const cacheKey = leaderboardCacheKey(request, { mode, onlyAllSecrets });
-  const cached = await cache.match(cacheKey);
-  if (cached) {
-    // Cache hit bypasses the per-IP rate limit on purpose: a hit costs
-    // us nothing (no D1, no compute beyond stream-back), so rate-
-    // limiting it would just add a needless DB round-trip on the hot
-    // path. The cache TTL itself bounds origin work.
-    return cached;
+  const cacheKey = isCacheable ? leaderboardCacheKey(request, { mode, onlyAllSecrets }) : null;
+  if (cacheKey) {
+    const cached = await cache.match(cacheKey);
+    if (cached) {
+      // Cache hit bypasses the per-IP rate limit on purpose: a hit costs
+      // us nothing (no D1, no compute beyond stream-back), so rate-
+      // limiting it would just add a needless DB round-trip on the hot
+      // path. The cache TTL itself bounds origin work.
+      return cached;
+    }
   }
 
   // Cache miss — rate-limit and query D1.
@@ -286,9 +315,11 @@ async function handleGetLeaderboard(request, env, cfg, ctx) {
   const allowed = await rateLimit(env.LB_DB, ipHash, 'lb_get', 120, 60 * 1000, now);
   if (!allowed) return apiError(429, 'rate_limited', 'Too many requests');
 
-  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg, {
+  const { rows: leaderboard, totalVisible } = await getNormalizedLeaderboard(env.LB_DB, cfg, {
     mode,
     onlyAllSecrets,
+    limit,
+    offset,
   });
   const payload = {
     ok: true,
@@ -297,7 +328,12 @@ async function handleGetLeaderboard(request, env, cfg, ctx) {
     onlyAllSecrets,
     allSecretsGoal: cfg.ALL_SECRETS_GOAL,
     leaderboard,
+    limit,
+    offset,
+    total: totalVisible,
+    hasMore: offset + leaderboard.length < totalVisible,
     maxEntries: cfg.LB_MAX,
+    hardMaxEntries: cfg.LB_HARD_MAX,
     perPlayer: cfg.LB_PER_PLAYER,
     requiredCoinCount: onlyAllSecrets ? null : cfg.COIN_IDS_BY_MODE[mode].length,
     minRunMs: cfg.MIN_RUN_MS,
@@ -314,13 +350,16 @@ async function handleGetLeaderboard(request, env, cfg, ctx) {
     status: 200,
     headers: {
       'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'public, s-maxage=15, stale-while-revalidate=60',
+      'cache-control': isCacheable
+        ? 'public, s-maxage=15, stale-while-revalidate=60'
+        : 'no-store',
     },
   });
 
-  // Stash a clone in the edge cache. cache.put is fire-and-forget via
-  // waitUntil so it doesn't add latency to the miss-path response.
-  if (ctx && typeof ctx.waitUntil === 'function') {
+  // Stash a clone in the edge cache (default first page only).
+  // cache.put is fire-and-forget via waitUntil so it doesn't add
+  // latency to the miss-path response.
+  if (cacheKey && ctx && typeof ctx.waitUntil === 'function') {
     ctx.waitUntil(cache.put(cacheKey, response.clone()));
   }
   return response;
@@ -499,14 +538,25 @@ async function handleRunFinish(request, env, cfg, ctx) {
 
   await deleteRun(env.LB_DB, runId);
 
-  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg, { mode: runMode });
+  const { rows: leaderboard } = await getNormalizedLeaderboard(env.LB_DB, cfg, { mode: runMode });
   await pruneLeaderboard(env.LB_DB, cfg);
   // The board changed — purge the edge cache so the next GET hits
   // origin and the new entry appears immediately for everyone (incl.
   // the share link the player is about to send).
   purgeLeaderboardCache(request, ctx);
 
-  const rank = leaderboard.findIndex((row) => row.id === entryId) + 1;
+  // Rank within the visible top-page first; if the entry placed lower,
+  // fall back to a SQL count of strictly-faster entries in the same
+  // mode so the player still sees a real rank for slower runs.
+  let rank = leaderboard.findIndex((row) => row.id === entryId) + 1;
+  if (rank <= 0) {
+    const countRow = await env.LB_DB.prepare(
+      `SELECT COUNT(*) AS c FROM leaderboard_entries
+         WHERE is_test = 0 AND mode = ?
+           AND (time_ms < ? OR (time_ms = ? AND at_ms < ?))`
+    ).bind(runMode, Math.floor(elapsed), Math.floor(elapsed), now).first();
+    rank = Number(countRow?.c || 0) + 1;
+  }
   const entry = leaderboard.find((row) => row.id === entryId) || {
     id: entryId,
     name: finalName,
@@ -573,7 +623,7 @@ async function handleRunRename(request, env, cfg, ctx) {
   purgeLeaderboardCache(request, ctx);
 
   const targetMode = sanitizeMode(target.mode);
-  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg, { mode: targetMode });
+  const { rows: leaderboard } = await getNormalizedLeaderboard(env.LB_DB, cfg, { mode: targetMode });
   const rank = leaderboard.findIndex((row) => row.id === entryId) + 1;
   const entry = leaderboard.find((row) => row.id === entryId) || {
     id: entryId,
@@ -602,11 +652,23 @@ async function handleAdminLeaderboard(request, env, cfg) {
   const auth = await requireAdmin(request, env);
   if (auth) return auth;
 
-  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg, { includeTests: true });
+  const url = new URL(request.url);
+  // ?all=1 returns every saved entry across all modes with no
+  // per-player cap and no display slice — used to look up runs that
+  // didn't make the public top page.
+  const showAll = url.searchParams.get('all') === '1';
+  const { rows: leaderboard, totalVisible } = await getNormalizedLeaderboard(env.LB_DB, cfg, {
+    includeTests: true,
+    unbounded: showAll,
+    limit: showAll ? cfg.LB_HARD_MAX * VALID_MODES.length : cfg.LB_HARD_MAX,
+  });
   return jsonResponse(200, {
     ok: true,
     leaderboard,
+    total: totalVisible,
+    unbounded: showAll,
     maxEntries: cfg.LB_MAX,
+    hardMaxEntries: cfg.LB_HARD_MAX,
     perPlayer: cfg.LB_PER_PLAYER,
     requiredCoinCount: cfg.COIN_IDS.length,
   });
@@ -626,7 +688,7 @@ async function handleAdminDelete(request, env, cfg, ctx) {
 
   await pruneLeaderboard(env.LB_DB, cfg);
   purgeLeaderboardCache(request, ctx);
-  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg);
+  const { rows: leaderboard } = await getNormalizedLeaderboard(env.LB_DB, cfg);
   return jsonResponse(200, { ok: true, deletedId: id, leaderboardSize: leaderboard.length });
 }
 
@@ -637,7 +699,7 @@ async function handleAdminDeleteTests(request, env, cfg, ctx) {
   const result = await env.LB_DB.prepare(`DELETE FROM leaderboard_entries WHERE is_test = 1`).run();
   const deleted = Number(result.meta?.changes || 0);
   purgeLeaderboardCache(request, ctx);
-  const leaderboard = await getNormalizedLeaderboard(env.LB_DB, cfg);
+  const { rows: leaderboard } = await getNormalizedLeaderboard(env.LB_DB, cfg);
   return jsonResponse(200, { ok: true, deletedCount: deleted, leaderboardSize: leaderboard.length });
 }
 
@@ -699,7 +761,21 @@ async function getNormalizedLeaderboard(db, cfg, options = {}) {
   const includeTests = options.includeTests === true;
   const mode = options.mode == null ? null : sanitizeMode(options.mode);
   const onlyAllSecrets = options.onlyAllSecrets === true;
-  const scanLimit = Math.max(cfg.LB_MAX * cfg.LB_PER_PLAYER * 6, 200);
+  // When `unbounded` is set we skip the per-player cap AND the
+  // limit/offset slice — used by the admin "show everything" view.
+  const unbounded = options.unbounded === true;
+  const limit = Number.isFinite(options.limit) && options.limit > 0
+    ? Math.floor(options.limit)
+    : cfg.LB_MAX;
+  const offset = Number.isFinite(options.offset) && options.offset > 0
+    ? Math.floor(options.offset)
+    : 0;
+
+  // Scan a wide enough window that the per-player cap can't silently
+  // drop a fast run we should have shown. LB_HARD_MAX is the absolute
+  // ceiling for runs we keep per mode, so scanning that many is the
+  // tightest correct bound.
+  const scanLimit = unbounded ? cfg.LB_HARD_MAX * VALID_MODES.length : cfg.LB_HARD_MAX;
 
   const where = [];
   const params = [];
@@ -720,22 +796,39 @@ async function getNormalizedLeaderboard(db, cfg, options = {}) {
   const bound = stmt.bind(...params, scanLimit);
   const rows = await bound.all();
 
-  return normalizeLeaderboard(rows.results || [], cfg.LB_MAX, cfg.LB_PER_PLAYER);
+  if (unbounded) {
+    const all = normalizeRowsRaw(rows.results || []);
+    return { rows: all, totalVisible: all.length };
+  }
+
+  // Apply per-player cap up front (returns ALL visible rows in order),
+  // then slice by offset/limit so pagination stays correct across the
+  // capped view.
+  const allVisible = normalizeLeaderboard(rows.results || [], cfg.LB_HARD_MAX, cfg.LB_PER_PLAYER);
+  const sliced = allVisible.slice(offset, offset + limit);
+  return { rows: sliced, totalVisible: allVisible.length };
 }
 
 async function pruneLeaderboard(db, cfg) {
   // Compute per-mode displayed leaderboards so we keep the best entries
-  // for each mode independently.
+  // for each mode independently. We pull the full per-player-capped
+  // visible board (up to LB_HARD_MAX rows per mode) so the DB matches
+  // what /api/leaderboard could ever surface.
   const keepIds = new Set();
   for (const mode of VALID_MODES) {
-    const board = await getNormalizedLeaderboard(db, cfg, { mode });
+    const { rows: board } = await getNormalizedLeaderboard(db, cfg, {
+      mode,
+      limit: cfg.LB_HARD_MAX,
+      offset: 0,
+    });
     for (const row of board) keepIds.add(row.id);
   }
 
-  // Preserve every distinct (player, mode) pair's single best entry, even
-  // if it doesn't fit in the displayed leaderboard. New people who finish
-  // a run always get at least one row per mode in the DB regardless of
-  // their time.
+  // Preserve every player's best LB_PER_PLAYER entries per mode, even
+  // if they don't fit in the displayed leaderboard. New players who
+  // finish a run always get at least one row per mode in the DB
+  // regardless of their time, and a player's top-N personal bests are
+  // never silently dropped by global pruning.
   const allRows = await db
     .prepare(
       `SELECT id, name, time_ms, at_ms, player_id, mode
@@ -743,7 +836,7 @@ async function pruneLeaderboard(db, cfg) {
     )
     .all();
 
-  const bestPerPlayerMode = new Map();
+  const perPlayerModeCount = new Map();
   for (const row of allRows.results || []) {
     if (!row) continue;
     const id = String(row.id || '').trim();
@@ -754,11 +847,15 @@ async function pruneLeaderboard(db, cfg) {
     const ident = playerId ? `id:${playerId}` : `name:${name}`;
     if (!ident || ident === 'name:') continue;
     const key = `${rowMode}|${ident}`;
-    // Rows are already ordered by (time_ms ASC, at_ms ASC), so the first
-    // row we see per key is that player's best run for that mode.
-    if (!bestPerPlayerMode.has(key)) bestPerPlayerMode.set(key, id);
+    const seen = perPlayerModeCount.get(key) || 0;
+    // Rows are already ordered by (time_ms ASC, at_ms ASC), so the
+    // first LB_PER_PLAYER rows we see per key are that player's best
+    // runs for that mode.
+    if (seen < cfg.LB_PER_PLAYER) {
+      perPlayerModeCount.set(key, seen + 1);
+      keepIds.add(id);
+    }
   }
-  for (const id of bestPerPlayerMode.values()) keepIds.add(id);
 
   const toDelete = [];
   for (const row of allRows.results || []) {
@@ -776,7 +873,7 @@ async function pruneLeaderboard(db, cfg) {
   }
 }
 
-function normalizeLeaderboard(rows, maxEntries, perPlayer) {
+function normalizeRowsRaw(rows) {
   const clean = [];
   for (const row of rows || []) {
     if (!row) continue;
@@ -799,8 +896,12 @@ function normalizeLeaderboard(rows, maxEntries, perPlayer) {
     const mode = sanitizeMode(row.mode);
     clean.push({ id, name, timeMs, at: safeAt, catColor, catHair, catModel, playerId, isTest, secretCoins, mode });
   }
-
   clean.sort((a, b) => a.timeMs - b.timeMs || a.at - b.at);
+  return clean;
+}
+
+function normalizeLeaderboard(rows, maxEntries, perPlayer) {
+  const clean = normalizeRowsRaw(rows);
 
   // Per-player cap: group by stable playerId when present; fall back to
   // display name for legacy rows with no playerId.

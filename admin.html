@@ -227,6 +227,17 @@
       <div class="body">
         <div id="lbStatus" class="status"></div>
         <div class="scroll">
+          <div id="renameModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:999;">
+            <div style="background:var(--card); border:1px solid var(--edge); border-radius:12px; padding:20px; min-width:300px; max-width:500px;">
+              <h2 style="margin:0 0 12px; color:var(--accent);">Rename entry</h2>
+              <input id="renameInput" type="text" placeholder="New name" style="width:100%; margin-bottom:12px;" />
+              <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button id="renameCancelBtn" class="btn">Cancel</button>
+                <button id="renameOkBtn" class="btn primary">Rename</button>
+              </div>
+              <div id="renameStatus" class="status" style="margin-top:12px;"></div>
+            </div>
+          </div>
           <table id="lbTable">
             <thead>
               <tr>
@@ -402,11 +413,17 @@
         <td class="sub" style="color:var(--muted);">${escapeHtml(fmtAt(e.at))}</td>
         <td><span class="pill">${escapeHtml(cat || '—')}</span></td>
         <td class="id">${escapeHtml(e.id)}</td>
-        <td style="text-align:right;"><button class="btn danger" data-id="${escapeHtml(e.id)}">Delete</button></td>
+        <td style="text-align:right; display:flex; gap:4px; justify-content:flex-end;">
+          <button class="btn rename-btn" data-id="${escapeHtml(e.id)}" data-name="${escapeHtml(e.name)}">Rename</button>
+          <button class="btn danger" data-id="${escapeHtml(e.id)}">Delete</button>
+        </td>
       `;
       lbBody.appendChild(tr);
     });
-    lbBody.querySelectorAll('button[data-id]').forEach((b) => {
+    lbBody.querySelectorAll('button.rename-btn').forEach((b) => {
+      b.addEventListener('click', () => openRenameDialog(b.getAttribute('data-id'), b.getAttribute('data-name')));
+    });
+    lbBody.querySelectorAll('button.danger').forEach((b) => {
       b.addEventListener('click', () => deleteEntry(b.getAttribute('data-id'), b));
     });
   }
@@ -415,14 +432,15 @@
     lbStatus.textContent = 'Loading…';
     lbStatus.className = 'status';
     try {
-      const data = await apiGet('/api/admin/leaderboard');
+      const data = await apiGet('/api/admin/leaderboard?all=1');
       const entries = Array.isArray(data.leaderboard) ? data.leaderboard : [];
       _lastEntries = entries;
       _lastMeta = data;
       renderRows(entries);
       const testCount = entries.filter((e) => e.isTest).length;
       const testNote = testCount ? ` · ${testCount} test` : '';
-      lbCount.textContent = `${entries.length} entries${testNote} · cap ${data.maxEntries} · per-player ${data.perPlayer} · coins ${data.requiredCoinCount}`;
+      const totalNote = data.total ? ` / ${data.total} total` : '';
+      lbCount.textContent = `${entries.length} entries${totalNote}${testNote} · cap ${data.maxEntries} · per-player ${data.perPlayer}`;
       deleteTestsBtn.disabled = testCount === 0;
       lbStatus.textContent = '';
     } catch (err) {
@@ -449,6 +467,64 @@
       lbStatus.className = 'status err';
     }
   }
+
+  // ─── Rename dialog ─────────────────────────────────────────────────
+  const renameModal = $('renameModal');
+  const renameInput = $('renameInput');
+  const renameOkBtn = $('renameOkBtn');
+  const renameCancelBtn = $('renameCancelBtn');
+  const renameStatus = $('renameStatus');
+  let _currentRenameId = null;
+
+  function closeRenameDialog() {
+    renameModal.style.display = 'none';
+    renameInput.value = '';
+    renameStatus.textContent = '';
+    renameStatus.className = 'status';
+    _currentRenameId = null;
+  }
+
+  function openRenameDialog(id, currentName) {
+    _currentRenameId = id;
+    renameInput.value = currentName || '';
+    renameStatus.textContent = '';
+    renameStatus.className = 'status';
+    renameModal.style.display = 'flex';
+    renameInput.focus();
+    renameInput.select();
+  }
+
+  async function doRename() {
+    const id = _currentRenameId;
+    const newName = renameInput.value.trim();
+    if (!id || !newName) return;
+    renameOkBtn.disabled = true;
+    renameStatus.textContent = 'Renaming…';
+    renameStatus.className = 'status';
+    try {
+      await apiPost('/api/run/rename', { entryId: id, name: newName });
+      renameStatus.textContent = 'Renamed!';
+      renameStatus.className = 'status ok';
+      setTimeout(() => {
+        closeRenameDialog();
+        refreshLeaderboard();
+      }, 600);
+    } catch (err) {
+      renameStatus.textContent = err.message || 'Rename failed';
+      renameStatus.className = 'status err';
+      renameOkBtn.disabled = false;
+    }
+  }
+
+  renameCancelBtn.addEventListener('click', closeRenameDialog);
+  renameOkBtn.addEventListener('click', doRename);
+  renameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doRename();
+    else if (e.key === 'Escape') closeRenameDialog();
+  });
+  renameModal.addEventListener('click', (e) => {
+    if (e.target === renameModal) closeRenameDialog();
+  });
 
   async function resetAll() {
     const word = prompt('This WIPES the whole leaderboard.\n\nType RESET to confirm.');

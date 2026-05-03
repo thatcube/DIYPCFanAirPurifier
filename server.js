@@ -445,15 +445,20 @@ setInterval(() => {
   }
 }, 60 * 1000).unref();
 
-app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'vite-index.html')));
-app.get('/index.html', (_req, res) => res.sendFile(path.join(__dirname, 'vite-index.html')));
+app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'home.html')));
+app.get('/home', (_req, res) => res.sendFile(path.join(__dirname, 'home.html')));
+app.get('/home.html', (_req, res) => res.sendFile(path.join(__dirname, 'home.html')));
+app.get('/index.html', (_req, res) => res.redirect(301, '/home.html'));
 app.get('/play', (_req, res) => res.sendFile(path.join(__dirname, 'vite-index.html')));
+app.get('/play/', (_req, res) => res.sendFile(path.join(__dirname, 'vite-index.html')));
 app.get('/legacy', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 app.use(express.static(__dirname, { index: false }));
 
 app.get('/admin', (_req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 app.get('/leaderboard', (_req, res) => res.sendFile(path.join(__dirname, 'leaderboard.html')));
+app.get('/about', (_req, res) => res.sendFile(path.join(__dirname, 'about.html')));
+app.get('/settings', (_req, res) => res.sendFile(path.join(__dirname, 'settings.html')));
 
 app.get('/healthz', (_req, res) => {
   res.json({ ok: true, activeRuns: activeRuns.size, leaderboardSize: leaderboard.length });

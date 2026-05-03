@@ -40,8 +40,8 @@
 
     body {
       margin: 0;
-      font-family: var(--font-ui);
-      color: var(--text);
+      font-family: var(--font-ui, "Segoe UI", "Helvetica Neue", Arial, sans-serif);
+      color: var(--text, #f3f8ff);
       font-weight: var(--weight-regular);
       line-height: 1.55;
       text-rendering: optimizeLegibility;
@@ -139,6 +139,7 @@
       opacity: 1;
       transform: none;
       filter: none;
+      color: #f6fbff;
       transition:
         background-color 0.65s cubic-bezier(0.32, 0.72, 0, 1),
         border-color 0.5s ease-out;
