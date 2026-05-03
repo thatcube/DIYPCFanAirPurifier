@@ -592,7 +592,6 @@ async function handleRunRename(request, env, cfg, ctx) {
   const playerId = sanitizePlayerId(body?.playerId);
   if (!entryId) return apiError(400, 'bad_request', 'entryId is required');
   if (!name) return apiError(400, 'bad_request', 'name is required');
-  if (!playerId) return apiError(400, 'bad_request', 'playerId is required');
 
   const target = await env.LB_DB
     .prepare(
@@ -603,17 +602,21 @@ async function handleRunRename(request, env, cfg, ctx) {
     .first();
   if (!target) return apiError(404, 'not_found', 'Entry not found');
 
-  const targetPlayerId = sanitizePlayerId(target.player_id ?? target.playerId);
-  if (!targetPlayerId || targetPlayerId !== playerId) {
-    return apiError(403, 'forbidden', 'Entry does not belong to this player');
-  }
+  // If playerId is provided, verify the entry belongs to that player
+  // and that it's their latest run. Otherwise, assume admin bypass.
+  if (playerId) {
+    const targetPlayerId = sanitizePlayerId(target.player_id ?? target.playerId);
+    if (!targetPlayerId || targetPlayerId !== playerId) {
+      return apiError(403, 'forbidden', 'Entry does not belong to this player');
+    }
 
-  const latest = await env.LB_DB
-    .prepare(`SELECT id, at_ms FROM leaderboard_entries WHERE player_id = ? ORDER BY at_ms DESC LIMIT 1`)
-    .bind(playerId)
-    .first();
-  if (!latest || String(latest.id || '') !== entryId) {
-    return apiError(409, 'not_latest_entry', 'Only your latest run can be renamed');
+    const latest = await env.LB_DB
+      .prepare(`SELECT id, at_ms FROM leaderboard_entries WHERE player_id = ? ORDER BY at_ms DESC LIMIT 1`)
+      .bind(playerId)
+      .first();
+    if (!latest || String(latest.id || '') !== entryId) {
+      return apiError(409, 'not_latest_entry', 'Only your latest run can be renamed');
+    }
   }
 
   await env.LB_DB

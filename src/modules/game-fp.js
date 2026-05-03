@@ -2638,13 +2638,13 @@ function _spawnOfficeGuitar() {
       root.scale.multiplyScalar(uniformScale);
     }
 
-    // Office back wall is around Z=-78. Slightly tilt the guitar so it
-    // reads as leaning against the wall instead of perfectly upright.
-    root.rotation.set(-0.14, Math.PI * 0.96, 0);
+    // Stand the guitar on the desk-side wall (+Z) and tip the headstock
+    // back toward that wall so it reads as leaning instead of floating.
+    root.rotation.set(0.14, Math.PI * 0.96, 0);
 
     const floorY = getFloorY();
-    const placeX = -122;
-    const placeZ = -76.4;
+    const placeX = -144;
+    const placeZ = 67.4;
     const placeBox = new THREE.Box3().setFromObject(root);
     root.position.set(placeX, floorY + 0.4 - placeBox.min.y, placeZ);
     root._isOfficeGuitar = true;
@@ -2662,7 +2662,7 @@ function _spawnOfficeGuitar() {
     const guitarHitbox = new THREE.Mesh(new THREE.BoxGeometry(16, 42, 10), hitMat);
     guitarHitbox._isOfficeGuitar = true;
     guitarHitbox.userData.clickPassthrough = true;
-    guitarHitbox.position.set(placeX, floorY + 21, placeZ + 0.8);
+    guitarHitbox.position.set(placeX, floorY + 21, placeZ - 0.8);
     _scene.add(guitarHitbox);
     root._hitbox = guitarHitbox;
     _interactiveObjects.push(guitarHitbox);
