@@ -1723,7 +1723,7 @@ function _labelForInteractable(target) {
     if (p._isFoodBowl) return { verb: 'Fill', noun: 'Food Bowl' };
     if (p._isPickupSkateboard) return { verb: 'Pick up', noun: 'Skateboard' };
     if (p._isPickupFireball) return { verb: 'Pick up', noun: 'Fireball' };
-    if (p._isOfficeGuitar) return { verb: 'Play', noun: 'Guitar' };
+    if (p._isOfficeGuitar) return { verb: 'Play', noun: 'Guitar Hero' };
     if (p._isAvatarPoster) return { verb: 'Inspect', noun: 'Painting' };
     if (p._isPokemonBinder) {
       const isOpen = !!(p._pokemonBinderState && p._pokemonBinderState.open);
@@ -1731,6 +1731,119 @@ function _labelForInteractable(target) {
     }
   }
   return null;
+}
+
+function _escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function _gpBtnVisualMeta(idx, type) {
+  const padType = (type === 'playstation' || type === 'nintendo') ? type : 'xbox';
+  const meta = {
+    label: _gpBtnNameFor(idx, padType),
+    kind: 'gp',
+    padType,
+    role: 'misc',
+  };
+  if (idx === 0 || idx === 1 || idx === 2 || idx === 3) {
+    meta.role = idx === 0 ? 'face-south'
+      : idx === 1 ? 'face-east'
+      : idx === 2 ? 'face-west'
+      : 'face-north';
+    if (padType === 'playstation') {
+      meta.label = idx === 0 ? '×'
+        : idx === 1 ? '○'
+        : idx === 2 ? '□'
+        : '△';
+    }
+    return meta;
+  }
+  if (idx === 4 || idx === 5) {
+    meta.role = idx === 4 ? 'shoulder-left' : 'shoulder-right';
+    return meta;
+  }
+  if (idx === 6 || idx === 7) {
+    meta.role = idx === 6 ? 'trigger-left' : 'trigger-right';
+    return meta;
+  }
+  if (idx === 8 || idx === 9) {
+    meta.role = idx === 8 ? 'system-left' : 'system-right';
+    return meta;
+  }
+  if (idx === 10 || idx === 11) {
+    meta.role = idx === 10 ? 'stick-left' : 'stick-right';
+    return meta;
+  }
+  if (idx >= 12 && idx <= 15) {
+    meta.role = idx === 12 ? 'dpad-up'
+      : idx === 13 ? 'dpad-down'
+      : idx === 14 ? 'dpad-left'
+      : 'dpad-right';
+  }
+  return meta;
+}
+
+function _inputGlyphMetaForAction(action, kbLabel) {
+  if (_lastInputDevice === 'gp' && _gpMap && typeof _gpMap[action] === 'number') {
+    return _gpBtnVisualMeta(_gpMap[action], _gpControllerType);
+  }
+  return {
+    label: kbLabel || action,
+    kind: 'kb',
+    padType: '',
+    role: 'key',
+  };
+}
+
+function _applyInputGlyphToElement(el, meta) {
+  if (!el || !meta) return;
+  el.classList.add('input-glyph');
+  if (meta.kind) el.dataset.inputKind = meta.kind;
+  else delete el.dataset.inputKind;
+  if (meta.padType) el.dataset.padType = meta.padType;
+  else delete el.dataset.padType;
+  if (meta.role) el.dataset.gpRole = meta.role;
+  else delete el.dataset.gpRole;
+  if (el.textContent !== meta.label) el.textContent = meta.label;
+}
+
+function _renderInputGlyphHtml(meta, extraClass = '') {
+  const classes = ['input-glyph'];
+  if (extraClass) classes.push(extraClass);
+  const attrs = [
+    `class="${classes.join(' ')}"`,
+    `data-input-kind="${_escapeHtml(meta.kind || 'kb')}"`,
+  ];
+  if (meta.padType) attrs.push(`data-pad-type="${_escapeHtml(meta.padType)}"`);
+  if (meta.role) attrs.push(`data-gp-role="${_escapeHtml(meta.role)}"`);
+  return `<kbd ${attrs.join(' ')}>${_escapeHtml(meta.label)}</kbd>`;
+}
+
+function _renderActionGlyphHtml(action, kbLabel = '', extraClass = '') {
+  const meta = _inputGlyphMetaForAction(action, kbLabel || action);
+  const classes = ['input-glyph'];
+  if (extraClass) classes.push(extraClass);
+  const attrs = [
+    `class="${classes.join(' ')}"`,
+    `data-action="${_escapeHtml(action)}"`,
+    `data-kb-key="${_escapeHtml(kbLabel || action)}"`,
+    `data-input-kind="${_escapeHtml(meta.kind || 'kb')}"`,
+  ];
+  if (meta.padType) attrs.push(`data-pad-type="${_escapeHtml(meta.padType)}"`);
+  if (meta.role) attrs.push(`data-gp-role="${_escapeHtml(meta.role)}"`);
+  return `<kbd ${attrs.join(' ')}>${_escapeHtml(meta.label)}</kbd>`;
+}
+
+function _interactPromptMeta() {
+  if (_lastInputDevice === 'gp' && (_gpMap && typeof _gpMap.interact === 'number')) {
+    return _gpBtnVisualMeta(_gpMap.interact, _gpControllerType);
+  }
+  return { label: 'LMB', kind: 'kb', padType: '', role: 'mouse' };
 }
 
 function _pushWorldAabbBox(result, obj, padXZ = 0) {
@@ -2640,11 +2753,11 @@ function _spawnOfficeGuitar() {
 
     // Stand the guitar on the desk-side wall (+Z) and tip the headstock
     // back toward that wall so it reads as leaning instead of floating.
-    root.rotation.set(0.14, Math.PI * 0.96, 0);
+    root.rotation.set(0.12, Math.PI * 0.96, 0);
 
     const floorY = getFloorY();
     const placeX = -144;
-    const placeZ = 67.4;
+    const placeZ = 66.2;
     const placeBox = new THREE.Box3().setFromObject(root);
     root.position.set(placeX, floorY + 0.4 - placeBox.min.y, placeZ);
     root._isOfficeGuitar = true;
@@ -3489,6 +3602,18 @@ function _buildStaticBoxes() {
       });
     }
   }
+
+  // Office guitar — leaning against the +Z wall near the desk
+  // Approximate as a box for collision (actual model is rotated)
+  {
+    const guitarX = 144, guitarZ = 66.2; // pre-mirror; world X is mirrored
+    const guitarW = 8, guitarD = 16, guitarH = 42;
+    _staticBoxes.push({
+      xMin: -(guitarX + guitarW / 2), xMax: -(guitarX - guitarW / 2),
+      zMin: guitarZ - guitarD / 2, zMax: guitarZ + guitarD / 2,
+      yTop: fy + guitarH + 5, yBottom: fy, room: true
+    });
+  }
 }
 
 // ── Get collision boxes (per-frame) ─────────────────────────────────
@@ -4238,6 +4363,11 @@ function _resetWorldState() {
     if (typeof _roomRefs.toggleCornerDoor === 'function') _roomRefs.toggleCornerDoor(false);
     if (typeof _roomRefs.toggleGuestDoor === 'function') _roomRefs.toggleGuestDoor(false);
     if (typeof _roomRefs.toggleGuestDoor === 'function') _roomRefs.toggleGuestDoor(false);
+    // Stop any in-flight music (MacBook + desk monitor) so songs can't
+    // leak across runs — otherwise a song started in inspect / orbit
+    // mode would still be playing when the player triggers a different
+    // source mid-run, double-stacking the audio.
+    if (typeof _roomRefs.stopAllMusic === 'function') _roomRefs.stopAllMusic();
   }
   if (typeof window._resetPokemonBinder === 'function') window._resetPokemonBinder();
   // Filter / drawer collision boxes are cached; force a rebuild.
@@ -5129,10 +5259,16 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
   // so doorway transitions don't flicker between in/out. Y-bounded too:
   // a player standing on top of the house counts as outdoors so the
   // indoor floor + ceiling don't yank them back into the room.
+  // NOTE: use the *current* fpPos.y, not the predicted newY. A very
+  // fast upward push (Super Saiyan activation jump, stacked spin taps)
+  // can overshoot _roofY in a single frame; using newY would flip the
+  // zone to outdoor mid-jump, which then raises ceilMax to roof+200 and
+  // lets the player punch clean through the ceiling. The roof bonk +
+  // indoor ceilMax below will pin them under the ceiling.
   const _roofY = getFloorY() + 80;
-  const inBedroom = (nx >= -51 && nx <= 81 && nz >= -78 && nz <= 49 && newY < _roofY);
-  const inOffice = (nx >= -183 && nx <= -51 && nz >= -78 && nz <= 69 && newY < _roofY);
-  const inHallway = (nx >= -51 && nx <= -11 && nz >= 49 && nz <= 289 && newY < _roofY);
+  const inBedroom = (nx >= -51 && nx <= 81 && nz >= -78 && nz <= 49 && fpPos.y < _roofY);
+  const inOffice = (nx >= -183 && nx <= -51 && nz >= -78 && nz <= 69 && fpPos.y < _roofY);
+  const inHallway = (nx >= -51 && nx <= -11 && nz >= 49 && nz <= 289 && fpPos.y < _roofY);
   const outdoorZone = !(inBedroom || inOffice || inHallway);
   // When outdoors, the lawn sits well below the indoor floor, so use
   // the terrain height directly instead of max'ing against the indoor
@@ -5529,14 +5665,24 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
         const _flY = getFloorY();
         const _ceilY = outdoorZone ? (_flY + 200) : (_flY + 80) - 0.5;
         const headroom = _ceilY - fpPos.y;
-        const HOVER_MARGIN = 10;
+        // Wider dampening window than before so accumulated upward
+        // velocity bleeds off well before the cat's body reaches the
+        // ceiling. Mini-split top (eye≈72, headroom ≈ 7.5) and TV top
+        // (eye≈66, headroom ≈ 13.5) both still climb-reachable: at
+        // HOVER_MARGIN=14 the cap at eye=72 is 1.1*0.54 ≈ 0.59, plenty
+        // to gain the last few units of altitude after a normal ascent.
+        const HOVER_MARGIN = 14;
         const ceilDamp = headroom < HOVER_MARGIN ? Math.max(0, headroom / HOVER_MARGIN) : 1;
         if (!grounded) {
           // Per-tap impulse stacks on top of current vy, capped so a
-          // long combo doesn't reach escape velocity.
+          // long combo doesn't reach escape velocity. The cap itself
+          // is dampened with ceilDamp so coasting vy from prior frames
+          // can't punch the body through the ceiling — the spam-tap
+          // climb naturally tops out a few units below the actual
+          // ceiling instead of clipping the cat into it.
           const AIR_TAP_KICK = 0.32;
           const STACK_CAP = 1.1;
-          fpVy = Math.min(fpVy + AIR_TAP_KICK * ceilDamp, STACK_CAP);
+          fpVy = Math.min(fpVy + AIR_TAP_KICK * ceilDamp, STACK_CAP * ceilDamp);
         } else {
           const SPIN_CAP_LOCAL = Math.PI * 20;
           const ratio = Math.min(1, Math.abs(_trickSpinSpeed) / SPIN_CAP_LOCAL);
@@ -5649,11 +5795,18 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
       if (tooltip) {
         const label = aimTarget ? _labelForInteractable(aimTarget) : null;
         if (label) {
-          const html = '<span class="tt-verb">' + label.verb + '</span><span class="tt-sep">\u00b7</span>' + label.noun;
+          // Only show an input glyph when the player is on a gamepad — the
+          // controller button mapping is genuinely useful, while a "LMB"
+          // prompt for keyboard/mouse adds visual noise without new info.
+          const prompt = _lastInputDevice === 'gp' ? _interactPromptMeta() : null;
+          const html =
+            (prompt ? _renderInputGlyphHtml(prompt, 'tt-input') : '') +
+            '<span class="tt-verb">' + _escapeHtml(label.verb) + '</span><span class="tt-sep">\u00b7</span>' + _escapeHtml(label.noun);
           if (tooltip._lastHtml !== html) {
             tooltip.innerHTML = html;
             tooltip._lastHtml = html;
           }
+          tooltip.classList.toggle('no-input', !prompt);
           tooltip.classList.add('visible');
         } else {
           tooltip.classList.remove('visible');
@@ -5963,16 +6116,11 @@ function _updateHudGlyphs() {
   nodes.forEach(el => {
     const action = el.getAttribute('data-action');
     if (!action) return;
-    let text;
-    if (useGp && (action in _gpMap)) {
-      text = _gpBtnNameFor(_gpMap[action], _gpControllerType);
-    } else {
-      // Keyboard fallback. Prefer the explicit data-kb-key attribute
-      // (set in markup) so we don't have to mirror keyboard bindings
-      // here. Falls back to the action name as a last resort.
-      text = el.getAttribute('data-kb-key') || action;
-    }
-    if (el.textContent !== text) el.textContent = text;
+    const text = el.getAttribute('data-kb-key') || action;
+    const meta = (useGp && (action in _gpMap))
+      ? _gpBtnVisualMeta(_gpMap[action], _gpControllerType)
+      : { label: text, kind: 'kb', padType: '', role: 'key' };
+    _applyInputGlyphToElement(el, meta);
   });
 }
 // Defer the first paint a tick so the HUD HTML is in the DOM by then.
@@ -5995,6 +6143,9 @@ window.__gpBindings = {
   buttonName:    (i) => _gpBtnNameFor(i, _gpControllerType),
   controllerType: () => _gpControllerType,
   buttonNamesFor: (type) => ({ ...(_GP_BTN_NAMES_BY_TYPE[type] || _GP_BTN_NAMES_XBOX) }),
+  buttonMeta:    (i, type) => _gpBtnVisualMeta(i, type || _gpControllerType),
+  renderButtonHtml: (i, type, extraClass = '') => _renderInputGlyphHtml(_gpBtnVisualMeta(i, type || _gpControllerType), extraClass),
+  renderActionHtml: (action, kbLabel = '', extraClass = '') => _renderActionGlyphHtml(action, kbLabel, extraClass),
   refreshHud:    () => _updateHudGlyphs(),
   actionLabel:   (a) => _GP_ACTION_LABELS[a] || a,
   actionOrder:   () => _GP_ACTION_ORDER.slice(),

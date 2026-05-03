@@ -1553,6 +1553,11 @@ export function createRoom(scene) {
   let _officeWindowModel = null;
   let _officeWindowOpen = false;
   let _standingDeskRef = null;
+  // Center desk monitor — exposed for setCenterMonitorTrack(). Assigned
+  // when the desk block runs further down.
+  let _centerMonitorMat = null;
+  let _centerScreenMesh = null;
+  const _centerMonitorTextures = {}; // lowercased song name → THREE.Texture
   const _grXmin = 51;              // BACK wall — shared wall w/ hallway (has the door)
   const _grXmax = 183;             // FRONT wall — where desk faces (132" deep)
   const _grZmin = oppWallZ;        // TV wall serves as the -Z boundary (no separate RIGHT wall)
@@ -2320,24 +2325,93 @@ export function createRoom(scene) {
         monSideX + armReach / 2, deskTopY + deskTopH / 2 + monStandH, deskZ + side * monSideOff, 0, 0, 0));
     }
 
-    // Screen glow (3 emissive planes, offset from monitor face toward chair)
-    const screenMat = new THREE.MeshStandardMaterial({
-      color: 0x1a3a5a, emissive: 0x2a4a6a, emissiveIntensity: 0.6,
-      roughness: 0.3, metalness: 0.0,
-    });
+    // ─ Monitor screens ────────────────────────────────────────────────
+    // Each screen is its own emissive textured plane that rises with the
+    // desk (pushed into standingDeskRiseParts). Center monitor displays
+    // the "Through the Fire and Flames" cover so the office guitar hands
+    // off a visible song-source on that screen; the side monitors have
+    // simple dark-gradient placeholder wallpapers for now.
+    const _maxAniso = state.renderer ? state.renderer.capabilities.getMaxAnisotropy() : 4;
+    const _texLoader = new THREE.TextureLoader();
+    function _makeScreenMat() {
+      const m = new THREE.MeshStandardMaterial({
+        color: 0x0a0a0a,
+        emissive: 0xffffff, emissiveIntensity: 0.0,
+        roughness: 0.35, metalness: 0.0,
+        // The room mirror pass negates rotation.y, which can put the
+        // plane's front face on the wall side of the screen. Render
+        // both sides so the image is always visible from the chair.
+        side: THREE.DoubleSide,
+      });
+      return m;
+    }
+    function _loadScreenTex(url) {
+      return new Promise((resolve) => {
+        _texLoader.load(url, (tex) => {
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.anisotropy = Math.min(8, _maxAniso);
+          // The room mirror pass negates rotation.y on every screen, which
+          // flips the plane's UV space horizontally relative to the viewer.
+          // Mirror the texture back so the image reads correctly.
+          tex.wrapS = THREE.RepeatWrapping;
+          tex.repeat.x = -1;
+          tex.offset.x = 1;
+          resolve(tex);
+        }, undefined, () => resolve(null));
+      });
+    }
+    // Procedural placeholder wallpaper — clean dark gradient, no text.
+    function _makePlaceholderTex(seed) {
+      const c = document.createElement('canvas');
+      c.width = 512; c.height = 288; // 16:9
+      const g = c.getContext('2d');
+      const grad = g.createLinearGradient(0, 0, c.width, c.height);
+      // Slight hue shift between the two side monitors.
+      if (seed === 0) {
+        grad.addColorStop(0, '#0e1a2c');
+        grad.addColorStop(1, '#1a2540');
+      } else {
+        grad.addColorStop(0, '#101a14');
+        grad.addColorStop(1, '#1c2c22');
+      }
+      g.fillStyle = grad;
+      g.fillRect(0, 0, c.width, c.height);
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = THREE.RepeatWrapping;
+      t.repeat.x = -1;
+      t.offset.x = 1;
+      return t;
+    }
     const scrOff = monD / 2 + 0.1; // offset from monitor center to face
-    // Center screen (faces -X toward chair)
+    // Center screen — starts off (dark, no map). setCenterMonitorTrack()
+    // toggles the cover image + emissive when a recognized song plays.
+    // The material + texture cache live on outer-scope vars so the
+    // setter (defined below the desk block) can reach them.
+    _loadScreenTex('img/through the fire and flames.jpg').then((tex) => {
+      if (tex) _centerMonitorTextures['through the fire and flames'] = tex;
+    });
     {
-      const s = new THREE.Mesh(new THREE.PlaneGeometry(monW - 1, monH - 1), screenMat);
+      const mat = _makeScreenMat();
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(monW - 1, monH - 1), mat);
       s.rotation.y = Math.PI / 2;
       s.position.set(monBaseX - scrOff, monY, deskZ);
       s._isRoom = true; s._isOffice = true; s._isStandingDesk = true;
+      s._isCenterMonitor = true;
       standingDeskRiseParts.push({ mesh: s, baseY: s.position.y });
       addRoom(s);
+      _centerMonitorMat = mat;
+      // Track the mesh on _standingDeskRef once the ref is built (below).
+      _centerScreenMesh = s;
     }
-    // Left screen (rotated, offset along rotated normal)
+    // Left screen — placeholder wallpaper.
     {
-      const s = new THREE.Mesh(new THREE.PlaneGeometry(monW - 1, monH - 1), screenMat);
+      const mat = _makeScreenMat();
+      mat.map = _makePlaceholderTex(0);
+      mat.emissiveMap = mat.map;
+      mat.emissiveIntensity = 0.55;
+      mat.userData._screenOnEmissive = 0.55;
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(monW - 1, monH - 1), mat);
       s.rotation.y = Math.PI / 2 + monSideAngle;
       const nx = -Math.cos(monSideAngle), nz = Math.sin(monSideAngle);
       s.position.set(monSideX + nx * scrOff, monY, deskZ - monSideOff + nz * scrOff);
@@ -2345,9 +2419,14 @@ export function createRoom(scene) {
       standingDeskRiseParts.push({ mesh: s, baseY: s.position.y });
       addRoom(s);
     }
-    // Right screen (rotated, offset along rotated normal)
+    // Right screen — placeholder wallpaper (different hue).
     {
-      const s = new THREE.Mesh(new THREE.PlaneGeometry(monW - 1, monH - 1), screenMat);
+      const mat = _makeScreenMat();
+      mat.map = _makePlaceholderTex(1);
+      mat.emissiveMap = mat.map;
+      mat.emissiveIntensity = 0.55;
+      mat.userData._screenOnEmissive = 0.55;
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(monW - 1, monH - 1), mat);
       s.rotation.y = Math.PI / 2 - monSideAngle;
       const nx = -Math.cos(monSideAngle), nz = -Math.sin(monSideAngle);
       s.position.set(monSideX + nx * scrOff, monY, deskZ + monSideOff + nz * scrOff);
@@ -2457,6 +2536,10 @@ export function createRoom(scene) {
       deskX, deskZ, deskW, deskD, deskLegH, deskTopH,
       // World-space (post-mirror) desktop top surface; coin uses this.
       getDeskTopWorldY() { return deskTopY + deskTopH / 2 + this.rise; },
+      // Center monitor mesh — used as the proximity anchor for the
+      // guitar-triggered "Through the Fire and Flames" track so the
+      // song fades with distance from the screen.
+      centerScreen: _centerScreenMesh,
     };
 
     // ── Herman Miller Aeron chair (Size B, Graphite) ──────────────
@@ -4980,6 +5063,10 @@ export function createRoom(scene) {
   let _macbookAudio = null;
   let _macbookBaseVol = 0.28;
   let _macbookProxVol = 1;
+  // Toast callback for MacBook track-change announcements. main.js wires
+  // this via roomRefs.setToastFn so we don't have to import the toast
+  // helper directly into room.js.
+  let _roomShowToast = () => {};
   const MUSIC_MUTE_KEY = 'diy_air_purifier_music_muted_v2';
   let _macbookMuted = false;
   try { _macbookMuted = localStorage.getItem(MUSIC_MUTE_KEY) === '1'; } catch (e) { }
@@ -5045,6 +5132,8 @@ export function createRoom(scene) {
     audio.play().catch(() => {
       if (_macbookAudio === audio) _macbookAudio = null;
     });
+    // Announce the track so the player can tell which song is up.
+    try { _roomShowToast(`♪ ${song.name}`); } catch (e) { /* ignore */ }
     // Warm up the other song(s) in the background for instant switching.
     _prefetchMacbookSongs();
   }
@@ -5185,6 +5274,10 @@ export function createRoom(scene) {
     _macbookOn = !_macbookOn;
     if (_macbookScreen) _macbookScreen.visible = _macbookOn;
     if (_macbookOn) {
+      // Mutual exclusion: turning the MacBook on stops any music playing
+      // through the desk-monitor source so we never have two songs
+      // overlapping at once.
+      if (_monitorMusicStop) { try { _monitorMusicStop(); } catch (e) {} }
       // Start music
       if (!_macbookAudio) _playMacbookTrack();
     } else {
@@ -5195,6 +5288,55 @@ export function createRoom(scene) {
         _macbookAudio = null;
       }
     }
+  }
+
+  // Force the MacBook off (used by mutual-exclusion + run-end cleanup).
+  function forceStopMacbook() {
+    if (!_macbookOn && !_macbookAudio) return false;
+    _macbookOn = false;
+    if (_macbookScreen) _macbookScreen.visible = false;
+    if (_macbookAudio) {
+      try { _macbookAudio.pause(); _macbookAudio.currentTime = 0; } catch (e) { }
+      _macbookAudio = null;
+    }
+    return true;
+  }
+
+  // Monitor-music stop callback — main.js wires music.stop here so the
+  // room can stop the desk-monitor track from mutual-exclusion +
+  // run-end paths without importing the music module directly.
+  let _monitorMusicStop = null;
+  function setMonitorMusicStop(fn) { _monitorMusicStop = (typeof fn === 'function') ? fn : null; }
+
+  // Stop every music source the room knows about. Called on FP entry,
+  // run reset, and FP exit so songs can't bleed across runs.
+  function stopAllMusic() {
+    forceStopMacbook();
+    if (_monitorMusicStop) { try { _monitorMusicStop(); } catch (e) {} }
+  }
+
+  // Toast setter — main.js wires showToast here so the MacBook playlist
+  // can announce each song as it starts.
+  function setToastFn(fn) { _roomShowToast = (typeof fn === 'function') ? fn : (() => {}); }
+
+  // Center desk monitor display — turns on with a per-song image when
+  // the matching track is playing, off (dark, no image) otherwise.
+  // Pass null/undefined or any unknown song name to turn the screen off.
+  function setCenterMonitorTrack(songName) {
+    const mat = _centerMonitorMat;
+    if (!mat) return;
+    const key = String(songName || '').trim().toLowerCase();
+    const tex = key ? _centerMonitorTextures[key] : null;
+    if (tex) {
+      mat.map = tex;
+      mat.emissiveMap = tex;
+      mat.emissiveIntensity = 0.85;
+    } else {
+      mat.map = null;
+      mat.emissiveMap = null;
+      mat.emissiveIntensity = 0;
+    }
+    mat.needsUpdate = true;
   }
 
   function setMacbookMuted(muted) {
@@ -5268,6 +5410,11 @@ export function createRoom(scene) {
     doorKnobs,
     toggleTV,
     toggleMacbook,
+    forceStopMacbook,
+    setMonitorMusicStop,
+    stopAllMusic,
+    setToastFn,
+    setCenterMonitorTrack,
     setMacbookMuted,
     updateMacbookProximity,
     resetMacbookProximity,

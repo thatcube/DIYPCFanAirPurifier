@@ -30,6 +30,7 @@ let _musicStart = 0;
 let _musicStep = 0;
 let _currentSong = null;
 let _on = false;
+let _proxSmooth = 1;        // smoothed proximity multiplier (1 = full vol)
 
 // Shared AudioContext — caller must set via setAudioContext()
 let _ac = null;
@@ -37,11 +38,27 @@ let _ac = null;
 // Toast callback — set via setToastFn()
 let _showToast = () => {};
 
+// Song-change observer — fires with song name (string) when a new song
+// starts and with null when playback stops. Set via setOnSongChange().
+let _onSongChange = null;
+let _lastNotifiedSong = null;
+
+function _emitSongChange() {
+  const name = _currentSong ? _currentSong.name : null;
+  if (name === _lastNotifiedSong) return;
+  _lastNotifiedSong = name;
+  if (name) _showToast(`♪ ${name}`);
+  if (_onSongChange) {
+    try { _onSongChange(name); } catch (e) { /* ignore */ }
+  }
+}
+
 // ── Public API ──────────────────────────────────────────────────────
 
 export function setAudioContext(ac) { _ac = ac; }
 export function getAudioContext() { return _ac; }
 export function setToastFn(fn) { _showToast = fn; }
+export function setOnSongChange(fn) { _onSongChange = (typeof fn === 'function') ? fn : null; }
 
 export function isPlaying() { return _on; }
 export function getCurrentSong() { return _currentSong; }
@@ -66,6 +83,8 @@ export function stop() {
   _stopCurrent();
   _queue = [];
   _queueIdx = 0;
+  _proxSmooth = 1;
+  _emitSongChange();
 }
 
 export function playNext() {
@@ -82,6 +101,7 @@ export function playNext() {
   _lastPlayed = song.name;
   if (song.kind === 'audio') _playAudio(song);
   else _playChiptune(song);
+  _emitSongChange();
 }
 
 export function skipNext() {
@@ -123,6 +143,7 @@ export function playSongByName(name, opts = {}) {
   _lastPlayed = song.name;
   if (song.kind === 'audio') _playAudio(song);
   else _playChiptune(song);
+  _emitSongChange();
   return true;
 }
 
@@ -162,6 +183,30 @@ export function resetVolume() {
   } catch (e) { /* ignore */ }
 }
 
+/**
+ * Proximity-based volume: full inside ~24" of `anchor`, steep inverse-square
+ * dropoff beyond, with a floor so the song stays faintly audible at long
+ * range. Mirrors the MacBook proximity model in room.js so both music
+ * sources share the same listener feel.
+ */
+export function updateProximity(playerVec3, anchorVec3) {
+  if (!_currentAudio || !_currentSong || !playerVec3 || !anchorVec3) return;
+  const dx = anchorVec3.x - playerVec3.x;
+  const dy = anchorVec3.y - playerVec3.y;
+  const dz = anchorVec3.z - playerVec3.z;
+  const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  const near = 24;       // 2 ft — full volume inside this radius
+  const floorVol = 0.18; // minimum proximity multiplier at extreme distance
+  let prox = 1;
+  if (dist > near) {
+    const k = near / dist;
+    prox = floorVol + (1 - floorVol) * (k * k);
+  }
+  _proxSmooth += (prox - _proxSmooth) * 0.2;
+  const base = (_currentSong.volume !== undefined) ? _currentSong.volume : 0.3;
+  try { _currentAudio.volume = Math.max(0, Math.min(1, base * _proxSmooth)); } catch (e) { /* ignore */ }
+}
+
 // ── Internals ───────────────────────────────────────────────────────
 
 function _ensureAC() {
@@ -197,6 +242,7 @@ function _buildQueue() {
 function _stopCurrent() {
   if (_chiptuneTimer) { clearTimeout(_chiptuneTimer); _chiptuneTimer = null; }
   if (_advanceTimer) { clearTimeout(_advanceTimer); _advanceTimer = null; }
+  _proxSmooth = 1;
   if (_musicGain && _ac) {
     const g = _musicGain, ac = _ac;
     try {

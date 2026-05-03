@@ -2257,8 +2257,15 @@ export function createPurifier(scene) {
       return;
     }
     if(obj._isOfficeGuitar){
+      // Mutual exclusion: only one music source plays at a time. Stop the
+      // MacBook (if it's on) before kicking off the desk-monitor track so
+      // we never double up.
+      const refs = (typeof window !== 'undefined') ? window._roomRefs : null;
+      if (refs && typeof refs.forceStopMacbook === 'function') refs.forceStopMacbook();
       const played = playSongByName(OFFICE_GUITAR_TRACK, { startIfStopped: true, restart: true });
-      if(_showToast) _showToast(played ? 'Now playing: Through the Fire and Flames' : 'Guitar track unavailable');
+      // music.js emits its own "♪ <song>" toast when the track starts;
+      // only message here on failure.
+      if (!played && _showToast) _showToast('Guitar track unavailable');
       return;
     }
     // Clicked the avatar painting — first click drops a literal fireball

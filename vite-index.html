@@ -245,29 +245,6 @@
         <span class="spark spark-b"></span>
         <span class="spark spark-c"></span>
       </div>
-      <div id="fpBarTopRow">
-        <div id="fpUnlocksCluster">
-          <div id="skateUnlockHint" aria-label="Skateboard unlocked">
-            <span class="skate-icon">🛹</span> <kbd data-action="skateToggle" data-kb-key="K">K</kbd> Skateboard
-          </div>
-          <div id="fireballUnlockHint" aria-label="Fireball unlocked">
-            <span class="fb-hint-icon">🔥</span>
-            <span class="fb-hint-icon fb-hint-icon-ss">⚡</span>
-            <kbd data-action="fireball" data-kb-key="F">F</kbd>
-            <span class="fb-hint-label">Fireball</span>
-            <span class="fb-hint-label fb-hint-label-ss">Kamehameha</span>
-          </div>
-        </div>
-        <div id="pauseHint" onclick="window._pauseFP&&window._pauseFP()">
-          <kbd data-action="pause" data-kb-key="Esc">Esc</kbd> Pause
-        </div>
-      </div>
-      <div id="skateTrickHints" aria-label="Skate trick controls">
-        <span><kbd data-action="kickflip" data-kb-key="Q">Q</kbd> Kickflip</span>
-        <span><kbd data-action="manual" data-kb-key="E">E</kbd> Manual</span>
-        <span><kbd data-action="spin" data-kb-key="X">X</kbd> Spin</span>
-      </div>
-      <div id="fpBarDivider"></div>
       <div class="fp-charge-head">
         <span class="fp-charge-label"><kbd data-action="jump" data-kb-key="Space">Space</kbd> <span id="fpChargeLabel">Jump
             charge</span></span>
@@ -288,26 +265,26 @@
         </div>
         <div class="skate-onboard-grid">
           <div class="skate-onboard-row">
-            <div class="skate-onboard-keys"><kbd>K</kbd></div>
+            <div class="skate-onboard-keys"><kbd data-action="skateToggle" data-kb-key="K">K</kbd></div>
             <div class="skate-onboard-desc"><b>Get on / off the board</b><br><span>Toggle skate mode anytime</span>
             </div>
           </div>
           <div class="skate-onboard-row">
-            <div class="skate-onboard-keys"><kbd>Q</kbd></div>
+            <div class="skate-onboard-keys"><kbd data-action="kickflip" data-kb-key="Q">Q</kbd></div>
             <div class="skate-onboard-desc"><b>Kickflip</b><br><span>While in the air after an ollie</span></div>
           </div>
           <div class="skate-onboard-row">
-            <div class="skate-onboard-keys"><kbd>E</kbd></div>
+            <div class="skate-onboard-keys"><kbd data-action="manual" data-kb-key="E">E</kbd></div>
             <div class="skate-onboard-desc"><b>Manual / wheelie</b><br><span>Hold to balance on back wheels</span></div>
           </div>
           <div class="skate-onboard-row">
-            <div class="skate-onboard-keys"><kbd>F</kbd></div>
+            <div class="skate-onboard-keys"><kbd data-action="fireball" data-kb-key="F">F</kbd></div>
             <div class="skate-onboard-desc"><b>Board spin</b><br><span>Tap mid-air; chain spins for tricks</span></div>
           </div>
         </div>
         <div class="skate-onboard-footer">
           <button class="glass-btn glass-btn--primary" id="fpSkateOnboardingClose"
-            onclick="window._closeSkateOnboarding&&window._closeSkateOnboarding()">Got it <kbd>Esc</kbd></button>
+            onclick="window._closeSkateOnboarding&&window._closeSkateOnboarding()">Got it <kbd data-action="pause" data-kb-key="Esc">Esc</kbd></button>
         </div>
       </div>
     </div>
@@ -365,10 +342,10 @@
               <div class="pause-launcher__btns">
                 <button class="pause-btn pause-btn--hero glass-btn glass-btn--tile glass-btn--primary" id="fpPauseResume"
                   onclick="window._resumeFP&&window._resumeFP()"><i class="ph-fill ph-play"></i> Resume <kbd
-                    class="pause-btn-key">Esc</kbd></button>
+                    class="pause-btn-key" data-action="pause" data-kb-key="Esc">Esc</kbd></button>
                 <button class="pause-btn pause-btn--secondary glass-btn glass-btn--tile"
                   onclick="window._resetFP&&window._resetFP()"><i class="ph ph-arrow-counter-clockwise"></i> Restart
-                  <kbd class="pause-btn-key">R</kbd></button>
+                  <kbd class="pause-btn-key" data-action="reset" data-kb-key="R">R</kbd></button>
                 <button class="pause-btn pause-btn--secondary glass-btn glass-btn--tile" type="button"
                   data-action="pause-settings"><i class="ph ph-gear"></i> Settings</button>
                 <button class="pause-btn pause-btn--secondary glass-btn glass-btn--tile glass-btn--danger"

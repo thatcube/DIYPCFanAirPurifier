@@ -481,6 +481,25 @@ music.setToastFn(showToast);
 coins.setToastFn(showToast);
 purifier.setToastFn(showToast);
 
+// Let the room stop the desk-monitor track from its mutual-exclusion
+// + run-end paths without importing the music module directly.
+if (roomRefs && typeof roomRefs.setMonitorMusicStop === 'function') {
+  roomRefs.setMonitorMusicStop(music.stop);
+}
+// Toast announcements + center-monitor image gating: music.js fires a
+// callback whenever its current song changes (or playback stops). Toast
+// is handled inside music.js (via setToastFn); we forward the song name
+// here so the room's center monitor can light up with the matching
+// cover art and go dark when a different song (or nothing) is playing.
+if (roomRefs && typeof roomRefs.setToastFn === 'function') {
+  roomRefs.setToastFn(showToast);
+}
+music.setOnSongChange((songName) => {
+  if (roomRefs && typeof roomRefs.setCenterMonitorTrack === 'function') {
+    roomRefs.setCenterMonitorTrack(songName);
+  }
+});
+
 // Create coin group + spawn room coins
 const coinGroup = coins.createCoinGroup(scene);
 coins.spawnRoomCoins(roomRefs);
@@ -1197,6 +1216,11 @@ window._exitFP = () => {
   // Clear pause without triggering re-lock (setPaused(false) would re-lock pointer)
   gameFp.clearPauseState();
   if (gameFp.fpMode) gameFp.toggleFirstPerson();
+  // Stop every music source so a song can't bleed past the run end and
+  // overlap with whatever the player turns on next.
+  if (roomRefs && typeof roomRefs.stopAllMusic === 'function') {
+    roomRefs.stopAllMusic();
+  }
   // Reset macbook music to full volume when leaving game mode
   if (roomRefs && typeof roomRefs.resetMacbookProximity === 'function') {
     roomRefs.resetMacbookProximity();
@@ -1934,6 +1958,10 @@ const _elRunTimer = document.getElementById('runTimerText');
 const _elMphValue = document.getElementById('mphValue');
 let _lastMphText = '';
 let _lastTimerText = '';
+
+// Reusable Vector3 for the desk-monitor music proximity anchor lookup,
+// allocated once so the per-frame proximity update doesn't churn the GC.
+const _monitorAnchor = new THREE.Vector3();
 const _elFps = document.getElementById('fpsInline');
 const _elPauseOv = document.getElementById('fpPauseOverlay');
 
@@ -1981,6 +2009,17 @@ function animate(ts) {
     // MacBook music proximity volume (full within ~2 ft, steep falloff beyond)
     if (roomRefs && typeof roomRefs.updateMacbookProximity === 'function') {
       roomRefs.updateMacbookProximity(gameFp.fpPos);
+    }
+    // Desk-monitor music proximity volume — same model, anchored to the
+    // center monitor mesh so the song fades with distance from the
+    // screen and rides up/down with the standing desk.
+    {
+      const sd = roomRefs && roomRefs.standingDesk;
+      const centerScreen = sd && sd.centerScreen;
+      if (centerScreen) {
+        centerScreen.getWorldPosition(_monitorAnchor);
+        music.updateProximity(gameFp.fpPos, _monitorAnchor);
+      }
     }
     // Timer tick
     leaderboard.tickTimer(ts);

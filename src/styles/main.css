@@ -1379,12 +1379,16 @@ input[type=range]::-moz-range-thumb {
   white-space: nowrap;
   background: rgba(8, 16, 28, 0.58);
   border: 1px solid rgba(146, 210, 255, 0.18);
-  border-radius: 10px;
-  padding: 4px 12px;
+  border-radius: 12px;
+  padding: 4px 12px 6px 6px;
   backdrop-filter: blur(10px);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   transition: opacity 0.18s ease, transform 0.18s ease;
   opacity: 0;
+}
+
+#fpCrosshairTooltip.no-input {
+  padding: 6px 12px;
 }
 
 #fpCrosshairTooltip.visible {
@@ -1394,6 +1398,11 @@ input[type=range]::-moz-range-thumb {
 
 #fpCrosshairTooltip .tt-verb {
   color: rgba(145, 222, 255, 0.88);
+}
+
+#fpCrosshairTooltip .tt-input {
+  margin-right: 8px;
+  vertical-align: 1px;
 }
 
 #fpCrosshairTooltip .tt-sep {
@@ -1467,188 +1476,11 @@ input[type=range]::-moz-range-thumb {
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-/* ── Top row (skate hint + pause, inline) ───────────────────────────── */
-#fpBarTopRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  row-gap: 10px;
-}
-
-/* Left-side cluster groups every "you've unlocked X" hint so they sit
-   next to each other and wrap together when the row is tight. */
-#fpUnlocksCluster {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  row-gap: 8px;
-  min-width: 0;
-}
-
-#skateUnlockHint {
-  display: none;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #7af5c2;
-  letter-spacing: 0.02em;
-  pointer-events: none;
-}
-
-#skateUnlockHint.visible {
-  display: inline-flex;
-}
-
-#skateUnlockHint.active {
-  color: #7af5c2;
-}
-
-#skateUnlockHint:not(.active) {
-  color: rgba(225, 244, 255, 0.92);
-}
-
-#skateUnlockHint .skate-icon {
-  font-size: 15px;
-}
-
-#skateUnlockHint kbd {
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.32);
-  color: #f4fbff;
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 9px;
-  line-height: 1;
-  margin: 0 2px;
-}
-
-/* ── Fireball unlock hint (top row, mirrors skate hint) ─────────────── */
-#fireballUnlockHint {
-  display: none;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #ffb866;
-  letter-spacing: 0.02em;
-  pointer-events: none;
-  text-shadow: 0 0 8px rgba(255, 120, 40, 0.5);
-}
-
-#fireballUnlockHint.visible {
-  display: inline-flex;
-}
-
-#fireballUnlockHint .fb-hint-icon {
-  font-size: 14px;
-  filter: drop-shadow(0 0 4px rgba(255, 120, 40, 0.7));
-}
-
-#fireballUnlockHint kbd {
-  background: rgba(255, 130, 40, 0.18);
-  border: 1px solid rgba(255, 160, 80, 0.45);
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 9px;
-  line-height: 1;
-  margin: 0 2px;
-  color: #ffd9a8;
-}
-
 /* Note class used in the controls panel for parenthetical hints. */
 .kbd-hint-note {
   opacity: 0.6;
   font-size: 0.85em;
   margin-left: 2px;
-}
-
-/* ── Skate trick hints (inside charge bar) ──────────────────────────── */
-#skateTrickHints {
-  display: none;
-  gap: 8px;
-  margin-top: 12px;
-  margin-bottom: 14px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #e3f9ff;
-  letter-spacing: 0.02em;
-  pointer-events: none;
-}
-
-#skateTrickHints.visible {
-  display: flex;
-}
-
-#skateTrickHints.fade-out {
-  opacity: 0;
-}
-
-#skateTrickHints span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: rgba(122, 245, 194, 0.08);
-  border: 1px solid rgba(122, 245, 194, 0.2);
-  border-radius: 6px;
-  padding: 4px 8px;
-}
-
-#skateTrickHints kbd {
-  background: rgba(255, 255, 255, 0.13);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 9px;
-  line-height: 1;
-}
-
-/* ── Pause hint (right side of top row) ─────────────────────────────── */
-#pauseHint {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(225, 244, 255, 0.9);
-  letter-spacing: 0.02em;
-  pointer-events: auto;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: color 0.15s ease;
-}
-
-#skateUnlockHint.visible~#pauseHint::before {
-  content: '';
-  display: inline-block;
-  width: 1px;
-  height: 14px;
-  background: rgba(170, 220, 255, 0.22);
-  margin-right: 2px;
-}
-
-#pauseHint:hover {
-  color: #ffffff;
-}
-
-#pauseHint kbd {
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.32);
-  color: #f4fbff;
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 9px;
-  line-height: 1;
-}
-
-/* ── Divider between top row and charge bar ─────────────────────────── */
-#fpBarDivider {
-  height: 1px;
-  background: rgba(170, 220, 255, 0.18);
-  margin: 6px 0 4px;
 }
 
 #fpChargeBar {
@@ -1659,16 +1491,9 @@ input[type=range]::-moz-range-thumb {
   transform: translateX(-50%);
   width: min(92vw, 420px);
   /* Match the top .run-pill (run timer / coins / mph) glass material
-     exactly so the top and bottom HUD chrome read as the same surface.
-     Same --glass + --glass-specular fill, same blue-tinted border, same
-     box-shadow stack with inset top highlight, same heavy --glass-blur. */
+     exactly so the top and bottom HUD chrome read as the same surface. */
   border-radius: 22px;
   padding: 14px 16px 18px;
-  /* Same glass recipe as the top run-pill, but with an extra dark tint
-     layered on top. The dense control cluster (skate hint + fireball
-     hint + pause + trick chips + charge bar all in one panel) needs
-     more contrast against bright window/wall pixels behind it than the
-     sparser top-HUD pills do. */
   background-color: var(--glass);
   background-image:
     linear-gradient(rgba(10, 22, 36, 0.26), rgba(10, 22, 36, 0.26)),
@@ -1681,6 +1506,10 @@ input[type=range]::-moz-range-thumb {
   -webkit-backdrop-filter: var(--glass-blur);
   pointer-events: none;
   z-index: 320;
+}
+
+body.play-mode #fpChargeBar {
+  display: block;
 }
 
 .fp-charge-head {
@@ -3492,6 +3321,136 @@ line-height: 1;
   padding: 0;
   font-size: 12px;
   letter-spacing: 0.02em;
+}
+
+kbd.input-glyph {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 22px !important;
+  height: 20px !important;
+  padding: 0 6px !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(219, 232, 241, 0.28) !important;
+  background: rgba(214, 228, 239, 0.12) !important;
+  color: rgba(244, 249, 253, 0.98) !important;
+  box-sizing: border-box !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  text-align: center !important;
+  font-family: var(--font-mono) !important;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.16) !important;
+}
+
+kbd.input-glyph[data-input-kind="kb"] {
+  min-width: 24px !important;
+}
+
+kbd.input-glyph[data-input-kind="gp"] {
+  font-family: inherit !important;
+  letter-spacing: 0.02em !important;
+}
+
+kbd.input-glyph[data-input-kind="gp"][data-gp-role^="face"] {
+  width: 20px !important;
+  min-width: 20px !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+}
+
+kbd.input-glyph[data-pad-type="xbox"][data-gp-role="face-south"] {
+  border-color: rgba(115, 232, 156, 0.65) !important;
+  background: rgba(39, 125, 75, 0.92) !important;
+  color: #f3fff8 !important;
+}
+
+kbd.input-glyph[data-pad-type="xbox"][data-gp-role="face-east"] {
+  border-color: rgba(255, 132, 132, 0.65) !important;
+  background: rgba(152, 45, 45, 0.92) !important;
+  color: #fff4f4 !important;
+}
+
+kbd.input-glyph[data-pad-type="xbox"][data-gp-role="face-west"] {
+  border-color: rgba(127, 197, 255, 0.68) !important;
+  background: rgba(40, 96, 155, 0.92) !important;
+  color: #f3f9ff !important;
+}
+
+kbd.input-glyph[data-pad-type="xbox"][data-gp-role="face-north"] {
+  border-color: rgba(255, 223, 122, 0.72) !important;
+  background: rgba(156, 118, 22, 0.92) !important;
+  color: #fffced !important;
+}
+
+kbd.input-glyph[data-pad-type="playstation"][data-gp-role^="face"] {
+  background: rgba(19, 28, 43, 0.82) !important;
+}
+
+kbd.input-glyph[data-pad-type="playstation"][data-gp-role="face-south"] {
+  border-color: rgba(123, 188, 255, 0.78) !important;
+  color: rgba(210, 233, 255, 0.98) !important;
+}
+
+kbd.input-glyph[data-pad-type="playstation"][data-gp-role="face-east"] {
+  border-color: rgba(255, 132, 132, 0.78) !important;
+  color: rgba(255, 220, 220, 0.98) !important;
+}
+
+kbd.input-glyph[data-pad-type="playstation"][data-gp-role="face-west"] {
+  border-color: rgba(255, 168, 224, 0.8) !important;
+  color: rgba(255, 230, 247, 0.98) !important;
+}
+
+kbd.input-glyph[data-pad-type="playstation"][data-gp-role="face-north"] {
+  border-color: rgba(137, 255, 166, 0.78) !important;
+  color: rgba(220, 255, 228, 0.98) !important;
+}
+
+kbd.input-glyph[data-pad-type="nintendo"][data-gp-role^="face"] {
+  background: rgba(179, 49, 49, 0.94) !important;
+  border-color: rgba(255, 193, 193, 0.52) !important;
+  color: #fff8f8 !important;
+}
+
+kbd.input-glyph[data-input-kind="gp"][data-gp-role^="shoulder"],
+kbd.input-glyph[data-input-kind="gp"][data-gp-role^="trigger"],
+kbd.input-glyph[data-input-kind="gp"][data-gp-role^="system"],
+kbd.input-glyph[data-input-kind="gp"][data-gp-role^="dpad"],
+kbd.input-glyph[data-input-kind="gp"][data-gp-role="misc"] {
+  min-width: 28px !important;
+  padding: 0 7px !important;
+  background: rgba(18, 29, 44, 0.78) !important;
+  border-color: rgba(162, 205, 235, 0.34) !important;
+  color: rgba(237, 245, 251, 0.98) !important;
+  text-transform: none !important;
+}
+
+kbd.input-glyph[data-input-kind="gp"][data-gp-role^="stick"],
+kbd.input-glyph[data-input-kind="gp"][data-gp-role="dpad-cluster"] {
+  min-width: 42px !important;
+  padding: 0 8px !important;
+  background: rgba(18, 29, 44, 0.78) !important;
+  border-color: rgba(162, 205, 235, 0.34) !important;
+  color: rgba(237, 245, 251, 0.98) !important;
+  text-transform: none !important;
+}
+
+.pause-btn-key.input-glyph {
+  margin-left: 6px;
+}
+
+.gp-rebind-btn .input-glyph,
+.gp-rebind-glyph .input-glyph {
+  margin: 0;
+}
+
+#fpCrosshairTooltip .input-glyph {
+  transform: translateY(1px);
 }
 @keyframes gp-rebind-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(140, 200, 255, 0.0); }
@@ -6218,10 +6177,6 @@ body.play-mode #fpControls {
   display: block;
 }
 
-body.play-mode #fpChargeBar {
-  display: block;
-}
-
 /* HUD entrance — when play-mode flips on (toggleFirstPerson enters
    FP), the top run-pill (.run-hud-center) and bottom charge bar
    (#fpChargeBar) animate in using the same Linear-style fade
@@ -6230,8 +6185,8 @@ body.play-mode #fpChargeBar {
    motion legible: a bare opacity fade reads as "the chrome was always
    there"; the blur dropoff makes it clearly arrive.
 
-   Both elements already use `transform: translateX(-50%)` for centering,
-   so the keyframes preserve that X translation while animating Y +
+   Both elements use `transform: translateX(-50%)` for centering, so
+   the keyframes preserve that X translation while animating Y +
    opacity + filter. The class flip from absent → present re-runs the
    animation on every fresh entry into FP (re-runs included).
 
@@ -6302,14 +6257,6 @@ body.play-mode #fpChargeBar {
   }
 
   body.play-mode #fpControls {
-    display: none !important;
-  }
-
-  body.play-mode #fpBarTopRow {
-    display: none !important;
-  }
-
-  body.play-mode #fpBarDivider {
     display: none !important;
   }
 

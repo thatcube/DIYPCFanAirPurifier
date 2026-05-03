@@ -234,7 +234,7 @@ const CONTROLS = [
     id: 'fpPauseCam', tabs: ['controls'], type: 'inline',
     label: 'Camera', icon: 'ph ph-camera-rotate',
     keywords: 'camera view first third person',
-    btnLabelId: 'fpPauseCamLabel', btnLabel: 'Third person', kbd: 'V',
+    btnLabelId: 'fpPauseCamLabel', btnLabel: 'Third person', kbd: 'V', kbdAction: 'camera',
     onclick: '_switchCamFP',
   },
   {
@@ -414,7 +414,7 @@ function _renderInlineRow(c) {
       <button type="button" class="pause-inline-btn"
         onclick="window.${c.onclick}&&window.${c.onclick}()">
         <span id="${_esc(c.btnLabelId)}">${_esc(c.btnLabel)}</span>
-        ${c.kbd ? `<kbd>${_esc(c.kbd)}</kbd>` : ''}
+        ${c.kbd ? _renderActionGlyph(c.kbdAction || '', c.kbd) : ''}
       </button>
     </div>`;
 }
@@ -490,6 +490,85 @@ function _gpBtnName(btnIdx, type) {
   return map[btnIdx] || `Btn ${btnIdx}`;
 }
 
+function _gpBtnMeta(btnIdx, type) {
+  const t = type || _gpReadType();
+  const meta = { label: _gpBtnName(btnIdx, t), kind: 'gp', padType: t, role: 'misc' };
+  if (btnIdx === 0 || btnIdx === 1 || btnIdx === 2 || btnIdx === 3) {
+    meta.role = btnIdx === 0 ? 'face-south'
+      : btnIdx === 1 ? 'face-east'
+      : btnIdx === 2 ? 'face-west'
+      : 'face-north';
+    if (t === 'playstation') {
+      meta.label = btnIdx === 0 ? '×'
+        : btnIdx === 1 ? '○'
+        : btnIdx === 2 ? '□'
+        : '△';
+    }
+    return meta;
+  }
+  if (btnIdx === 4 || btnIdx === 5) {
+    meta.role = btnIdx === 4 ? 'shoulder-left' : 'shoulder-right';
+    return meta;
+  }
+  if (btnIdx === 6 || btnIdx === 7) {
+    meta.role = btnIdx === 6 ? 'trigger-left' : 'trigger-right';
+    return meta;
+  }
+  if (btnIdx === 8 || btnIdx === 9) {
+    meta.role = btnIdx === 8 ? 'system-left' : 'system-right';
+    return meta;
+  }
+  if (btnIdx === 10 || btnIdx === 11) {
+    meta.role = btnIdx === 10 ? 'stick-left' : 'stick-right';
+    return meta;
+  }
+  if (btnIdx >= 12 && btnIdx <= 15) {
+    meta.role = btnIdx === 12 ? 'dpad-up'
+      : btnIdx === 13 ? 'dpad-down'
+      : btnIdx === 14 ? 'dpad-left'
+      : 'dpad-right';
+  }
+  return meta;
+}
+
+function _renderInputGlyph(meta, extraClass = '') {
+  const classes = ['input-glyph'];
+  if (extraClass) classes.push(extraClass);
+  const attrs = [
+    `class="${classes.join(' ')}"`,
+    `data-input-kind="${_esc(meta.kind || 'kb')}"`,
+  ];
+  if (meta.padType) attrs.push(`data-pad-type="${_esc(meta.padType)}"`);
+  if (meta.role) attrs.push(`data-gp-role="${_esc(meta.role)}"`);
+  return `<kbd ${attrs.join(' ')}>${_esc(meta.label)}</kbd>`;
+}
+
+function _renderActionGlyph(action, kbLabel, extraClass = '') {
+  const api = _gpApi();
+  if (api && typeof api.renderActionHtml === 'function') {
+    return api.renderActionHtml(action, kbLabel || '', extraClass);
+  }
+  const classes = ['input-glyph'];
+  if (extraClass) classes.push(extraClass);
+  return `<kbd class="${classes.join(' ')}" data-action="${_esc(action)}" data-kb-key="${_esc(kbLabel || action)}" data-input-kind="kb">${_esc(kbLabel || action)}</kbd>`;
+}
+
+function _renderButtonGlyph(btnIdx, type, extraClass = '') {
+  const api = _gpApi();
+  if (api && typeof api.renderButtonHtml === 'function') {
+    return api.renderButtonHtml(btnIdx, type || _gpReadType(), extraClass);
+  }
+  return _renderInputGlyph(_gpBtnMeta(btnIdx, type), extraClass);
+}
+
+function _renderStaticControllerGlyph(kind) {
+  const type = _gpReadType();
+  if (kind === 'L Stick') return _renderInputGlyph({ label: 'L Stick', kind: 'gp', padType: type, role: 'stick-left' }, 'gp-static-glyph');
+  if (kind === 'R Stick') return _renderInputGlyph({ label: 'R Stick', kind: 'gp', padType: type, role: 'stick-right' }, 'gp-static-glyph');
+  if (kind === 'D-pad') return _renderInputGlyph({ label: 'D-Pad', kind: 'gp', padType: type, role: 'dpad-cluster' }, 'gp-static-glyph');
+  return _renderInputGlyph({ label: kind, kind: 'gp', padType: type, role: 'misc' }, 'gp-static-glyph');
+}
+
 function _renderRebindRow(action, btnIdx, type) {
   const label = _GP_ACTION_LABELS[action] || action;
   const name = _gpBtnName(btnIdx, type);
@@ -498,7 +577,7 @@ function _renderRebindRow(action, btnIdx, type) {
       <span class="gp-rebind-label">${_esc(label)}</span>
       <button type="button" class="gp-rebind-btn" data-action="${_esc(action)}"
         aria-label="Rebind ${_esc(label)} (currently ${_esc(name)})">
-        <kbd>${_esc(name)}</kbd>
+        ${_renderButtonGlyph(btnIdx, type)}
       </button>
     </div>`;
 }
@@ -516,7 +595,7 @@ function _renderControllerRebind() {
   const fixed = CONTROLLER_FIXED_REF.map(r => `
     <div class="gp-rebind-row gp-rebind-row--static">
       <span class="gp-rebind-label">${_esc(r.desc)}</span>
-      <span class="gp-rebind-glyph"><kbd>${_esc(r.glyph)}</kbd></span>
+      <span class="gp-rebind-glyph">${_renderStaticControllerGlyph(r.glyph)}</span>
     </div>`).join('');
   return `
     <div class="gp-rebind-fixed">${fixed}</div>
@@ -972,9 +1051,14 @@ export function mountSettings(host) {
       if (!action) return;
       btn.classList.remove('is-listening');
       const name = _gpBtnName(map[action], type);
-      btn.innerHTML = `<kbd>${_esc(name)}</kbd>`;
+      btn.innerHTML = _renderButtonGlyph(map[action], type);
       const label = _GP_ACTION_LABELS[action] || action;
       btn.setAttribute('aria-label', `Rebind ${label} (currently ${name})`);
+    });
+    host.querySelectorAll('.gp-rebind-row--static .gp-rebind-glyph').forEach((el, idx) => {
+      const ref = CONTROLLER_FIXED_REF[idx];
+      if (!ref) return;
+      el.innerHTML = _renderStaticControllerGlyph(ref.glyph);
     });
     const hint = host.querySelector('.gp-rebind-hint');
     if (hint) hint.textContent = '';
@@ -988,7 +1072,7 @@ export function mountSettings(host) {
     if (api.isListening()) api.cancelListen();
     _rebindListeningBtn = btn;
     btn.classList.add('is-listening');
-    btn.innerHTML = `<kbd>Press a button…</kbd>`;
+    btn.innerHTML = _renderInputGlyph({ label: 'Press a button...', kind: 'kb', padType: '', role: 'key' });
     const hint = host.querySelector('.gp-rebind-hint');
     if (hint) hint.textContent = 'Press any controller button. Esc to cancel.';
     api.startListen(action, () => {
