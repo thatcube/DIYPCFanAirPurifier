@@ -31,10 +31,10 @@ export const boundsBase = {
   // every direction. Wall AABBs (bedroom window-wall, office front wall,
   // back wall, hallway walls, etc.) keep the player from clipping into
   // the house structure.
-  xMin: -3000,
-  xMax: 3000,
-  zMin: -3000,
-  zMax: 3000
+  xMin: -6000,
+  xMax: 6000,
+  zMin: -6000,
+  zMax: 6000
 };
 
 export function getBounds(placementOffset) {

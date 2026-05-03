@@ -4697,7 +4697,7 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
     }
 
     // No hard velocity clamp — progressive boost is the cap
-    const maxVel = skateSpd * 1.18;
+    const maxVel = skateSpd * 2.36;
     const velMag = Math.hypot(_velX, _velZ);
     if (velMag > maxVel && velMag > 1e-6) {
       const clamp = maxVel / velMag;
