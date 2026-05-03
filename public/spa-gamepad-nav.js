@@ -109,9 +109,43 @@
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   }
 
-  // 2D nearest-in-direction picker. Score = primary distance + 2x the
-  // perpendicular offset, so we prefer elements roughly in line with
-  // the current one before stepping diagonally.
+  // Character-select has an asymmetric bottom row: three mode pills
+  // above one centered CTA. Pure geometry makes Down from side pills
+  // miss the CTA cone, so define explicit edges here.
+  function focusCharSelectEdge(current, dir) {
+    const picker = document.getElementById('charSelect');
+    if (!picker || !picker.classList.contains('open') || !isVisible(picker)) return false;
+
+    const startBtn = picker.querySelector('.char-start');
+    if (!startBtn || !isVisible(startBtn)) return false;
+
+    const modePill = current && typeof current.closest === 'function'
+      ? current.closest('.mode-pill')
+      : null;
+
+    if (modePill && dir === 'down') {
+      focusEl(startBtn);
+      return true;
+    }
+
+    if (current === startBtn && dir === 'up') {
+      const activePill = picker.querySelector('.mode-pill.on');
+      const fallbackPill = picker.querySelector('.mode-pill');
+      const target = (activePill && isVisible(activePill)) ? activePill : fallbackPill;
+      if (target && isVisible(target)) {
+        focusEl(target);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // 2D nearest-in-direction picker. Restricted to a ~45° cone around
+  // the requested direction (so "left" never picks an above-and-left
+  // element — the user perceives that as the press going UP). Within
+  // the cone, score = primary + secondary*2 prefers closer/aligned
+  // candidates first.
   function focusInDirection(dir) {
     const focusables = getFocusables();
     if (focusables.length === 0) return false;
@@ -132,6 +166,8 @@
       return true;
     }
 
+    if (focusCharSelectEdge(current, dir)) return true;
+
     const c = rectCenter(current);
     let best = null;
     let bestScore = Infinity;
@@ -145,9 +181,14 @@
       else if (dir === 'down')  { primary =  dy; secondary = Math.abs(dx); }
       else if (dir === 'left')  { primary = -dx; secondary = Math.abs(dy); }
       else /* right */          { primary =  dx; secondary = Math.abs(dy); }
-      // Must actually be in that direction (epsilon avoids picking
-      // overlapping rects).
+      // Must be in that direction at all.
       if (primary < 4) continue;
+      // 45° cone: secondary must not exceed primary. This is what
+      // keeps "left" from picking up-and-left elements when there's
+      // nothing directly to the left, etc. Without it pressing left
+      // when no in-row element exists steals focus to a row above
+      // and reads as the press "going up".
+      if (secondary > primary) continue;
       const score = primary + secondary * 2;
       if (score < bestScore) { bestScore = score; best = el; }
     }
@@ -271,14 +312,6 @@
   }
 
   // ── Polling ─────────────────────────────────────────────────────
-  // Cache one lookup per poll — getElementById is cheap but called
-  // every animation frame, so memoize the handle we keep checking.
-  let _fpHud = null;
-  function getFpHud() {
-    if (!_fpHud || !_fpHud.isConnected) _fpHud = document.getElementById('fpHud');
-    return _fpHud;
-  }
-
   function shouldPoll() {
     if (activeIdx < 0) return false;
     // While the parent has promoted the iframe into play, the parent
@@ -290,11 +323,13 @@
     // and the parent owns nav. Don't double-handle.
     if (document.documentElement.classList.contains('is-bg')) return false;
     // When fpMode is active (in-game), game-fp.js's own _pollGamepad
-    // owns input. We use #fpHud's display state as the proxy because
-    // it's the single inline style that flips with fpMode and is
-    // safely observable from this isolated script.
-    const hud = getFpHud();
-    if (hud && hud.style.display === 'block') return false;
+    // owns input. game-fp toggles two authoritative signals on
+    // toggleFirstPerson: html.is-ingame and window.__fpInGame.
+    // Either being truthy means we yield. (#fpHud's inline display
+    // proved unreliable as a proxy — CSS/other code can leave its
+    // inline display empty even while the HUD is visible.)
+    if (document.documentElement.classList.contains('is-ingame')) return false;
+    if (window.__fpInGame) return false;
     return true;
   }
 
@@ -457,13 +492,12 @@
   //   1. html.is-bg removed when the parent promotes /play into the
   //      foreground (char-select opens — we need to start handling
   //      input there).
-  //   2. #fpHud display flipped from block → none when the user
-  //      exits a run back to char-select / splash without a full
-  //      page navigation (game-fp's pollGamepad goes silent; we
-  //      need to take over again).
-  // A single MutationObserver on <html> + <body> covers both via
-  // attribute changes; #fpHud's inline style change is observed by
-  // watching the body subtree for style attribute mutations.
+  //   2. html.is-ingame removed when the user exits a run back to
+  //      char-select / splash without a full page navigation
+  //      (game-fp's pollGamepad goes silent; we need to take over
+  //      again).
+  // A single MutationObserver on <html> + <body> class attributes
+  // covers both.
   if (typeof MutationObserver !== 'undefined') {
     const wake = () => {
       if (activeIdx >= 0 && !rafId && shouldPoll()) {
@@ -473,11 +507,5 @@
     const mo = new MutationObserver(wake);
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     mo.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-    // Watch #fpHud's style attribute once it exists. The element is
-    // present in vite-index.html from the start, but in the menu
-    // pages it doesn't exist at all — querySelector returns null,
-    // observer.observe(null) would throw, so guard.
-    const hud = document.getElementById('fpHud');
-    if (hud) mo.observe(hud, { attributes: true, attributeFilter: ['style'] });
   }
 })();

@@ -248,6 +248,22 @@ const CONTROLS = [
     initialLabel: '1.00×',
   },
   {
+    id: 'fpPauseInvertLookX', tabs: ['controls'], type: 'toggle',
+    label: 'Invert X axis', icon: 'ph ph-arrows-horizontal',
+    keywords: 'invert x axis horizontal look camera mouse right stick controller',
+    swId: 'fpPauseInvertLookX', stateId: 'fpPauseInvertLookXState',
+    onclick: '_toggleInvertLookX',
+    initialOn: false,
+  },
+  {
+    id: 'fpPauseInvertLookY', tabs: ['controls'], type: 'toggle',
+    label: 'Invert Y axis', icon: 'ph ph-arrows-vertical',
+    keywords: 'invert y axis vertical look camera mouse right stick controller',
+    swId: 'fpPauseInvertLookY', stateId: 'fpPauseInvertLookYState',
+    onclick: '_toggleInvertLookY',
+    initialOn: false,
+  },
+  {
     id: 'fpPauseFov', tabs: ['controls'], type: 'slider',
     label: 'Field of view', icon: 'ph ph-binoculars',
     keywords: 'fov field view zoom camera',
@@ -286,9 +302,9 @@ const KEYBOARD_REF_SKATE = [
 // can render the rebind UI before the iframe boots; once it does,
 // window.__gpBindings is the source of truth.
 const CONTROLLER_FIXED_REF = [
-  { keys: ['L Stick'], desc: 'Move' },
-  { keys: ['R Stick'], desc: 'Look' },
-  { keys: ['D-pad'],   desc: 'Move (alt)' },
+  { glyph: 'L Stick', desc: 'Move' },
+  { glyph: 'R Stick', desc: 'Look' },
+  { glyph: 'D-pad',   desc: 'Move (alt)' },
 ];
 
 const _GP_BTN_NAMES_XBOX = {
@@ -370,10 +386,10 @@ function _renderToggleRow(c) {
   ].filter(Boolean).join(' ');
   const classAttr = extraClasses ? ` ${extraClasses}` : '';
   return `
-    <div class="pause-toggle-row${classAttr}"${rowIdAttr}${rowStyle} ${_searchAttrs(c)}>
+    <div class="pause-toggle-row${classAttr}"${rowIdAttr}${rowStyle} tabindex="0" ${_searchAttrs(c)}>
       <span class="pause-toggle-label"${labelTitle}><i class="${_esc(c.icon)}"></i> ${_esc(c.label)}</span>
       <div class="toggle-sw${onAttr}" id="${_esc(c.swId)}" role="switch" aria-checked="${c.initialOn ? 'true' : 'false'}"
-        tabindex="0"
+        tabindex="-1"
         onclick="${onclick}"></div>
       <span class="pause-toggle-state${stateOff}" id="${_esc(c.stateId)}">${stateText}</span>
     </div>`;
@@ -381,7 +397,7 @@ function _renderToggleRow(c) {
 
 function _renderSliderRow(c) {
   return `
-    <div class="pause-toggle-row pause-toggle-row--slider" ${_searchAttrs(c)}>
+    <div class="pause-toggle-row pause-toggle-row--slider" tabindex="0" ${_searchAttrs(c)}>
       <span class="pause-toggle-label"><i class="${_esc(c.icon)}"></i> ${_esc(c.label)}</span>
       <input type="range" id="${_esc(c.rangeId)}" class="pause-range"
         min="${c.min}" max="${c.max}" step="${c.step}" value="${c.value}"
@@ -393,7 +409,7 @@ function _renderSliderRow(c) {
 
 function _renderInlineRow(c) {
   return `
-    <div class="pause-toggle-row" ${_searchAttrs(c)}>
+    <div class="pause-toggle-row" tabindex="0" ${_searchAttrs(c)}>
       <span class="pause-toggle-label"><i class="${_esc(c.icon)}"></i> ${_esc(c.label)}</span>
       <button type="button" class="pause-inline-btn"
         onclick="window.${c.onclick}&&window.${c.onclick}()">
@@ -497,7 +513,11 @@ function _renderControllerRebind() {
     const rows = g.actions.map(a => _renderRebindRow(a, map[a], type)).join('');
     return `${heading}<div class="gp-rebind-list">${rows}</div>`;
   }).join('');
-  const fixed = _renderKbdGroup(CONTROLLER_FIXED_REF);
+  const fixed = CONTROLLER_FIXED_REF.map(r => `
+    <div class="gp-rebind-row gp-rebind-row--static">
+      <span class="gp-rebind-label">${_esc(r.desc)}</span>
+      <span class="gp-rebind-glyph"><kbd>${_esc(r.glyph)}</kbd></span>
+    </div>`).join('');
   return `
     <div class="gp-rebind-fixed">${fixed}</div>
     ${groups}
@@ -640,6 +660,8 @@ const _STORAGE_KEYS = {
   raycast:      'diy_air_purifier_perf_raycast_v1',
   fov:          'diy_air_purifier_fov_v1',
   mouseSens:    'diy_air_purifier_mouse_sens_v1',
+  lookInvertX:  'diy_air_purifier_look_invert_x_v1',
+  lookInvertY:  'diy_air_purifier_look_invert_y_v1',
   muteSfx:      'diy_air_purifier_muted_v2',
   muteMusic:    'diy_air_purifier_music_muted_v2',
   inputDiag:    'diy_air_purifier_input_diag_visible_v1',
@@ -662,6 +684,8 @@ const _BOOL_ROWS = [
   { key: 'abilities',    defOn: true,  swId: 'fpPausePerfAbilities',   stateId: 'fpPausePerfAbilitiesState' },
   { key: 'raycast',      defOn: true,  swId: 'fpPausePerfRaycast',     stateId: 'fpPausePerfRaycastState' },
   { key: 'inputDiag',    defOn: false, swId: 'fpPauseShowInputDiag',   stateId: 'fpPauseShowInputDiagState' },
+  { key: 'lookInvertX',  defOn: false, swId: 'fpPauseInvertLookX',     stateId: 'fpPauseInvertLookXState' },
+  { key: 'lookInvertY',  defOn: false, swId: 'fpPauseInvertLookY',     stateId: 'fpPauseInvertLookYState' },
   // Audio toggles use mute storage ('1'=muted, else audible). The
   // visual switch is "on=audible" so we read with mutedReader.
   { key: 'muteSfx',      defOn: true,  swId: 'fpPauseMuteSfx',         stateId: 'fpPauseMuteSfxState', mutedReader: true },
@@ -776,6 +800,7 @@ const _PROXY_FNS = [
   '_toggleDebugWallLabels',
   '_toggleMuteSfx', '_toggleMuteMusic',
   '_switchCamFP', '_setMouseSens', '_setFov',
+  '_toggleInvertLookX', '_toggleInvertLookY',
   '_enterInspector',
 ];
 
@@ -979,6 +1004,39 @@ export function mountSettings(host) {
     _refreshRebindUi();
   }
 
+  // Keyboard activation bridge for row-level focus. Settings rows are
+  // focusable containers so controller/keyboard can move between rows,
+  // then Enter/Space activates the row's primary control.
+  host.addEventListener('keydown', (e) => {
+    const row = e.target.closest && e.target.closest('.pause-toggle-row');
+    if (row && e.target === row
+        && (e.key === ' ' || e.key === 'Enter' || e.key === 'Spacebar')) {
+      e.preventDefault();
+      const slider = row.querySelector('.pause-range');
+      if (slider) {
+        slider.focus();
+        return;
+      }
+      const sw = row.querySelector('.toggle-sw');
+      if (sw) {
+        sw.click();
+        return;
+      }
+      const btn = row.querySelector('.pause-inline-btn');
+      if (btn) {
+        btn.click();
+        return;
+      }
+    }
+
+    const sw = e.target.closest && e.target.closest('.toggle-sw');
+    if (!sw) return;
+    if (e.key === ' ' || e.key === 'Enter' || e.key === 'Spacebar') {
+      e.preventDefault();
+      sw.click();
+    }
+  });
+
   host.addEventListener('click', (e) => {
     const reset = e.target.closest('.gp-rebind-reset');
     if (reset) {
@@ -1150,13 +1208,19 @@ export function mountSettings(host) {
   if (fovCanonical && fovMirror) {
     function _syncFovMirror(from) {
       // `from` lets us mirror in either direction without echoing.
+      // Both rows always represent the same value, so update both
+      // labels regardless of source — game-fp's _syncFovUi only knows
+      // about the canonical row, so the mirror's own label would
+      // otherwise never refresh when dragged.
+      const src = from === 'mirror' ? fovMirror : fovCanonical;
+      const label = `${Math.round(parseFloat(src.value))}°`;
       if (from === 'mirror') {
         fovCanonical.value = fovMirror.value;
-        if (fovCanonicalVal) fovCanonicalVal.textContent = `${Math.round(parseFloat(fovMirror.value))}°`;
       } else {
         fovMirror.value = fovCanonical.value;
-        if (fovMirrorVal) fovMirrorVal.textContent = `${Math.round(parseFloat(fovCanonical.value))}°`;
       }
+      if (fovCanonicalVal) fovCanonicalVal.textContent = label;
+      if (fovMirrorVal) fovMirrorVal.textContent = label;
     }
     // On user input on either, forward to the canonical setter and
     // sync the other row's display. The inline oninput already calls

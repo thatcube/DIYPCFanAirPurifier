@@ -69,6 +69,7 @@ document.addEventListener('settings-panel:mounted', () => {
   try { _applyFpsVisibility(); } catch (e) { }
   try { gameFp.syncFovUi(); } catch (e) { }
   try { gameFp.syncMouseSensUi(); } catch (e) { }
+  try { gameFp.syncLookInvertUi(); } catch (e) { }
   try { gameFp.syncAudioToggleUi(); } catch (e) { }
   try { gameFp.syncSkateToggleUi(); } catch (e) { }
 });
@@ -1220,6 +1221,8 @@ window._syncAudioUi = () => gameFp.syncAudioToggleUi();
 window._switchCamFP = () => gameFp.setCamMode();
 window._setMouseSens = (v) => gameFp.setMouseSens(v);
 window._setFov = (v) => gameFp.setFov(v);
+window._toggleInvertLookX = () => gameFp.setLookXInverted(!gameFp.isLookXInverted());
+window._toggleInvertLookY = () => gameFp.setLookYInverted(!gameFp.isLookYInverted());
 window._toggleSkateMode = () => gameFp.setSkateMode(!gameFp.isSkateMode());
 
 // ── Overcharge death flow ───────────────────────────────────────────

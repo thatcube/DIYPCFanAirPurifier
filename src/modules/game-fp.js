@@ -63,6 +63,8 @@ export let musicMuted = false;
 const SFX_MUTE_KEY = 'diy_air_purifier_muted_v2';
 const MUSIC_MUTE_KEY = 'diy_air_purifier_music_muted_v2';
 const MOUSE_SENS_KEY = 'diy_air_purifier_mouse_sens_v1';
+const LOOK_INVERT_X_KEY = 'diy_air_purifier_look_invert_x_v1';
+const LOOK_INVERT_Y_KEY = 'diy_air_purifier_look_invert_y_v1';
 const FOV_KEY = 'diy_air_purifier_fov_v1';
 const SPEED_MODE_KEY = 'diy_air_purifier_speed_mode_v1';
 const SKATE_MODE_KEY = 'diy_air_purifier_skate_mode_v1';
@@ -181,6 +183,56 @@ export function setMouseSens(v) {
 
 export function syncMouseSensUi() {
   _syncMouseSensUi();
+}
+
+// ── Look axis inversion ────────────────────────────────────────────
+// Applies to all look paths (mouse, right stick, unlocked fallback)
+// because _applyRawLookDelta is the single integration point.
+export let invertLookX = false;
+export let invertLookY = false;
+try { invertLookX = localStorage.getItem(LOOK_INVERT_X_KEY) === '1'; } catch (e) { }
+try { invertLookY = localStorage.getItem(LOOK_INVERT_Y_KEY) === '1'; } catch (e) { }
+
+function _syncLookInvertUi() {
+  const swX = document.getElementById('fpPauseInvertLookX');
+  const stX = document.getElementById('fpPauseInvertLookXState');
+  const swY = document.getElementById('fpPauseInvertLookY');
+  const stY = document.getElementById('fpPauseInvertLookYState');
+  if (swX) {
+    swX.classList.toggle('on', invertLookX);
+    swX.setAttribute('aria-checked', String(invertLookX));
+  }
+  if (stX) {
+    stX.textContent = invertLookX ? 'On' : 'Off';
+    stX.classList.toggle('off', !invertLookX);
+  }
+  if (swY) {
+    swY.classList.toggle('on', invertLookY);
+    swY.setAttribute('aria-checked', String(invertLookY));
+  }
+  if (stY) {
+    stY.textContent = invertLookY ? 'On' : 'Off';
+    stY.classList.toggle('off', !invertLookY);
+  }
+}
+
+export function isLookXInverted() { return invertLookX; }
+export function isLookYInverted() { return invertLookY; }
+
+export function setLookXInverted(v) {
+  invertLookX = !!v;
+  try { localStorage.setItem(LOOK_INVERT_X_KEY, invertLookX ? '1' : '0'); } catch (e) { }
+  _syncLookInvertUi();
+}
+
+export function setLookYInverted(v) {
+  invertLookY = !!v;
+  try { localStorage.setItem(LOOK_INVERT_Y_KEY, invertLookY ? '1' : '0'); } catch (e) { }
+  _syncLookInvertUi();
+}
+
+export function syncLookInvertUi() {
+  _syncLookInvertUi();
 }
 
 // ── FOV (camera vertical field of view) ────────────────────────────
@@ -1205,9 +1257,11 @@ function _resetLookInputState() {
 }
 
 function _applyRawLookDelta(rawX, rawY) {
-  if (!rawX && !rawY) return;
-  fpYaw -= rawX * LOOK_RAD_PER_PX * mouseSens;
-  fpPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, fpPitch - rawY * LOOK_RAD_PER_PX * mouseSens));
+  const x = invertLookX ? -rawX : rawX;
+  const y = invertLookY ? -rawY : rawY;
+  if (!x && !y) return;
+  fpYaw -= x * LOOK_RAD_PER_PX * mouseSens;
+  fpPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, fpPitch - y * LOOK_RAD_PER_PX * mouseSens));
 }
 
 function _getInputEventAgeMs(e) {
@@ -3901,6 +3955,16 @@ export function toggleFirstPerson() {
   if (_fpHud) _fpHud.style.display = fpMode ? 'block' : 'none';
   const crosshair = document.getElementById('fpCrosshair');
   if (crosshair) crosshair.style.display = fpMode ? 'block' : 'none';
+  // Authoritative in-game signal that spa-gamepad-nav.js checks to
+  // suspend itself. The previous proxy (#fpHud inline display) is
+  // unreliable: CSS or other code can leave the inline value empty
+  // while the HUD is still effectively visible. A flag on <html>
+  // is observable from the isolated /spa-gamepad-nav.js script and
+  // can't be confused with anything else.
+  try {
+    document.documentElement.classList.toggle('is-ingame', fpMode);
+    window.__fpInGame = fpMode;
+  } catch (e) {}
 
   if (fpMode) {
     _wasAimingAtInteractable = false;
@@ -4220,6 +4284,7 @@ export function setPaused(paused) {
 
     _syncAudioToggleUi();
     _syncMouseSensUi();
+    _syncLookInvertUi();
     _syncFovUi();
 
     if (_useUnlockedLook) {
@@ -5825,7 +5890,12 @@ try {
 
 function _updateHudGlyphs() {
   if (typeof document === 'undefined') return;
-  const nodes = document.querySelectorAll('[data-action]');
+  // HUD glyphs are <kbd> elements tagged with data-action so we can
+  // rewrite their displayed text on device flip. Other elements use
+  // data-action for click-routing (pause launcher buttons, the
+  // settings rebind <button>s) — never touch those, or we'd clobber
+  // their icon + label content with a raw action string.
+  const nodes = document.querySelectorAll('kbd[data-action]');
   if (!nodes.length) return;
   const useGp = (_lastInputDevice === 'gp');
   nodes.forEach(el => {
@@ -5935,6 +6005,12 @@ function _gpStickCurve(v, deadzone) {
 // Mirrors keyboard arrow-keys + Enter/Esc. We synthesize focus moves
 // and click() calls so existing dialog handlers keep working unchanged.
 const _GP_NAV_THRESHOLD = 0.55;             // post-curve stick level that counts as a nav press
+// Hysteresis: once a direction is latched it stays latched until the
+// input drops below this lower threshold. Prevents stick chatter near
+// the engage line from firing back-to-back nav steps. D-pad presses
+// report magnitude 1 / 0, so this only affects sticks.
+const _GP_NAV_RELEASE_THRESHOLD = 0.30;
+// Autorepeat — match the home-page poller (spa-gamepad-nav.js).
 const _GP_NAV_REPEAT_INITIAL_MS = 380;
 const _GP_NAV_REPEAT_INTERVAL_MS = 110;
 const _gpNavLatch = { up: false, down: false, left: false, right: false };
@@ -5987,13 +6063,90 @@ const _NAV_FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), ' +
   'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+function _focusNavTarget(el) {
+  if (!el || typeof el.focus !== 'function') return;
+  try { el.focus({ preventScroll: true }); } catch { try { el.focus(); } catch {} }
+}
+
+function _navCandidateNode(el) {
+  if (!el || typeof el.closest !== 'function') return el;
+  const row = el.closest('.pause-toggle-row');
+  if (row && row.getAttribute('tabindex') !== null) return row;
+  return el;
+}
+
+function _navFocusedNode(el) {
+  if (!el) return el;
+  if (el.tagName === 'INPUT' && el.type === 'range') return el;
+  return _navCandidateNode(el);
+}
+
+function _focusActiveSettingsTab(modal) {
+  if (!modal) return false;
+  const pick = modal.querySelector('.settings-tab.is-active')
+    || modal.querySelector('.settings-tab[aria-selected="true"]')
+    || modal.querySelector('.settings-tab');
+  if (!pick || pick.offsetParent === null) return false;
+  _focusNavTarget(pick);
+  return true;
+}
+
+function _pauseLauncherButtons(modal) {
+  if (!modal) return null;
+  const launcher = modal.querySelector('.pause-view--launcher:not([hidden])');
+  if (!launcher) return null;
+  const buttons = Array.from(launcher.querySelectorAll('.pause-launcher__btns .pause-btn'));
+  if (buttons.length < 4) return null;
+  return {
+    resume: buttons[0],
+    restart: buttons[1],
+    settings: buttons[2],
+    exit: buttons[3],
+  };
+}
+
+function _navMovePauseLauncher(modal, focused, dir) {
+  const btns = _pauseLauncherButtons(modal);
+  if (!btns) return false;
+  const { resume, restart, settings, exit } = btns;
+  if (focused === resume && dir === 'down') {
+    _focusNavTarget(restart);
+    return true;
+  }
+  if ((focused === restart || focused === settings || focused === exit) && dir === 'up') {
+    _focusNavTarget(resume);
+    return true;
+  }
+  if (focused === restart && dir === 'right') {
+    _focusNavTarget(settings);
+    return true;
+  }
+  if (focused === settings && dir === 'left') {
+    _focusNavTarget(restart);
+    return true;
+  }
+  if (focused === settings && dir === 'right') {
+    _focusNavTarget(exit);
+    return true;
+  }
+  if (focused === exit && dir === 'left') {
+    _focusNavTarget(settings);
+    return true;
+  }
+  return false;
+}
+
 function _focusableIn(container) {
   if (!container) return [];
   const all = container.querySelectorAll(_NAV_FOCUSABLE_SELECTOR);
   const out = [];
-  for (const el of all) {
-    if (el.offsetParent === null) continue;        // not rendered
+  const seen = new Set();
+  for (const raw of all) {
+    const el = _navCandidateNode(raw);
+    if (!el || el.offsetParent === null) continue; // not rendered
     if (el.getAttribute('aria-hidden') === 'true') continue;
+    if (seen.has(el)) continue;
+    seen.add(el);
     // Skip elements inside a hidden ancestor (offsetParent catches most
     // cases but display:contents parents can fool it).
     out.push(el);
@@ -6004,43 +6157,122 @@ function _focusableIn(container) {
 function _navMove(dir) {
   const modal = _findActiveModal();
   if (!modal) return;
-  const focused = document.activeElement;
+  const focusedRaw = document.activeElement;
+  const focused = _navFocusedNode(focusedRaw);
 
   // Range slider: left/right adjusts the value instead of moving focus.
-  if (focused && focused.tagName === 'INPUT' && focused.type === 'range'
-      && (dir === 'left' || dir === 'right')) {
-    const step = parseFloat(focused.step) || 1;
-    const minRaw = parseFloat(focused.min);
-    const maxRaw = parseFloat(focused.max);
-    const val = parseFloat(focused.value) || 0;
+  if (focusedRaw && focusedRaw.tagName === 'INPUT' && focusedRaw.type === 'range') {
+    if (dir !== 'left' && dir !== 'right') {
+      // Slider-detail mode: up/down movement is disabled until the
+      // player backs out (B/Escape) to the parent row.
+      return;
+    }
+    const step = parseFloat(focusedRaw.step) || 1;
+    const minRaw = parseFloat(focusedRaw.min);
+    const maxRaw = parseFloat(focusedRaw.max);
+    const val = parseFloat(focusedRaw.value) || 0;
     const candidate = dir === 'left' ? val - step : val + step;
     const min = Number.isFinite(minRaw) ? minRaw : -Infinity;
     const max = Number.isFinite(maxRaw) ? maxRaw : Infinity;
     const next = Math.max(min, Math.min(max, candidate));
     if (next !== val) {
-      focused.value = String(next);
-      focused.dispatchEvent(new Event('input',  { bubbles: true }));
-      focused.dispatchEvent(new Event('change', { bubbles: true }));
+      focusedRaw.value = String(next);
+      focusedRaw.dispatchEvent(new Event('input',  { bubbles: true }));
+      focusedRaw.dispatchEvent(new Event('change', { bubbles: true }));
     }
     return;
   }
 
+  // Pause launcher has an asymmetric layout (full-width hero over
+  // three secondary buttons). Explicit edges keep up/down predictable.
+  if (_navMovePauseLauncher(modal, focused, dir)) return;
+
+  // In settings, LEFT on a slider row exits to the active side rail
+  // tab. (LEFT while inside the slider itself still adjusts value.)
+  if (dir === 'left' && focused
+      && focused.classList
+      && focused.classList.contains('pause-toggle-row--slider')) {
+    if (_focusActiveSettingsTab(modal)) return;
+  }
+
   const focusables = _focusableIn(modal);
   if (focusables.length === 0) return;
-  const idx = focused ? focusables.indexOf(focused) : -1;
-  let nextIdx;
-  if (dir === 'up' || dir === 'left') {
-    nextIdx = idx <= 0 ? focusables.length - 1 : idx - 1;
-  } else {
-    nextIdx = idx < 0 ? 0 : (idx + 1) % focusables.length;
+
+  // No prior focus inside the modal: just land on the first focusable
+  // (matches the linear behavior we used to have for the cold-start
+  // case, and avoids a confusing "no movement" first press).
+  const focusedInModal = focused && modal.contains(focused)
+    && focusables.indexOf(focused) !== -1;
+  if (!focusedInModal) {
+    const first = focusables[0];
+    if (first && typeof first.focus === 'function') first.focus();
+    return;
   }
-  const target = focusables[nextIdx];
-  if (target && typeof target.focus === 'function') target.focus();
+
+  // 2D directional pick by rect centers: prefer the nearest element
+  // actually IN the requested direction, weighting perpendicular
+  // offset 2x so we keep traveling along the same row/column before
+  // stepping diagonally. Mirrors the picker in spa-gamepad-nav.js so
+  // both menu nav surfaces behave the same.
+  const cr = focused.getBoundingClientRect();
+  const cx = cr.left + cr.width / 2;
+  const cy = cr.top + cr.height / 2;
+  let best = null;
+  let bestScore = Infinity;
+  for (const el of focusables) {
+    if (el === focused) continue;
+    const r = el.getBoundingClientRect();
+    const dx = (r.left + r.width / 2) - cx;
+    const dy = (r.top + r.height / 2) - cy;
+    let primary, secondary;
+    if (dir === 'up')         { primary = -dy; secondary = Math.abs(dx); }
+    else if (dir === 'down')  { primary =  dy; secondary = Math.abs(dx); }
+    else if (dir === 'left')  { primary = -dx; secondary = Math.abs(dy); }
+    else /* right */          { primary =  dx; secondary = Math.abs(dy); }
+    if (primary < 4) continue; // not in this direction (epsilon for overlap)
+    // 45° cone: secondary must not exceed primary. Without this,
+    // pressing LEFT when nothing is directly to the left will pick
+    // an above-and-left element and the user perceives that as the
+    // press going UP.
+    if (secondary > primary) continue;
+    const score = primary + secondary * 2;
+    if (score < bestScore) { bestScore = score; best = el; }
+  }
+
+  if (best && typeof best.focus === 'function') {
+    _focusNavTarget(best);
+    // Bring it into view if the modal scrolled.
+    const r = best.getBoundingClientRect();
+    if (r.top < 0 || r.bottom > window.innerHeight
+        || r.left < 0 || r.right > window.innerWidth) {
+      try { best.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch {}
+    }
+  }
 }
 
 function _navActivate() {
-  const focused = document.activeElement;
+  const focusedRaw = document.activeElement;
+  const focused = _navFocusedNode(focusedRaw);
   if (!focused) return;
+
+  if (focused.classList && focused.classList.contains('pause-toggle-row')) {
+    const slider = focused.querySelector('input[type="range"]');
+    if (slider) {
+      _focusNavTarget(slider);
+      return;
+    }
+    const sw = focused.querySelector('.toggle-sw');
+    if (sw && typeof sw.click === 'function') {
+      sw.click();
+      return;
+    }
+    const btn = focused.querySelector('.pause-inline-btn');
+    if (btn && typeof btn.click === 'function') {
+      btn.click();
+      return;
+    }
+  }
+
   if (focused.tagName === 'INPUT') {
     const t = focused.type;
     // Range sliders and text-like inputs ignore A; A is for buttons/checkboxes.
@@ -6054,6 +6286,14 @@ function _navActivate() {
 }
 
 function _navCancel() {
+  const focused = document.activeElement;
+  if (focused && focused.tagName === 'INPUT' && focused.type === 'range') {
+    const row = focused.closest && focused.closest('.pause-toggle-row');
+    if (row) {
+      _focusNavTarget(row);
+      return;
+    }
+  }
   // Synthesize an Escape so existing dialog/pause handlers run.
   const evt = new KeyboardEvent('keydown', {
     key: 'Escape', code: 'Escape', bubbles: true, cancelable: true,
@@ -6124,9 +6364,16 @@ function _navCycleTab(delta) {
   }
 }
 
-function _navDirEdge(active, key, now) {
-  // Returns true on the initial latch AND on autorepeat ticks while held.
+function _navDirEdge(active, magnitude, key, now) {
+  // Edge + autorepeat with stick hysteresis. Mirrors dirEdge() in
+  // public/spa-gamepad-nav.js so home and in-game nav feel the same.
+  // `magnitude` is the raw deflection along this axis (0..1): D-pad
+  // presses pass 1, stick reads pass the post-curve absolute value.
   const wasLatched = _gpNavLatch[key];
+  if (wasLatched && magnitude < _GP_NAV_RELEASE_THRESHOLD) {
+    _gpNavLatch[key] = false;
+    return false;
+  }
   if (active && !wasLatched) {
     _gpNavLatch[key] = true;
     _gpNavHoldStart[key] = now;
@@ -6135,16 +6382,12 @@ function _navDirEdge(active, key, now) {
   }
   if (active && wasLatched) {
     const heldFor = now - _gpNavHoldStart[key];
-    if (heldFor >= _GP_NAV_REPEAT_INITIAL_MS) {
-      const since = now - _gpNavLastRepeat[key];
-      if (since >= _GP_NAV_REPEAT_INTERVAL_MS) {
-        _gpNavLastRepeat[key] = now;
-        return true;
-      }
+    if (heldFor >= _GP_NAV_REPEAT_INITIAL_MS
+        && now - _gpNavLastRepeat[key] >= _GP_NAV_REPEAT_INTERVAL_MS) {
+      _gpNavLastRepeat[key] = now;
+      return true;
     }
-    return false;
   }
-  if (!active && wasLatched) _gpNavLatch[key] = false;
   return false;
 }
 
@@ -6271,14 +6514,21 @@ function _pollGamepad(fpDtMs) {
   // When the pause overlay or any modal is up, the pad drives focus
   // moves + click() on the active dialog instead of gameplay inputs.
   if (_menuNavActive()) {
-    const navUp = dUp || ly < -_GP_NAV_THRESHOLD;
-    const navDn = dDn || ly >  _GP_NAV_THRESHOLD;
-    const navLf = dLf || lx < -_GP_NAV_THRESHOLD;
-    const navRt = dRt || lx >  _GP_NAV_THRESHOLD;
-    if (_navDirEdge(navUp, 'up',    now)) _navMove('up');
-    if (_navDirEdge(navDn, 'down',  now)) _navMove('down');
-    if (_navDirEdge(navLf, 'left',  now)) _navMove('left');
-    if (_navDirEdge(navRt, 'right', now)) _navMove('right');
+    // Combined D-pad + stick magnitude per direction. D-pad press = 1
+    // (so its release cleanly drops to 0 below the release threshold);
+    // stick uses the post-curve absolute deflection along that axis.
+    const upMag = dUp ? 1 : Math.max(0, -ly);
+    const dnMag = dDn ? 1 : Math.max(0,  ly);
+    const lfMag = dLf ? 1 : Math.max(0, -lx);
+    const rtMag = dRt ? 1 : Math.max(0,  lx);
+    const navUp = upMag > _GP_NAV_THRESHOLD;
+    const navDn = dnMag > _GP_NAV_THRESHOLD;
+    const navLf = lfMag > _GP_NAV_THRESHOLD;
+    const navRt = rtMag > _GP_NAV_THRESHOLD;
+    if (_navDirEdge(navUp, upMag, 'up',    now)) _navMove('up');
+    if (_navDirEdge(navDn, dnMag, 'down',  now)) _navMove('down');
+    if (_navDirEdge(navLf, lfMag, 'left',  now)) _navMove('left');
+    if (_navDirEdge(navRt, rtMag, 'right', now)) _navMove('right');
     if (pressed(GP_A)) _navActivate();
     if (pressed(GP_B)) _navCancel();
     // LB/RB cycle the active tab group (e.g. pause-settings sections).

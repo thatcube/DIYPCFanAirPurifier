@@ -529,8 +529,11 @@ h4 {
   transition: all 0.3s var(--spring);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
-  -webkit-mask-image: -webkit-radial-gradient(white, black);
-  mask-image: radial-gradient(white, black);
+  /* No mask-image — border-radius already rounds the pill, and a mask
+     creates a compositing layer that can clip the keyboard focus
+     indicator (outline + halo box-shadow) on Chromium. The thumb
+     pseudo-element stays fully inside the pill at all times so we
+     don't need a clip mask for visual safety. */
 }
 
 .toggle-sw.on {
@@ -2883,6 +2886,8 @@ line-height: 1;
   border: 1px solid rgba(9, 13, 20, 0.6);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
   cursor: pointer;
+  transition: transform 160ms var(--spring), box-shadow 160ms ease,
+    background 160ms ease, border-color 160ms ease;
 }
 
 .pause-range::-moz-range-thumb {
@@ -2893,10 +2898,15 @@ line-height: 1;
   border: 1px solid rgba(9, 13, 20, 0.6);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
   cursor: pointer;
+  transition: transform 160ms var(--spring), box-shadow 160ms ease,
+    background 160ms ease, border-color 160ms ease;
 }
 
 .pause-range:focus-visible {
-  box-shadow: 0 0 0 2px rgba(159, 227, 255, 0.5);
+  /* Soft halo around the thin track. The global rule paints the
+     outline ring outside this; the thumb pseudo-element has its own
+     glow at .pause-range:focus-visible::-{webkit,moz}-slider-thumb. */
+  box-shadow: 0 0 0 2px rgba(92, 216, 255, 0.32);
 }
 
 /* Inline button (e.g. Camera cycle) inside a toggle row */
@@ -3399,13 +3409,38 @@ line-height: 1;
 .gp-rebind-fixed {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-.gp-rebind-fixed > div {
-  display: flex;
-  align-items: center;
   gap: 6px;
+  margin: 8px 0 4px;
+}
+/* Static reference row: label on the left, glyph chip on the right.
+   Keep this read-only block visually quieter than remappable rows so
+   L/R sticks + D-pad don't look clickable. */
+.gp-rebind-row--static {
+  opacity: 0.86;
+}
+.gp-rebind-row--static .gp-rebind-label {
+  color: rgba(225, 240, 255, 0.72);
+}
+.gp-rebind-row--static .gp-rebind-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  min-width: 0;
+  min-height: 0;
+  color: rgba(225, 240, 255, 0.8);
+}
+.gp-rebind-row--static .gp-rebind-glyph kbd {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  padding: 1px 8px;
+  font-size: 11px;
+  letter-spacing: 0.01em;
+  color: rgba(225, 240, 255, 0.9);
 }
 .gp-rebind-list {
   display: flex;
@@ -3426,26 +3461,28 @@ line-height: 1;
 }
 .gp-rebind-btn {
   appearance: none;
-  background: rgba(8, 14, 26, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(170, 220, 255, 0.32);
   border-radius: 8px;
   padding: 4px 10px;
   cursor: pointer;
-  color: inherit;
+  color: rgba(225, 240, 255, 0.96);
+  font-size: 11px;
+  font-weight: var(--weight-medium);
   min-width: 88px;
   text-align: center;
-  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
 }
 .gp-rebind-btn:hover {
-  background: rgba(20, 40, 70, 0.55);
-  border-color: rgba(140, 200, 255, 0.35);
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(170, 220, 255, 0.5);
 }
 .gp-rebind-btn:focus-visible {
-  outline: 2px solid rgba(140, 200, 255, 0.55);
+  outline: 2px solid #5cd8ff;
   outline-offset: 2px;
 }
 .gp-rebind-btn.is-listening {
-  background: rgba(40, 80, 140, 0.55);
+  background: rgba(92, 216, 255, 0.22);
   border-color: rgba(140, 200, 255, 0.7);
   animation: gp-rebind-pulse 1.1s ease-in-out infinite;
 }
@@ -6438,16 +6475,65 @@ body.play-mode #fpChargeBar {
   outline-offset: -2px;
 }
 
-/* Toggle switch focus ring */
+/* Toggle switch focus ring — pairs the accent outline with a soft
+   halo + lift so it reads clearly on the busy settings background.
+   The toggle pill is small (36×20) and the surrounding rows are
+   dense, so a plain 2px outline gets lost; the halo separates the
+   focused row from its neighbors at a glance. */
 .toggle-sw:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: 2px solid #5cd8ff;
+  outline-offset: 3px;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.12),
+    0 0 0 6px rgba(92, 216, 255, 0.18),
+    0 0 14px rgba(92, 216, 255, 0.35);
 }
 
-/* Range slider — ring on the track since thumb is pseudo-element */
+/* Row-level focus for controller-first settings navigation. The row
+   is now the default focus stop; primary controls are entered with A
+   / Enter and exited with B / Escape (for sliders). */
+.pause-toggle-row:focus-visible {
+  outline: 2px solid #5cd8ff;
+  outline-offset: 2px;
+  border-color: rgba(140, 200, 255, 0.55);
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Range slider focus — outline marks the track, but the real signal
+   is the thumb growing + glowing so the user knows which slider will
+   accept controller / arrow-key input. */
 input[type=range]:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 4px;
+}
+
+.pause-range:focus-visible::-webkit-slider-thumb {
+  background: #ffffff;
+  border-color: rgba(92, 216, 255, 0.9);
+  box-shadow:
+    0 0 0 3px rgba(92, 216, 255, 0.32),
+    0 0 12px rgba(92, 216, 255, 0.55),
+    0 1px 4px rgba(0, 0, 0, 0.4);
+  transform: scale(1.25);
+}
+.pause-range:focus-visible::-moz-range-thumb {
+  background: #ffffff;
+  border-color: rgba(92, 216, 255, 0.9);
+  box-shadow:
+    0 0 0 3px rgba(92, 216, 255, 0.32),
+    0 0 12px rgba(92, 216, 255, 0.55),
+    0 1px 4px rgba(0, 0, 0, 0.4);
+  transform: scale(1.25);
+}
+
+/* Inline action buttons inside settings rows (e.g. Camera switcher).
+   Match the gp-rebind-btn focus look so all interactive controls in
+   the panel land on the same focus language. */
+.pause-inline-btn:focus-visible {
+  outline: 2px solid #5cd8ff;
+  outline-offset: 2px;
+  border-color: rgba(140, 200, 255, 0.55);
+  background: rgba(255, 255, 255, 0.22);
 }
 
 /* Color dots — small, need tighter ring */
