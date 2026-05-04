@@ -5387,8 +5387,9 @@ main.page[data-spa="1"]>*:not(#titleSplash):not(.title-splash-card) {
   cursor: progress;
 }
 
-/* Spinner inside the play button. White-on-glass to match the
-   .glass-btn--primary surface. */
+/* The spinner element is no longer used on the home splash (the
+   full-button shimmer replaced it). Keep the class for the legacy
+   index.html splash and vite-index.html which still reference it. */
 .title-splash-play-spinner {
   display: inline-block;
   width: 22px;

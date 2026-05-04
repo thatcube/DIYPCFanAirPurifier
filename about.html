@@ -479,8 +479,10 @@
   </style>
 </head>
 
-<body>
+<body class="tabs-revealed">
   <iframe id="bgFrame" src="/play?bg=1" title="" aria-hidden="true" tabindex="-1" referrerpolicy="same-origin"></iframe>
+  <!-- Note: body class `tabs-revealed` set above so the nav paints
+       sharp on first frame (no entrance transition). -->
   <div id="bgScrim" aria-hidden="true">
     <div class="bg-grid"></div>
   </div>
@@ -629,19 +631,11 @@
     const _isCoarse = matchMedia('(pointer: coarse)').matches;
     const _isNarrow = window.innerWidth < 720;
 
-    // Tabs start hidden (CSS) and slide down once the scene is up
-    // AND the page card has had time to settle. The chrome lands last
-    // so the eye reads the room first.
-    let _tabsRevealed = false;
-    function _revealTabs() {
-      if (_tabsRevealed) return;
-      _tabsRevealed = true;
-      document.body.classList.add('tabs-revealed');
-    }
+    // Tabs are revealed via the body class set in the HTML itself
+    // (`tabs-revealed`) so they paint sharp on the very first frame.
 
     if (bgFrame && (_isCoarse || _isNarrow)) {
       bgFrame.remove();
-      setTimeout(_revealTabs, 1100);
     } else if (bgFrame) {
       // Wait for the iframe to postMessage that its first scene frame
       // actually composited — not just iframe.load (which fires while
@@ -654,17 +648,12 @@
         // (matches home.html / leaderboard.html).
         bgFrame.setAttribute('data-scene-ready', '1');
         if (typeof window.__flushPendingPlay === 'function') window.__flushPendingPlay();
-        // Hold an extra beat after the scene paints so the page card
-        // finishes its entrance before the tabs join in.
-        setTimeout(_revealTabs, 520);
       }
       window.addEventListener('message', (e) => {
         if (e.origin !== location.origin) return;
         if (e.data && e.data.type === 'bg-scene-ready') _bgReady();
       });
       setTimeout(_bgReady, 4000);
-    } else {
-      setTimeout(_revealTabs, 1100);
     }
   </script>
   <script>
@@ -797,6 +786,17 @@
         // and we fall through to a full reload.
         const targetView = viewFor(new URL(href, location.href).pathname);
         if (!targetView || targetView === 'play') { fullNav(href); return; }
+
+        // Update the active-tab pill IMMEDIATELY (before the 260ms
+        // exit + fetch round-trip) so the user gets instant visual
+        // confirmation that their click registered. Without this, on
+        // cold loads where the iframe is still downloading, the pill
+        // sits frozen on the old tab for >1s and the click feels
+        // broken — the destination page does eventually swap in, but
+        // the lack of motion in the meantime reads as "nothing
+        // happened". URL is still pushed at the end of swap() so
+        // history stays in sync with the actually-visible page.
+        setActiveTab(targetView);
 
         const oldMain = document.querySelector('main.page');
 

@@ -376,7 +376,10 @@ function _renderToggleRow(c) {
   const labelTitle = c.hint ? ` title="${_esc(c.hint)}"` : '';
   const onclick = c.onclickRaw
     ? c.onclickRaw
-    : `window.${c.onclick}&&window.${c.onclick}()`;
+    : `this.classList.toggle('on');this.setAttribute('aria-checked',String(this.classList.contains('on')));` +
+      `var _n=this.nextElementSibling;if(_n){_n.textContent=this.classList.contains('on')?'On':'Off';` +
+      `_n.classList.toggle('off',!this.classList.contains('on'))}` +
+      `window.${c.onclick}&&window.${c.onclick}()`;
   const rowIdAttr = c.rowId ? ` id="${_esc(c.rowId)}"` : '';
   const rowStyle = c.rowHidden ? ' style="display:none"' : '';
   // Optional gating classes. CSS rules in main.css hide rows when

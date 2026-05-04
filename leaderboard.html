@@ -776,7 +776,7 @@
   </style>
 </head>
 
-<body class="is-booting">
+<body class="is-booting tabs-revealed">
   <iframe id="bgFrame" src="/play?bg=1" title="" aria-hidden="true" tabindex="-1" referrerpolicy="same-origin"></iframe>
   <div id="bgScrim" aria-hidden="true">
     <div class="bg-grid"></div>
@@ -972,16 +972,11 @@
       const _isCoarse = matchMedia('(pointer: coarse)').matches;
       const _isNarrow = window.innerWidth < 720;
 
-      // Tabs start hidden (CSS) and slide down from above once the
-      // scene is up AND the page card has had time to settle. This
-      // keeps the entrance from racing the rest of the page — the
-      // user reads the room first, the chrome arrives last.
-      let _tabsRevealed = false;
-      function revealTabs() {
-        if (_tabsRevealed) return;
-        _tabsRevealed = true;
-        document.body.classList.add('tabs-revealed');
-      }
+      // Tabs are revealed via the body class set in the HTML itself
+      // (`tabs-revealed`) so they paint sharp on the very first
+      // frame. The leaderboard fetches its own data independently
+      // of the iframe, so the page is fully usable as soon as the
+      // data lands.
 
       // End the boot/loading state. Removing .is-booting from <body>
       // triggers the CSS transition on .board's background-color
@@ -999,10 +994,8 @@
       if (bgFrame && (_isCoarse || _isNarrow)) {
         bgFrame.remove();
         // No live scene to wait on — end boot immediately so the
-        // board morphs to its glass-over-fallback-gradient look,
-        // then reveal tabs after a beat.
+        // board morphs to its glass-over-fallback-gradient look.
         endBoot();
-        setTimeout(revealTabs, 1100);
       } else if (bgFrame) {
         function _bgReady() {
           bgFrame.classList.add('ready');
@@ -1015,9 +1008,8 @@
           // iframe sits at opacity:0 → 1 (snap, no transition) BEHIND
           // the still-opaque board, so the user can't see it pop.
           // The board then morphs to glass over 0.65s and the now-
-          // visible live scene refracts through it. Tabs come in last.
+          // visible live scene refracts through it.
           endBoot();
-          setTimeout(revealTabs, 520);
         }
         window.addEventListener('message', (e) => {
           if (e.origin !== location.origin) return;
@@ -1026,7 +1018,6 @@
         setTimeout(_bgReady, 4000);
       } else {
         endBoot();
-        setTimeout(revealTabs, 1100);
       }
     })();
   </script>
@@ -1543,6 +1534,17 @@
         // and we fall through to a full reload.
         const targetView = viewFor(new URL(href, location.href).pathname);
         if (!targetView || targetView === 'play') { fullNav(href); return; }
+
+        // Update the active-tab pill IMMEDIATELY (before the 260ms
+        // exit + fetch round-trip) so the user gets instant visual
+        // confirmation that their click registered. Without this, on
+        // cold loads where the iframe is still downloading, the pill
+        // sits frozen on the old tab for >1s and the click feels
+        // broken — the destination page does eventually swap in, but
+        // the lack of motion in the meantime reads as "nothing
+        // happened". URL is still pushed at the end of swap() so
+        // history stays in sync with the actually-visible page.
+        setActiveTab(targetView);
 
         const oldMain = document.querySelector('main.page');
 

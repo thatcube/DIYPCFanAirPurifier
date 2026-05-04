@@ -164,33 +164,122 @@
       border-color: rgba(255, 255, 255, 0.06);
     }
 
-    /* Loading content (spinner + "Loading…") is shown only during
-       boot; the Play row takes over once the scene is ready. Both
-       use the existing .title-splash-play-content--loading /
-       --ready classes from main.css (which also defines the
-       spinner's keyframes), but main.css gates them behind
-       #titleSplash[data-state="…"] sibling selectors that don't
-       apply here (home has no #titleSplash). Re-gate them on
-       body.is-booting instead. */
+    /* Loading/ready content rows — fixed-size stack so the button
+       never reflows. Both rows are absolutely positioned inside
+       .title-splash-play-stack whose explicit width+height are the
+       sole source of the button's size — content can't grow it.
+       We crossfade between rows (opacity + blur + translateY lift)
+       when body.is-booting is removed. */
+    .title-splash-play-stack {
+      position: relative;
+      display: inline-block;
+      /* Just text. No spinner element anymore — the shimmer is on
+         the button itself. Width accommodates the longest tip. */
+      width: 212px;
+      /* 28px = ceil(22px font × 1.2 line-height). Whole pixel. */
+      height: 28px;
+    }
+
     main.page>.title-splash-card .title-splash-play-content {
-      display: none;
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(6px);
+      filter: blur(6px);
+      transition:
+        opacity 320ms cubic-bezier(.32, .72, 0, 1),
+        transform 320ms cubic-bezier(.32, .72, 0, 1),
+        filter 320ms cubic-bezier(.32, .72, 0, 1),
+        visibility 0s linear 320ms;
+      pointer-events: none;
     }
 
-    body.is-booting main.page>.title-splash-card .title-splash-play-content--loading {
-      display: inline-flex;
-    }
-
+    body.is-booting main.page>.title-splash-card .title-splash-play-content--loading,
     body:not(.is-booting) main.page>.title-splash-card .title-splash-play-content--ready {
-      display: inline-flex;
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+      filter: blur(0);
+      transition:
+        opacity 320ms cubic-bezier(.32, .72, 0, 1),
+        transform 320ms cubic-bezier(.32, .72, 0, 1),
+        filter 320ms cubic-bezier(.32, .72, 0, 1),
+        visibility 0s linear 0s;
+      pointer-events: auto;
     }
 
-    /* During boot, the Play button can't actually start a run — the
-       iframe scene isn't up yet — so kill its hit-targeting and
-       show a progress cursor. pointer-events also blocks Tab+Enter
-       activation since a disabled <a> still receives keyboard focus. */
+    /* During boot the button is non-interactive. Ghost pill with a
+       light-bar sweep so it's unmistakably "loading." When .is-booting
+       drops, the glass-btn base floods in via its existing transition. */
     body.is-booting .title-splash-play {
       cursor: progress;
       pointer-events: none;
+      overflow: hidden;
+      /* Hollow: no fill, no gradient. */
+      background-color: transparent;
+      background-image: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      /* Muted text — present but clearly inactive. */
+      color: rgba(255, 255, 255, 0.5);
+      text-shadow: none;
+      /* Static dim border. */
+      border-color: rgba(100, 170, 255, 0.28);
+      box-shadow:
+        0 0 16px rgba(100, 180, 255, 0.08),
+        0 16px 44px rgba(0, 0, 0, 0.25);
+    }
+
+    /* Sweep bar — a glow beam that scans left-to-right. */
+    body.is-booting .title-splash-play::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg,
+        transparent 20%,
+        rgba(130, 200, 255, 0.25) 35%,
+        rgba(180, 220, 255, 0.45) 50%,
+        rgba(130, 200, 255, 0.25) 65%,
+        transparent 80%
+      );
+      animation: btnSweep 1.8s cubic-bezier(.4, 0, .2, 1) infinite;
+      pointer-events: none;
+    }
+
+
+
+    /* Kill ALL hover/active effects during boot. */
+    body.is-booting .title-splash-play:hover,
+    body.is-booting .title-splash-play:active {
+      transform: none;
+      filter: none;
+      border-color: inherit;
+      box-shadow: inherit;
+      background-image: none;
+    }
+
+    @keyframes btnSweep {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body.is-booting .title-splash-play::after {
+        animation: none;
+        /* Static centered glow instead of sweep. */
+        background: radial-gradient(ellipse at 50% 50%,
+          rgba(130, 200, 255, 0.15), transparent 70%);
+      }
+
+    }
+
+    .title-splash-play-tip {
+      white-space: nowrap;
+      will-change: transform, filter, opacity;
     }
 
     /* The splash treatment lives in main.css under #titleSplash and
@@ -283,7 +372,7 @@
   </style>
 </head>
 
-<body class="is-booting">
+<body class="is-booting tabs-revealed">
   <!-- Persistent live-scene iframe — kept mounted across SPA swaps to
        /about and /leaderboard so the three.js scene never reboots when
        the user changes tabs. The router only replaces <main> + the
@@ -341,15 +430,20 @@
              a brief fade for continuity. We use an <a> (not a <button>)
              so middle-click / cmd-click open in a new tab as expected. -->
         <a class="title-splash-play glass-btn glass-btn--primary" href="/play" data-play-cta>
-          <!-- Boot/loading row — visible while body.is-booting (see
-               inline CSS above). Reuses the .title-splash-play-spinner
-               pattern from the original index.html splash. -->
-          <span class="title-splash-play-content title-splash-play-content--loading">
-            <span class="title-splash-play-spinner" aria-hidden="true"></span>
-            <span>Loading…</span>
-          </span>
-          <span class="title-splash-play-content title-splash-play-content--ready">
-            <span>Play game</span>
+          <!-- Both rows live in a grid stack so the button's intrinsic
+               width is max(loading, ready) and stays IDENTICAL across
+               the boot→ready morph. The two rows overlap in the same
+               1/1 cell; visibility is crossfaded (see inline CSS). -->
+          <span class="title-splash-play-stack">
+            <!-- Boot/loading row — visible while body.is-booting (see
+                 inline CSS above). Reuses the .title-splash-play-spinner
+                 pattern from the original index.html splash. -->
+            <span class="title-splash-play-content title-splash-play-content--loading">
+              <span id="homeLoadingTip" class="title-splash-play-tip" aria-live="polite">Going Super Saiyan…</span>
+            </span>
+            <span class="title-splash-play-content title-splash-play-content--ready">
+              <span>Play game</span>
+            </span>
           </span>
         </a>
       </div>
@@ -372,15 +466,43 @@
       const bg = document.getElementById('bgFrame');
       const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-      // Tabs start hidden (CSS) and slide down once the scene is up
-      // AND the splash card has had time to settle. The chrome lands
-      // last so the eye reads the room first.
-      let _tabsRevealed = false;
-      function revealTabs() {
-        if (_tabsRevealed) return;
-        _tabsRevealed = true;
-        document.body.classList.add('tabs-revealed');
-      }
+      // Tabs are revealed via the body class set in the HTML itself
+      // (`tabs-revealed`) so they paint sharp on the very first frame
+      // — no entrance transition mid-load. Navigation must be
+      // available the moment the page paints; the bg iframe scene
+      // can take 5–20s on cold cache, and gating tabs on it makes
+      // the whole site feel locked up. The Play button is gated
+      // separately via body.is-booting (see CSS above).
+
+      // Randomise the first-paint tip synchronously — this script
+      // runs before first paint so the user never sees a fixed string.
+      // Must mirror the TIPS array in /loading-tips.js.
+      (function () {
+        const TIPS = [
+          'Avatar State, go!…', 'Bending elements…', 'Consulting Korra…', 'Asking Uncle Iroh…',
+          'Going Super Saiyan…', "It's over 9000…", 'KA-ME-HA-ME-HA…', 'Powering up…',
+          'Loading fireballs…', 'Lighting the fuse…',
+          'Counting the coins…', 'Hiding the coins…',
+          'Optimizing routes…', 'Skipping cutscenes…', 'Any% speedrun…',
+          'Catching Pikachu…', 'Wild encounter…', 'Pokémon Center…',
+          'Tuning the guitar…', 'Star power ready…', 'Nailing the solo…',
+        ];
+        const el = document.getElementById('homeLoadingTip');
+        if (el) el.textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
+      })();
+
+      // Attach the rotating tip to the loading button. /loading-tips.js
+      // is loaded with `defer`, so it parses after this inline script;
+      // poll briefly until the global is available, then attach.
+      (function attachWhenReady() {
+        const tipEl = document.getElementById('homeLoadingTip');
+        if (!tipEl) return;
+        if (typeof window.attachLoadingTips === 'function') {
+          window.attachLoadingTips(tipEl);
+          return;
+        }
+        setTimeout(attachWhenReady, 50);
+      })();
 
       // End the boot/loading state. Removing .is-booting from <body>
       // triggers the CSS transition on .title-splash-card's
@@ -404,17 +526,15 @@
         // — the iframe is sitting at opacity:0 → 1 (snap, no transition)
         // BEHIND the still-opaque card, so the user can't see it pop.
         // The card then morphs to glass over 0.65s and the now-visible
-        // live scene refracts through it. Tabs come in last.
+        // live scene refracts through it.
         endBoot();
-        setTimeout(revealTabs, 520);
       }
       if (!bg || reduce) {
         // No live scene to gate on — end boot immediately so the
-        // user isn't stuck on the loading row, then reveal tabs after
-        // a beat. (With reduce-motion we skip the iframe entirely;
-        // the card stays opaque-styled but functional.)
+        // user isn't stuck on the loading row. (With reduce-motion
+        // we skip the iframe entirely; the card stays opaque-styled
+        // but functional.)
         endBoot();
-        setTimeout(revealTabs, reduce ? 0 : 1100);
         return;
       }
       window.addEventListener('message', (e) => {
@@ -555,6 +675,17 @@
         // and we fall through to a full reload.
         const targetView = viewFor(new URL(href, location.href).pathname);
         if (!targetView || targetView === 'play') { fullNav(href); return; }
+
+        // Update the active-tab pill IMMEDIATELY (before the 260ms
+        // exit + fetch round-trip) so the user gets instant visual
+        // confirmation that their click registered. Without this, on
+        // cold loads where the iframe is still downloading, the pill
+        // sits frozen on the old tab for >1s and the click feels
+        // broken — the destination page does eventually swap in, but
+        // the lack of motion in the meantime reads as "nothing
+        // happened". URL is still pushed at the end of swap() so
+        // history stays in sync with the actually-visible page.
+        setActiveTab(targetView);
 
         const oldMain = document.querySelector('main.page');
 
@@ -880,6 +1011,9 @@
     })();
   </script>
 
+  <!-- Rotating "Discord-style" tips for the boot loader. Lives in
+       /public so Vite copies it as-is. Exposes window.attachLoadingTips. -->
+  <script src="/loading-tips.js" defer></script>
   <!-- Gamepad navigation for the menu chrome. Self-contained,
        idempotent, lives in /public so Vite copies it as-is. Picks up
        the first connected pad and lets the d-pad / sticks / A / B / LB

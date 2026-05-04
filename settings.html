@@ -180,10 +180,72 @@
                 border-radius: 26px;
             }
         }
+
+        /* ── Boot loading overlay ─────────────────────────────────
+           While the bg /play iframe is still booting (5–20s on cold
+           cache), the settings panel is mounted but its proxy bridge
+           into the iframe (see settings-panel.js _installParentBridge)
+           has nothing to forward to. Changing a toggle in that window
+           would silently fail. Cover the card contents with a blocking
+           overlay that also doubles as the loading indicator, so the
+           user can still navigate via the tabs but can't poke at
+           controls that won't take effect yet.
+
+           Two pieces:
+             1. The card itself stays visible (its glass material is
+                what people came here for) — we just put an absolutely-
+                positioned overlay on top.
+             2. The overlay's backdrop-filter blurs the card's contents
+                slightly, reinforcing "this is unavailable right now".
+
+           The overlay is removed entirely once boot ends so it doesn't
+           keep capturing pointer events even at opacity:0. */
+        .settings-card {
+            position: relative;
+        }
+
+        .settings-card__boot {
+            position: absolute;
+            inset: 0;
+            z-index: 3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            border-radius: inherit;
+            background: rgba(7, 18, 29, 0.42);
+            backdrop-filter: blur(6px) saturate(1.05);
+            -webkit-backdrop-filter: blur(6px) saturate(1.05);
+            color: rgba(232, 244, 255, 0.95);
+            font-size: 14px;
+            font-weight: var(--weight-medium, 500);
+            opacity: 1;
+            pointer-events: auto;
+            transition: opacity 380ms cubic-bezier(.32,.72,0,1);
+        }
+
+        body:not(.is-booting) .settings-card__boot {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Same min-width pattern as the home loader so the overlay
+           doesn't reflow as the rotating tip swaps. */
+        .settings-card__boot-tip {
+            min-width: 240px;
+            text-align: left;
+            display: inline-block;
+        }
+
+        @media (max-width: 540px) {
+            .settings-card__boot-tip {
+                min-width: 0;
+            }
+        }
     </style>
 </head>
 
-<body>
+<body class="is-booting tabs-revealed">
     <iframe id="bgFrame" src="/play?bg=1" title="" aria-hidden="true" tabindex="-1"
         referrerpolicy="same-origin"></iframe>
     <div id="bgScrim" aria-hidden="true">
@@ -218,6 +280,16 @@
                 </h1>
             </header>
             <div id="settingsHost"></div>
+            <!-- Boot overlay — visible while body.is-booting (the bg
+                 /play iframe hasn't finished its first scene frame).
+                 Blocks pointer events so toggles don't get poked
+                 before settings-panel.js's parent bridge is wired up.
+                 Removed from the DOM by the boot script the moment
+                 boot ends so the card behaves normally afterwards. -->
+            <div id="settingsBoot" class="settings-card__boot" role="status" aria-live="polite">
+                <span class="title-splash-play-spinner" aria-hidden="true"></span>
+                <span id="settingsBootTip" class="settings-card__boot-tip">Loading…</span>
+            </div>
         </section>
     </main>
 
@@ -241,30 +313,54 @@
         const _isCoarse = matchMedia('(pointer: coarse)').matches;
         const _isNarrow = window.innerWidth < 720;
 
-        let _tabsRevealed = false;
-        function _revealTabs() {
-            if (_tabsRevealed) return;
-            _tabsRevealed = true;
-            document.body.classList.add('tabs-revealed');
+        // Tabs are revealed via the body class set in the HTML itself
+        // (`tabs-revealed`) so they paint sharp on the very first
+        // frame — no entrance transition mid-load. Settings inputs
+        // are gated separately by the boot overlay over .settings-card.
+
+        // Boot end — drop body.is-booting so the overlay fades out
+        // and the settings panel becomes interactive. Idempotent.
+        let _bootEnded = false;
+        function _endBoot() {
+            if (_bootEnded) return;
+            _bootEnded = true;
+            document.body.classList.remove('is-booting');
         }
+
+        // Attach the rotating tip to the boot overlay. Polls until
+        // /loading-tips.js (deferred) has registered the global.
+        (function attachWhenReady() {
+            const tipEl = document.getElementById('settingsBootTip');
+            if (!tipEl) return;
+            if (typeof window.attachLoadingTips === 'function') {
+                window.attachLoadingTips(tipEl);
+                return;
+            }
+            setTimeout(attachWhenReady, 50);
+        })();
 
         if (bgFrame && (_isCoarse || _isNarrow)) {
             bgFrame.remove();
-            setTimeout(_revealTabs, 1100);
+            // No iframe to wait on — settings still need a live game
+            // to forward writes to, but coarse/narrow visitors are
+            // typically here just to read; unblock immediately so
+            // they can scroll the panel.
+            _endBoot();
         } else if (bgFrame) {
             function _bgReady() {
                 bgFrame.classList.add('ready');
                 bgFrame.setAttribute('data-scene-ready', '1');
                 if (typeof window.__flushPendingPlay === 'function') window.__flushPendingPlay();
-                setTimeout(_revealTabs, 520);
+                _endBoot();
             }
             window.addEventListener('message', (e) => {
                 if (e.origin !== location.origin) return;
                 if (e.data && e.data.type === 'bg-scene-ready') _bgReady();
             });
+            // Fallback: reveal anyway after 4s if the message never arrives.
             setTimeout(_bgReady, 4000);
         } else {
-            setTimeout(_revealTabs, 1100);
+            _endBoot();
         }
     </script>
 
@@ -364,6 +460,17 @@
                 // and we fall through to a full reload.
                 const targetView = viewFor(new URL(href, location.href).pathname);
                 if (!targetView || targetView === 'play') { fullNav(href); return; }
+
+                // Update the active-tab pill IMMEDIATELY (before the 260ms
+                // exit + fetch round-trip) so the user gets instant visual
+                // confirmation that their click registered. Without this, on
+                // cold loads where the iframe is still downloading, the pill
+                // sits frozen on the old tab for >1s and the click feels
+                // broken — the destination page does eventually swap in, but
+                // the lack of motion in the meantime reads as "nothing
+                // happened". URL is still pushed at the end of swap() so
+                // history stays in sync with the actually-visible page.
+                setActiveTab(targetView);
 
                 const oldMain = document.querySelector('main.page');
 
@@ -605,6 +712,8 @@
         })();
     </script>
 
+    <!-- Rotating "Discord-style" tips for the boot overlay. -->
+    <script src="/loading-tips.js" defer></script>
     <!-- Gamepad navigation for the menu chrome. See home.html note. -->
     <script src="/spa-gamepad-nav.js" defer></script>
 </body>
