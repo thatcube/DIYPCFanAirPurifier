@@ -1753,13 +1753,13 @@ function _gpBtnVisualMeta(idx, type) {
   if (idx === 0 || idx === 1 || idx === 2 || idx === 3) {
     meta.role = idx === 0 ? 'face-south'
       : idx === 1 ? 'face-east'
-      : idx === 2 ? 'face-west'
-      : 'face-north';
+        : idx === 2 ? 'face-west'
+          : 'face-north';
     if (padType === 'playstation') {
       meta.label = idx === 0 ? '×'
         : idx === 1 ? '○'
-        : idx === 2 ? '□'
-        : '△';
+          : idx === 2 ? '□'
+            : '△';
     }
     return meta;
   }
@@ -1782,8 +1782,8 @@ function _gpBtnVisualMeta(idx, type) {
   if (idx >= 12 && idx <= 15) {
     meta.role = idx === 12 ? 'dpad-up'
       : idx === 13 ? 'dpad-down'
-      : idx === 14 ? 'dpad-left'
-      : 'dpad-right';
+        : idx === 14 ? 'dpad-left'
+          : 'dpad-right';
   }
   return meta;
 }
@@ -2346,9 +2346,9 @@ function _sampleSkateFootAnchor(out = _skateFootAnchor) {
   catAnimation.catModel.traverse((o) => {
     if (!o || !o.isBone) return;
     const name = String(o.name || '');
-    const isPaw  = /paw/i.test(name);
+    const isPaw = /paw/i.test(name);
     const isFoot = !isPaw && /foot/i.test(name);
-    const isToe  = !isPaw && !isFoot && /toe/i.test(name);
+    const isToe = !isPaw && !isFoot && /toe/i.test(name);
     if (!isPaw && !isFoot && !isToe) return;
     o.getWorldPosition(_skateFootTmp);
     _catGroup.worldToLocal(_skateFootTmp);
@@ -3584,7 +3584,7 @@ function _buildStaticBoxes() {
     // Backrest slab + Y-frame yoke (sticks back ~2" behind mesh).
     const backX = chairX - 17 / 2 + 1; // matches room.js: chairX - seatDepth/2 + 1
     _staticBoxes.push({
-      xMin: -(backX + 1) , xMax: -(backX - 2.5),
+      xMin: -(backX + 1), xMax: -(backX - 2.5),
       zMin: chairZ - 11, zMax: chairZ + 11,
       yTop: backTopY, yBottom: seatTopY, room: true
     });
@@ -4151,7 +4151,7 @@ export function toggleFirstPerson() {
   try {
     document.documentElement.classList.toggle('is-ingame', fpMode);
     window.__fpInGame = fpMode;
-  } catch (e) {}
+  } catch (e) { }
 
   if (fpMode) {
     _wasAimingAtInteractable = false;
@@ -4238,7 +4238,7 @@ export function toggleFirstPerson() {
         const el = document.documentElement;
         if (el && el.requestFullscreen && !document.fullscreenElement) {
           const p = el.requestFullscreen();
-          if (p && typeof p.catch === 'function') p.catch(() => {});
+          if (p && typeof p.catch === 'function') p.catch(() => { });
         }
       } catch (e) { /* fullscreen unavailable; cursor will leave window */ }
     }
@@ -4308,7 +4308,7 @@ export function toggleFirstPerson() {
     if (_useUnlockedLook && document.fullscreenElement && document.exitFullscreen) {
       try {
         const p = document.exitFullscreen();
-        if (p && typeof p.catch === 'function') p.catch(() => {});
+        if (p && typeof p.catch === 'function') p.catch(() => { });
       } catch (e) { /* not in fullscreen */ }
     }
     _syncSkateToggleUi();
@@ -4701,17 +4701,17 @@ export function updatePhysics(ts, dtSec, animFrameScale) {
           _ffMacVelY = 0;
           _ffMacVelHoldMs = 0;
         } else {
-        _ffMacQueueMode = false;
-        FF_MAC_SIMPLE_MOUSEMOVE_MODE = true;
-        _ffMacViewDecoupleMode = false;
-        _ffMacLookStepAccMs = 0;
-        _ffMacPendingDX = 0;
-        _ffMacPendingDY = 0;
-        _ffMacQueueDX = 0;
-        _ffMacQueueDY = 0;
-        _ffMacVelX = 0;
-        _ffMacVelY = 0;
-        _ffMacVelHoldMs = 0;
+          _ffMacQueueMode = false;
+          FF_MAC_SIMPLE_MOUSEMOVE_MODE = true;
+          _ffMacViewDecoupleMode = false;
+          _ffMacLookStepAccMs = 0;
+          _ffMacPendingDX = 0;
+          _ffMacPendingDY = 0;
+          _ffMacQueueDX = 0;
+          _ffMacQueueDY = 0;
+          _ffMacVelX = 0;
+          _ffMacVelY = 0;
+          _ffMacVelHoldMs = 0;
         }
       } else {
         _ffMacLookStepAccMs = 0;
@@ -5920,24 +5920,24 @@ let _sprintToggle = false;
 // vendors is what the cap is *printed with*. Detection uses
 // gamepad.id heuristics on connect; default = xbox.
 const _GP_BTN_NAMES_XBOX = {
-  0:'A', 1:'B', 2:'X', 3:'Y', 4:'LB', 5:'RB', 6:'LT', 7:'RT',
-  8:'View', 9:'Menu', 10:'L3', 11:'R3',
-  12:'D-Up', 13:'D-Down', 14:'D-Left', 15:'D-Right',
+  0: 'A', 1: 'B', 2: 'X', 3: 'Y', 4: 'LB', 5: 'RB', 6: 'LT', 7: 'RT',
+  8: 'View', 9: 'Menu', 10: 'L3', 11: 'R3',
+  12: 'D-Up', 13: 'D-Down', 14: 'D-Left', 15: 'D-Right',
 };
 const _GP_BTN_NAMES_PS = {
-  0:'Cross', 1:'Circle', 2:'Square', 3:'Triangle',
-  4:'L1', 5:'R1', 6:'L2', 7:'R2',
-  8:'Share', 9:'Options', 10:'L3', 11:'R3',
-  12:'D-Up', 13:'D-Down', 14:'D-Left', 15:'D-Right',
+  0: 'Cross', 1: 'Circle', 2: 'Square', 3: 'Triangle',
+  4: 'L1', 5: 'R1', 6: 'L2', 7: 'R2',
+  8: 'Share', 9: 'Options', 10: 'L3', 11: 'R3',
+  12: 'D-Up', 13: 'D-Down', 14: 'D-Left', 15: 'D-Right',
 };
 // Nintendo Standard Mapping is by physical position, so button 0
 // (south) prints as 'B' on a Switch Pro Controller, button 1 (east)
 // prints as 'A', etc.
 const _GP_BTN_NAMES_NINTENDO = {
-  0:'B', 1:'A', 2:'Y', 3:'X',
-  4:'L', 5:'R', 6:'ZL', 7:'ZR',
-  8:'-', 9:'+', 10:'L3', 11:'R3',
-  12:'D-Up', 13:'D-Down', 14:'D-Left', 15:'D-Right',
+  0: 'B', 1: 'A', 2: 'Y', 3: 'X',
+  4: 'L', 5: 'R', 6: 'ZL', 7: 'ZR',
+  8: '-', 9: '+', 10: 'L3', 11: 'R3',
+  12: 'D-Up', 13: 'D-Down', 14: 'D-Left', 15: 'D-Right',
 };
 const _GP_BTN_NAMES_BY_TYPE = {
   xbox: _GP_BTN_NAMES_XBOX,
@@ -5952,13 +5952,13 @@ function _gpDetectType(idStr) {
   if (!idStr) return 'xbox';
   const s = String(idStr).toLowerCase();
   if (s.includes('054c') || s.includes('sony') || s.includes('playstation')
-      || s.includes('dualshock') || s.includes('dualsense')
-      || s.includes('ps3') || s.includes('ps4') || s.includes('ps5')) {
+    || s.includes('dualshock') || s.includes('dualsense')
+    || s.includes('ps3') || s.includes('ps4') || s.includes('ps5')) {
     return 'playstation';
   }
   if (s.includes('057e') || s.includes('nintendo') || s.includes('joy-con')
-      || s.includes('joycon') || s.includes('switch pro')
-      || s.includes('pro controller')) {
+    || s.includes('joycon') || s.includes('switch pro')
+    || s.includes('pro controller')) {
     return 'nintendo';
   }
   return 'xbox';
@@ -5970,15 +5970,15 @@ function _gpBtnNameFor(idx, type) {
 // Back-compat alias used by older code paths.
 const _GP_BTN_NAMES = _GP_BTN_NAMES_XBOX;
 const _GP_ACTION_LABELS = {
-  jump:'Jump (hold)', sprint:'Sprint (hold)', sprintToggle:'Sprint (toggle)',
-  interact:'Interact', fireball:'Fireball / charge', camera:'Camera',
-  reset:'Reset run', pause:'Pause',
-  skateToggle:'Skateboard on/off', kickflip:'Kickflip', manual:'Manual',
-  spin:'Board spin',
+  jump: 'Jump (hold)', sprint: 'Sprint (hold)', sprintToggle: 'Sprint (toggle)',
+  interact: 'Interact', fireball: 'Fireball / charge', camera: 'Camera',
+  reset: 'Reset run', pause: 'Pause',
+  skateToggle: 'Skateboard on/off', kickflip: 'Kickflip', manual: 'Manual',
+  spin: 'Board spin',
 };
 const _GP_ACTION_GROUPS = {
-  general: ['jump','sprint','sprintToggle','interact','fireball','camera','reset','pause'],
-  skate:   ['skateToggle','kickflip','manual','spin'],
+  general: ['jump', 'sprint', 'sprintToggle', 'interact', 'fireball', 'camera', 'reset', 'pause'],
+  skate: ['skateToggle', 'kickflip', 'manual', 'spin'],
 };
 const _GP_ACTION_ORDER = _GP_ACTION_GROUPS.general.concat(_GP_ACTION_GROUPS.skate);
 const _GP_DEFAULT_MAP = Object.freeze({
@@ -6058,13 +6058,13 @@ function _gpSetControllerType(type) {
   const next = (type === 'playstation' || type === 'nintendo') ? type : 'xbox';
   if (next === _gpControllerType) return;
   _gpControllerType = next;
-  try { localStorage.setItem('gamepadType', next); } catch {}
+  try { localStorage.setItem('gamepadType', next); } catch { }
   // Same-window listeners (settings panel rendered inside the play
   // iframe) — storage events don't fire in the writing window, so
   // notify them via a custom event.
   try {
     window.dispatchEvent(new CustomEvent('gamepadtypechange', { detail: { type: next } }));
-  } catch {}
+  } catch { }
   if (typeof _updateHudGlyphs === 'function') _updateHudGlyphs();
 }
 // Settings panel may write to 'gamepadMap' from another realm
@@ -6101,7 +6101,7 @@ function _setLastInputDevice(d) {
 // we record it. Doesn't interfere with any gameplay routing.
 try {
   window.addEventListener('keydown', () => _setLastInputDevice('kb'), true);
-} catch {}
+} catch { }
 
 function _updateHudGlyphs() {
   if (typeof document === 'undefined') return;
@@ -6128,29 +6128,31 @@ try {
   if (typeof window !== 'undefined' && typeof requestAnimationFrame === 'function') {
     requestAnimationFrame(_updateHudGlyphs);
   }
-} catch {}
+} catch { }
 
 // Public API for settings UI.
 window.__gpBindings = {
-  get:           () => ({ ..._gpMap }),
-  defaults:      () => ({ ..._GP_DEFAULT_MAP }),
-  set:           _gpSetMap,
-  reset:         _gpResetMap,
-  startListen:   _gpStartListen,
-  cancelListen:  _gpCancelListen,
-  isListening:   () => _gpListenAction != null,
+  get: () => ({ ..._gpMap }),
+  defaults: () => ({ ..._GP_DEFAULT_MAP }),
+  set: _gpSetMap,
+  reset: _gpResetMap,
+  startListen: _gpStartListen,
+  cancelListen: _gpCancelListen,
+  isListening: () => _gpListenAction != null,
   listeningFor: () => _gpListenAction,
-  buttonName:    (i) => _gpBtnNameFor(i, _gpControllerType),
+  buttonName: (i) => _gpBtnNameFor(i, _gpControllerType),
   controllerType: () => _gpControllerType,
   buttonNamesFor: (type) => ({ ...(_GP_BTN_NAMES_BY_TYPE[type] || _GP_BTN_NAMES_XBOX) }),
-  buttonMeta:    (i, type) => _gpBtnVisualMeta(i, type || _gpControllerType),
+  buttonMeta: (i, type) => _gpBtnVisualMeta(i, type || _gpControllerType),
   renderButtonHtml: (i, type, extraClass = '') => _renderInputGlyphHtml(_gpBtnVisualMeta(i, type || _gpControllerType), extraClass),
   renderActionHtml: (action, kbLabel = '', extraClass = '') => _renderActionGlyphHtml(action, kbLabel, extraClass),
-  refreshHud:    () => _updateHudGlyphs(),
-  actionLabel:   (a) => _GP_ACTION_LABELS[a] || a,
-  actionOrder:   () => _GP_ACTION_ORDER.slice(),
-  actionGroups:  () => ({ general: _GP_ACTION_GROUPS.general.slice(),
-                          skate:   _GP_ACTION_GROUPS.skate.slice() }),
+  refreshHud: () => _updateHudGlyphs(),
+  actionLabel: (a) => _GP_ACTION_LABELS[a] || a,
+  actionOrder: () => _GP_ACTION_ORDER.slice(),
+  actionGroups: () => ({
+    general: _GP_ACTION_GROUPS.general.slice(),
+    skate: _GP_ACTION_GROUPS.skate.slice()
+  }),
 };
 
 function _gamepadConnect(idx) {
@@ -6278,7 +6280,7 @@ const _NAV_FOCUSABLE_SELECTOR =
 
 function _focusNavTarget(el) {
   if (!el || typeof el.focus !== 'function') return;
-  try { el.focus({ preventScroll: true }); } catch { try { el.focus(); } catch {} }
+  try { el.focus({ preventScroll: true }); } catch { try { el.focus(); } catch { } }
 }
 
 function _navCandidateNode(el) {
@@ -6390,7 +6392,7 @@ function _navMove(dir) {
     const next = Math.max(min, Math.min(max, candidate));
     if (next !== val) {
       focusedRaw.value = String(next);
-      focusedRaw.dispatchEvent(new Event('input',  { bubbles: true }));
+      focusedRaw.dispatchEvent(new Event('input', { bubbles: true }));
       focusedRaw.dispatchEvent(new Event('change', { bubbles: true }));
     }
     return;
@@ -6403,8 +6405,8 @@ function _navMove(dir) {
   // In settings, LEFT on a slider row exits to the active side rail
   // tab. (LEFT while inside the slider itself still adjusts value.)
   if (dir === 'left' && focused
-      && focused.classList
-      && focused.classList.contains('pause-toggle-row--slider')) {
+    && focused.classList
+    && focused.classList.contains('pause-toggle-row--slider')) {
     if (_focusActiveSettingsTab(modal)) return;
   }
 
@@ -6438,10 +6440,10 @@ function _navMove(dir) {
     const dx = (r.left + r.width / 2) - cx;
     const dy = (r.top + r.height / 2) - cy;
     let primary, secondary;
-    if (dir === 'up')         { primary = -dy; secondary = Math.abs(dx); }
-    else if (dir === 'down')  { primary =  dy; secondary = Math.abs(dx); }
-    else if (dir === 'left')  { primary = -dx; secondary = Math.abs(dy); }
-    else /* right */          { primary =  dx; secondary = Math.abs(dy); }
+    if (dir === 'up') { primary = -dy; secondary = Math.abs(dx); }
+    else if (dir === 'down') { primary = dy; secondary = Math.abs(dx); }
+    else if (dir === 'left') { primary = -dx; secondary = Math.abs(dy); }
+    else /* right */ { primary = dx; secondary = Math.abs(dy); }
     if (primary < 4) continue; // not in this direction (epsilon for overlap)
     // 45° cone: secondary must not exceed primary. Without this,
     // pressing LEFT when nothing is directly to the left will pick
@@ -6457,8 +6459,8 @@ function _navMove(dir) {
     // Bring it into view if the modal scrolled.
     const r = best.getBoundingClientRect();
     if (r.top < 0 || r.bottom > window.innerHeight
-        || r.left < 0 || r.right > window.innerWidth) {
-      try { best.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch {}
+      || r.left < 0 || r.right > window.innerWidth) {
+      try { best.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch { }
     }
   }
 }
@@ -6490,7 +6492,7 @@ function _navActivate() {
     const t = focused.type;
     // Range sliders and text-like inputs ignore A; A is for buttons/checkboxes.
     if (t === 'range' || t === 'text' || t === 'search' || t === 'email'
-        || t === 'password' || t === 'number' || t === 'tel' || t === 'url') {
+      || t === 'password' || t === 'number' || t === 'tel' || t === 'url') {
       return;
     }
   }
@@ -6559,8 +6561,8 @@ function _navCycleTab(delta) {
   const root = modal || document;
   const groups = [
     { container: '.settings-tabs', tab: '.settings-tab' },
-    { container: '.modeTabs',      tab: '.modeTab' },
-    { container: '.site-tabs',     tab: '.site-tab' },
+    { container: '.modeTabs', tab: '.modeTab' },
+    { container: '.site-tabs', tab: '.site-tab' },
   ];
   for (const g of groups) {
     const tabs = Array.from(root.querySelectorAll(`${g.container} ${g.tab}`))
@@ -6596,7 +6598,7 @@ function _navDirEdge(active, magnitude, key, now) {
   if (active && wasLatched) {
     const heldFor = now - _gpNavHoldStart[key];
     if (heldFor >= _GP_NAV_REPEAT_INITIAL_MS
-        && now - _gpNavLastRepeat[key] >= _GP_NAV_REPEAT_INTERVAL_MS) {
+      && now - _gpNavLastRepeat[key] >= _GP_NAV_REPEAT_INTERVAL_MS) {
       _gpNavLastRepeat[key] = now;
       return true;
     }
@@ -6630,9 +6632,9 @@ function _pollGamepad(fpDtMs) {
   const moving = (lx !== 0) || (ly !== 0) || dUp || dDn || dLf || dRt;
   if (!fpPaused && !_deathLocked && (moving || _gamepadWasMoving)) {
     fpKeys.w = ly < -0.15 || dUp;
-    fpKeys.s = ly > 0.15  || dDn;
+    fpKeys.s = ly > 0.15 || dDn;
     fpKeys.a = lx < -0.15 || dLf;
-    fpKeys.d = lx > 0.15  || dRt;
+    fpKeys.d = lx > 0.15 || dRt;
   }
   _gamepadWasMoving = moving;
 
@@ -6654,7 +6656,7 @@ function _pollGamepad(fpDtMs) {
   const curr = new Array(pad.buttons.length);
   for (let i = 0; i < pad.buttons.length; i++) curr[i] = btn(i);
 
-  const pressed  = (i) => !!curr[i] && !prev[i];
+  const pressed = (i) => !!curr[i] && !prev[i];
   const released = (i) => !curr[i] && !!prev[i];
 
   // Last-input-device tracking: any new button press OR appreciable
@@ -6731,16 +6733,16 @@ function _pollGamepad(fpDtMs) {
     // (so its release cleanly drops to 0 below the release threshold);
     // stick uses the post-curve absolute deflection along that axis.
     const upMag = dUp ? 1 : Math.max(0, -ly);
-    const dnMag = dDn ? 1 : Math.max(0,  ly);
+    const dnMag = dDn ? 1 : Math.max(0, ly);
     const lfMag = dLf ? 1 : Math.max(0, -lx);
-    const rtMag = dRt ? 1 : Math.max(0,  lx);
+    const rtMag = dRt ? 1 : Math.max(0, lx);
     const navUp = upMag > _GP_NAV_THRESHOLD;
     const navDn = dnMag > _GP_NAV_THRESHOLD;
     const navLf = lfMag > _GP_NAV_THRESHOLD;
     const navRt = rtMag > _GP_NAV_THRESHOLD;
-    if (_navDirEdge(navUp, upMag, 'up',    now)) _navMove('up');
-    if (_navDirEdge(navDn, dnMag, 'down',  now)) _navMove('down');
-    if (_navDirEdge(navLf, lfMag, 'left',  now)) _navMove('left');
+    if (_navDirEdge(navUp, upMag, 'up', now)) _navMove('up');
+    if (_navDirEdge(navDn, dnMag, 'down', now)) _navMove('down');
+    if (_navDirEdge(navLf, lfMag, 'left', now)) _navMove('left');
     if (_navDirEdge(navRt, rtMag, 'right', now)) _navMove('right');
     if (pressed(GP_A)) _navActivate();
     if (pressed(GP_B)) _navCancel();

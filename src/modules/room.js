@@ -1999,7 +1999,7 @@ export function createRoom(scene) {
       const w = roadEndX - roadStartX;
       const slab = new THREE.Mesh(
         new THREE.BoxGeometry(w, 2, terrainZw), roadMat);
-      slab.position.set((roadStartX + roadEndX) / 2, flatY + 0.2, terrainZcenter);
+      slab.position.set((roadStartX + roadEndX) / 2, flatY + 0.3, terrainZcenter);
       slab.castShadow = true; slab.receiveShadow = true;
       slab._isRoom = true; slab._isGuestRoom = true;
       addRoom(slab);
@@ -2551,17 +2551,17 @@ export function createRoom(scene) {
     {
       const chairX = deskX - deskD / 2 - 22;        // 22" between desk front and seat center
       const chairZ = deskZ;                          // centered on desk
-      const frameBlack   = 0x16181c;                 // graphite frame/base/arms
+      const frameBlack = 0x16181c;                 // graphite frame/base/arms
       const meshGraphite = 0x2c2e32;                 // pellicle mesh
-      const aluminum     = 0xb4b7bb;                 // gas-lift cylinder only
+      const aluminum = 0xb4b7bb;                 // gas-lift cylinder only
       const casterRubber = 0x111114;
 
       // Aeron Size B-ish proportions — narrower than v1.
-      const seatTopY  = floorY + 19;
+      const seatTopY = floorY + 19;
       const seatThick = 1.6;
       const seatDepth = 17;                          // X axis (front-back)
       const seatWidth = 19;                          // Z axis (side-to-side)
-      const backH     = 22;                          // backrest height above seat
+      const backH = 22;                          // backrest height above seat
 
       // ─ 5-star black plastic base + casters ─
       const starArmLen = 11;
@@ -2851,7 +2851,7 @@ export function createRoom(scene) {
   const _msVentWorldX = -msX;                      // X-mirror flips msX
   const _msVentWorldY = msY - msH / 2 + 1.7;       // mid of louver stack
   const _msVentWorldZ = msZ + msD / 2 + 0.16;      // just in front of vent face
-  const _msVentWidth  = msW - 8;                   // emit across vent width
+  const _msVentWidth = msW - 8;                   // emit across vent width
   let _miniSplitAirPoints = null;
   let _miniSplitAirData = null;
   let _msAirSpriteTex = null;
@@ -3074,7 +3074,7 @@ export function createRoom(scene) {
       const k = i * 3;
       if (p.age >= p.life) {
         // Respawn at the vent face, jittered across width + tiny depth/height.
-        arr[k    ] = _msVentWorldX + (Math.random() - 0.5) * _msVentWidth;
+        arr[k] = _msVentWorldX + (Math.random() - 0.5) * _msVentWidth;
         arr[k + 1] = _msVentWorldY + (Math.random() - 0.5) * 1.4;
         arr[k + 2] = _msVentWorldZ + (Math.random() - 0.5) * 0.4;
         // Forward (+Z) push, slight downward droop, tiny side spread.
@@ -3085,7 +3085,7 @@ export function createRoom(scene) {
         p.life = 1.6 + Math.random() * 1.0;
         continue;
       }
-      arr[k    ] += p.vx * dt;
+      arr[k] += p.vx * dt;
       arr[k + 1] += p.vy * dt;
       arr[k + 2] += p.vz * dt;
     }
@@ -5066,7 +5066,7 @@ export function createRoom(scene) {
   // Toast callback for MacBook track-change announcements. main.js wires
   // this via roomRefs.setToastFn so we don't have to import the toast
   // helper directly into room.js.
-  let _roomShowToast = () => {};
+  let _roomShowToast = () => { };
   const MUSIC_MUTE_KEY = 'diy_air_purifier_music_muted_v2';
   let _macbookMuted = false;
   try { _macbookMuted = localStorage.getItem(MUSIC_MUTE_KEY) === '1'; } catch (e) { }
@@ -5277,7 +5277,7 @@ export function createRoom(scene) {
       // Mutual exclusion: turning the MacBook on stops any music playing
       // through the desk-monitor source so we never have two songs
       // overlapping at once.
-      if (_monitorMusicStop) { try { _monitorMusicStop(); } catch (e) {} }
+      if (_monitorMusicStop) { try { _monitorMusicStop(); } catch (e) { } }
       // Start music
       if (!_macbookAudio) _playMacbookTrack();
     } else {
@@ -5312,12 +5312,12 @@ export function createRoom(scene) {
   // run reset, and FP exit so songs can't bleed across runs.
   function stopAllMusic() {
     forceStopMacbook();
-    if (_monitorMusicStop) { try { _monitorMusicStop(); } catch (e) {} }
+    if (_monitorMusicStop) { try { _monitorMusicStop(); } catch (e) { } }
   }
 
   // Toast setter — main.js wires showToast here so the MacBook playlist
   // can announce each song as it starts.
-  function setToastFn(fn) { _roomShowToast = (typeof fn === 'function') ? fn : (() => {}); }
+  function setToastFn(fn) { _roomShowToast = (typeof fn === 'function') ? fn : (() => { }); }
 
   // Center desk monitor display — turns on with a per-song image when
   // the matching track is playing, off (dark, no image) otherwise.
@@ -5404,7 +5404,7 @@ export function createRoom(scene) {
     getCornerDoorPanelMesh: () => doorPanel,
     getCornerDoorAngle: () => _cornerDoorAngle,
     toggleGuestDoor: toggleGuestDoor || (() => false),
-    applyPushGuestDoor: applyPushGuestDoor || (() => {}),
+    applyPushGuestDoor: applyPushGuestDoor || (() => { }),
     isGuestDoorOpen: _guestDoorOpenState,
     getGuestDoorPanelMesh: () => _guestDoorPanelMesh,
     doorKnobs,

@@ -26,9 +26,9 @@
 // To add a new setting later: add one entry here. Done.
 
 const TABS = [
-  { id: 'display',     label: 'Display',     icon: 'ph ph-monitor' },
-  { id: 'audio',       label: 'Audio',       icon: 'ph ph-speaker-high' },
-  { id: 'controls',    label: 'Controls',    icon: 'ph ph-mouse' },
+  { id: 'display', label: 'Display', icon: 'ph ph-monitor' },
+  { id: 'audio', label: 'Audio', icon: 'ph ph-speaker-high' },
+  { id: 'controls', label: 'Controls', icon: 'ph ph-mouse' },
   { id: 'performance', label: 'Performance', icon: 'ph ph-lightning' },
   { id: 'diagnostics', label: 'Diagnostics', icon: 'ph ph-bug' },
 ];
@@ -280,7 +280,7 @@ const CONTROLS = [
 // Split into general and skate-specific sections so the skate group mirrors
 // the in-game skate onboarding dialog (Get on/off, Kickflip, Manual, Spin).
 const KEYBOARD_REF = [
-  { keys: ['W','A','S','D'], desc: 'Move' },
+  { keys: ['W', 'A', 'S', 'D'], desc: 'Move' },
   { keys: ['Space'], desc: 'Jump (hold)' },
   { keys: ['Shift'], desc: 'Sprint' },
   { keys: ['V'], desc: 'Camera' },
@@ -304,28 +304,28 @@ const KEYBOARD_REF_SKATE = [
 const CONTROLLER_FIXED_REF = [
   { glyph: 'L Stick', desc: 'Move' },
   { glyph: 'R Stick', desc: 'Look' },
-  { glyph: 'D-pad',   desc: 'Move (alt)' },
+  { glyph: 'D-pad', desc: 'Move (alt)' },
 ];
 
 const _GP_BTN_NAMES_XBOX = {
-  0:'A', 1:'B', 2:'X', 3:'Y', 4:'LB', 5:'RB', 6:'LT', 7:'RT',
-  8:'View', 9:'Menu', 10:'L3', 11:'R3',
-  12:'D-Up', 13:'D-Down', 14:'D-Left', 15:'D-Right',
+  0: 'A', 1: 'B', 2: 'X', 3: 'Y', 4: 'LB', 5: 'RB', 6: 'LT', 7: 'RT',
+  8: 'View', 9: 'Menu', 10: 'L3', 11: 'R3',
+  12: 'D-Up', 13: 'D-Down', 14: 'D-Left', 15: 'D-Right',
 };
 const _GP_BTN_NAMES_PS = {
-  0:'Cross', 1:'Circle', 2:'Square', 3:'Triangle',
-  4:'L1', 5:'R1', 6:'L2', 7:'R2',
-  8:'Share', 9:'Options', 10:'L3', 11:'R3',
-  12:'D-Up', 13:'D-Down', 14:'D-Left', 15:'D-Right',
+  0: 'Cross', 1: 'Circle', 2: 'Square', 3: 'Triangle',
+  4: 'L1', 5: 'R1', 6: 'L2', 7: 'R2',
+  8: 'Share', 9: 'Options', 10: 'L3', 11: 'R3',
+  12: 'D-Up', 13: 'D-Down', 14: 'D-Left', 15: 'D-Right',
 };
 // Nintendo Standard Mapping is by physical position, so button 0
 // (south) prints as 'B' on a Switch Pro Controller, button 1 (east)
 // prints as 'A', etc.
 const _GP_BTN_NAMES_NINTENDO = {
-  0:'B', 1:'A', 2:'Y', 3:'X',
-  4:'L', 5:'R', 6:'ZL', 7:'ZR',
-  8:'-', 9:'+', 10:'L3', 11:'R3',
-  12:'D-Up', 13:'D-Down', 14:'D-Left', 15:'D-Right',
+  0: 'B', 1: 'A', 2: 'Y', 3: 'X',
+  4: 'L', 5: 'R', 6: 'ZL', 7: 'ZR',
+  8: '-', 9: '+', 10: 'L3', 11: 'R3',
+  12: 'D-Up', 13: 'D-Down', 14: 'D-Left', 15: 'D-Right',
 };
 const _GP_BTN_NAMES_BY_TYPE = {
   xbox: _GP_BTN_NAMES_XBOX,
@@ -336,22 +336,26 @@ const _GP_BTN_NAMES_BY_TYPE = {
 // for surfacing 'A B X Y LB RB' query terms).
 const _GP_BTN_NAMES = _GP_BTN_NAMES_XBOX;
 const _GP_DEFAULT_MAP = {
-  jump:0, sprint:6, sprintToggle:10, interact:2, fireball:1,
-  camera:3, reset:8, pause:9,
-  skateToggle:11, kickflip:4, manual:5, spin:7,
+  jump: 0, sprint: 6, sprintToggle: 10, interact: 2, fireball: 1,
+  camera: 3, reset: 8, pause: 9,
+  skateToggle: 11, kickflip: 4, manual: 5, spin: 7,
 };
 const _GP_ACTION_LABELS = {
-  jump:'Jump (hold)', sprint:'Sprint (hold)', sprintToggle:'Sprint (toggle)',
-  interact:'Interact', fireball:'Fireball / charge', camera:'Camera',
-  reset:'Reset run', pause:'Pause',
-  skateToggle:'Skateboard on/off', kickflip:'Kickflip', manual:'Manual',
-  spin:'Board spin',
+  jump: 'Jump (hold)', sprint: 'Sprint (hold)', sprintToggle: 'Sprint (toggle)',
+  interact: 'Interact', fireball: 'Fireball / charge', camera: 'Camera',
+  reset: 'Reset run', pause: 'Pause',
+  skateToggle: 'Skateboard on/off', kickflip: 'Kickflip', manual: 'Manual',
+  spin: 'Board spin',
 };
 const _GP_REBIND_GROUPS = [
-  { title: 'Controller',           icon: 'ph ph-game-controller', sub: false,
-    actions: ['jump','sprint','sprintToggle','interact','fireball','camera','reset','pause'] },
-  { title: 'Skateboard',           emoji: '🛹', sub: true,
-    actions: ['skateToggle','kickflip','manual','spin'] },
+  {
+    title: 'Controller', icon: 'ph ph-game-controller', sub: false,
+    actions: ['jump', 'sprint', 'sprintToggle', 'interact', 'fireball', 'camera', 'reset', 'pause']
+  },
+  {
+    title: 'Skateboard', emoji: '🛹', sub: true,
+    actions: ['skateToggle', 'kickflip', 'manual', 'spin']
+  },
 ];
 
 // ────────────────────────────────────────────────────────────────────
@@ -360,7 +364,7 @@ const _GP_REBIND_GROUPS = [
 
 function _esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   })[c]);
 }
 
@@ -377,9 +381,9 @@ function _renderToggleRow(c) {
   const onclick = c.onclickRaw
     ? c.onclickRaw
     : `this.classList.toggle('on');this.setAttribute('aria-checked',String(this.classList.contains('on')));` +
-      `var _n=this.nextElementSibling;if(_n){_n.textContent=this.classList.contains('on')?'On':'Off';` +
-      `_n.classList.toggle('off',!this.classList.contains('on'))}` +
-      `window.${c.onclick}&&window.${c.onclick}()`;
+    `var _n=this.nextElementSibling;if(_n){_n.textContent=this.classList.contains('on')?'On':'Off';` +
+    `_n.classList.toggle('off',!this.classList.contains('on'))}` +
+    `window.${c.onclick}&&window.${c.onclick}()`;
   const rowIdAttr = c.rowId ? ` id="${_esc(c.rowId)}"` : '';
   const rowStyle = c.rowHidden ? ' style="display:none"' : '';
   // Optional gating classes. CSS rules in main.css hide rows when
@@ -459,7 +463,7 @@ function _gpReadStoredMap() {
 // access is required; on cross-origin the lookup throws and we
 // return null.
 function _gpApi() {
-  try { if (typeof window.__gpBindings !== 'undefined') return window.__gpBindings; } catch {}
+  try { if (typeof window.__gpBindings !== 'undefined') return window.__gpBindings; } catch { }
   try {
     const fr = document.getElementById('bgFrame');
     if (!fr) return null;
@@ -480,11 +484,11 @@ function _gpReadType() {
       const t = api.controllerType();
       if (t === 'playstation' || t === 'nintendo' || t === 'xbox') return t;
     }
-  } catch {}
+  } catch { }
   try {
     const t = localStorage.getItem('gamepadType');
     if (t === 'playstation' || t === 'nintendo' || t === 'xbox') return t;
-  } catch {}
+  } catch { }
   return 'xbox';
 }
 function _gpBtnName(btnIdx, type) {
@@ -499,13 +503,13 @@ function _gpBtnMeta(btnIdx, type) {
   if (btnIdx === 0 || btnIdx === 1 || btnIdx === 2 || btnIdx === 3) {
     meta.role = btnIdx === 0 ? 'face-south'
       : btnIdx === 1 ? 'face-east'
-      : btnIdx === 2 ? 'face-west'
-      : 'face-north';
+        : btnIdx === 2 ? 'face-west'
+          : 'face-north';
     if (t === 'playstation') {
       meta.label = btnIdx === 0 ? '×'
         : btnIdx === 1 ? '○'
-        : btnIdx === 2 ? '□'
-        : '△';
+          : btnIdx === 2 ? '□'
+            : '△';
     }
     return meta;
   }
@@ -528,8 +532,8 @@ function _gpBtnMeta(btnIdx, type) {
   if (btnIdx >= 12 && btnIdx <= 15) {
     meta.role = btnIdx === 12 ? 'dpad-up'
       : btnIdx === 13 ? 'dpad-down'
-      : btnIdx === 14 ? 'dpad-left'
-      : 'dpad-right';
+        : btnIdx === 14 ? 'dpad-left'
+          : 'dpad-right';
   }
   return meta;
 }
@@ -726,27 +730,27 @@ let _mountedHost = null;
 // rendered control. Same set of keys main.js / game-fp.js use.
 
 const _STORAGE_KEYS = {
-  fps:          'diy_air_purifier_show_fps_v1',
-  windowSun:    'diy_air_purifier_perf_window_sun_v1',
-  shadows:      'diy_air_purifier_perf_shadows_v1',
-  fog:          'diy_air_purifier_perf_fog_v1',
-  fpProfile:    'diy_air_purifier_perf_profile_v1',
+  fps: 'diy_air_purifier_show_fps_v1',
+  windowSun: 'diy_air_purifier_perf_window_sun_v1',
+  shadows: 'diy_air_purifier_perf_shadows_v1',
+  fog: 'diy_air_purifier_perf_fog_v1',
+  fpProfile: 'diy_air_purifier_perf_profile_v1',
   fpResolution: 'diy_air_purifier_perf_resolution_v1',
   fpResolutionScale: 'diy_air_purifier_perf_resolution_scale_v1',
-  fpShadowInterval:  'diy_air_purifier_perf_fp_shadow_interval_v1',
-  fpsCap:       'diy_air_purifier_perf_fps_cap_v1',
-  catAnim:      'diy_air_purifier_perf_cat_anim_v1',
-  coins:        'diy_air_purifier_perf_coins_v1',
-  purifier:     'diy_air_purifier_perf_purifier_v1',
-  abilities:    'diy_air_purifier_perf_abilities_v1',
-  raycast:      'diy_air_purifier_perf_raycast_v1',
-  fov:          'diy_air_purifier_fov_v1',
-  mouseSens:    'diy_air_purifier_mouse_sens_v1',
-  lookInvertX:  'diy_air_purifier_look_invert_x_v1',
-  lookInvertY:  'diy_air_purifier_look_invert_y_v1',
-  muteSfx:      'diy_air_purifier_muted_v2',
-  muteMusic:    'diy_air_purifier_music_muted_v2',
-  inputDiag:    'diy_air_purifier_input_diag_visible_v1',
+  fpShadowInterval: 'diy_air_purifier_perf_fp_shadow_interval_v1',
+  fpsCap: 'diy_air_purifier_perf_fps_cap_v1',
+  catAnim: 'diy_air_purifier_perf_cat_anim_v1',
+  coins: 'diy_air_purifier_perf_coins_v1',
+  purifier: 'diy_air_purifier_perf_purifier_v1',
+  abilities: 'diy_air_purifier_perf_abilities_v1',
+  raycast: 'diy_air_purifier_perf_raycast_v1',
+  fov: 'diy_air_purifier_fov_v1',
+  mouseSens: 'diy_air_purifier_mouse_sens_v1',
+  lookInvertX: 'diy_air_purifier_look_invert_x_v1',
+  lookInvertY: 'diy_air_purifier_look_invert_y_v1',
+  muteSfx: 'diy_air_purifier_muted_v2',
+  muteMusic: 'diy_air_purifier_music_muted_v2',
+  inputDiag: 'diy_air_purifier_input_diag_visible_v1',
 };
 
 // Map of (storage key, default-on, swId, stateId) tuples we'll read on
@@ -754,24 +758,24 @@ const _STORAGE_KEYS = {
 // `getItem(...) !== '0'` recipe.
 const _BOOL_ROWS = [
   // FPS defaults to OFF (matches schema's initialOn:false).
-  { key: 'fps',          defOn: false, swId: 'fpPauseShowFps',         stateId: 'fpPauseShowFpsState' },
-  { key: 'windowSun',    defOn: true,  swId: 'fpPausePerfWindowSun',   stateId: 'fpPausePerfWindowSunState' },
-  { key: 'shadows',      defOn: true,  swId: 'fpPausePerfShadows',     stateId: 'fpPausePerfShadowsState' },
-  { key: 'fog',          defOn: true,  swId: 'fpPausePerfFog',         stateId: 'fpPausePerfFogState' },
-  { key: 'fpResolution', defOn: true,  swId: 'fpPausePerfResolution',  stateId: 'fpPausePerfResolutionState' },
-  { key: 'fpProfile',    defOn: true,  swId: 'fpPausePerfFpProfile',   stateId: 'fpPausePerfFpProfileState' },
-  { key: 'catAnim',      defOn: true,  swId: 'fpPausePerfCatAnim',     stateId: 'fpPausePerfCatAnimState' },
-  { key: 'coins',        defOn: true,  swId: 'fpPausePerfCoins',       stateId: 'fpPausePerfCoinsState' },
-  { key: 'purifier',     defOn: true,  swId: 'fpPausePerfPurifier',    stateId: 'fpPausePerfPurifierState' },
-  { key: 'abilities',    defOn: true,  swId: 'fpPausePerfAbilities',   stateId: 'fpPausePerfAbilitiesState' },
-  { key: 'raycast',      defOn: true,  swId: 'fpPausePerfRaycast',     stateId: 'fpPausePerfRaycastState' },
-  { key: 'inputDiag',    defOn: false, swId: 'fpPauseShowInputDiag',   stateId: 'fpPauseShowInputDiagState' },
-  { key: 'lookInvertX',  defOn: false, swId: 'fpPauseInvertLookX',     stateId: 'fpPauseInvertLookXState' },
-  { key: 'lookInvertY',  defOn: false, swId: 'fpPauseInvertLookY',     stateId: 'fpPauseInvertLookYState' },
+  { key: 'fps', defOn: false, swId: 'fpPauseShowFps', stateId: 'fpPauseShowFpsState' },
+  { key: 'windowSun', defOn: true, swId: 'fpPausePerfWindowSun', stateId: 'fpPausePerfWindowSunState' },
+  { key: 'shadows', defOn: true, swId: 'fpPausePerfShadows', stateId: 'fpPausePerfShadowsState' },
+  { key: 'fog', defOn: true, swId: 'fpPausePerfFog', stateId: 'fpPausePerfFogState' },
+  { key: 'fpResolution', defOn: true, swId: 'fpPausePerfResolution', stateId: 'fpPausePerfResolutionState' },
+  { key: 'fpProfile', defOn: true, swId: 'fpPausePerfFpProfile', stateId: 'fpPausePerfFpProfileState' },
+  { key: 'catAnim', defOn: true, swId: 'fpPausePerfCatAnim', stateId: 'fpPausePerfCatAnimState' },
+  { key: 'coins', defOn: true, swId: 'fpPausePerfCoins', stateId: 'fpPausePerfCoinsState' },
+  { key: 'purifier', defOn: true, swId: 'fpPausePerfPurifier', stateId: 'fpPausePerfPurifierState' },
+  { key: 'abilities', defOn: true, swId: 'fpPausePerfAbilities', stateId: 'fpPausePerfAbilitiesState' },
+  { key: 'raycast', defOn: true, swId: 'fpPausePerfRaycast', stateId: 'fpPausePerfRaycastState' },
+  { key: 'inputDiag', defOn: false, swId: 'fpPauseShowInputDiag', stateId: 'fpPauseShowInputDiagState' },
+  { key: 'lookInvertX', defOn: false, swId: 'fpPauseInvertLookX', stateId: 'fpPauseInvertLookXState' },
+  { key: 'lookInvertY', defOn: false, swId: 'fpPauseInvertLookY', stateId: 'fpPauseInvertLookYState' },
   // Audio toggles use mute storage ('1'=muted, else audible). The
   // visual switch is "on=audible" so we read with mutedReader.
-  { key: 'muteSfx',      defOn: true,  swId: 'fpPauseMuteSfx',         stateId: 'fpPauseMuteSfxState', mutedReader: true },
-  { key: 'muteMusic',    defOn: true,  swId: 'fpPauseMuteMusic',       stateId: 'fpPauseMuteMusicState', mutedReader: true },
+  { key: 'muteSfx', defOn: true, swId: 'fpPauseMuteSfx', stateId: 'fpPauseMuteSfxState', mutedReader: true },
+  { key: 'muteMusic', defOn: true, swId: 'fpPauseMuteMusic', stateId: 'fpPauseMuteMusicState', mutedReader: true },
 ];
 
 function _readBool(key, defOn) {
@@ -813,7 +817,7 @@ function _refreshPanelFromStorage(host) {
     if (row.mutedReader) {
       // Storage: '1'=muted, else audible. Switch shows audible state.
       let muted = false;
-      try { muted = localStorage.getItem(_STORAGE_KEYS[row.key]) === '1'; } catch {}
+      try { muted = localStorage.getItem(_STORAGE_KEYS[row.key]) === '1'; } catch { }
       on = !muted;
     } else {
       on = _readBool(row.key, row.defOn);
@@ -1097,7 +1101,7 @@ export function mountSettings(host) {
   host.addEventListener('keydown', (e) => {
     const row = e.target.closest && e.target.closest('.pause-toggle-row');
     if (row && e.target === row
-        && (e.key === ' ' || e.key === 'Enter' || e.key === 'Spacebar')) {
+      && (e.key === ' ' || e.key === 'Enter' || e.key === 'Spacebar')) {
       e.preventDefault();
       const slider = row.querySelector('.pause-range');
       if (slider) {
@@ -1135,7 +1139,7 @@ export function mountSettings(host) {
         // listener will pick it up on next external write; on /play
         // context the api always exists so this branch is a no-op
         // path for stale iframes.
-        try { localStorage.removeItem('gamepadMap'); } catch {}
+        try { localStorage.removeItem('gamepadMap'); } catch { }
       }
       _refreshRebindUi();
       return;
