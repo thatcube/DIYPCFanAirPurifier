@@ -26,13 +26,16 @@ The box is an open-sided rectangle — **4 plywood panels** (top, bottom, front,
 | Status | Item | Notes |
 |---|---|---|
 | ✅ Have | ADS-25-12 power supply (12V 2.1A) | Main power source |
-| ✅ Have | 6× Arctic P12 Pro ARGB fans | 3 front + 3 back |
-| ✅ Have | 5.5×2.1mm 1-to-2 DC power splitter cable | Splits PSU output — one feed for fans, one for step-down |
-| ✅ Have | 12V→5V 3A step-down module (USB-C output) | Powers ESP32 via USB-C; also provides 5V for ARGB LEDs |
+| ✅ Have | 6× Arctic P12 Pro ARGB fans | 3 front + 3 back, 12 ARGB LEDs each |
+| ✅ Have | 5.5×2.1mm 1-to-2 DC power splitter cable | Splits PSU output — one feed for fans, one for buck converter |
+| ✅ Have | 12V→5V 3A step-down module (USB-C output) | Powers ESP32 via USB-C |
+| ✅ Have | 12V→5V 5A bare-wire buck converter | Powers ARGB LEDs via 5V WAGO bus |
 | ✅ Have | ESP32-C6-N16 dev board | Controls fan speed (PWM) + ARGB via HomeKit/ESPHome |
-| ✅ Have| 5× Dupont F-F jumper wires 26AWG | For connecting ESP32 GPIO pins to fan PWM + ARGB data |
-| ❌ Need | 5V 3-pin ARGB extension cable (~$3–5) | See ARGB wiring section below |
-| ❌ Need (maybe) | 74AHCT125 level shifter chip (~$1–2) | Only needed if ARGB LEDs flicker — try without first |
+| ✅ Have | 5× Dupont F-F jumper wires 26AWG | For connecting ESP32 GPIO pins to level shifter |
+| ✅ Have | HW-209 8-channel bidirectional level shifter | Boosts 3.3V data to 5V for ARGB |
+| ✅ Have | 5V 3-pin ARGB extension cable (female-female) | Cut one end; connects ESP32 data/power to fan chain |
+| ✅ Have | 3-pin male-to-male gender changer | Adapts extension cable to fan's female ARGB input |
+| ✅ Have | WAGO 5-port lever connectors | 5V bus and GND bus distribution |
 
 ### Wood & hardware
 
@@ -208,42 +211,72 @@ Arctic P12 Pro has a 4-pin PWM connector (pin 3 hole is physically absent — th
 
 **PST daisy-chain means you only connect the above once.** All 6 fans share the same PWM signal and same 12V through the passthrough connectors.
 
-### Step F — ARGB wiring (once extension cable arrives)
-1. Cut a 5V 3-pin ARGB extension cable in half.
-2. Plug the male end into fan #1's ARGB input.
-3. On the cut end, identify the three wires: **5V / Data / GND**.
-4. Twist/tape splice:
-   - 5V → step-down's 5V output (piggyback on ESP32's 5V pin is fine for 72 LEDs at moderate brightness)
-   - GND → ESP32 GND (shared ground is critical)
-   - Data → ESP32 **GPIO5**
-5. If LEDs flicker or show wrong colors: insert the TXS0108E level shifter between GPIO5 and the Data wire.
+### Step F — ARGB wiring (PROVEN WORKING)
 
-## ESPHome config that works (fan speed only, ARGB to be added)
+**Equipment used:**
+- 5V 3-pin ARGB extension cable (both ends female) — cut one end to expose bare wires
+- 3-pin male-to-male gender changer adapter (came with extension cable) — connects extension cable to fan's female ARGB input
+- HW-209 8-channel bidirectional level shifter
+- 5V 5A bare-wire buck converter (separate from the USB-C step-down powering the ESP32)
+- 5-port WAGO lever connectors (for 5V bus and GND bus)
+
+**⚠️ CRITICAL: Extension cable wire colors are NON-STANDARD. Do NOT trust color assumptions. Always verify with a multimeter in continuity/diode mode before connecting.**
+
+Our extension cable mapped as follows (yours may differ — TEST FIRST):
+
+| Wire color | Connector pin position | Actual signal |
+|---|---|---|
+| **Black** | Pin 1 (first of the two adjacent pins) | **5V** |
+| **Red** | Pin 2 (second of the two adjacent pins) | **Data** |
+| **Blue** | Pin 4 (lone pin across the gap) | **GND** |
+
+**Wiring connections:**
+
+| Wire | Connects to |
+|---|---|
+| Black (5V) | 5V WAGO bus (fed by buck converter output +) |
+| Blue (GND) | GND WAGO bus (shared between buck converter −, ESP32 GND, level shifter GND) |
+| Red (Data) | Level shifter **B1** (high-voltage side output) |
+
+**Level shifter (HW-209) connections:**
+
+| HW-209 pin | Connects to |
+|---|---|
+| VCCA | ESP32 **3V3** pin |
+| VCCB | 5V WAGO bus |
+| GND | GND WAGO bus |
+| A1 | ESP32 **GPIO2** |
+| B1 | Extension cable **red** wire (Data) |
+
+**Power supply connections (buck converter):**
+- Input: 12V from DC splitter barrel B (same source as fans)
+- Output +: 5V WAGO bus
+- Output −: GND WAGO bus
+
+**Shared GND is critical.** ESP32 GND, buck converter GND, and extension cable GND must all connect to the same WAGO terminal. Without common ground, the data signal has no reference.
+
+**Pin assignments on ESP32-C6:**
+- **GPIO2** — ARGB data (to level shifter A1). Do NOT use GPIO5 — it's JTAG MTDI on ESP32-C6 and gets held by the debug peripheral.
+- **GPIO4** — Fan PWM speed signal
+- **GPIO8** — Onboard WS2812B status LED
+
+**Fan connection:** Extension cable female end → male-to-male gender changer → fan's **female** ARGB connector (this is the INPUT side). The male connector on the fan is the OUTPUT for daisy-chaining to the next fan.
+
+**Daisy-chaining all 6 fans:** Fan 1 male OUT → Fan 2 female IN → Fan 2 male OUT → Fan 3 female IN → etc. Only Fan 1 needs the extension cable from the ESP32. Power (5V + GND) passes through all connectors via the daisy-chain. Change `num_leds` in the YAML to 72 (12 LEDs × 6 fans).
+
+## ESPHome config that works (fan speed + ARGB — FULLY WORKING)
 
 File: [air-purifier.yaml](air-purifier.yaml)
 
-Key sections:
+**Network:** WiFi "The Moores", static IP 192.168.68.238, OTA updates enabled.
 
-```yaml
-esp32:
-  board: esp32-c6-devkitc-1
-  framework:
-    type: esp-idf
-
-# 25 kHz PWM on GPIO4 for PC fan speed control
-output:
-  - platform: ledc
-    id: fan_pwm_output
-    pin: GPIO4
-    frequency: 25000Hz
-
-fan:
-  - platform: speed
-    id: purifier_fan
-    name: "Purifier Fan"
-    output: fan_pwm_output
-    speed_count: 100
-```
+**Key details:**
+- `rmt_symbols: 48` required on BOTH LED strips (ESP32-C6 only has 192 total RMT symbols)
+- `pin: GPIO2` for ARGB data (NOT GPIO5 — JTAG conflict)
+- `pin: GPIO4` for fan PWM at 25kHz
+- `num_leds: 12` for single fan testing, change to `72` for all 6 fans
+- `chipset: WS2812` + `rgb_order: GRB` for Arctic P12 Pro ARGB fans
+- `on_boot` forces fan_argb to white at 100% on startup (useful for testing)
 
 Flashing (OTA over WiFi, no USB cable needed after first flash):
 
@@ -300,15 +333,18 @@ Web UI: **http://air-purifier.local**
 3. **Pin 3 missing on P12 Pro PWM connector.** Totally normal. The lone 4th pin on the other side is the PWM signal.
 4. **Mismatched wire gauges when splicing.** Wrap the thin wire around the thick one, not the other way around. Fold the thick wire's tip back over the wrap to lock it.
 5. **Polarity is not guaranteed by wire color.** Always verify with a multimeter before connecting to the step-down.
-6. **BSS138-based level shifters are bad for WS2812 ARGB data.** They work for I2C but cause flicker on LED strips. Use TXS0108E or 74AHCT125 instead.
+6. **BSS138-based level shifters are bad for WS2812 ARGB data.** They work for I2C but cause flicker on LED strips. Use HW-209 (TXB0108 / TXS0108E based) or 74AHCT125 instead.
 7. **mDNS discovery on `air-purifier.local` is the single best debugging tool.** If that resolves, 95% of the wiring is correct.
+8. **ARGB extension cable wire colors are LIES.** Our cable had Black=5V, Red=Data, Blue=GND — the exact opposite of what you'd assume. ALWAYS continuity-test from bare wire to connector pin before hooking anything up. This cost us hours of debugging.
+9. **GPIO5 on ESP32-C6 is JTAG (MTDI).** It appears to work in software but doesn't reliably output data. Use GPIO2 instead for ARGB data.
+10. **ESP32-C6 RMT memory is limited to 192 symbols (4 blocks × 48).** Two LED strips need `rmt_symbols: 48` each in ESPHome config, otherwise the second strip fails to allocate. The encoder callback in ESP-IDF 5.3+ streams data in chunks, so 48 symbols works for any LED count.
+11. **Level shifter is REQUIRED.** WS2812B powered at 5V needs data HIGH ≥ 3.5V. ESP32 GPIO outputs 3.3V which is below threshold. The HW-209 level shifter (VCCA=3.3V, VCCB=5V) boosts the signal properly.
+12. **Fan ARGB connectors have direction.** Female = INPUT (receives data). Male = OUTPUT (passes to next fan). If you're on the male side, LEDs won't respond.
 
-## Shopping list for the next build (AliExpress)
+## Shopping list for the next build (spares / nice-to-haves)
 
-Add these to your next order to have everything ready:
-
-- [ ] 5V 3-pin ARGB extension cable (~$3)
-- [ ] 8-channel TXS0108E level shifter module (~$3 for 2-pack)
-- [ ] USB-C power meter dongle (optional, ~$3–5)
-- [ ] Extra Dupont jumper kit (M-F and F-F, 20cm)
+- [ ] Extra ARGB extension cables (buy 2 — one always gets sacrificed to testing)
+- [ ] Extra 3-pin male-to-male gender changers
 - [ ] Heat-shrink tubing assortment (nicer than electrical tape)
+- [ ] Extra WAGO 5-port lever connectors
+- [ ] Spare HW-209 level shifter module

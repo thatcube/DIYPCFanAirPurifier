@@ -12,6 +12,7 @@ logger:
 
 # Enable Home Assistant API
 api:
+  reboot_timeout: 0s
 
 # Enable OTA updates
 ota:
@@ -42,10 +43,12 @@ light:
   - platform: esp32_rmt_led_strip
     id: onboard_led
     name: "Onboard LED"
+    restore_mode: RESTORE_DEFAULT_OFF
     pin: GPIO8
     num_leds: 1
     rgb_order: GRB
     chipset: WS2812
+    rmt_symbols: 48
     default_transition_length: 0.5s
     effects:
       - pulse:
@@ -57,40 +60,148 @@ light:
           transition_length: 2s
           update_interval: 3s
 
-  # ARGB chain for the 6 Arctic P12 Pro fans
-  # 8 LEDs per fan × 6 fans = 48 addressable LEDs
-  # Data goes through TXS0108E level shifter (GPIO5 → A0, B0 → fan #1 Data)
-  # 5V piggybacks off the ESP32's 5V pin — capped brightness to stay under ~2A
+  # ARGB chain for the Arctic P12 Pro fans
+  # 12 LEDs per fan × 6 fans = 72 LEDs total
+  # Data goes through HW-209 level shifter (GPIO2 → A1, B1 → fan #1 Data)
+  # 5V comes from buck converter via 5V Wago
   - platform: esp32_rmt_led_strip
     id: fan_argb
     name: "Fan ARGB"
-    pin: GPIO5
-    num_leds: 48
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin: GPIO2
+    num_leds: 72
     rgb_order: GRB
     chipset: WS2812
+    rmt_symbols: 48
     default_transition_length: 0.5s
-    # Cap max brightness to ~80% to keep current draw safe when powered via ESP32 5V pin
-    gamma_correct: 2.8
+    gamma_correct: 1.5
     effects:
+      # --- Subtle / tasteful ---
+      - pulse:
+          name: "Breathe"
+          transition_length: 3s
+          update_interval: 3s
       - addressable_rainbow:
-          name: "Rainbow"
+          name: "Slow Rainbow"
+          speed: 5
+          width: 72
       - addressable_color_wipe:
-          name: "Color Wipe"
+          name: "Warm Wave"
+          colors:
+            - red: 100%
+              green: 60%
+              blue: 10%
+              num_leds: 12
+            - red: 100%
+              green: 40%
+              blue: 5%
+              num_leds: 12
+          add_led_interval: 80ms
+          reverse: false
+      - addressable_color_wipe:
+          name: "Cool Wave"
+          colors:
+            - red: 20%
+              green: 50%
+              blue: 100%
+              num_leds: 12
+            - red: 10%
+              green: 30%
+              blue: 80%
+              num_leds: 12
+          add_led_interval: 80ms
+          reverse: false
       - addressable_scan:
-          name: "Scan"
+          name: "Slow Scan"
+          move_interval: 40ms
+          scan_width: 6
       - addressable_twinkle:
-          name: "Twinkle"
+          name: "Gentle Twinkle"
+          twinkle_probability: 3%
+          progress_interval: 16ms
+      - addressable_lambda:
+          name: "Candlelight"
+          update_interval: 50ms
+          lambda: |-
+            // Warm flickering like a candle — each LED gets slight random variation
+            for (int i = 0; i < it.size(); i++) {
+              uint8_t flicker = 200 + (rand() % 55);
+              it[i] = Color(flicker, (uint8_t)(flicker * 0.4f), (uint8_t)(flicker * 0.05f));
+            }
+      - addressable_lambda:
+          name: "Ocean"
+          update_interval: 60ms
+          lambda: |-
+            // Gentle undulating blue-teal like light through water
+            static uint16_t offset = 0;
+            offset++;
+            for (int i = 0; i < it.size(); i++) {
+              float angle = (i * 0.3f + offset * 0.04f);
+              uint8_t wave = (uint8_t)(127.0f * (1.0f + sinf(angle)));
+              uint8_t r = (uint8_t)(wave * 0.02f);
+              uint8_t g = (uint8_t)(wave * 0.35f);
+              uint8_t b = (uint8_t)(wave * 0.6f + 80);
+              it[i] = Color(r, g, b);
+            }
+      - addressable_lambda:
+          name: "Sunrise"
+          update_interval: 100ms
+          lambda: |-
+            // Slow gradient from deep amber to warm white, rolls across fans
+            static uint16_t phase = 0;
+            phase++;
+            for (int i = 0; i < it.size(); i++) {
+              uint8_t pos = (uint8_t)((i * 3 + phase) % 255);
+              uint8_t r = 255;
+              uint8_t g = pos < 128 ? (uint8_t)(pos * 0.7f) : (uint8_t)(90 + pos * 0.3f);
+              uint8_t b = pos < 85 ? 0 : (uint8_t)((pos - 85) * 0.3f);
+              it[i] = Color(r, g, b);
+            }
+      - addressable_lambda:
+          name: "Northern Lights"
+          update_interval: 50ms
+          lambda: |-
+            // Slow morphing greens and purples like aurora borealis
+            static uint16_t t = 0;
+            t++;
+            for (int i = 0; i < it.size(); i++) {
+              float wave1 = 127.5f * (1.0f + sinf(i * 0.5f + t * 0.03f));
+              float wave2 = 127.5f * (1.0f + sinf(i * 0.3f + t * 0.06f));
+              uint8_t r = (uint8_t)(wave2 * 0.3f);
+              uint8_t g = (uint8_t)(wave1 * 0.7f);
+              uint8_t b = (uint8_t)(wave2 * 0.5f + 40);
+              it[i] = Color(r, g, b);
+            }
+      - addressable_lambda:
+          name: "Ember"
+          update_interval: 70ms
+          lambda: |-
+            // Deep red/orange glow with subtle pulsing per-LED
+            static uint16_t t = 0;
+            t++;
+            for (int i = 0; i < it.size(); i++) {
+              float pulse = 127.5f * (1.0f + sinf(i * 0.9f + t * 0.05f));
+              uint8_t r = (uint8_t)(180 + pulse * 0.29f);
+              uint8_t g = (uint8_t)(pulse * 0.2f);
+              it[i] = Color(r, g, 0);
+            }
+      # --- Fun / party (less frequent use) ---
+      - addressable_rainbow:
+          name: "Fast Rainbow"
+          speed: 30
+          width: 36
       - addressable_fireworks:
           name: "Fireworks"
-      - pulse:
-          name: "Pulse"
+          spark_probability: 10%
+          use_random_color: true
+          fade_out_rate: 120
 
-# 25 kHz PWM output on GPIO4 for the fan speed signal (PC fans expect ~25 kHz)
+# 32 kHz PWM output on GPIO4 for the fan speed signal (bumped from 25kHz to reduce coil whine)
 output:
   - platform: ledc
     id: fan_pwm_output
     pin: GPIO4
-    frequency: 25000Hz
+    frequency: 32000Hz
 
 # Fan control exposed to Home Assistant / web UI with speed slider
 fan:
@@ -99,3 +210,4 @@ fan:
     name: "Purifier Fan"
     output: fan_pwm_output
     speed_count: 100
+    restore_mode: RESTORE_DEFAULT_OFF
