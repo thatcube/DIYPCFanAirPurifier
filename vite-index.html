@@ -230,6 +230,21 @@
       <span id="fpInputDiag" class="run-timer-state" hidden></span>
       <div id="fpShareRow" style="display:none"><button id="fpShareBtn" type="button"><i class="ph ph-copy"></i> Copy
           result</button></div>
+      <!-- House wayfinding indicator: blurs/fades in only once the player
+           wanders far enough that the room is out of sight, pointing the
+           way back home. The arrow child is rotated each frame toward the
+           house; the pill itself fades via opacity (set from main.js). -->
+      <div id="homeIndicator" aria-hidden="true">
+        <span class="home-ind__compass">
+          <svg class="home-ind__arrow" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3 L19 20 L12 16 L5 20 Z" />
+          </svg>
+        </span>
+        <span class="home-ind__text">
+          <span class="home-ind__label">House</span>
+          <span id="homeIndicatorDist" class="home-ind__dist">0 ft</span>
+        </span>
+      </div>
     </div>
     <div id="fpCrosshair"></div>
     <div id="fpCrosshairTooltip"></div>
@@ -252,6 +267,39 @@
       </div>
       <div class="fp-charge-track">
         <div id="fpChargeFill"></div>
+      </div>
+    </div>
+
+    <!-- On-screen ability control hints. Fireball pins to the left edge,
+         skate to the right edge of a max-width row so both stay readable
+         (and close to the action) on ultrawide displays. Each bubble fades
+         in only once its ability is unlocked. -->
+    <div id="fpControlHints" class="fp-control-hints" aria-hidden="true">
+      <div class="fp-ctrl-hint fp-ctrl-hint--fire" id="fpFireHint">
+        <i class="ph-fill ph-fire fp-ctrl-hint__glyph fp-ctrl-hint__glyph--fire" aria-hidden="true"></i>
+        <span class="fp-ctrl-item">
+          <span class="fp-ctrl-item__key"><kbd data-action="fireball" data-kb-key="F">F</kbd></span>
+          <span class="fp-ctrl-item__label">Fireball</span>
+        </span>
+      </div>
+      <div class="fp-ctrl-hint fp-ctrl-hint--skate" id="fpSkateHint">
+        <span class="fp-ctrl-hint__glyph fp-ctrl-hint__glyph--skate" aria-hidden="true">🛹</span>
+        <span class="fp-ctrl-item">
+          <span class="fp-ctrl-item__key"><kbd data-action="skateToggle" data-kb-key="K">K</kbd></span>
+          <span class="fp-ctrl-item__label">Ride</span>
+        </span>
+        <span class="fp-ctrl-item">
+          <span class="fp-ctrl-item__key"><kbd data-action="kickflip" data-kb-key="Q">Q</kbd></span>
+          <span class="fp-ctrl-item__label">Kickflip</span>
+        </span>
+        <span class="fp-ctrl-item">
+          <span class="fp-ctrl-item__key"><kbd data-action="manual" data-kb-key="E">E</kbd></span>
+          <span class="fp-ctrl-item__label">Manual</span>
+        </span>
+        <span class="fp-ctrl-item">
+          <span class="fp-ctrl-item__key"><kbd data-action="spin" data-kb-key="X">X</kbd></span>
+          <span class="fp-ctrl-item__label">Spin</span>
+        </span>
       </div>
     </div>
 

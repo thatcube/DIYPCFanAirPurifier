@@ -1965,6 +1965,26 @@ const _monitorAnchor = new THREE.Vector3();
 const _elFps = document.getElementById('fpsInline');
 const _elPauseOv = document.getElementById('fpPauseOverlay');
 
+// ── Home indicator ────────────────────────────────────────────────
+// Subtle compass pill that points back toward the room when the house
+// is out of sight (off-screen or beyond render range), so the player
+// can find their way home after wandering far. Hidden whenever the
+// house is plainly within view or the player is close to it.
+const _HOME_X = 15;
+const _HOME_Y = 16;
+const _HOME_Z = -14.5;
+const _HOME_MIN_DIST = 660; // 55 ft (~12 world units/ft) — always hidden when closer than this
+const _HOME_VISIBLE_FAR = 430; // beyond this the house is too far to make out, so show the pill
+const _homeProjVec = new THREE.Vector3();
+const _elHomeInd = document.getElementById('homeIndicator');
+const _elHomeArrow = _elHomeInd ? _elHomeInd.querySelector('.home-ind__arrow') : null;
+const _elHomeDist = document.getElementById('homeIndicatorDist');
+let _lastHomeOpacity = -1;
+let _lastHomeRotDeg = 9999;
+let _lastHomeDistText = '';
+let _homeIndVisible = false;
+let _homeWantShow = false;
+
 function animate(ts) {
   requestAnimationFrame(animate);
 
@@ -2070,6 +2090,58 @@ function animate(ts) {
       // Open finish screen immediately and let player edit name inline
       // before saving this run.
       leaderboard.openFinishDialogForRun(finalTime, coins.coinTotal, coins.coinSecretScore);
+    }
+  }
+
+  // Home indicator: show a compass pill pointing back to the room when
+  // the house is out of sight, hide it while it's plainly on-screen or
+  // the player is near home.
+  if (_elHomeInd) {
+    let target = 0;
+    let dx = 0, dz = 0, dist = 0;
+    if (gameFp.fpMode) {
+      dx = _HOME_X - gameFp.fpPos.x;
+      dz = _HOME_Z - gameFp.fpPos.z;
+      dist = Math.hypot(dx, dz);
+      if (dist > _HOME_MIN_DIST) {
+        _homeProjVec.set(_HOME_X, _HOME_Y, _HOME_Z).project(camera);
+        const inFront = _homeProjVec.z < 1;
+        const ax = Math.abs(_homeProjVec.x), ay = Math.abs(_homeProjVec.y);
+        const tooFar = dist > _HOME_VISIBLE_FAR;
+        const clearlyInSight = inFront && ax < 0.9 && ay < 0.9 && !tooFar;
+        const clearlyOut = !inFront || ax > 1.15 || ay > 1.15 || tooFar;
+        if (clearlyInSight) _homeWantShow = false;
+        else if (clearlyOut) _homeWantShow = true;
+        if (_homeWantShow) target = 1;
+      } else {
+        _homeWantShow = false;
+      }
+    }
+    if (target > 0) {
+      const forwardAngle = Math.atan2(-Math.sin(gameFp.fpYaw), -Math.cos(gameFp.fpYaw));
+      const homeAngle = Math.atan2(dx, dz);
+      const rotDeg = Math.round((forwardAngle - homeAngle) * 180 / Math.PI);
+      if (_elHomeArrow && rotDeg !== _lastHomeRotDeg) {
+        _elHomeArrow.style.transform = `rotate(${rotDeg}deg)`;
+        _lastHomeRotDeg = rotDeg;
+      }
+      if (_elHomeDist) {
+        const feet = Math.round(dist / 12 / 5) * 5;
+        const distText = `${feet} ft`;
+        if (distText !== _lastHomeDistText) {
+          _elHomeDist.textContent = distText;
+          _lastHomeDistText = distText;
+        }
+      }
+    }
+    if (target !== _lastHomeOpacity) {
+      _elHomeInd.style.opacity = String(target);
+      _lastHomeOpacity = target;
+      const shouldShow = target > 0;
+      if (shouldShow !== _homeIndVisible) {
+        _elHomeInd.classList.toggle('is-visible', shouldShow);
+        _homeIndVisible = shouldShow;
+      }
     }
   }
 

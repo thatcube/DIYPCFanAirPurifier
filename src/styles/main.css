@@ -809,6 +809,99 @@ input[type=range]::-moz-range-thumb {
   color: rgba(207, 236, 255, 0.85);
 }
 
+/* ─── House wayfinding indicator ──────────────────────────────────────
+   A subtle glass pill that drifts up from the bottom-center of the
+   screen once the player strays far from the room. Opacity is driven
+   per-frame from main.js (0 = hidden, 1 = fully out). When hidden it
+   also blurs + sinks a few pixels so the reveal feels like it surfaces
+   out of focus rather than hard-popping in. */
+#homeIndicator {
+  position: fixed;
+  left: 50%;
+  top: 112px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 14px 8px 9px;
+  background-color: var(--glass);
+  background-image: var(--glass-specular);
+  border: 1px solid rgba(170, 220, 255, 0.26);
+  border-radius: 999px;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  color: var(--text);
+  font-family: system-ui, -apple-system, sans-serif;
+  pointer-events: none;
+  z-index: 9998;
+  opacity: 0;
+  transform: translate(-50%, -8px);
+  filter: blur(6px);
+  transition: opacity 0.4s var(--ease-out-expo),
+    transform 0.4s var(--ease-out-expo),
+    filter 0.4s var(--ease-out-expo);
+}
+
+/* main.js adds this class once opacity crosses the visible threshold;
+   the opacity value itself is still written inline for the smooth ramp. */
+#homeIndicator.is-visible {
+  transform: translate(-50%, 0);
+  filter: blur(0);
+}
+
+.home-ind__compass {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  border: 1px solid rgba(170, 220, 255, 0.3);
+  flex-shrink: 0;
+}
+
+.home-ind__arrow {
+  width: 15px;
+  height: 15px;
+  display: block;
+  fill: var(--accent);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  /* Rotation is set inline per-frame; keep it crisp with no transition
+     so the needle tracks the player's turn 1:1 without spin-on-wrap. */
+  transform: rotate(0deg);
+  transform-origin: 50% 50%;
+}
+
+.home-ind__text {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.home-ind__label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.home-ind__dist {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #homeIndicator {
+    transition: opacity 0.4s var(--ease-out-expo);
+    transform: translate(-50%, 0);
+    filter: none;
+  }
+}
+
 .run-pill__icon--gold {
   color: #ffd700;
   font-size: 20px;
@@ -1510,6 +1603,118 @@ input[type=range]::-moz-range-thumb {
 
 body.play-mode #fpChargeBar {
   display: block;
+}
+
+/* ── On-screen ability control hints (left = fireball, right = skate) ──
+   A full-width row capped to a max width so the two glass bubbles hug the
+   play area. The cap is wide enough that a 27" 1440p panel (or a laptop)
+   still uses the full width edge-to-edge; only true ultrawides get reined
+   in so the hints don't drift miles into the periphery. Each bubble fades
+   in only once its ability is unlocked. */
+.fp-control-hints {
+  display: none;
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(calc(100vw - 32px), 2560px);
+  justify-content: space-between;
+  align-items: flex-end;
+  pointer-events: none;
+  z-index: 315;
+}
+
+body.play-mode .fp-control-hints {
+  display: flex;
+}
+
+.fp-ctrl-hint {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  background-color: var(--glass);
+  background-image: var(--glass-specular);
+  border: 1px solid rgba(170, 220, 255, 0.26);
+  border-radius: 18px;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  line-height: 1;
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 0.45s var(--ease-out-expo),
+    transform 0.45s var(--ease-out-expo);
+}
+
+.fp-ctrl-hint.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.fp-ctrl-hint__glyph {
+  flex: none;
+}
+
+.fp-ctrl-hint__glyph--fire {
+  font-size: 18px;
+  color: #ffb27a;
+  filter: drop-shadow(0 0 6px rgba(255, 150, 80, 0.55));
+}
+
+.fp-ctrl-hint__glyph--skate {
+  font-size: 17px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+}
+
+/* Each control = a compact column: key chip stacked over its label. */
+.fp-ctrl-item {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.fp-ctrl-item__label {
+  font-size: 10px;
+  font-weight: var(--weight-medium);
+  color: rgba(225, 244, 255, 0.92);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.fp-ctrl-item__key kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 7px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  color: rgba(232, 247, 255, 0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fp-ctrl-hint {
+    transition: opacity 0.2s linear;
+    transform: none;
+  }
+  .fp-ctrl-hint.visible {
+    transform: none;
+  }
 }
 
 .fp-charge-head {
