@@ -1387,6 +1387,7 @@ function _checkFanOffUnlock() {
     coins.spawnSecretFansOffCoin();
   }
   _updateFireballBtnVisibility();
+  _syncControlHints();
 }
 
 // Poll for the trigger — fans are toggled by clicking individual rotors
@@ -1402,6 +1403,17 @@ function _updateFireballBtnVisibility() {
   if (hint && fireball.isUnlocked()) {
     hint.classList.add('visible');
   }
+}
+
+// ── On-screen ability control hints (fireball left / skate right) ──
+// Each glass bubble fades in only once its ability is unlocked. Kept in
+// sync from the 500ms poll above so the hints appear the moment an
+// ability is unlocked mid-run.
+function _syncControlHints() {
+  const fire = document.getElementById('fpFireHint');
+  const skate = document.getElementById('fpSkateHint');
+  if (fire) fire.classList.toggle('visible', fireball.isUnlocked());
+  if (skate) skate.classList.toggle('visible', gameFp.isSkateboardFound());
 }
 
 // F-key behavior depends on Super Saiyan state:
