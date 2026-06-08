@@ -1414,6 +1414,18 @@ function _syncControlHints() {
   const skate = document.getElementById('fpSkateHint');
   if (fire) fire.classList.toggle('visible', fireball.isUnlocked());
   if (skate) skate.classList.toggle('visible', gameFp.isSkateboardFound());
+
+  // Swap label + icon when Super Saiyan is active
+  if (fire) {
+    const ss = gameFp.isSuperSaiyanActive();
+    const label = fire.querySelector('.fp-ctrl-item__label');
+    const glyph = fire.querySelector('.fp-ctrl-hint__glyph');
+    if (label) label.textContent = ss ? 'Kamehameha' : 'Fireball';
+    if (glyph) {
+      glyph.classList.toggle('ph-fire', !ss);
+      glyph.classList.toggle('ph-lightning', ss);
+    }
+  }
 }
 
 // F-key behavior depends on Super Saiyan state:
