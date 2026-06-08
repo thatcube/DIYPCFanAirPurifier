@@ -1270,6 +1270,7 @@
           loadedRows = [];
           hasMore = false;
           autoLoadCount = 0;
+          updateShowMore();
           return;
         }
 
@@ -1292,6 +1293,7 @@
         loadedRows = rows.slice();
         hasMore = hasMoreFromServer;
         autoLoadCount = 0;
+        updateShowMore();
         triggerScrollObserver();
       }
 
