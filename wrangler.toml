@@ -1,4 +1,4 @@
-name = "diy-air-purifier-leaderboard"
+name = "airpurifier"
 main = "workers/leaderboard-worker.js"
 compatibility_date = "2026-04-16"
 workers_dev = true
