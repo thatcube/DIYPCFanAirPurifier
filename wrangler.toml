@@ -5,7 +5,9 @@ workers_dev = true
 
 [vars]
 LB_MAX = "25"
-LB_PER_PLAYER = "25"
+# No per-player cap — every attempt a player records is kept and shown,
+# bounded only by the global per-mode ceiling (LB_HARD_MAX = 1000).
+LB_PER_PLAYER = "1000"
 # Must match the number of non-secret, non-speed-mode coins spawned by
 # src/modules/coins.js (currently 22: 21 inline addCoin calls + the
 # nightstand-drawer coin pushed manually in spawnCoins). If you add or

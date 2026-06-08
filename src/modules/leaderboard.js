@@ -16,7 +16,9 @@ import { CAT_COLOR_PRESETS, CAT_MODEL_PRESETS, TOTAL_SECRETS } from './constants
 // ── Config ──────────────────────────────────────────────────────────
 
 const LB_MAX = 25;
-const LB_PER_PLAYER = 25;
+// No per-player cap: keep every run a player records (bounded only by
+// the LB_MAX total board size).
+const LB_PER_PLAYER = Infinity;
 const LB_STORE_KEY = 'diy_air_purifier_leaderboard_v1';
 const LB_PLAYER_KEY = 'diy_air_purifier_player_name_v1';
 const LB_PLAYER_ID_KEY = 'diy_air_purifier_player_id_v1';
@@ -797,9 +799,10 @@ async function _renameLatestEntry(entryId, nextName, baseData) {
   return _renameLatestEntryLocal(entryId, nextName, baseData);
 }
 
-// ── Filter: keep only top N entries per player ────────────────────
-// List must already be sorted by time. Returns indices to show.
-const MAX_PER_PLAYER = 5;
+// ── Visible indices ───────────────────────────────────────────────
+// No per-player display cap: every run a player records is shown.
+// (Set MAX_PER_PLAYER to a finite number to re-enable the cap.)
+const MAX_PER_PLAYER = Infinity;
 function _visibleIndices(board) {
   const counts = {};
   const vis = [];
@@ -1767,14 +1770,47 @@ function _renderFinishDialog() {
         </li>`;
       }
 
-      const visSet = new Set(_visibleIndices(finishBoard));
+      // Always surface the just-finished run so the player can see and
+      // rename it, even when it lands too far down to make the board. The
+      // client keeps only the top LB_MAX rows (_normalizeLeaderboard), so
+      // a slow run can fall off the local page entirely. We work on a
+      // shallow copy so the shared per-mode board isn't mutated.
+      const displayBoard = finishBoard.slice();
+      let ownIdx = ownId ? displayBoard.findIndex((r) => String(r.id || '') === ownId) : -1;
+      if (!pending && ownId && ownIdx < 0) {
+        // The saved entry isn't in the kept page (ranked below the top
+        // slice). Splice it in at its time-sorted position so the player
+        // still sees their row instead of it vanishing entirely.
+        const ownEntry = {
+          id: ownId,
+          name: _sanitizePlayerName(data.name || _readPlayerName() || _playerName || 'Player') || 'Player',
+          timeMs: Math.floor(Number(data.timeMs) || 0),
+          at: Date.now(),
+          catColor: sanitizeColorKey(data.catColor || catColorKey),
+          catHair: sanitizeHairKey(data.catHair || catHairKey),
+          catModel: sanitizeModelKey(data.catModel || catModelKey),
+          secretCoins: Math.max(0, Math.floor(Number(data.secretCoins) || 0)),
+          playerId: _playerId,
+          mode: finishMode
+        };
+        ownIdx = displayBoard.length;
+        for (let i = 0; i < displayBoard.length; i++) {
+          if (ownEntry.timeMs < displayBoard[i].timeMs) { ownIdx = i; break; }
+        }
+        displayBoard.splice(ownIdx, 0, ownEntry);
+      }
+
+      const visSet = new Set(_visibleIndices(displayBoard));
+      // Defensive: keep the player's own current run visible no matter
+      // what _visibleIndices decides.
+      if (ownIdx >= 0) visSet.add(ownIdx);
       let displayRank = 0;
 
-      for (let i = 0; i < finishBoard.length; i++) {
+      for (let i = 0; i < displayBoard.length; i++) {
         if (pending && i === pendingInsertAt) { displayRank++; rows.push(pendingHtml); }
         if (!visSet.has(i)) continue;
         displayRank++;
-        const r = finishBoard[i];
+        const r = displayBoard[i];
         const isHistory = !!r.playerId && r.playerId === _playerId;
         const isCurrent = !!ownId && r.id === ownId;
         const rowClass = `${isHistory ? 'own-history ' : ''}${isCurrent ? 'own-current' : ''}`.trim();
@@ -1791,7 +1827,7 @@ function _renderFinishDialog() {
           ${editable ? '<span class="finishDialogRowSaveHint" data-finish-row-hint></span>' : ''}
         </li>`);
       }
-      if (pending && pendingInsertAt >= finishBoard.length) rows.push(pendingHtml);
+      if (pending && pendingInsertAt >= displayBoard.length) rows.push(pendingHtml);
     } else {
       rows.push('<li style="opacity:0.62;padding:8px 10px">No runs yet.</li>');
     }
