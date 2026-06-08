@@ -62,10 +62,9 @@ const DEFAULTS = {
   // nobody scrolls to anyway, so we drop the slowest entries.
   LB_HARD_MAX: 1000,
   // Per-player cap on both the displayed board AND DB retention.
-  // Effectively disabled (matches LB_HARD_MAX) so every attempt a
-  // player records is kept and shown, bounded only by the global
-  // per-mode ceiling. Override via the LB_PER_PLAYER env var.
-  LB_PER_PLAYER: 1000,
+  // Each player's best N runs per mode are kept; slower extras are
+  // pruned so the board stays varied. Override via LB_PER_PLAYER env.
+  LB_PER_PLAYER: 5,
   RUN_TTL_MS: 15 * 60 * 1000,
   MIN_RUN_MS: 12000,
   MAX_RUN_MS: 20 * 60 * 1000,

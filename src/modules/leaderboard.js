@@ -16,9 +16,7 @@ import { CAT_COLOR_PRESETS, CAT_MODEL_PRESETS, TOTAL_SECRETS } from './constants
 // ── Config ──────────────────────────────────────────────────────────
 
 const LB_MAX = 25;
-// No per-player cap: keep every run a player records (bounded only by
-// the LB_MAX total board size).
-const LB_PER_PLAYER = Infinity;
+const LB_PER_PLAYER = 5;
 const LB_STORE_KEY = 'diy_air_purifier_leaderboard_v1';
 const LB_PLAYER_KEY = 'diy_air_purifier_player_name_v1';
 const LB_PLAYER_ID_KEY = 'diy_air_purifier_player_id_v1';
@@ -799,10 +797,9 @@ async function _renameLatestEntry(entryId, nextName, baseData) {
   return _renameLatestEntryLocal(entryId, nextName, baseData);
 }
 
-// ── Visible indices ───────────────────────────────────────────────
-// No per-player display cap: every run a player records is shown.
-// (Set MAX_PER_PLAYER to a finite number to re-enable the cap.)
-const MAX_PER_PLAYER = Infinity;
+// ── Filter: keep only top N entries per player ────────────────────
+// List must already be sorted by time. Returns indices to show.
+const MAX_PER_PLAYER = 5;
 function _visibleIndices(board) {
   const counts = {};
   const vis = [];
